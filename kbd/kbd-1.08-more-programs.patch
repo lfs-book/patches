@@ -1,3 +1,8 @@
+Submitted By: LFS BOOK <lfs-book@linuxfromscratch.org>
+Date: 2003-10-05
+Initial Package Version: 1.08
+Origin: LFS Book
+Description: Install additional programs included in kbd package.
 diff -Naur kbd-1.08/src/Makefile.in kbd-1.08-patched/src/Makefile.in
 --- kbd-1.08/src/Makefile.in	Sun Oct 13 03:34:10 2002
 +++ kbd-1.08-patched/src/Makefile.in	Tue Oct 15 17:24:22 2002
