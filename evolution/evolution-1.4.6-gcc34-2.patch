@@ -1,9 +1,9 @@
-Submitted By: Jeremy Utley (jeremy@linuxfromscratch.org)
-Date: 2004-05-20
+Submitted By:            Randy McMurchy (randy_at_linuxfromscratch_dot_org)
+Date:                    2004-09-10
 Initial Package Version: 1.4.6
-Upstream Status: Not Submitted
-Origin: Self Created
-Description: Fixes syntax issues with GCC 3.4
+Upstream Status:         Not Submitted
+Origin:                  Jeremy Utley and Randy McMurchy
+Description:             Fixes syntax issues with GCC 3.4
 
 diff -ur evolution-1.4.6/calendar/cal-client/cal-client.h 
 evolution-1.4.6.jbit/calendar/cal-client/cal-client.h
@@ -63,3 +63,39 @@ diff -ur evolution-1.4.6/mail/message-browser.c evolution-1.4.6.jbit/mail/messag
  	}
  	
  	return FALSE;
+
+diff -Naur evolution-1.4.6-orig/addressbook/conduit/address-conduit.c evolution-1.4.6/addressbook/conduit/address-conduit.c
+--- evolution-1.4.6-orig/addressbook/conduit/address-conduit.c	2003-08-26 17:45:53.000000000 +0000
++++ evolution-1.4.6/addressbook/conduit/address-conduit.c	2004-09-11 02:01:04.213022248 +0000
+@@ -610,6 +610,7 @@
+ 	case E_CARD_SIMPLE_FIELD_EMAIL_2:
+ 		return E_CARD_SIMPLE_FIELD_EMAIL_3;
+ 	default:
++		break;
+ 	}
+ 
+ 	return E_CARD_SIMPLE_FIELD_LAST;
+@@ -625,6 +626,7 @@
+ 	case E_CARD_SIMPLE_FIELD_PHONE_HOME:
+ 		return E_CARD_SIMPLE_FIELD_PHONE_HOME_2;
+ 	default:
++		break;
+ 	}
+ 
+ 	return E_CARD_SIMPLE_FIELD_LAST;
+@@ -640,6 +642,7 @@
+ 	case E_CARD_SIMPLE_FIELD_PHONE_BUSINESS:
+ 		return E_CARD_SIMPLE_FIELD_PHONE_BUSINESS_2;
+ 	default:
++		break;
+ 	}
+ 
+ 	return E_CARD_SIMPLE_FIELD_LAST;
+@@ -657,6 +660,7 @@
+ 	case E_CARD_SIMPLE_FIELD_PHONE_HOME_FAX:
+ 		return E_CARD_SIMPLE_FIELD_PHONE_OTHER_FAX;
+ 	default:
++		break;
+ 	}
+ 
+ 	return E_CARD_SIMPLE_FIELD_LAST;
