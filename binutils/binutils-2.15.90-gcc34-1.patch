@@ -1,0 +1,23 @@
+Submitted By: Zack Winkles <winkie AT linuxfromscratch DOT org>
+Date: 2004-04-06
+Initial Package Version: 2.15.90 (20040406)
+Origin: N/A
+Description: Binutils builds a few tests using the -fgnu-linker option,
+	which is no longer supported by GCC 3.4.0.  Removing those flags
+	lets the tests continue to pass.
+
+--- binutils-2.15.90-20040406.orig/ld/testsuite/ld-cdtest/cdtest.exp	2004-04-05 13:51:25.025169000 -0400
++++ binutils-2.15.90-20040406/ld/testsuite/ld-cdtest/cdtest.exp	2004-04-05 13:51:40.698786248 -0400
+@@ -35,9 +35,9 @@
+     return
+ }
+ 
+-if {   ![ld_compile "$CXX $CXXFLAGS -fgnu-linker -fno-exceptions" $srcdir/$subdir/cdtest-foo.cc tmpdir/cdtest-foo.o]
+-    || ![ld_compile "$CXX $CXXFLAGS -fgnu-linker -fno-exceptions" $srcdir/$subdir/cdtest-bar.cc tmpdir/cdtest-bar.o]
+-    || ![ld_compile "$CXX $CXXFLAGS -fgnu-linker -fno-exceptions" $srcdir/$subdir/cdtest-main.cc tmpdir/cdtest-main.o] } {
++if {   ![ld_compile "$CXX $CXXFLAGS -fno-exceptions" $srcdir/$subdir/cdtest-foo.cc tmpdir/cdtest-foo.o]
++    || ![ld_compile "$CXX $CXXFLAGS -fno-exceptions" $srcdir/$subdir/cdtest-bar.cc tmpdir/cdtest-bar.o]
++    || ![ld_compile "$CXX $CXXFLAGS -fno-exceptions" $srcdir/$subdir/cdtest-main.cc tmpdir/cdtest-main.o] } {
+     unresolved $test1
+     unresolved $test2
+     return
