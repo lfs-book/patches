@@ -1,3 +1,8 @@
+Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
+Date: 2003-10-06
+Initial Package Version: 1.875
+Origin: Bison CVS
+Description: Allows compilation of packages that depend on bison.
 --- bison-1.875/data/yacc.c	2002-12-28 03:36:02.000000000 -0500
 +++ bison-1.875a/data/yacc.c	2003-01-22 01:38:32.000000000 -0500
 @@ -1,7 +1,7 @@
