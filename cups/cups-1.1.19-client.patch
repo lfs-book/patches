@@ -1,9 +1,9 @@
-Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
-Origin: First hunk - Alexander E. Patrakov, second hunk - CUPS CVS (problem
-reported by Alexander E. Patrakov)
+Submitted By: Alexander E. Patrakov (semzx at newmail dot ru)
 Date: 2003-08-13
 Initial Package Version: 1.1.19
-Description: First hunk: allow execution of language-specific CGI-scripts with a 
+Origin: First hunk - Alexander E. Patrakov, second hunk - CUPS CVS (problem
+reported by Alexander E. Patrakov)
+Description: First hunk: allow execution of language-specific CGI-scripts with a
 query string (I am really too lazy, I should submit that as a software trouble 
 report to the CUPS team); Second hunk: Drop privileges properly, see http://www.cups.org/str.php?L185
 The patch should go into the book.

@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-05-16
+Initial Package Version: 1.2.5
 Origin: SDL CVS
-Date:  05-16-2003
 Description: Fixes GCC 3.3 Compile Errors
 
 diff -Naur SDL-1.2.5.orig/src/video/SDL_stretch.c SDL-1.2.5/src/video/SDL_stretch.c

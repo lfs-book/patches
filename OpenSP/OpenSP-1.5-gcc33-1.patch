@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-08-10
+Initial Package Version: 1.5
 Origin: Debian OpenSP Maintainer
-Date: 08-10-2003
 Description: Fixes GCC 3.3 Compile Error
 
 diff -Naur OpenSP-1.5.orig/include/Attribute.h OpenSP-1.5/include/Attribute.h

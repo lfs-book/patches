@@ -1,7 +1,7 @@
-Submitter: Douglas Hunley (doug@hunley.homeip.net)
-Origin: Douglas Hunley
-Initial Package Version: 1.11
+Submitted By: Douglas Hunley (doug@hunley.homeip.net)
 Date: 2003-08-14
+Initial Package Version: 1.11
+Origin: Douglas Hunley
 Description: Various changes to lfs-bootscripts including fixing Bug #488, preventing the bootscripts from halting on error, adding a new runlevel error summary function, various cleanups for consistancy in code style, added funtionality to handle the kernel pseudo-filesystems and finally added /tmp /var/run and /var/lock as tmpfs/shmfs if supported on the current kernel
 
 diff -Naur lfs-bootscripts-1.11/CHANGELOG lfs-bootscripts-1.2/CHANGELOG

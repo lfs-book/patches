@@ -1,7 +1,7 @@
-Submitter: Douglas Hunley (doug@hunley.homeip.net)
-Origin: N/A
+Submitted By: Douglas Hunley (doug@hunley.homeip.net)
 Date: 2003-08-14
 Initial Package Version: 1.2
+Origin: N/A
 Description: Add /etc/rc.d/init.d/random for increasing the size of the default entropy pool to 1k, and seeding it with a saved seed from the last boot. Also saves a seed on shutdown for the next boot.
 
 diff -Naur lfs-bootscripts-1.2/makesymlinks lfs-bootscripts-1.21/makesymlinks

@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-08-15
+Initial Package Version: 0.50.3
 Origin: http://www.mail-archive.com/aspell-user@gnu.org/msg00285.html
-Date: 08-15-2003
 Description: Fixes GCC 3.3 Errors
 
 diff -Naur aspell-0.50.3.orig/prog/checker_string.cpp aspell-0.50.3/prog/checker_string.cpp

@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-05-29
+Initial Package Version: 1.4.1
 Origin: Jim Gifford
-Date: 05-29-2003
 Description: Fixes GCC 3.3 Compile Errors
 
 diff -Naur java.orig/hotspot/src/os/linux/vm/os_linux.cpp java/hotspot/src/os/linux/vm/os_linux.cpp

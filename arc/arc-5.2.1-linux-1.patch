@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-08-17
+Initial Package Version: 5.2.1
 Origin: Jim Gifford and time.h based on Gentoo Patch
-Date: 08-17-03
 Description: Fixes arc to Compile with linux
 
 diff -Naur arc-5.2.1.orig/arc.c arc-5.2.1/arc.c

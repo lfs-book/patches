@@ -1,7 +1,7 @@
-Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
-Origin: Alexander E. Patrakov
+Submitted By: Alexander E. Patrakov (semzx at newmail dot ru)
 Date: 2003-08-13
 Initial Package Version: 3.1.3
+Origin: Alexander E. Patrakov
 Description: Turn off the magic that kmix does to determine the 
 "master" volume control. Always assume that the zeroth control is 
 the master one. The line that I commented out is certainly incorrect. 

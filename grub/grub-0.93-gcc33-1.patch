@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-08-16
+Initial Package Version: 0.93
 Origin: Grub CVS
-Date: 08-16-2003
 Description: Fixes GCC 3.3 Compile Errors
 
 diff -Naur grub-0.93.orig/stage2/fsys_reiserfs.c grub-0.93/stage2/fsys_reiserfs.c

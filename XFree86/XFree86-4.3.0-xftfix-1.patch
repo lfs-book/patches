@@ -2,11 +2,9 @@ Submitted By: Kelledin <kelledin@users.sourceforge.net>
 Date: 2003-08-30
 Initial Package Version: 4.3.0
 Origin: XFree86-CVS
-Synopsis: integer overflow patch for XFree86
 Description: XFree86 4.3.0 contains several integer overflow vulnerabilities
              in its Xft handling.  This patch is a backport of CVS entry 1002
              (authored by blexim and Matthieu Herrb) to fix the issue.
-
 
 diff -Naur xc/lib/FS/FSFontInfo.c xc-xftfix/lib/FS/FSFontInfo.c
 --- xc/lib/FS/FSFontInfo.c	2001-12-14 13:53:32.000000000 -0600

@@ -1,7 +1,7 @@
-Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
-Origin: Alexander E. Patrakov
+Submitted By: Alexander E. Patrakov (semzx at newmail dot ru)
 Date: 2003-08-13
 Initial Package Version: 0.77
+Origin: Alexander E. Patrakov
 Description: Fix pam_group and pam_time modules.
 1) Make pam_group look at the configuration file in the right place
 2) Make these modules accept things like ":0" for the tty name, since 

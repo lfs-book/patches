@@ -1,7 +1,7 @@
 Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
-Origin: http://bugs.kde.org/show_bug.cgi?id=55484
 Date: 2003-08-13
 Initial Package Version: 3.1.3
+Origin: http://bugs.kde.org/show_bug.cgi?id=55484
 Description: Fix the problem "Bug 55484 - Wordwrap doesn't respect
 white space" . To reproduce: type words in Kate, until wordwrap happens
 twice. Add a word to the first line. One of the spaces between

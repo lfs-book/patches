@@ -1,6 +1,7 @@
-Submitter: Jim Gifford (patches at jg555 dot com)
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2003-02-14
+Initial Package Version: 4.0.3
 Origin: Shadow Mailing List
-Date: 02-14-2003
 Description: Fixes PAM Compile Issues
 
 diff -uNr shadow-4.0.3.orig/configure.in shadow-4.0.3/configure.in

@@ -1,7 +1,7 @@
-Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
-Origin: some Yahoo Groups post
+Submitted By: Alexander E. Patrakov (semzx at newmail dot ru)
 Date: 2003-08-13
 Initial Package Version: 2.0.46
+Origin: some Yahoo Groups post
 Description: Don't treat some requests that Microsoft Internet Explorer 
 sends as bad ones. Really MSIE, not Apache, should be fixed.
 Related information: http://127.0.0.1/manual/mod/mod_auth_digest.html
