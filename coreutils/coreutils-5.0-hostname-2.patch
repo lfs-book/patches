@@ -1,6 +1,7 @@
-Submitted by: ttrepl@yahoo.de
+Submitted By: ttrepl@yahoo.de
 Date: 2003-09-09
 Initial Package Version: 5.0
+Origin: NA
 Description: Removes installation of hostname binary, and also suppresses
 tests on that binary.
 

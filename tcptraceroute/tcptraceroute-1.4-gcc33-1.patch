@@ -1,5 +1,6 @@
 Submitted By: Jeremy Utley <jeremy@linuxfromscratch.org>
 Date: 2003-10-29
+Initial Package Version: 1.4
 Origin: Gentoo tcptraceroute Ebuild
 Description: Fixes syntax errors with GCC 3.3.x in tcptraceroute.c
 

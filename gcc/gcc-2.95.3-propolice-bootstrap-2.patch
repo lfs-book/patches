@@ -1,3 +1,10 @@
+Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
+Date: 2003-11-03
+Initial Package Version: 2.95.3
+Origin: http://www.research.ibm.com/trl/projects/security/ssp/
+Description: ProPolice Stack Gaurd
+http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt
+
 --- gcc-2.95.3.orig/gcc/Makefile.in	2003-10-31 15:51:26.636935035 -0500
 +++ gcc-2.95.3/gcc/Makefile.in	2003-10-31 15:51:41.530738426 -0500
 @@ -1136,7 +1136,7 @@

@@ -1,11 +1,13 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
-Date: 2003-10-26
+Date: 2003-11-03
 Initial Package Version: 2.95.3
 Origin: http://www.research.ibm.com/trl/projects/security/ssp/
-Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt
+Description: ProPolice Stack Gaurd
+http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt
 
---- gcc-2.95.3.orig/gcc/Makefile.in	2001-01-25 09:02:58.000000000 -0500
-+++ gcc-2.95.3/gcc/Makefile.in	2003-10-26 11:07:47.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/Makefile.in gcc-2.95.3/gcc/Makefile.in
+--- gcc-2.95.3.orig/gcc/Makefile.in	2003-10-31 15:48:14.338118952 -0500
++++ gcc-2.95.3/gcc/Makefile.in	2003-10-31 15:48:58.968543448 -0500
 @@ -683,7 +683,7 @@
   insn-peep.o reorg.o $(SCHED_PREFIX)sched.o final.o recog.o reg-stack.o \
   insn-opinit.o insn-recog.o insn-extract.o insn-output.o insn-emit.o lcm.o \
@@ -24,26 +26,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  
  LIB2FUNCS_EH = _eh
  
-@@ -1136,7 +1136,7 @@
- 	    if [ $${name}.asm = $${file} ]; then \
- 	      cp $${file} $${name}.s || exit 1; file=$${name}.s; \
- 	    else true; fi; \
--	    $(GCC_FOR_TARGET) $(LIBGCC2_CFLAGS) $(INCLUDES) -c $${file}; \
-+	    $(GCC_FOR_TARGET) -fno-stack-protector $(LIBGCC2_CFLAGS) $(INCLUDES) -c $${file}; \
- 	    if [ $$? -eq 0 ] ; then true; else exit 1; fi; \
- 	    $(AR_FOR_TARGET) $(AR_FLAGS_FOR_TARGET) tmplibgcc2.a $${oname}$(objext); \
- 	    rm -f $${name}.s $${oname}$(objext); \
-@@ -1463,7 +1463,7 @@
-    dwarf2out.h sdbout.h dbxout.h $(EXPR_H) $(BASIC_BLOCK_H) \
-    $(lang_options_files)
- 	$(CC) $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $(MAYBE_USE_COLLECT2) \
--	  -DTARGET_NAME=\"$(target_alias)\" \
-+	  -DSTACK_PROTECTOR -DTARGET_NAME=\"$(target_alias)\" \
- 	  -c `echo $(srcdir)/toplev.c | sed 's,^\./,,'`
- 
- rtl.o : rtl.c $(CONFIG_H) system.h $(RTL_H) bitmap.h
---- gcc-2.95.3.orig/gcc/calls.c	2001-01-25 09:03:00.000000000 -0500
-+++ gcc-2.95.3/gcc/calls.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/calls.c gcc-2.95.3/gcc/calls.c
+--- gcc-2.95.3.orig/gcc/calls.c	2003-10-31 15:48:14.412098107 -0500
++++ gcc-2.95.3/gcc/calls.c	2003-10-31 15:48:58.989537532 -0500
 @@ -1753,7 +1753,7 @@
  	    /* This DECL is just something to feed to mark_addressable;
  	       it doesn't get pushed.  */
@@ -53,8 +38,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  	    mark_addressable (d);
  	    structure_value_addr = XEXP (DECL_RTL (d), 0);
  	    TREE_USED (d) = 1;
---- gcc-2.95.3.orig/gcc/combine.c	2001-01-25 09:03:01.000000000 -0500
-+++ gcc-2.95.3/gcc/combine.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/combine.c gcc-2.95.3/gcc/combine.c
+--- gcc-2.95.3.orig/gcc/combine.c	2003-10-31 15:48:14.499073600 -0500
++++ gcc-2.95.3/gcc/combine.c	2003-10-31 15:48:59.024527673 -0500
 @@ -3483,6 +3483,16 @@
  	  rtx inner_op1 = XEXP (x, 1);
  	  rtx inner;
@@ -96,8 +82,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  	return gen_binary (MINUS, mode,
  			   gen_binary (MINUS, mode, XEXP (x, 0),
  				       XEXP (XEXP (x, 1), 0)),
---- gcc-2.95.3.orig/gcc/config/t-linux	1998-12-16 16:00:09.000000000 -0500
-+++ gcc-2.95.3/gcc/config/t-linux	2003-10-26 10:55:15.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/config/t-linux gcc-2.95.3/gcc/config/t-linux
+--- gcc-2.95.3.orig/gcc/config/t-linux	2003-10-31 15:48:15.259859233 -0500
++++ gcc-2.95.3/gcc/config/t-linux	2003-10-31 15:48:59.319444575 -0500
 @@ -7,7 +7,7 @@
  # Compile crtbeginS.o and crtendS.o with pic.
  CRTSTUFF_T_CFLAGS_S = -fPIC
@@ -107,8 +94,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  
  # Do not build libgcc1. Let gcc generate those functions. The GNU/Linux
  # C library can handle them.
---- gcc-2.95.3.orig/gcc/cse.c	2001-01-25 09:03:03.000000000 -0500
-+++ gcc-2.95.3/gcc/cse.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/cse.c gcc-2.95.3/gcc/cse.c
+--- gcc-2.95.3.orig/gcc/cse.c	2003-10-31 15:48:14.571053318 -0500
++++ gcc-2.95.3/gcc/cse.c	2003-10-31 15:48:59.061517251 -0500
 @@ -4504,6 +4504,7 @@
    int n_ops = 2, input_ops = 2, input_consts = 0, n_consts = 0;
    int first = 1, negate = 0, changed;
@@ -214,8 +202,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  
        /* Don't count call-insns, (set (reg 0) (call ...)), as a set.
  	 The hard function value register is used only once, to copy to
---- gcc-2.95.3.orig/gcc/explow.c	1999-04-17 13:14:48.000000000 -0400
-+++ gcc-2.95.3/gcc/explow.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/explow.c gcc-2.95.3/gcc/explow.c
+--- gcc-2.95.3.orig/gcc/explow.c	2003-10-31 15:48:14.613041487 -0500
++++ gcc-2.95.3/gcc/explow.c	2003-10-31 15:48:59.065516124 -0500
 @@ -52,7 +52,8 @@
    register rtx tem;
    int all_constant = 0;
@@ -258,8 +247,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
        LEGITIMIZE_ADDRESS (x, oldx, mode, win);
  
        /* PLUS and MULT can appear in special ways
---- gcc-2.95.3.orig/gcc/expr.c	2001-02-19 09:02:00.000000000 -0500
-+++ gcc-2.95.3/gcc/expr.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/expr.c gcc-2.95.3/gcc/expr.c
+--- gcc-2.95.3.orig/gcc/expr.c	2003-10-31 15:48:14.658028811 -0500
++++ gcc-2.95.3/gcc/expr.c	2003-10-31 15:48:59.117501476 -0500
 @@ -41,6 +41,7 @@
  #include "typeclass.h"
  #include "defaults.h"
@@ -337,8 +327,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  	{
  	  rtx constant_term = const0_rtx;
  
---- gcc-2.95.3.orig/gcc/flags.h	1999-05-17 21:05:04.000000000 -0400
-+++ gcc-2.95.3/gcc/flags.h	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/flags.h gcc-2.95.3/gcc/flags.h
+--- gcc-2.95.3.orig/gcc/flags.h	2003-10-31 15:48:14.696018107 -0500
++++ gcc-2.95.3/gcc/flags.h	2003-10-31 15:48:59.132497251 -0500
 @@ -538,3 +538,12 @@
     string identifying the compiler.  */
  
@@ -352,8 +343,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +/* Warn when not issuing stack smashing protection for some reason */
 +
 +extern int warn_stack_protector;
---- gcc-2.95.3.orig/gcc/function.c	2001-01-25 09:03:15.000000000 -0500
-+++ gcc-2.95.3/gcc/function.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/function.c gcc-2.95.3/gcc/function.c
+--- gcc-2.95.3.orig/gcc/function.c	2003-10-31 15:48:14.731008248 -0500
++++ gcc-2.95.3/gcc/function.c	2003-10-31 15:48:59.157490208 -0500
 @@ -58,6 +58,7 @@
  #include "obstack.h"
  #include "toplev.h"
@@ -380,7 +372,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +
 +int temp_boundary_mark;
 +
- 
+ 
  /* This structure is used to record MEMs or pseudos used to replace VAR, any
     SUBREGs of VAR, and any MEMs containing VAR as an address.  We need to
 @@ -917,7 +925,8 @@
@@ -466,8 +458,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  		emit_insn_before (gen_move_insn (temp, new_offset), object);
  	      else
  		{
---- gcc-2.95.3.orig/gcc/gcse.c	1999-10-16 17:20:32.000000000 -0400
-+++ gcc-2.95.3/gcc/gcse.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/gcse.c gcc-2.95.3/gcc/gcse.c
+--- gcc-2.95.3.orig/gcc/gcse.c	2003-10-31 15:48:14.759000360 -0500
++++ gcc-2.95.3/gcc/gcse.c	2003-10-31 15:48:59.178484293 -0500
 @@ -3718,7 +3718,7 @@
        /* Find an assignment that sets reg_used and is available
  	 at the start of the block.  */
@@ -477,8 +470,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  	continue;
    
        pat = set->expr;
---- gcc-2.95.3.orig/gcc/integrate.c	1999-04-25 19:35:12.000000000 -0400
-+++ gcc-2.95.3/gcc/integrate.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/integrate.c gcc-2.95.3/gcc/integrate.c
+--- gcc-2.95.3.orig/gcc/integrate.c	2003-10-31 15:48:14.835978670 -0500
++++ gcc-2.95.3/gcc/integrate.c	2003-10-31 15:48:59.199478377 -0500
 @@ -2270,6 +2270,8 @@
  	}
        /* These args would always appear unused, if not for this.  */
@@ -499,13 +493,14 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  	      emit_insn_after (seq, map->insns_at_start);
  	      return temp;
  	    }
---- gcc-2.95.3.orig/gcc/libgcc2.c	1999-06-10 23:11:43.000000000 -0400
-+++ gcc-2.95.3/gcc/libgcc2.c	2003-10-26 10:55:14.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/libgcc2.c gcc-2.95.3/gcc/libgcc2.c
+--- gcc-2.95.3.orig/gcc/libgcc2.c	2003-10-31 15:48:14.934950783 -0500
++++ gcc-2.95.3/gcc/libgcc2.c	2003-10-31 15:48:59.219472744 -0500
 @@ -4012,3 +4012,102 @@
    __terminate ();
  }
  #endif
-+
++
 +#ifdef L_stack_smash_handler
 +#include <stdio.h>
 +#include <string.h>
@@ -604,8 +599,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +  _exit(127);
 +}
 +#endif
---- gcc-2.95.3.orig/gcc/loop.c	2001-01-25 09:03:18.000000000 -0500
-+++ gcc-2.95.3/gcc/loop.c	2003-10-26 10:55:15.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/loop.c gcc-2.95.3/gcc/loop.c
+--- gcc-2.95.3.orig/gcc/loop.c	2003-10-31 15:48:14.952945712 -0500
++++ gcc-2.95.3/gcc/loop.c	2003-10-31 15:48:59.245465420 -0500
 @@ -6201,6 +6201,14 @@
    if (GET_CODE (*mult_val) == USE)
      *mult_val = XEXP (*mult_val, 0);
@@ -621,8 +617,9 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
    if (is_addr)
      {
  #ifdef ADDRESS_COST
---- gcc-2.95.3.orig/gcc/optabs.c	2001-01-25 09:03:19.000000000 -0500
-+++ gcc-2.95.3/gcc/optabs.c	2003-10-26 10:55:15.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/optabs.c gcc-2.95.3/gcc/optabs.c
+--- gcc-2.95.3.orig/gcc/optabs.c	2003-10-31 15:48:14.974939515 -0500
++++ gcc-2.95.3/gcc/optabs.c	2003-10-31 15:48:59.261460913 -0500
 @@ -772,6 +772,25 @@
    if (target)
      target = protect_from_queue (target, 1);
@@ -651,7 +648,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
        op0 = force_not_mem (op0);
 diff -Naur gcc-2.95.3.orig/gcc/protector.c gcc-2.95.3/gcc/protector.c
 --- gcc-2.95.3.orig/gcc/protector.c	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-2.95.3/gcc/protector.c	2003-10-26 11:11:05.000000000 -0500
++++ gcc-2.95.3/gcc/protector.c	2003-10-31 15:49:07.642099504 -0500
 @@ -0,0 +1,2636 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3291,7 +3288,7 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.c gcc-2.95.3/gcc/protector.c
 +#endif
 diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
 --- gcc-2.95.3.orig/gcc/protector.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-2.95.3/gcc/protector.h	2003-10-26 11:11:05.000000000 -0500
++++ gcc-2.95.3/gcc/protector.h	2003-10-31 15:49:11.851913306 -0500
 @@ -0,0 +1,48 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3341,8 +3338,9 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
 +extern rtx assign_stack_local_for_pseudo_reg PARAMS ((enum machine_mode, HOST_WIDE_INT, int));
 +
 +#endif
---- gcc-2.95.3.orig/gcc/reload1.c	2001-01-25 09:03:21.000000000 -0500
-+++ gcc-2.95.3/gcc/reload1.c	2003-10-26 10:55:15.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/reload1.c gcc-2.95.3/gcc/reload1.c
+--- gcc-2.95.3.orig/gcc/reload1.c	2003-10-31 15:48:15.040920924 -0500
++++ gcc-2.95.3/gcc/reload1.c	2003-10-31 15:48:59.289453025 -0500
 @@ -39,6 +39,7 @@
  #include "output.h"
  #include "real.h"
@@ -3360,8 +3358,9 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
  				  inherent_size == total_size ? 0 : -1);
  	  if (BYTES_BIG_ENDIAN)
  	    /* Cancel the  big-endian correction done in assign_stack_local.
---- gcc-2.95.3.orig/gcc/toplev.c	2001-01-25 09:03:23.000000000 -0500
-+++ gcc-2.95.3/gcc/toplev.c	2003-10-26 10:55:15.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/toplev.c gcc-2.95.3/gcc/toplev.c
+--- gcc-2.95.3.orig/gcc/toplev.c	2003-10-31 15:48:15.176882614 -0500
++++ gcc-2.95.3/gcc/toplev.c	2003-10-31 15:48:59.308447673 -0500
 @@ -772,6 +772,15 @@
  
  int flag_no_ident = 0;
@@ -3400,7 +3399,7 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
 +  {"stack-protector", &warn_stack_protector, 1,
 +   "Warn when disabling stack protector for some reason"}
  };
- 
+ 
  /* Output files for assembler code (real compiler output)
 @@ -3608,6 +3623,10 @@
    int failure = 0;
@@ -3423,8 +3422,3 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
        /* Dump the rtl code if we are dumping rtl.  */
  
        if (rtl_dump)
---- gcc-2.95.3.orig/gcc/version.c	2001-03-16 07:52:12.000000000 -0500
-+++ gcc-2.95.3/gcc/version.c	2003-10-26 11:21:59.000000000 -0500
-@@ -1 +1 @@
--char *version_string = "2.95.3 20010315 (release)";
-+char *version_string = "2.95.3 20010315 (release - propolice_only)";

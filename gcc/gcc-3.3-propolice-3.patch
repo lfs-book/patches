@@ -1,11 +1,13 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
-Date: 2003-10-21
-Initial Package Version: 3.3.1
+Date: 2003-11-03
+Initial Package Version: 3.3
 Origin: http://www.research.ibm.com/trl/projects/security/ssp/
-Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt 
+Description: ProPolice Stack Gaurd
+http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt
 
---- gcc-3.3.1.orig/gcc/Makefile.in	2003-08-03 11:48:36.000000000 -0400
-+++ gcc-3.3.1/gcc/Makefile.in	2003-10-21 20:05:59.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/Makefile.in gcc-3.3.2/gcc/Makefile.in
+--- gcc-3.3.2.orig/gcc/Makefile.in	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/Makefile.in	2003-11-01 10:59:02.000000000 -0500
 @@ -764,7 +764,7 @@
   sibcall.o simplify-rtx.o ssa.o ssa-ccp.o ssa-dce.o stmt.o		   \
   stor-layout.o stringpool.o timevar.o toplev.o tracer.o tree.o tree-dump.o \
@@ -32,9 +34,10 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
  $(out_object_file): $(out_file) $(CONFIG_H) $(TREE_H) $(GGC_H) \
     $(RTL_H) $(REGS_H) hard-reg-set.h real.h insn-config.h conditions.h \
---- gcc-3.3.1.orig/gcc/calls.c	2003-07-17 22:58:25.000000000 -0400
-+++ gcc-3.3.1/gcc/calls.c	2003-10-21 19:32:04.000000000 -0400
-@@ -2327,7 +2327,7 @@
+diff -Naur gcc-3.3.2.orig/gcc/calls.c gcc-3.3.2/gcc/calls.c
+--- gcc-3.3.2.orig/gcc/calls.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/calls.c	2003-11-01 10:59:02.000000000 -0500
+@@ -2331,7 +2331,7 @@
  	    /* For variable-sized objects, we must be called with a target
  	       specified.  If we were to allocate space on the stack here,
  	       we would have no way of knowing when to free it.  */
@@ -43,9 +46,10 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
  	    mark_temp_addr_taken (d);
  	    structure_value_addr = XEXP (d, 0);
---- gcc-3.3.1.orig/gcc/combine.c	2003-03-24 06:37:32.000000000 -0500
-+++ gcc-3.3.1/gcc/combine.c	2003-10-21 19:32:04.000000000 -0400
-@@ -3859,7 +3859,17 @@
+diff -Naur gcc-3.3.2.orig/gcc/combine.c gcc-3.3.2/gcc/combine.c
+--- gcc-3.3.2.orig/gcc/combine.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/combine.c	2003-11-01 10:59:02.000000000 -0500
+@@ -3889,7 +3889,17 @@
  	  rtx inner_op0 = XEXP (XEXP (x, 0), 1);
  	  rtx inner_op1 = XEXP (x, 1);
  	  rtx inner;
@@ -64,7 +68,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	  /* Make sure we pass the constant operand if any as the second
  	     one if this is a commutative operation.  */
  	  if (CONSTANT_P (inner_op0) && GET_RTX_CLASS (code) == 'c')
-@@ -4272,6 +4282,11 @@
+@@ -4302,6 +4312,11 @@
  	 they are now checked elsewhere.  */
        if (GET_CODE (XEXP (x, 0)) == PLUS
  	  && CONSTANT_ADDRESS_P (XEXP (XEXP (x, 0), 1)))
@@ -76,7 +80,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	return gen_binary (PLUS, mode,
  			   gen_binary (PLUS, mode, XEXP (XEXP (x, 0), 0),
  				       XEXP (x, 1)),
-@@ -4400,7 +4415,10 @@
+@@ -4430,7 +4445,10 @@
  
        /* Canonicalize (minus A (plus B C)) to (minus (minus A B) C) for
  	 integers.  */
@@ -88,8 +92,21 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	return gen_binary (MINUS, mode,
  			   gen_binary (MINUS, mode, XEXP (x, 0),
  				       XEXP (XEXP (x, 1), 0)),
---- gcc-3.3.1.orig/gcc/cse.c	2003-04-29 15:16:40.000000000 -0400
-+++ gcc-3.3.1/gcc/cse.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/config/t-linux gcc-3.3.2/gcc/config/t-linux
+--- gcc-3.3.2.orig/gcc/config/t-linux	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/config/t-linux	2003-11-01 10:59:02.000000000 -0500
+@@ -4,7 +4,7 @@
+ # Compile crtbeginS.o and crtendS.o with pic.
+ CRTSTUFF_T_CFLAGS_S = $(CRTSTUFF_T_CFLAGS) -fPIC
+ # Compile libgcc2.a with pic.
+-TARGET_LIBGCC2_CFLAGS = -fPIC
++TARGET_LIBGCC2_CFLAGS = -fPIC -DHAVE_SYSLOG
+ 
+ # Override t-slibgcc-elf-ver to export some libgcc symbols with
+ # the symbol versions that glibc used.
+diff -Naur gcc-3.3.2.orig/gcc/cse.c gcc-3.3.2/gcc/cse.c
+--- gcc-3.3.2.orig/gcc/cse.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/cse.c	2003-11-01 10:59:02.000000000 -0500
 @@ -4288,7 +4288,14 @@
  
  	      if (new_const == 0)
@@ -121,8 +138,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
        /* Don't count call-insns, (set (reg 0) (call ...)), as a set.
  	 The hard function value register is used only once, to copy to
---- gcc-3.3.1.orig/gcc/explow.c	2003-04-07 18:58:12.000000000 -0400
-+++ gcc-3.3.1/gcc/explow.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/explow.c gcc-3.3.2/gcc/explow.c
+--- gcc-3.3.2.orig/gcc/explow.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/explow.c	2003-11-01 10:59:02.000000000 -0500
 @@ -86,7 +86,8 @@
    rtx tem;
    int all_constant = 0;
@@ -165,8 +183,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
        LEGITIMIZE_ADDRESS (x, oldx, mode, win);
  
        /* PLUS and MULT can appear in special ways
---- gcc-3.3.1.orig/gcc/expr.c	2003-07-24 15:11:20.000000000 -0400
-+++ gcc-3.3.1/gcc/expr.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
+--- gcc-3.3.2.orig/gcc/expr.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/expr.c	2003-11-01 10:59:02.000000000 -0500
 @@ -45,6 +45,7 @@
  #include "langhooks.h"
  #include "intl.h"
@@ -175,7 +194,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
  /* Decide whether a function's arguments should be processed
     from first to last or from last to first.
-@@ -1518,7 +1519,7 @@
+@@ -1527,7 +1528,7 @@
  
        if (USE_LOAD_PRE_DECREMENT (mode) && data.reverse && ! data.autinc_from)
  	{
@@ -184,7 +203,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	  data.autinc_from = 1;
  	  data.explicit_inc_from = -1;
  	}
-@@ -1532,7 +1533,7 @@
+@@ -1541,7 +1542,7 @@
  	data.from_addr = copy_addr_to_reg (from_addr);
        if (USE_STORE_PRE_DECREMENT (mode) && data.reverse && ! data.autinc_to)
  	{
@@ -193,7 +212,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	  data.autinc_to = 1;
  	  data.explicit_inc_to = -1;
  	}
-@@ -1649,11 +1650,13 @@
+@@ -1658,11 +1659,13 @@
  	from1 = adjust_address (data->from, mode, data->offset);
  
        if (HAVE_PRE_DECREMENT && data->explicit_inc_to < 0)
@@ -211,7 +230,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
        if (data->to)
  	emit_insn ((*genfun) (to1, from1));
-@@ -2826,7 +2829,7 @@
+@@ -2835,7 +2838,7 @@
  
        if (USE_STORE_PRE_DECREMENT (mode) && data->reverse && ! data->autinc_to)
  	{
@@ -220,7 +239,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	  data->autinc_to = 1;
  	  data->explicit_inc_to = -1;
  	}
-@@ -2897,8 +2900,9 @@
+@@ -2906,8 +2909,9 @@
  	to1 = adjust_address (data->to, mode, data->offset);
  
        if (HAVE_PRE_DECREMENT && data->explicit_inc_to < 0)
@@ -232,7 +251,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
        cst = (*data->constfun) (data->constfundata, data->offset, mode);
        emit_insn ((*genfun) (to1, cst));
-@@ -5894,7 +5898,9 @@
+@@ -5903,7 +5907,9 @@
  	  && GET_CODE (XEXP (value, 0)) == PLUS
  	  && GET_CODE (XEXP (XEXP (value, 0), 0)) == REG
  	  && REGNO (XEXP (XEXP (value, 0), 0)) >= FIRST_VIRTUAL_REGISTER
@@ -243,7 +262,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	{
  	  rtx temp = expand_simple_binop (GET_MODE (value), code,
  					  XEXP (XEXP (value, 0), 0), op2,
-@@ -8070,7 +8076,8 @@
+@@ -8079,7 +8085,8 @@
        /* If adding to a sum including a constant,
  	 associate it to put the constant outside.  */
        if (GET_CODE (op1) == PLUS
@@ -253,8 +272,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	{
  	  rtx constant_term = const0_rtx;
  
---- gcc-3.3.1.orig/gcc/flags.h	2003-06-20 17:18:41.000000000 -0400
-+++ gcc-3.3.1/gcc/flags.h	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/flags.h gcc-3.3.2/gcc/flags.h
+--- gcc-3.3.2.orig/gcc/flags.h	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/flags.h	2003-11-01 10:59:02.000000000 -0500
 @@ -690,4 +690,13 @@
  #define HONOR_SIGN_DEPENDENT_ROUNDING(MODE) \
    (MODE_HAS_SIGN_DEPENDENT_ROUNDING (MODE) && !flag_unsafe_math_optimizations)
@@ -269,17 +289,19 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
 +extern int warn_stack_protector;
 +
  #endif /* ! GCC_FLAGS_H */
---- gcc-3.3.1.orig/gcc/function.c	2003-04-10 18:26:04.000000000 -0400
-+++ gcc-3.3.1/gcc/function.c	2003-10-21 19:32:04.000000000 -0400
-@@ -59,6 +59,7 @@
- #include "tm_p.h"
+diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
+--- gcc-3.3.2.orig/gcc/function.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/function.c	2003-11-01 10:59:52.000000000 -0500
+@@ -60,6 +60,8 @@
  #include "integrate.h"
  #include "langhooks.h"
-+#include "protector.h"
  
++#include "protector.h"
++
  #ifndef TRAMPOLINE_ALIGNMENT
  #define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
-@@ -142,6 +143,10 @@
+ #endif
+@@ -142,6 +144,10 @@
  /* Array of INSN_UIDs to hold the INSN_UIDs for each sibcall epilogue
     in this function.  */
  static GTY(()) varray_type sibcall_epilogue;
@@ -290,7 +312,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
  /* In order to evaluate some expressions, such as function calls returning
     structures in memory, we need to temporarily allocate stack locations.
-@@ -195,6 +200,8 @@
+@@ -195,6 +201,8 @@
    /* The size of the slot, including extra space for alignment.  This
       info is for combine_temp_slots.  */
    HOST_WIDE_INT full_size;
@@ -299,7 +321,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  };
  
  /* This structure is used to record MEMs or pseudos used to replace VAR, any
-@@ -629,6 +636,7 @@
+@@ -629,6 +637,7 @@
     whose lifetime is controlled by CLEANUP_POINT_EXPRs.  KEEP is 3
     if we are to allocate something at an inner level to be treated as
     a variable in the block (e.g., a SAVE_EXPR).
@@ -307,7 +329,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
     TYPE is the type that will be used for the stack slot.  */
  
-@@ -642,6 +650,8 @@
+@@ -642,6 +651,8 @@
    unsigned int align;
    struct temp_slot *p, *best_p = 0;
    rtx slot;
@@ -316,7 +338,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
    /* If SIZE is -1 it means that somebody tried to allocate a temporary
       of a variable size.  */
-@@ -667,7 +677,8 @@
+@@ -667,7 +678,8 @@
  	&& ! p->in_use
  	&& objects_must_conflict_p (p->type, type)
  	&& (best_p == 0 || best_p->size > p->size
@@ -326,7 +348,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
        {
  	if (p->align == align && p->size == size)
  	  {
-@@ -702,6 +713,7 @@
+@@ -702,6 +714,7 @@
  	      p->address = 0;
  	      p->rtl_expr = 0;
  	      p->type = best_p->type;
@@ -334,7 +356,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	      p->next = temp_slots;
  	      temp_slots = p;
  
-@@ -762,6 +774,7 @@
+@@ -762,6 +775,7 @@
        p->full_size = frame_offset - frame_offset_old;
  #endif
        p->address = 0;
@@ -342,7 +364,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
        p->next = temp_slots;
        temp_slots = p;
      }
-@@ -932,14 +945,16 @@
+@@ -932,14 +946,16 @@
  	    int delete_q = 0;
  	    if (! q->in_use && GET_MODE (q->slot) == BLKmode)
  	      {
@@ -361,7 +383,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  		  {
  		    /* P comes after Q; combine P into Q.  */
  		    q->size += p->size;
-@@ -1497,7 +1512,9 @@
+@@ -1499,7 +1515,9 @@
      new = func->x_parm_reg_stack_loc[regno];
  
    if (new == 0)
@@ -372,7 +394,7 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  
    PUT_CODE (reg, MEM);
    PUT_MODE (reg, decl_mode);
-@@ -3961,7 +3978,8 @@
+@@ -3963,7 +3981,8 @@
  		 constant with that register.  */
  	      temp = gen_reg_rtx (Pmode);
  	      XEXP (x, 0) = new;
@@ -382,8 +404,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  		emit_insn_before (gen_move_insn (temp, new_offset), object);
  	      else
  		{
---- gcc-3.3.1.orig/gcc/gcse.c	2003-07-14 05:21:22.000000000 -0400
-+++ gcc-3.3.1/gcc/gcse.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/gcse.c gcc-3.3.2/gcc/gcse.c
+--- gcc-3.3.2.orig/gcc/gcse.c	2003-11-01 10:31:35.000000000 -0500
++++ gcc-3.3.2/gcc/gcse.c	2003-11-01 10:59:02.000000000 -0500
 @@ -4211,7 +4211,7 @@
        /* Find an assignment that sets reg_used and is available
  	 at the start of the block.  */
@@ -393,8 +416,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	continue;
  
        pat = set->expr;
---- gcc-3.3.1.orig/gcc/integrate.c	2003-07-14 21:05:43.000000000 -0400
-+++ gcc-3.3.1/gcc/integrate.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/integrate.c gcc-3.3.2/gcc/integrate.c
+--- gcc-3.3.2.orig/gcc/integrate.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/integrate.c	2003-11-01 10:59:02.000000000 -0500
 @@ -401,6 +401,10 @@
    /* These args would always appear unused, if not for this.  */
    TREE_USED (copy) = 1;
@@ -417,8 +441,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  	      emit_insn_after (seq, map->insns_at_start);
  	      return temp;
  	    }
---- gcc-3.3.1.orig/gcc/libgcc-std.ver	2003-07-13 17:25:09.000000000 -0400
-+++ gcc-3.3.1/gcc/libgcc-std.ver	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/libgcc-std.ver gcc-3.3.2/gcc/libgcc-std.ver
+--- gcc-3.3.2.orig/gcc/libgcc-std.ver	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/libgcc-std.ver	2003-11-01 10:59:02.000000000 -0500
 @@ -174,6 +174,10 @@
    _Unwind_SjLj_RaiseException
    _Unwind_SjLj_ForcedUnwind
@@ -430,8 +455,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
  }
  
  %inherit GCC_3.3 GCC_3.0
---- gcc-3.3.1.orig/gcc/libgcc2.c	2002-10-23 06:47:24.000000000 -0400
-+++ gcc-3.3.1/gcc/libgcc2.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/libgcc2.c gcc-3.3.2/gcc/libgcc2.c
+--- gcc-3.3.2.orig/gcc/libgcc2.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/libgcc2.c	2003-11-01 10:59:02.000000000 -0500
 @@ -1993,3 +1993,102 @@
  #endif /* NEED_ATEXIT */
  
@@ -535,9 +561,10 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
 +  _exit(127);
 +}
 +#endif
---- gcc-3.3.1.orig/gcc/loop.c	2003-07-11 02:47:05.000000000 -0400
-+++ gcc-3.3.1/gcc/loop.c	2003-10-21 19:32:04.000000000 -0400
-@@ -6516,6 +6516,14 @@
+diff -Naur gcc-3.3.2.orig/gcc/loop.c gcc-3.3.2/gcc/loop.c
+--- gcc-3.3.2.orig/gcc/loop.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/loop.c	2003-11-01 10:59:02.000000000 -0500
+@@ -6543,6 +6543,14 @@
    if (GET_CODE (*mult_val) == USE)
      *mult_val = XEXP (*mult_val, 0);
  
@@ -552,8 +579,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
    if (is_addr)
      *pbenefit += address_cost (orig_x, addr_mode) - reg_address_cost;
    else
---- gcc-3.3.1.orig/gcc/optabs.c	2003-07-18 20:25:25.000000000 -0400
-+++ gcc-3.3.1/gcc/optabs.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/optabs.c gcc-3.3.2/gcc/optabs.c
+--- gcc-3.3.2.orig/gcc/optabs.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/optabs.c	2003-11-01 10:59:02.000000000 -0500
 @@ -703,6 +703,26 @@
    if (target)
      target = protect_from_queue (target, 1);
@@ -581,9 +609,9 @@ Description: ProPolice Stack Gaurd. More info at http://www.linuxfromscratch.org
    if (flag_force_mem)
      {
        op0 = force_not_mem (op0);
-diff -Naur gcc-3.3.1.orig/gcc/protector.c gcc-3.3.1/gcc/protector.c
---- gcc-3.3.1.orig/gcc/protector.c	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.1/gcc/protector.c	2003-10-20 08:05:01.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/protector.c gcc-3.3.2/gcc/protector.c
+--- gcc-3.3.2.orig/gcc/protector.c	1969-12-31 19:00:00.000000000 -0500
++++ gcc-3.3.2/gcc/protector.c	2003-11-01 10:59:02.000000000 -0500
 @@ -0,0 +1,2618 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3203,9 +3231,9 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.c gcc-3.3.1/gcc/protector.c
 +  return FALSE;
 +}
 +#endif
-diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
---- gcc-3.3.1.orig/gcc/protector.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.1/gcc/protector.h	2003-10-20 08:05:01.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/protector.h gcc-3.3.2/gcc/protector.h
+--- gcc-3.3.2.orig/gcc/protector.h	1969-12-31 19:00:00.000000000 -0500
++++ gcc-3.3.2/gcc/protector.h	2003-11-01 10:59:02.000000000 -0500
 @@ -0,0 +1,48 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3255,8 +3283,9 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
 +extern rtx assign_stack_local_for_pseudo_reg PARAMS ((enum machine_mode, HOST_WIDE_INT, int));
 +
 +#endif
---- gcc-3.3.1.orig/gcc/reload1.c	2003-06-07 01:30:09.000000000 -0400
-+++ gcc-3.3.1/gcc/reload1.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/reload1.c gcc-3.3.2/gcc/reload1.c
+--- gcc-3.3.2.orig/gcc/reload1.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/reload1.c	2003-11-01 10:59:02.000000000 -0500
 @@ -42,6 +42,7 @@
  #include "toplev.h"
  #include "except.h"
@@ -3274,8 +3303,9 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
  				  inherent_size == total_size ? 0 : -1);
  	  if (BYTES_BIG_ENDIAN)
  	    /* Cancel the  big-endian correction done in assign_stack_local.
---- gcc-3.3.1.orig/gcc/simplify-rtx.c	2003-07-03 03:38:22.000000000 -0400
-+++ gcc-3.3.1/gcc/simplify-rtx.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/simplify-rtx.c gcc-3.3.2/gcc/simplify-rtx.c
+--- gcc-3.3.2.orig/gcc/simplify-rtx.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/simplify-rtx.c	2003-11-01 10:59:02.000000000 -0500
 @@ -1670,7 +1670,8 @@
    int n_ops = 2, input_ops = 2, input_consts = 0, n_consts;
    int first, negate, changed;
@@ -3366,19 +3396,9 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
    /* Put a non-negated operand first.  If there aren't any, make all
       operands positive and negate the whole thing later.  */
  
---- gcc-3.3.1.orig/gcc/config/t-linux	2003-06-04 12:56:11.000000000 -0400
-+++ gcc-3.3.1/gcc/config/t-linux	2003-10-21 19:32:04.000000000 -0400
-@@ -4,7 +4,7 @@
- # Compile crtbeginS.o and crtendS.o with pic.
- CRTSTUFF_T_CFLAGS_S = $(CRTSTUFF_T_CFLAGS) -fPIC
- # Compile libgcc2.a with pic.
--TARGET_LIBGCC2_CFLAGS = -fPIC
-+TARGET_LIBGCC2_CFLAGS = -fPIC -DHAVE_SYSLOG
- 
- # Override t-slibgcc-elf-ver to export some libgcc symbols with
- # the symbol versions that glibc used.
---- gcc-3.3.1.orig/gcc/toplev.c	2003-07-18 02:59:16.000000000 -0400
-+++ gcc-3.3.1/gcc/toplev.c	2003-10-21 19:32:04.000000000 -0400
+diff -Naur gcc-3.3.2.orig/gcc/toplev.c gcc-3.3.2/gcc/toplev.c
+--- gcc-3.3.2.orig/gcc/toplev.c	2003-11-01 10:31:36.000000000 -0500
++++ gcc-3.3.2/gcc/toplev.c	2003-11-01 10:59:02.000000000 -0500
 @@ -904,6 +904,15 @@
     minimum function alignment.  Zero means no alignment is forced.  */
  int force_align_functions_log;
@@ -3427,14 +3447,3 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
        /* Dump the rtl code if we are dumping rtl.  */
  
        if (open_dump_file (DFI_rtl, decl))
---- gcc-3.3.1.orig/gcc/version.c	2003-08-04 08:50:23.000000000 -0400
-+++ gcc-3.3.1/gcc/version.c	2003-10-21 19:32:35.000000000 -0400
-@@ -6,7 +6,7 @@
-    please modify this string to indicate that, e.g. by putting your
-    organization's name in parentheses at the end of the string.  */
- 
--const char version_string[] = "3.3.1";
-+const char version_string[] = "3.3.1 (propolice)";
- 
- /* This is the location of the online document giving instructions for
-    reporting bugs.  If you distribute a modified version of GCC,

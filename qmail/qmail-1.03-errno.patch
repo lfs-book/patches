@@ -1,8 +1,8 @@
-ubmitted By: BLFS Book <blfs-book@linuxfromscratch.org>
+Submitted By: BLFS Book <blfs-book@linuxfromscratch.org>
 Date: 2003-10-04
 Initial Package Version: 0.76
 Origin: ftp://moni.csi.hu/pub/glibc-2.3.1/qmail-1.03.errno.patch
-Desciption: Fixes compilation with newer versions of glibc.
+Description: Fixes compilation with newer versions of glibc.
 diff -u qmail-1.03.old/cdb_seek.c qmail-1.03/cdb_seek.c
 --- qmail-1.03.old/cdb_seek.c	1998-06-15 05:52:55.000000000 -0500
 +++ qmail-1.03/cdb_seek.c	2003-01-08 15:55:53.000000000 -0600

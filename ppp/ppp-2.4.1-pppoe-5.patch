@@ -1,6 +1,6 @@
 Submitted By:     DJ Lucas
 Date:             2003-09-24
-Package Version:  2.4.1
+Initial Package Version:  2.4.1
 Origin:           Backported from ppp-cvs.  Unfortunaltely, the original 
                   author who ripped the code out of CVS is unknown at 
                   this time.
@@ -4199,7 +4199,7 @@ diff -Naur ppp-2.4.1-orig/sunos4/Makefile ppp-2.4.1/sunos4/Makefile
 -#
 -# Makefile for STREAMS modules for SunOS 4.
 -#
--# $Id: ppp-2.4.1-pppoe-5.patch,v 1.1 2003/09/26 21:37:18 jim Exp $
+-# $Id: ppp-2.4.1-pppoe-5.patch,v 1.2 2003/11/04 06:17:18 tushar Exp $
 -#
 -
 -include Makedefs

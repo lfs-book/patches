@@ -1,6 +1,6 @@
-Submitted by: Jeremy Utley <jeremy@linuxfromscratch.org>
+Submitted By: Jeremy Utley <jeremy@linuxfromscratch.org>
 Date: 2003-08-28
-Version: 2.05b
+Initial Package Version: 2.05b
 Origin: ftp://ftp.gnu.org/gnu/bash
 Description: Integrates all 7 published bash-2.05b patches into a single
              patch file for LFS use.
