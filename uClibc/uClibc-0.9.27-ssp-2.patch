@@ -1,0 +1,76 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-01-12
+Initial Package Version: 0.9.27
+Upstream Status: Not submitted
+Origin: http://www.research.ibm.com/trl/projects/security/ssp/
+        http://www.openbsd.org/cgi-bin/cvsweb/src/lib/libc/sys/stack_protector.c
+Description: Smashing Stack Protector - This patch modifies guard functions in
+uClibc.
+
+This patch depends on erandom sysctl from:
+http://frandom.sourceforge.net/
+http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
+
+Also see:
+http://www.research.ibm.com/trl/projects/security/ssp/
+http://www.linuxfromscratch.org/hlfs/
+http://www.linuxfromscratch.org/hints/downloads/files/ssp.txt
+
+diff -Naur uClibc-0.9.27.orig/libc/sysdeps/linux/common/ssp.c uClibc-0.9.27/libc/sysdeps/linux/common/ssp.c
+--- uClibc-0.9.27.orig/libc/sysdeps/linux/common/ssp.c	2005-01-12 20:28:20.963665271 +0000
++++ uClibc-0.9.27/libc/sysdeps/linux/common/ssp.c	2005-01-12 20:31:57.683918718 +0000
+@@ -29,9 +29,7 @@
+ #include <sys/un.h>
+ #include <sys/syslog.h>
+ #include <sys/time.h>
+-#ifdef HAVE_DEV_ERANDOM
+ #include <sys/sysctl.h>
+-#endif
+ 
+ #ifdef __PROPOLICE_BLOCK_SEGV__
+ #define SSP_SIGTYPE SIGSEGV
+@@ -48,25 +46,20 @@
+ 	size_t size;
+ 	struct timeval tv;
+ 
+-#ifdef HAVE_DEV_ERANDOM
+ 	int mib[3];
+-#endif
+ 
+ 	if (__guard != 0UL)
+ 		return;
+ 
+-#ifndef __SSP_QUICK_CANARY__
+-#ifdef HAVE_DEV_ERANDOM
+ 	/* Random is another depth in Linux, hence an array of 3. */
+ 	mib[0] = CTL_KERN;
+ 	mib[1] = KERN_RANDOM;
+ 	mib[2] = RANDOM_ERANDOM;
+ 
+ 	size = sizeof(unsigned long);
+-	if (__sysctl(mib, 3, &__guard, &size, NULL, 0) != (-1))
++	if (sysctl(mib, 3, &__guard, &size, NULL, 0) != (-1))
+ 		if (__guard != 0UL)
+ 			return;
+-#endif
+ 	/* 
+ 	 * Attempt to open kernel pseudo random device if one exists before 
+ 	 * opening urandom to avoid system entropy depletion.
+@@ -74,9 +67,7 @@
+ 	{
+ 		int fd;
+ 
+-#ifdef HAVE_DEV_ERANDOM
+ 		if ((fd = open("/dev/erandom", O_RDONLY)) == (-1))
+-#endif
+ 			fd = open("/dev/urandom", O_RDONLY);
+ 		if (fd != (-1)) {
+ 			size = read(fd, (char *) &__guard, sizeof(__guard));
+@@ -85,7 +76,6 @@
+ 				return;
+ 		}
+ 	}
+-#endif
+ 	/* If sysctl was unsuccessful, use the "terminator canary". */
+ 	__guard = 0xFF0A0D00UL;
+ 
