@@ -13,12 +13,6 @@ http://www.securiteam.com/unixfocus/5UP0J1PAAQ.html
 diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/Makefile Linux-PAM-0.77/modules/pam_unix/Makefile
 --- Linux-PAM-0.77.orig/modules/pam_unix/Makefile	2001-02-11 06:33:53.000000000 +0000
 +++ Linux-PAM-0.77/modules/pam_unix/Makefile	2003-09-14 06:18:17.000000000 +0000
-@@ -1,4 +1,4 @@
--# $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+# $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
- #
- # This Makefile controls a build process of the pam_unix modules
- # for Linux-PAM. You should not modify this Makefile.
 @@ -41,8 +41,10 @@
  
  ########################################################################
@@ -274,13 +268,6 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_passwd.c Linux-PAM-0.77
 diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c
 --- Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c	2000-12-20 05:15:05.000000000 +0000
 +++ Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c	2003-09-14 06:19:12.000000000 +0000
-@@ -1,5 +1,5 @@
- /*
-- * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-  *
-  * Copyright Alexander O. Yuriev, 1996.  All rights reserved.
-  * Copyright Jan Rêkorajski, 1999.  All rights reserved.
 @@ -53,6 +53,7 @@
  
  #include <security/_pam_macros.h>
@@ -316,13 +303,6 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c Linux-PAM-0.77/m
 diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.c Linux-PAM-0.77/modules/pam_unix/support.c
 --- Linux-PAM-0.77.orig/modules/pam_unix/support.c	2002-09-23 17:33:22.000000000 +0000
 +++ Linux-PAM-0.77/modules/pam_unix/support.c	2003-09-14 06:19:34.000000000 +0000
-@@ -1,5 +1,5 @@
- /* 
-- * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-  *
-  * Copyright information at end of file.
-  */
 @@ -20,6 +20,7 @@
  
  #include <security/_pam_macros.h>
@@ -391,13 +371,6 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.c Linux-PAM-0.77/modules
 diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.h Linux-PAM-0.77/modules/pam_unix/support.h
 --- Linux-PAM-0.77.orig/modules/pam_unix/support.h	2002-07-11 05:43:51.000000000 +0000
 +++ Linux-PAM-0.77/modules/pam_unix/support.h	2003-09-14 06:20:03.000000000 +0000
-@@ -1,5 +1,5 @@
- /*
-- * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-  */
- 
- #ifndef _PAM_UNIX_SUPPORT_H
 @@ -125,7 +125,6 @@
  	_pam_drop(xx);		\
  }
@@ -438,13 +411,6 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_wheel/pam_wheel.c Linux-PAM-0.77/modu
 diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/Makefile Linux-PAM-0.77/modules/pammodutil/Makefile
 --- Linux-PAM-0.77.orig/modules/pammodutil/Makefile	2001-12-09 22:15:12.000000000 +0000
 +++ Linux-PAM-0.77/modules/pammodutil/Makefile	2003-09-14 06:22:40.000000000 +0000
-@@ -1,5 +1,5 @@
- #
--# $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+# $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
- #
- #
- 
 @@ -18,7 +18,8 @@
    -DLIBPAM_VERSION_MINOR=$(MINOR_REL)
  
@@ -458,15 +424,6 @@ diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/Makefile Linux-PAM-0.77/module
 diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h
 --- Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h	2001-12-09 22:15:12.000000000 +0000
 +++ Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h	2003-09-14 06:23:13.000000000 +0000
-@@ -2,7 +2,7 @@
- #define _PAM_MODUTIL_H
- 
- /*
-- * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
-  *
-  * This file is a list of handy libc wrappers that attempt to provide some
-  * thread-safe and other convenient functionality to modules in a form that
 @@ -15,7 +15,7 @@
   * On systems that simply can't support thread safe programming, these
   * functions don't support it either - sorry.
@@ -488,7 +445,7 @@ diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/modutil_getlogin.c Linux-PAM-0
 +++ Linux-PAM-0.77/modules/pammodutil/modutil_getlogin.c	2003-09-14 06:21:50.000000000 +0000
 @@ -0,0 +1,71 @@
 +/*
-+ * $Id: Linux-PAM-0.77-security-2.patch,v 1.1 2004/04/04 19:35:08 jim Exp $
++ * 
 + *
 + * A central point for invoking getlogin(). Hopefully, this is a
 + * little harder to spoof than all the other versions that are out
