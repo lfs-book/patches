@@ -1,13 +1,18 @@
-Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
-Date: 2004-03-16
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-11-21
 Initial Package Version: 3.3
+Upstream Status: Not submitted - Stack protector specific. Will not be
+accepted upstream.
 Origin: Based on gcc-3.3.2-pie-ssp.patch by Alexander Gabert
-Description: See description in the sspspecs.h hunk below the copyright.
-This patch will also work on gcc-2.95.3 with fuzz
+Description: This adds -fstack-protector-all to the default gcc/g++
+behaviour, with filters to prevent libraries and kernel from getting
+built with it.
 
-diff -Naur gcc-3.3.orig/gcc/gcc.c gcc-3.3.sspspecs/gcc/gcc.c
---- gcc-3.3.orig/gcc/gcc.c	2004-03-16 16:04:50.000000000 -0500
-+++ gcc-3.3.sspspecs/gcc/gcc.c	2004-03-16 16:05:15.000000000 -0500
+See: http://www.linuxfromscratch.org/hlfs/
+
+diff -Naur gcc-3.3.orig/gcc/gcc.c gcc-3.3/gcc/gcc.c
+--- gcc-3.3.orig/gcc/gcc.c	2004-11-21 19:08:58.180091440 +0000
++++ gcc-3.3/gcc/gcc.c	2004-11-21 19:09:03.832232184 +0000
 @@ -538,6 +538,7 @@
  
  /* config.h can define CC1_SPEC to provide extra args to cc1 and cc1plus
@@ -16,10 +21,10 @@ diff -Naur gcc-3.3.orig/gcc/gcc.c gcc-3.3.sspspecs/gcc/gcc.c
  #ifndef CC1_SPEC
  #define CC1_SPEC ""
  #endif
-diff -Naur gcc-3.3.orig/gcc/sspspecs.h gcc-3.3.sspspecs/gcc/sspspecs.h
---- gcc-3.3.orig/gcc/sspspecs.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.sspspecs/gcc/sspspecs.h	2004-03-16 16:06:36.000000000 -0500
-@@ -0,0 +1,91 @@
+diff -Naur gcc-3.3.orig/gcc/sspspecs.h gcc-3.3/gcc/sspspecs.h
+--- gcc-3.3.orig/gcc/sspspecs.h	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.3/gcc/sspspecs.h	2004-11-21 19:09:09.364391168 +0000
+@@ -0,0 +1,104 @@
 +/* Adds spec for RTL buffer overflow protection function
 +Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +1999, 2000, 2001, 2002 Free Software Foundation, Inc.
@@ -52,8 +57,6 @@ diff -Naur gcc-3.3.orig/gcc/sspspecs.h gcc-3.3.sspspecs/gcc/sspspecs.h
 +Website at http://www.linuxfromscratch.org/hlfs/ */
 +/* ashes */
 +
-+/* Hopefully this define will prevent this header from being looped.
-+	It gets endif'd at the bottom */
 +#ifndef SSP_SPEC_H
 +#define SSP_SPEC_H
 +
@@ -86,17 +89,22 @@ diff -Naur gcc-3.3.orig/gcc/sspspecs.h gcc-3.3.sspspecs/gcc/sspspecs.h
 +#ifndef STD_SSP_EXCLUDE
 +#define STD_SSP_EXCLUDE(flag)			\
 +	NSPEC(SSP_KERNEL_EXCLUDE,				\
-+	NSPEC("DIN_GCC",					\
-+	NSPEC("DIN_LIBGCC",					\
-+	NSPEC("DIN_LIBGCC2",				\
-+	NSPEC("nostartfiles",				\
-+	NSPEC("nostdinc",				\
++	NSPEC("D_LIBC",				\
++	NSPEC("DIN_GCC",                                        \
++	NSPEC("DIN_LIBGCC",                                     \
++	NSPEC("DIN_LIBGCC2",                            \
 +	NSPEC("nostdlib",					\
-+	NSPEC("nodefaultlibs",				\
++	NSPEC("nostartfiles",                           \
++	NSPEC("nostdinc",                               \
++	NSPEC("nodefaultlibs",                          \
++	NSPEC("D_LIBC_REENTRANT",				\
++	NSPEC("nostdinc++",                               \
++	NSPEC("shared-libgcc",			\
++	NSPEC("static-libgcc",                  \
 +	NSPEC("fno-stack-protector",		\
 +	NSPEC("fno-stack-protector-all",	\
 +	flag								\
-+	))))))))))
++	)))))))))))))))
 +#endif
 +
 +/* -fforce-addr has been heavily tested by Gentoo and should be safe. */
@@ -105,9 +113,19 @@ diff -Naur gcc-3.3.orig/gcc/sspspecs.h gcc-3.3.sspspecs/gcc/sspspecs.h
 +#endif
 +
 +/* Setup our new spec string with exclusion flags, and prepend the original spec. */
++#ifndef CC1_SPEC
++#define CC1_SPEC ""
++#endif
 +static char cc1_spec_string[] = CC1_SPEC STD_SSP_EXCLUDE(CC1_SSP);
 +/* Redefine cc1 specs. */
 +#undef CC1_SPEC
 +#define CC1_SPEC (cc1_spec_string)
++/* Redefine cc1plus */
++#ifndef CC1PLUS_SPEC
++#define CC1PLUS_SPEC ""
++#endif
++static char cc1plus_spec_string[] = CC1PLUS_SPEC STD_SSP_EXCLUDE(CC1_SSP);
++#undef CC1PLUS_SPEC
++#define CC1PLUS_SPEC (cc1plus_spec_string)
 +
 +#endif /* End of SSP_SPEC_H */

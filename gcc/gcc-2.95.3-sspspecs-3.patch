@@ -1,14 +1,19 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2004-10-17
-Initial Package Version: 3.4
-Upstream Status: Not submitted - Stack protector specific. Will not be accepted upstream.
+Date: 2004-11-21
+Initial Package Version: 2.95.3
+Upstream Status: Not submitted - Stack protector specific. Will not be
+accepted upstream.
 Origin: Based on gcc-3.3.2-pie-ssp.patch by Alexander Gabert
-Description: See description in the sspspecs.h hunk below the copyright.
+Description: This adds -fstack-protector-all to the default gcc/g++
+behaviour, with filters to prevent libraries and kernel from getting
+built with it.
 
-diff -Naur gcc-3.4.0.orig/gcc/gcc.c gcc-3.4.0.sspspecs/gcc/gcc.c
---- gcc-3.4.0.orig/gcc/gcc.c	2004-04-18 23:45:11.000000000 +0000
-+++ gcc-3.4.0.sspspecs/gcc/gcc.c	2004-10-17 01:27:58.000000000 +0000
-@@ -574,6 +574,7 @@
+See: http://www.linuxfromscratch.org/hlfs/
+
+diff -Naur gcc-2.95.3.orig/gcc/gcc.c gcc-2.95.3/gcc/gcc.c
+--- gcc-2.95.3.orig/gcc/gcc.c	2004-11-21 19:03:54.065323912 +0000
++++ gcc-2.95.3/gcc/gcc.c	2004-11-21 19:04:43.493809640 +0000
+@@ -407,6 +407,7 @@
  
  /* config.h can define CC1_SPEC to provide extra args to cc1 and cc1plus
     or extra switch-translations.  */
@@ -16,10 +21,10 @@ diff -Naur gcc-3.4.0.orig/gcc/gcc.c gcc-3.4.0.sspspecs/gcc/gcc.c
  #ifndef CC1_SPEC
  #define CC1_SPEC ""
  #endif
-diff -Naur gcc-3.4.0.orig/gcc/sspspecs.h gcc-3.4.0.sspspecs/gcc/sspspecs.h
---- gcc-3.4.0.orig/gcc/sspspecs.h	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.0.sspspecs/gcc/sspspecs.h	2004-10-17 01:30:04.000000000 +0000
-@@ -0,0 +1,96 @@
+diff -Naur gcc-2.95.3.orig/gcc/sspspecs.h gcc-2.95.3/gcc/sspspecs.h
+--- gcc-2.95.3.orig/gcc/sspspecs.h	1970-01-01 00:00:00.000000000 +0000
++++ gcc-2.95.3/gcc/sspspecs.h	2004-11-21 19:06:18.226408096 +0000
+@@ -0,0 +1,104 @@
 +/* Adds spec for RTL buffer overflow protection function
 +Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +1999, 2000, 2001, 2002 Free Software Foundation, Inc.
@@ -52,8 +57,6 @@ diff -Naur gcc-3.4.0.orig/gcc/sspspecs.h gcc-3.4.0.sspspecs/gcc/sspspecs.h
 +Website at http://www.linuxfromscratch.org/hlfs/ */
 +/* ashes */
 +
-+/* Hopefully this define will prevent this header from being looped.
-+	It gets endif'd at the bottom */
 +#ifndef SSP_SPEC_H
 +#define SSP_SPEC_H
 +
@@ -110,9 +113,19 @@ diff -Naur gcc-3.4.0.orig/gcc/sspspecs.h gcc-3.4.0.sspspecs/gcc/sspspecs.h
 +#endif
 +
 +/* Setup our new spec string with exclusion flags, and prepend the original spec. */
++#ifndef CC1_SPEC
++#define CC1_SPEC ""
++#endif
 +static char cc1_spec_string[] = CC1_SPEC STD_SSP_EXCLUDE(CC1_SSP);
 +/* Redefine cc1 specs. */
 +#undef CC1_SPEC
 +#define CC1_SPEC (cc1_spec_string)
++/* Redefine cc1plus */
++#ifndef CC1PLUS_SPEC
++#define CC1PLUS_SPEC ""
++#endif
++static char cc1plus_spec_string[] = CC1PLUS_SPEC STD_SSP_EXCLUDE(CC1_SSP);
++#undef CC1PLUS_SPEC
++#define CC1PLUS_SPEC (cc1plus_spec_string)
 +
 +#endif /* End of SSP_SPEC_H */
