@@ -1,14 +1,36 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
-Date: 2003-11-03
+Date: 2003-11-12
 Initial Package Version: 3.3
 Origin: http://www.research.ibm.com/trl/projects/security/ssp/
-Description: ProPolice Stack Gaurd
+Description: ProPolice Stack Gaurd - protector-3.3-5.tar.gz
 http://www.linuxfromscratch.org/hints/downloads/files/propolice.txt
 
-diff -Naur gcc-3.3.2.orig/gcc/Makefile.in gcc-3.3.2/gcc/Makefile.in
---- gcc-3.3.2.orig/gcc/Makefile.in	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/Makefile.in	2003-11-01 10:59:02.000000000 -0500
-@@ -764,7 +764,7 @@
+If you want -fno-stack-protector by default edit out this first hunk.
+
+--- gcc-3.3.orig/gcc/Makefile.in	2003-11-13 22:33:48.000000000 -0500
++++ gcc-3.3/gcc/Makefile.in	2003-11-13 22:34:01.000000000 -0500
+@@ -385,7 +385,7 @@
+ # Options to use when compiling libgcc2.a.
+ #
+ LIBGCC2_DEBUG_CFLAGS = -g
+-LIBGCC2_CFLAGS = -O2 $(LIBGCC2_INCLUDES) $(GCC_CFLAGS) $(TARGET_LIBGCC2_CFLAGS) $(LIBGCC2_DEBUG_CFLAGS) $(GTHREAD_FLAGS) -DIN_LIBGCC2 -D__GCC_FLOAT_NOT_NEEDED @inhibit_libc@
++LIBGCC2_CFLAGS = -O2 $(LIBGCC2_INCLUDES) $(GCC_CFLAGS) $(TARGET_LIBGCC2_CFLAGS) $(LIBGCC2_DEBUG_CFLAGS) $(GTHREAD_FLAGS) -DIN_LIBGCC2 -D__GCC_FLOAT_NOT_NEEDED @inhibit_libc@ -fno-stack-protector
+ 
+ # Additional options to use when compiling libgcc2.a.
+ # Some targets override this to -isystem include
+@@ -1407,7 +1407,7 @@
+    ssa.h $(PARAMS_H) $(TM_P_H) reload.h dwarf2asm.h $(TARGET_H) \
+    langhooks.h insn-flags.h options.h cfglayout.h real.h
+ 	$(CC) $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+-	  -DTARGET_NAME=\"$(target_alias)\" \
++	  -DSTACK_PROTECTOR -DTARGET_NAME=\"$(target_alias)\" \
+ 	  -c $(srcdir)/toplev.c $(OUTPUT_OPTION)
+ main.o : main.c $(CONFIG_H) $(SYSTEM_H) toplev.h
+ 
+diff -Naur gcc-3.3.orig/gcc/Makefile.in gcc-3.3/gcc/Makefile.in
+--- gcc-3.3.orig/gcc/Makefile.in	2003-04-22 11:50:48.000000000 -0400
++++ gcc-3.3/gcc/Makefile.in	2003-11-13 22:30:48.000000000 -0500
+@@ -761,7 +761,7 @@
   sibcall.o simplify-rtx.o ssa.o ssa-ccp.o ssa-dce.o stmt.o		   \
   stor-layout.o stringpool.o timevar.o toplev.o tracer.o tree.o tree-dump.o \
   tree-inline.o unroll.o varasm.o varray.o version.o vmsdbgout.o xcoffout.o \
@@ -17,7 +39,7 @@ diff -Naur gcc-3.3.2.orig/gcc/Makefile.in gcc-3.3.2/gcc/Makefile.in
  
  BACKEND = main.o libbackend.a
  
-@@ -798,7 +798,7 @@
+@@ -795,7 +795,7 @@
  
  LIB2FUNCS_2 = _floatdixf _fixunsxfsi _fixtfdi _fixunstfdi _floatditf \
      _clear_cache _trampoline __main _exit _absvsi2 _absvdi2 _addvsi3 \
@@ -26,7 +48,7 @@ diff -Naur gcc-3.3.2.orig/gcc/Makefile.in gcc-3.3.2/gcc/Makefile.in
  
  # Defined in libgcc2.c, included only in the static library.
  LIB2FUNCS_ST = _eprintf _bb __gcc_bcmp
-@@ -1665,6 +1665,7 @@
+@@ -1662,6 +1662,7 @@
     output.h except.h $(TM_P_H) real.h
  params.o : params.c $(CONFIG_H) $(SYSTEM_H) $(PARAMS_H) toplev.h
  hooks.o: hooks.c $(CONFIG_H) $(SYSTEM_H) $(HOOKS_H)
@@ -34,10 +56,10 @@ diff -Naur gcc-3.3.2.orig/gcc/Makefile.in gcc-3.3.2/gcc/Makefile.in
  
  $(out_object_file): $(out_file) $(CONFIG_H) $(TREE_H) $(GGC_H) \
     $(RTL_H) $(REGS_H) hard-reg-set.h real.h insn-config.h conditions.h \
-diff -Naur gcc-3.3.2.orig/gcc/calls.c gcc-3.3.2/gcc/calls.c
---- gcc-3.3.2.orig/gcc/calls.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/calls.c	2003-11-01 10:59:02.000000000 -0500
-@@ -2331,7 +2331,7 @@
+diff -Naur gcc-3.3.orig/gcc/calls.c gcc-3.3/gcc/calls.c
+--- gcc-3.3.orig/gcc/calls.c	2003-04-22 11:50:54.000000000 -0400
++++ gcc-3.3/gcc/calls.c	2003-11-13 22:30:48.000000000 -0500
+@@ -2324,7 +2324,7 @@
  	    /* For variable-sized objects, we must be called with a target
  	       specified.  If we were to allocate space on the stack here,
  	       we would have no way of knowing when to free it.  */
@@ -46,10 +68,10 @@ diff -Naur gcc-3.3.2.orig/gcc/calls.c gcc-3.3.2/gcc/calls.c
  
  	    mark_temp_addr_taken (d);
  	    structure_value_addr = XEXP (d, 0);
-diff -Naur gcc-3.3.2.orig/gcc/combine.c gcc-3.3.2/gcc/combine.c
---- gcc-3.3.2.orig/gcc/combine.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/combine.c	2003-11-01 10:59:02.000000000 -0500
-@@ -3889,7 +3889,17 @@
+diff -Naur gcc-3.3.orig/gcc/combine.c gcc-3.3/gcc/combine.c
+--- gcc-3.3.orig/gcc/combine.c	2003-03-24 06:37:32.000000000 -0500
++++ gcc-3.3/gcc/combine.c	2003-11-13 22:30:48.000000000 -0500
+@@ -3859,7 +3859,17 @@
  	  rtx inner_op0 = XEXP (XEXP (x, 0), 1);
  	  rtx inner_op1 = XEXP (x, 1);
  	  rtx inner;
@@ -68,7 +90,7 @@ diff -Naur gcc-3.3.2.orig/gcc/combine.c gcc-3.3.2/gcc/combine.c
  	  /* Make sure we pass the constant operand if any as the second
  	     one if this is a commutative operation.  */
  	  if (CONSTANT_P (inner_op0) && GET_RTX_CLASS (code) == 'c')
-@@ -4302,6 +4312,11 @@
+@@ -4272,6 +4282,11 @@
  	 they are now checked elsewhere.  */
        if (GET_CODE (XEXP (x, 0)) == PLUS
  	  && CONSTANT_ADDRESS_P (XEXP (XEXP (x, 0), 1)))
@@ -80,7 +102,7 @@ diff -Naur gcc-3.3.2.orig/gcc/combine.c gcc-3.3.2/gcc/combine.c
  	return gen_binary (PLUS, mode,
  			   gen_binary (PLUS, mode, XEXP (XEXP (x, 0), 0),
  				       XEXP (x, 1)),
-@@ -4430,7 +4445,10 @@
+@@ -4400,7 +4415,10 @@
  
        /* Canonicalize (minus A (plus B C)) to (minus (minus A B) C) for
  	 integers.  */
@@ -92,9 +114,9 @@ diff -Naur gcc-3.3.2.orig/gcc/combine.c gcc-3.3.2/gcc/combine.c
  	return gen_binary (MINUS, mode,
  			   gen_binary (MINUS, mode, XEXP (x, 0),
  				       XEXP (XEXP (x, 1), 0)),
-diff -Naur gcc-3.3.2.orig/gcc/config/t-linux gcc-3.3.2/gcc/config/t-linux
---- gcc-3.3.2.orig/gcc/config/t-linux	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/config/t-linux	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/config/t-linux gcc-3.3/gcc/config/t-linux
+--- gcc-3.3.orig/gcc/config/t-linux	2002-11-28 09:47:01.000000000 -0500
++++ gcc-3.3/gcc/config/t-linux	2003-11-13 22:30:49.000000000 -0500
 @@ -4,7 +4,7 @@
  # Compile crtbeginS.o and crtendS.o with pic.
  CRTSTUFF_T_CFLAGS_S = $(CRTSTUFF_T_CFLAGS) -fPIC
@@ -104,9 +126,9 @@ diff -Naur gcc-3.3.2.orig/gcc/config/t-linux gcc-3.3.2/gcc/config/t-linux
  
  # Override t-slibgcc-elf-ver to export some libgcc symbols with
  # the symbol versions that glibc used.
-diff -Naur gcc-3.3.2.orig/gcc/cse.c gcc-3.3.2/gcc/cse.c
---- gcc-3.3.2.orig/gcc/cse.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/cse.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/cse.c gcc-3.3/gcc/cse.c
+--- gcc-3.3.orig/gcc/cse.c	2003-04-29 15:16:40.000000000 -0400
++++ gcc-3.3/gcc/cse.c	2003-11-13 22:30:48.000000000 -0500
 @@ -4288,7 +4288,14 @@
  
  	      if (new_const == 0)
@@ -138,9 +160,9 @@ diff -Naur gcc-3.3.2.orig/gcc/cse.c gcc-3.3.2/gcc/cse.c
  
        /* Don't count call-insns, (set (reg 0) (call ...)), as a set.
  	 The hard function value register is used only once, to copy to
-diff -Naur gcc-3.3.2.orig/gcc/explow.c gcc-3.3.2/gcc/explow.c
---- gcc-3.3.2.orig/gcc/explow.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/explow.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/explow.c gcc-3.3/gcc/explow.c
+--- gcc-3.3.orig/gcc/explow.c	2003-04-07 18:58:12.000000000 -0400
++++ gcc-3.3/gcc/explow.c	2003-11-13 22:30:48.000000000 -0500
 @@ -86,7 +86,8 @@
    rtx tem;
    int all_constant = 0;
@@ -183,9 +205,9 @@ diff -Naur gcc-3.3.2.orig/gcc/explow.c gcc-3.3.2/gcc/explow.c
        LEGITIMIZE_ADDRESS (x, oldx, mode, win);
  
        /* PLUS and MULT can appear in special ways
-diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
---- gcc-3.3.2.orig/gcc/expr.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/expr.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/expr.c gcc-3.3/gcc/expr.c
+--- gcc-3.3.orig/gcc/expr.c	2003-04-22 19:08:15.000000000 -0400
++++ gcc-3.3/gcc/expr.c	2003-11-13 22:30:48.000000000 -0500
 @@ -45,6 +45,7 @@
  #include "langhooks.h"
  #include "intl.h"
@@ -194,7 +216,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  
  /* Decide whether a function's arguments should be processed
     from first to last or from last to first.
-@@ -1527,7 +1528,7 @@
+@@ -1517,7 +1518,7 @@
  
        if (USE_LOAD_PRE_DECREMENT (mode) && data.reverse && ! data.autinc_from)
  	{
@@ -203,7 +225,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  	  data.autinc_from = 1;
  	  data.explicit_inc_from = -1;
  	}
-@@ -1541,7 +1542,7 @@
+@@ -1531,7 +1532,7 @@
  	data.from_addr = copy_addr_to_reg (from_addr);
        if (USE_STORE_PRE_DECREMENT (mode) && data.reverse && ! data.autinc_to)
  	{
@@ -212,7 +234,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  	  data.autinc_to = 1;
  	  data.explicit_inc_to = -1;
  	}
-@@ -1658,11 +1659,13 @@
+@@ -1648,11 +1649,13 @@
  	from1 = adjust_address (data->from, mode, data->offset);
  
        if (HAVE_PRE_DECREMENT && data->explicit_inc_to < 0)
@@ -230,7 +252,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  
        if (data->to)
  	emit_insn ((*genfun) (to1, from1));
-@@ -2835,7 +2838,7 @@
+@@ -2816,7 +2819,7 @@
  
        if (USE_STORE_PRE_DECREMENT (mode) && data->reverse && ! data->autinc_to)
  	{
@@ -239,7 +261,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  	  data->autinc_to = 1;
  	  data->explicit_inc_to = -1;
  	}
-@@ -2906,8 +2909,9 @@
+@@ -2887,8 +2890,9 @@
  	to1 = adjust_address (data->to, mode, data->offset);
  
        if (HAVE_PRE_DECREMENT && data->explicit_inc_to < 0)
@@ -251,7 +273,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  
        cst = (*data->constfun) (data->constfundata, data->offset, mode);
        emit_insn ((*genfun) (to1, cst));
-@@ -5903,7 +5907,9 @@
+@@ -5882,7 +5886,9 @@
  	  && GET_CODE (XEXP (value, 0)) == PLUS
  	  && GET_CODE (XEXP (XEXP (value, 0), 0)) == REG
  	  && REGNO (XEXP (XEXP (value, 0), 0)) >= FIRST_VIRTUAL_REGISTER
@@ -262,7 +284,7 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  	{
  	  rtx temp = expand_simple_binop (GET_MODE (value), code,
  					  XEXP (XEXP (value, 0), 0), op2,
-@@ -8079,7 +8085,8 @@
+@@ -8049,7 +8055,8 @@
        /* If adding to a sum including a constant,
  	 associate it to put the constant outside.  */
        if (GET_CODE (op1) == PLUS
@@ -272,10 +294,10 @@ diff -Naur gcc-3.3.2.orig/gcc/expr.c gcc-3.3.2/gcc/expr.c
  	{
  	  rtx constant_term = const0_rtx;
  
-diff -Naur gcc-3.3.2.orig/gcc/flags.h gcc-3.3.2/gcc/flags.h
---- gcc-3.3.2.orig/gcc/flags.h	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/flags.h	2003-11-01 10:59:02.000000000 -0500
-@@ -690,4 +690,13 @@
+diff -Naur gcc-3.3.orig/gcc/flags.h gcc-3.3/gcc/flags.h
+--- gcc-3.3.orig/gcc/flags.h	2003-05-02 17:01:17.000000000 -0400
++++ gcc-3.3/gcc/flags.h	2003-11-13 22:30:48.000000000 -0500
+@@ -685,4 +685,13 @@
  #define HONOR_SIGN_DEPENDENT_ROUNDING(MODE) \
    (MODE_HAS_SIGN_DEPENDENT_ROUNDING (MODE) && !flag_unsafe_math_optimizations)
  
@@ -289,19 +311,20 @@ diff -Naur gcc-3.3.2.orig/gcc/flags.h gcc-3.3.2/gcc/flags.h
 +extern int warn_stack_protector;
 +
  #endif /* ! GCC_FLAGS_H */
-diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
---- gcc-3.3.2.orig/gcc/function.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/function.c	2003-11-01 10:59:52.000000000 -0500
-@@ -60,6 +60,8 @@
+diff -Naur gcc-3.3.orig/gcc/function.c gcc-3.3/gcc/function.c
+--- gcc-3.3.orig/gcc/function.c	2003-04-10 18:26:04.000000000 -0400
++++ gcc-3.3/gcc/function.c	2003-11-13 22:32:09.000000000 -0500
+@@ -60,6 +60,9 @@
  #include "integrate.h"
  #include "langhooks.h"
  
++/* For propolice */
 +#include "protector.h"
 +
  #ifndef TRAMPOLINE_ALIGNMENT
  #define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
  #endif
-@@ -142,6 +144,10 @@
+@@ -142,6 +145,10 @@
  /* Array of INSN_UIDs to hold the INSN_UIDs for each sibcall epilogue
     in this function.  */
  static GTY(()) varray_type sibcall_epilogue;
@@ -309,19 +332,19 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
 +/* Current boundary mark for character arrays.  */
 +int temp_boundary_mark = 0;
 +
- 
+ 
  /* In order to evaluate some expressions, such as function calls returning
     structures in memory, we need to temporarily allocate stack locations.
-@@ -195,6 +201,8 @@
+@@ -195,6 +202,8 @@
    /* The size of the slot, including extra space for alignment.  This
       info is for combine_temp_slots.  */
    HOST_WIDE_INT full_size;
 +  /* Boundary mark of a character array and the others. This info is for propolice */
 +  int boundary_mark;
  };
- 
+ 
  /* This structure is used to record MEMs or pseudos used to replace VAR, any
-@@ -629,6 +637,7 @@
+@@ -629,6 +638,7 @@
     whose lifetime is controlled by CLEANUP_POINT_EXPRs.  KEEP is 3
     if we are to allocate something at an inner level to be treated as
     a variable in the block (e.g., a SAVE_EXPR).
@@ -329,7 +352,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  
     TYPE is the type that will be used for the stack slot.  */
  
-@@ -642,6 +651,8 @@
+@@ -642,6 +652,8 @@
    unsigned int align;
    struct temp_slot *p, *best_p = 0;
    rtx slot;
@@ -338,7 +361,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  
    /* If SIZE is -1 it means that somebody tried to allocate a temporary
       of a variable size.  */
-@@ -667,7 +678,8 @@
+@@ -667,7 +679,8 @@
  	&& ! p->in_use
  	&& objects_must_conflict_p (p->type, type)
  	&& (best_p == 0 || best_p->size > p->size
@@ -348,7 +371,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
        {
  	if (p->align == align && p->size == size)
  	  {
-@@ -702,6 +714,7 @@
+@@ -702,6 +715,7 @@
  	      p->address = 0;
  	      p->rtl_expr = 0;
  	      p->type = best_p->type;
@@ -356,7 +379,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  	      p->next = temp_slots;
  	      temp_slots = p;
  
-@@ -762,6 +775,7 @@
+@@ -762,6 +776,7 @@
        p->full_size = frame_offset - frame_offset_old;
  #endif
        p->address = 0;
@@ -364,7 +387,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
        p->next = temp_slots;
        temp_slots = p;
      }
-@@ -932,14 +946,16 @@
+@@ -932,14 +947,16 @@
  	    int delete_q = 0;
  	    if (! q->in_use && GET_MODE (q->slot) == BLKmode)
  	      {
@@ -383,7 +406,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  		  {
  		    /* P comes after Q; combine P into Q.  */
  		    q->size += p->size;
-@@ -1499,7 +1515,9 @@
+@@ -1497,7 +1514,9 @@
      new = func->x_parm_reg_stack_loc[regno];
  
    if (new == 0)
@@ -394,7 +417,7 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  
    PUT_CODE (reg, MEM);
    PUT_MODE (reg, decl_mode);
-@@ -3963,7 +3981,8 @@
+@@ -3961,7 +3980,8 @@
  		 constant with that register.  */
  	      temp = gen_reg_rtx (Pmode);
  	      XEXP (x, 0) = new;
@@ -404,10 +427,10 @@ diff -Naur gcc-3.3.2.orig/gcc/function.c gcc-3.3.2/gcc/function.c
  		emit_insn_before (gen_move_insn (temp, new_offset), object);
  	      else
  		{
-diff -Naur gcc-3.3.2.orig/gcc/gcse.c gcc-3.3.2/gcc/gcse.c
---- gcc-3.3.2.orig/gcc/gcse.c	2003-11-01 10:31:35.000000000 -0500
-+++ gcc-3.3.2/gcc/gcse.c	2003-11-01 10:59:02.000000000 -0500
-@@ -4211,7 +4211,7 @@
+diff -Naur gcc-3.3.orig/gcc/gcse.c gcc-3.3/gcc/gcse.c
+--- gcc-3.3.orig/gcc/gcse.c	2003-05-01 14:19:39.000000000 -0400
++++ gcc-3.3/gcc/gcse.c	2003-11-13 22:30:48.000000000 -0500
+@@ -4208,7 +4208,7 @@
        /* Find an assignment that sets reg_used and is available
  	 at the start of the block.  */
        set = find_avail_set (regno, insn);
@@ -416,10 +439,10 @@ diff -Naur gcc-3.3.2.orig/gcc/gcse.c gcc-3.3.2/gcc/gcse.c
  	continue;
  
        pat = set->expr;
-diff -Naur gcc-3.3.2.orig/gcc/integrate.c gcc-3.3.2/gcc/integrate.c
---- gcc-3.3.2.orig/gcc/integrate.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/integrate.c	2003-11-01 10:59:02.000000000 -0500
-@@ -401,6 +401,10 @@
+diff -Naur gcc-3.3.orig/gcc/integrate.c gcc-3.3/gcc/integrate.c
+--- gcc-3.3.orig/gcc/integrate.c	2003-03-20 18:20:02.000000000 -0500
++++ gcc-3.3/gcc/integrate.c	2003-11-13 22:30:48.000000000 -0500
+@@ -399,6 +399,10 @@
    /* These args would always appear unused, if not for this.  */
    TREE_USED (copy) = 1;
  
@@ -430,7 +453,7 @@ diff -Naur gcc-3.3.2.orig/gcc/integrate.c gcc-3.3.2/gcc/integrate.c
    /* Set the context for the new declaration.  */
    if (!DECL_CONTEXT (decl))
      /* Globals stay global.  */
-@@ -1965,6 +1969,10 @@
+@@ -1963,6 +1967,10 @@
  
  	      seq = get_insns ();
  	      end_sequence ();
@@ -441,9 +464,9 @@ diff -Naur gcc-3.3.2.orig/gcc/integrate.c gcc-3.3.2/gcc/integrate.c
  	      emit_insn_after (seq, map->insns_at_start);
  	      return temp;
  	    }
-diff -Naur gcc-3.3.2.orig/gcc/libgcc-std.ver gcc-3.3.2/gcc/libgcc-std.ver
---- gcc-3.3.2.orig/gcc/libgcc-std.ver	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/libgcc-std.ver	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/libgcc-std.ver gcc-3.3/gcc/libgcc-std.ver
+--- gcc-3.3.orig/gcc/libgcc-std.ver	2003-05-02 17:01:19.000000000 -0400
++++ gcc-3.3/gcc/libgcc-std.ver	2003-11-13 22:30:48.000000000 -0500
 @@ -174,6 +174,10 @@
    _Unwind_SjLj_RaiseException
    _Unwind_SjLj_ForcedUnwind
@@ -455,14 +478,14 @@ diff -Naur gcc-3.3.2.orig/gcc/libgcc-std.ver gcc-3.3.2/gcc/libgcc-std.ver
  }
  
  %inherit GCC_3.3 GCC_3.0
-diff -Naur gcc-3.3.2.orig/gcc/libgcc2.c gcc-3.3.2/gcc/libgcc2.c
---- gcc-3.3.2.orig/gcc/libgcc2.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/libgcc2.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/libgcc2.c gcc-3.3/gcc/libgcc2.c
+--- gcc-3.3.orig/gcc/libgcc2.c	2002-10-23 06:47:24.000000000 -0400
++++ gcc-3.3/gcc/libgcc2.c	2003-11-13 22:30:48.000000000 -0500
 @@ -1993,3 +1993,102 @@
  #endif /* NEED_ATEXIT */
  
  #endif /* L_exit */
-+
++
 +#ifdef L_stack_smash_handler
 +#include <stdio.h>
 +#include <string.h>
@@ -561,10 +584,10 @@ diff -Naur gcc-3.3.2.orig/gcc/libgcc2.c gcc-3.3.2/gcc/libgcc2.c
 +  _exit(127);
 +}
 +#endif
-diff -Naur gcc-3.3.2.orig/gcc/loop.c gcc-3.3.2/gcc/loop.c
---- gcc-3.3.2.orig/gcc/loop.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/loop.c	2003-11-01 10:59:02.000000000 -0500
-@@ -6543,6 +6543,14 @@
+diff -Naur gcc-3.3.orig/gcc/loop.c gcc-3.3/gcc/loop.c
+--- gcc-3.3.orig/gcc/loop.c	2003-04-24 20:36:00.000000000 -0400
++++ gcc-3.3/gcc/loop.c	2003-11-13 22:30:48.000000000 -0500
+@@ -6516,6 +6516,14 @@
    if (GET_CODE (*mult_val) == USE)
      *mult_val = XEXP (*mult_val, 0);
  
@@ -579,10 +602,10 @@ diff -Naur gcc-3.3.2.orig/gcc/loop.c gcc-3.3.2/gcc/loop.c
    if (is_addr)
      *pbenefit += address_cost (orig_x, addr_mode) - reg_address_cost;
    else
-diff -Naur gcc-3.3.2.orig/gcc/optabs.c gcc-3.3.2/gcc/optabs.c
---- gcc-3.3.2.orig/gcc/optabs.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/optabs.c	2003-11-01 10:59:02.000000000 -0500
-@@ -703,6 +703,26 @@
+diff -Naur gcc-3.3.orig/gcc/optabs.c gcc-3.3/gcc/optabs.c
+--- gcc-3.3.orig/gcc/optabs.c	2003-02-07 14:43:50.000000000 -0500
++++ gcc-3.3/gcc/optabs.c	2003-11-13 22:30:48.000000000 -0500
+@@ -696,6 +696,26 @@
    if (target)
      target = protect_from_queue (target, 1);
  
@@ -609,9 +632,9 @@ diff -Naur gcc-3.3.2.orig/gcc/optabs.c gcc-3.3.2/gcc/optabs.c
    if (flag_force_mem)
      {
        op0 = force_not_mem (op0);
-diff -Naur gcc-3.3.2.orig/gcc/protector.c gcc-3.3.2/gcc/protector.c
---- gcc-3.3.2.orig/gcc/protector.c	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.2/gcc/protector.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/protector.c gcc-3.3/gcc/protector.c
+--- gcc-3.3.orig/gcc/protector.c	1969-12-31 19:00:00.000000000 -0500
++++ gcc-3.3/gcc/protector.c	2003-11-13 22:30:56.000000000 -0500
 @@ -0,0 +1,2618 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3231,9 +3254,9 @@ diff -Naur gcc-3.3.2.orig/gcc/protector.c gcc-3.3.2/gcc/protector.c
 +  return FALSE;
 +}
 +#endif
-diff -Naur gcc-3.3.2.orig/gcc/protector.h gcc-3.3.2/gcc/protector.h
---- gcc-3.3.2.orig/gcc/protector.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.2/gcc/protector.h	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/protector.h gcc-3.3/gcc/protector.h
+--- gcc-3.3.orig/gcc/protector.h	1969-12-31 19:00:00.000000000 -0500
++++ gcc-3.3/gcc/protector.h	2003-11-13 22:30:58.000000000 -0500
 @@ -0,0 +1,48 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 1987, 88, 89, 92-7, 1998 Free Software Foundation, Inc.
@@ -3283,9 +3306,9 @@ diff -Naur gcc-3.3.2.orig/gcc/protector.h gcc-3.3.2/gcc/protector.h
 +extern rtx assign_stack_local_for_pseudo_reg PARAMS ((enum machine_mode, HOST_WIDE_INT, int));
 +
 +#endif
-diff -Naur gcc-3.3.2.orig/gcc/reload1.c gcc-3.3.2/gcc/reload1.c
---- gcc-3.3.2.orig/gcc/reload1.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/reload1.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/reload1.c gcc-3.3/gcc/reload1.c
+--- gcc-3.3.orig/gcc/reload1.c	2003-03-28 18:22:05.000000000 -0500
++++ gcc-3.3/gcc/reload1.c	2003-11-13 22:30:48.000000000 -0500
 @@ -42,6 +42,7 @@
  #include "toplev.h"
  #include "except.h"
@@ -3303,9 +3326,9 @@ diff -Naur gcc-3.3.2.orig/gcc/reload1.c gcc-3.3.2/gcc/reload1.c
  				  inherent_size == total_size ? 0 : -1);
  	  if (BYTES_BIG_ENDIAN)
  	    /* Cancel the  big-endian correction done in assign_stack_local.
-diff -Naur gcc-3.3.2.orig/gcc/simplify-rtx.c gcc-3.3.2/gcc/simplify-rtx.c
---- gcc-3.3.2.orig/gcc/simplify-rtx.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/simplify-rtx.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/simplify-rtx.c gcc-3.3/gcc/simplify-rtx.c
+--- gcc-3.3.orig/gcc/simplify-rtx.c	2003-02-11 17:26:30.000000000 -0500
++++ gcc-3.3/gcc/simplify-rtx.c	2003-11-13 22:30:49.000000000 -0500
 @@ -1670,7 +1670,8 @@
    int n_ops = 2, input_ops = 2, input_consts = 0, n_consts;
    int first, negate, changed;
@@ -3396,9 +3419,9 @@ diff -Naur gcc-3.3.2.orig/gcc/simplify-rtx.c gcc-3.3.2/gcc/simplify-rtx.c
    /* Put a non-negated operand first.  If there aren't any, make all
       operands positive and negate the whole thing later.  */
  
-diff -Naur gcc-3.3.2.orig/gcc/toplev.c gcc-3.3.2/gcc/toplev.c
---- gcc-3.3.2.orig/gcc/toplev.c	2003-11-01 10:31:36.000000000 -0500
-+++ gcc-3.3.2/gcc/toplev.c	2003-11-01 10:59:02.000000000 -0500
+diff -Naur gcc-3.3.orig/gcc/toplev.c gcc-3.3/gcc/toplev.c
+--- gcc-3.3.orig/gcc/toplev.c	2003-05-05 17:55:26.000000000 -0400
++++ gcc-3.3/gcc/toplev.c	2003-11-13 22:30:49.000000000 -0500
 @@ -904,6 +904,15 @@
     minimum function alignment.  Zero means no alignment is forced.  */
  int force_align_functions_log;
