@@ -1,0 +1,20 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-01-23
+Initial Package Version: 3.1.0
+Upstream Status: Not submitted.
+Origin: None
+Description: This patch adds options to syslog-ng so it runs in chroot as
+a regular user.
+
+diff -Naur lfs-bootscripts-3.1.0.orig/lfs/init.d/syslog-ng lfs-bootscripts-3.1.0/lfs/init.d/syslog-ng
+--- lfs-bootscripts-3.1.0.orig/lfs/init.d/syslog-ng	2005-01-23 10:46:53.465743516 +0000
++++ lfs-bootscripts-3.1.0/lfs/init.d/syslog-ng	2005-01-24 01:03:26.504972063 +0000
+@@ -18,7 +18,7 @@
+ case "${1}" in
+ 	start)
+ 		boot_mesg "Starting system log daemon..."
+-		loadproc syslog-ng
++		loadproc syslog-ng -C /var/log -u syslog -g syslog
+ 		;;
+ 
+ 	stop)
