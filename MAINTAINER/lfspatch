@@ -1,52 +1,35 @@
 #!/bin/bash
-
-# This script will generate a patch with the appropriate LFS header
+#
+# <http://www.linuxfromscratch.org/patches/>
+#
+# This script generates a patch with the proper naming
+# conventions and proper headers.
 # 
-# Asumptions
-#
-# #1 The script assumes that you have two directories
-#    One for the unmodified and one modified
-#    Examples: zoo-2.10 and zoo-2.10.orig
-#	   The .orig is unmodified
-#
-#    or
-#    The script assums that you have two files
-#    One for the umodified and one modified
-#    Examples: config.h and config.h.orig 
-#	   The .orig is unmodified
-#
-# #2 It assumes that this is a first release patch and
-#    adds -1 to end of the patch. Unless you specify the
-#    third option
+# Asumptions:
+# * The script assumes that you have two directories
+#   One for the unmodified and one modified
+#   Examples: zoo-2.10 and zoo-2.10.orig
+#   The .orig is unmodified
+#   or
+#   The script assums that you have two files
+#   One for the umodified and one modified
+#   Examples: config.h and config.h.orig 
+#   The .orig is unmodified
+# * It assumes that this is a first release patch and
+#   adds -1 to end of the patch. Unless you specify the
+#   third option
 # 
 # Script depends on the following programs that are not standard with
-# LFS
-#
-# nail - http://omnibus.ruf.uni-freiburg.de/~gritter/archive/nail/nail-10.5.tar.gz
-#	 build instructions
-#	 ./configure --prefix=/usr --with-openssl --with-rcfile=/etc/nail/nail.rc
-#	 mkdir /etc/nail
-#	 cp nail.rc /etc/nail
-#	 echo "# Use SMTP Server for mail sending" >> /etc/nail/nail.rc
-#	 echo "# If you do not have a email server, change localhost to your" >> /etc/nail/nail.rc
-#	 echo "# ISP's smtp server" >> /etc/nail/nail.rc
-#	 echo "set smtp=localhost" >> /etc/nail/nail.rc
-#	 make && make install
-#	 ln -sf /usr/bin/nail /usr/bin/mail
-#	 ln -sf /usr/bin/nail /usr/bin/Mail
-#	 ln -sf /usr/man/man1/nail.1 /usr/man/man1/mail.1
-#	 ln -sf /usr/man/man1/nail.1 /usr/man/man1/Mail.1
-#	
-# which - http://www.xs4all.nl/~carlo17/which/which-2.16.tar.gz
-#	  Build instructions
-#	  ./configure --prefix=/usr && make && make install
-#
+# LFS (See BLFS for installation)
+# * nail
+# * which
 #
 # This script also create a blank header that will need to be edited
 # with the Initial Package Version:, Origin: , and Description: of
 # the patch
 #
-# Script created by Jim Gifford
+# See ChangeLog at the end for credits.
+#
 
 # Input Check
 # 
@@ -72,7 +55,7 @@ rm -f /tmp/patch.mail /tmp/file.list /tmp/file.list.new
 submitter="Your Name"
 email="your@email.address"
 date="`date +%F`"
-patches="patches@linuxfromsratch.org"
+patches="patches@linuxfromscratch.org"
 
 # If you want the script to submit your patches
 # You will need to specify the mailer program
@@ -126,13 +109,11 @@ YESNO ()
 
 # Parse Email
 #
-emailpart1="`echo $email | cut -f1 -d'@'`"
-emailpart2="`echo $email | cut -f2 -d'@' | cut -f1 '-d.'`"
-emailpart3="`echo $email | cut -f2 -d'@' | cut -f2 '-d.'`"
-
+emailobfuscated="`echo $email|sed -e s%'@'%' at '% -e s%'\.'%' dot '%g`"
+                                                                                                                                        
 # Create Patch Header
 #
-echo "Submitted By: $submitter ($emailpart1 at $emailpart2 dot $emailpart3)" > $dir-$type-$version.patch
+echo "Submitted By: $submitter ($emailobfuscated)" > $dir-$type-$version.patch
 echo "Date: $date" >> $dir-$type-$version.patch
 echo "Initial Package Version: " >> $dir-$type-$version.patch
 echo "Origin: " >> $dir-$type-$version.patch
@@ -189,3 +170,9 @@ if [ "$SUBMIT_PATCH" == "enabled" ] && [ "$mailbin" != "" ]
 fi
 rm -f /tmp/patch.mail $dir-$type-$version.patch.$compressext /tmp/file.list /tmp/file.list.new
 
+# ChangeLog:
+# [2003-10-06]
+#  * Initial Version (Jim Gifford)
+# [2003-10-16]
+#  * Fixed typo in submission e-mail address (Ronald Hummelink)
+#  * Fixed e-mail obfuscation to handle more than one "." (Ronald Hummelink)
