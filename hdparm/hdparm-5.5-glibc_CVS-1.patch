@@ -1,6 +1,7 @@
 Submitted By: Ken Moffat <ken@kenmoffat.uklinux.net>
 Date: 2004-02-12
 Initial Package Version: 5.5
+Origin: NA
 Upstream Status: Mark Lord say he'll rename it to fsreadahead for 5.6.
 Description: fixes compilation with glibc dated after mid January 2004. 
 
