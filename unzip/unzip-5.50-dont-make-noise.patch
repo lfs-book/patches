@@ -3,8 +3,9 @@ Date: 2003-09-22
 Initial Package Version: 5.50
 Origin: http://archive.linuxfromscratch.org/mail-archives/blfs-dev/2003-August/003213.html
 Description: When unzipping files, the unzip stub prints out lot of "useful" info messages.
-These messages can cause applications such as Midnight Commander. This patch is useful for
-users linking unzip to the system zlib (i.e. installed as per the BLFS guidelines).
+These messages can cause applications such as Midnight Commander to display strange behavior.
+This patch is useful for users linking unzip to the system zlib
+(i.e. installed as per the BLFS guidelines).
 --- unzip-5.50/unzipstb.c.orig	2003-09-22 01:05:45.000000000 -0500
 +++ unzip-5.50/unzipstb.c	2003-09-22 01:06:57.000000000 -0500
 @@ -30,27 +30,6 @@
