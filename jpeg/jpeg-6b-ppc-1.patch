@@ -1,6 +1,6 @@
 Submitted by: Ken Moffat <ken@kenmoffat.uklinux.net>
 Date: 2003-09-24
-Version: jpegsrc.v6b
+Version: 6b
 Origin: Ken Moffat
 Description: Allows the build to work on my A1XE.  At a guess this might be
 caused by using binutils-2.14.90.0.6 - the script searches for elf32ppc as
