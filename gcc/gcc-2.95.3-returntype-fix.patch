@@ -1,5 +1,5 @@
 Submitted By: Zack Winkles <winkie@linuxfromscratch.org>
-Date:
+Date: 2003-10-05
 Initial Package Version: 2.95.3
 Source: LFS-Dev archives
 Description: Fixes gcc 2.95.3 so the -Wreturn-type flag will work, even when

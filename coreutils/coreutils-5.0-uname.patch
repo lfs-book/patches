@@ -1,3 +1,8 @@
+Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
+Date: 2003-10-05
+Initial Package Version: 5.0
+Origin: LFS Book
+Description: Fix uname working.
 diff -urN coreutils-5.0.old/src/uname.c coreutils-5.0/src/uname.c
 --- coreutils-5.0.old/src/uname.c	2002-12-06 15:40:55.000000000 +0000
 +++ coreutils-5.0/src/uname.c	2003-04-30 22:28:16.000000000 +0100

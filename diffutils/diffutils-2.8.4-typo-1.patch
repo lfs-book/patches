@@ -1,6 +1,6 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 09-09-2003
-Initial Package Version: diffutils 2.8.4
+Date: 2003-09-09
+Initial Package Version: 2.8.4
 Origin: azarah@gentoo.org Gentoo Bug # 8934
 Description: Build fails with make -j5 or greater on pentium4.  This is because
 	     the jobs creating the opjects, which depend on paths.h is sheduled

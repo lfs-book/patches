@@ -1,7 +1,7 @@
 Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
 Origin: Alexander E. Patrakov
 Date: 2003-09-28
-Initial Package Version: KDE 3.1.4
+Initial Package Version: 3.1.4
 Description: When kdebase is compiled against Qt 3.2.x, the "Run Command"
 dialog has wrong size (looks like the bottom is cut). This patch fixes
 this problem. Don't ask me how it works - I just noticed that in KDE CVS HEAD

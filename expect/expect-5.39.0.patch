@@ -1,3 +1,8 @@
+Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
+Date: 2003-10-05
+Initial Package Version: 5.38
+Origin: LFS Book
+Description: NA
 diff -uNr expect-5.38.orig/exp_chan.c expect-5.38/exp_chan.c
 --- expect-5.38.orig/exp_chan.c	2002-02-12 13:00:55.000000000 +1100
 +++ expect-5.38/exp_chan.c	2003-03-01 10:36:18.000000000 +1100

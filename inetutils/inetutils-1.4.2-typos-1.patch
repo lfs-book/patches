@@ -1,5 +1,5 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 09-10-2003
+Date: 2003-09-10
 Initial Package Version: 1.4.2
 Origin: inetutils CVS
 Description: Fixes Typos dest_realm_buf should be used instead

@@ -1,6 +1,6 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 09-09-2003
-Initial Package Version: diffutils 2.8.4
+Date: 2003-09-09
+Initial Package Version: 2.8.4
 Origin: taviso@gentoo.org Gentoo Bug # 24238
 Description: --tabsize option, undocumented in diff but used in sdiff, makes
 	     diff dump core

@@ -1,3 +1,8 @@
+Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
+Date: 2003-10-05
+Initial Package Version: 0.2
+Origin: Slackware Source
+Description: Use mkstemp instead of mktemp.
 diff -Naur ed-0.2/buf.c ed-0.2-2/buf.c
 --- ed-0.2/buf.c	Sat Nov 19 04:37:59 1994
 +++ ed-0.2-2/buf.c	Tue May 28 18:38:23 2002

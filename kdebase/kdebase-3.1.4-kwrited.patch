@@ -1,7 +1,7 @@
 Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
 Origin: Alexander E. Patrakov
 Date: 2003-09-28
-Initial Package Version: KDE 3.1.3
+Initial Package Version: 3.1.3
 Description: Allows the user to copy text from kwrited message window
 and clear that window. Fixes a FIXME.
 Applies to only those people who have the "utempter" program.

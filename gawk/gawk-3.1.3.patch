@@ -1,3 +1,10 @@
+Submitted By: LFS BOOK <lfs-book@linuxfromscratch.org>
+Date: 2003-10-05
+Initial Package Version: 3.1.3
+Origin: LFS Book
+Description: Do not create a subdirectory under libexecdir to store
+             internal programs, instead directly copy to libexecdir.
+             Create a unique datadir instead of using awk.
 diff -Naur gawk-3.1.3-orig/Makefile.in gawk-3.1.3/Makefile.in
 --- gawk-3.1.3-orig/Makefile.in	2003-07-10 14:36:14.000000000 +0000
 +++ gawk-3.1.3/Makefile.in	2003-07-10 14:37:50.000000000 +0000
