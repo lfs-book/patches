@@ -70,4 +70,4 @@ then
 	err_val=1
 fi
 
-exit err_val
+exit $err_val
