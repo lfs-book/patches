@@ -5,14 +5,6 @@ Origin: Mandrake CVS
 Description: New Utility. pcimodules loads all kernal pci modules
 	     for PCI devices currently plugged into any PCI slot.
  
-Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
-Date: 2003-09-29
-Initial Package Version: 2.1.11
-Origin: Mandrake CVS
-Description: Adds pcimodules, which loads all pci modules that 
-	     associated in PCI devices in a system.
-
- 
 diff -Naur pciutils-2.1.11.orig/Makefile pciutils-2.1.11/Makefile
 --- pciutils-2.1.11.orig/Makefile	2003-01-04 12:53:01.000000000 +0000
 +++ pciutils-2.1.11/Makefile	2003-09-29 16:43:51.000000000 +0000
