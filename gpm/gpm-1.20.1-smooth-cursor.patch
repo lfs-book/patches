@@ -1,7 +1,7 @@
-Submitted By: BLFS Book <blfs-book@linuxfromscratch.org>
+Submitted By: Alexander E. Patrakov semzx at newmail.ru
 Date: 2003-10-03
 Initial Package Version: 1.20.1
-Origin: BLFS Book
+Origin: http://archives.linuxfromscratch.org/mail-archives/blfs-dev/2003-May/002916.html
 Description: Smooth cursor movement.
 --- src/gpm.c_	Sat Jun  8 14:14:19 2002
 +++ src/gpm.c	Sat Jun  8 14:51:18 2002
