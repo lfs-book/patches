@@ -1,0 +1,38 @@
+Submitted By: Zack Winkles <winkie at linuxfromscratch dot org>
+Date: 2004-01-22
+Initial Package Version: gcc-3_4-branch (2004-01-22)
+Upstream Status: hackery - will not be merged
+Origin: http://gcc.gnu.org/ml/gcc/2004-01/msg01769.html
+Description: Fix nptl testsuite bugging out on gcc 3.4.  See mail by
+	Jakub Jelinek for more information.
+
+--- gcc-3.4-20040122.orig/gcc/unwind-dw2.c	2004-01-22 16:25:12.925266800 -0500
++++ gcc-3.4-20040122/gcc/unwind-dw2.c	2004-01-22 16:27:06.263036840 -0500
+@@ -191,9 +191,12 @@
+   index = DWARF_REG_TO_UNWIND_COLUMN (index);
+   if (index >= (int) sizeof(dwarf_reg_size_table))
+     abort ();
+-  size = dwarf_reg_size_table[index];
+   ptr = context->reg[index];
+ 
++  if (sizeof (_Unwind_Ptr) == sizeof (_Unwind_Word))
++    return * (_Unwind_Word *) ptr;
++
++  size = dwarf_reg_size_table[index];
+   /* This will segfault if the register hasn't been saved.  */
+   if (size == sizeof(_Unwind_Ptr))
+     return * (_Unwind_Ptr *) ptr;
+@@ -229,9 +232,12 @@
+   index = DWARF_REG_TO_UNWIND_COLUMN (index);
+   if (index >= (int) sizeof(dwarf_reg_size_table))
+     abort ();
+-  size = dwarf_reg_size_table[index];
+   ptr = context->reg[index];
+ 
++  if (sizeof (_Unwind_Ptr) == sizeof (_Unwind_Word))
++    return * (_Unwind_Word *) ptr;
++
++  size = dwarf_reg_size_table[index];
+   if (size == sizeof(_Unwind_Ptr))
+     * (_Unwind_Ptr *) ptr = val;
+   else if (size == sizeof(_Unwind_Word))
