@@ -55,7 +55,8 @@ else
 fi
 if [ -z "$UPSTREAM_STATUS" ]
 then
-	echo "WARNING: Upstream status not included!"
+	echo "Upstream status not included!"
+	err_val=1
 else
 	echo "Upstream Status: $UPSTREAM_STATUS"
 fi
