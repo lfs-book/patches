@@ -1,0 +1,219 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-12-08
+Initial Package Version: 20041208
+Upstream Status: Not submitted
+Origin: http://www.research.ibm.com/trl/projects/security/ssp/
+        http://www.openbsd.org/cgi-bin/cvsweb/src/lib/libc/sys/stack_protector.c
+Description: Smashing Stack Protector - This patch modifies guard functions in
+uClibc.
+
+This patch depends on erandom sysctl from:
+http://frandom.sourceforge.net/
+http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
+
+Also see:
+http://www.research.ibm.com/trl/projects/security/ssp/
+http://www.linuxfromscratch.org/hlfs/
+http://www.linuxfromscratch.org/hints/downloads/files/ssp.txt
+
+diff -Naur uClibc.orig/libc/sysdeps/linux/common/ssp.c uClibc/libc/sysdeps/linux/common/ssp.c
+--- uClibc.orig/libc/sysdeps/linux/common/ssp.c	2004-11-25 19:10:39.000000000 +0000
++++ uClibc/libc/sysdeps/linux/common/ssp.c	2004-12-08 21:54:05.340783856 +0000
+@@ -1,121 +1,115 @@
++/*	$hlfs: stack_protector.c,v 1.6 2004/12/08 00:00:00 robert Exp $	*/
++
+ /*
+- * Distributed under the terms of the GNU General Public License v2
+- * $Header: $
++ * Copyright (c) 2002 Hiroaki Etoh, Federico G. Schwindt, and Miodrag Vallat.
++ * All rights reserved.
+  *
+- * This is a modified version of Hiroaki Etoh's stack smashing routines
+- * implemented for glibc.
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
+  *
+- * The following people have contributed input to this code.
+- * Ned Ludd - <solar[@]gentoo.org>
+- * Alexander Gabert - <pappy[@]gentoo.org>
+- * The PaX Team - <pageexec[@]freemail.hu>
+- * Peter S. Mazinger - <ps.m[@]gmx.net>
+- * Yoann Vandoorselaere - <yoann[@]prelude-ids.org>
+- * Robert Connolly - <robert[@]linuxfromscratch.org>
+- * Cory Visi <cory@visi.name>
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR
++ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
+  *
+  */
+ 
+-#ifdef HAVE_CONFIG_H
+-# include <config.h>
+-#endif
+-
++#include <sys/param.h>
++#include <sys/sysctl.h>
++#include <sys/time.h>
+ #include <stdio.h>
++#include <signal.h>
+ #include <string.h>
+-#include <fcntl.h>
++#include <strings.h>
++#include <syslog.h>
+ #include <unistd.h>
+-#include <signal.h>
+-#include <sys/types.h>
+-#include <sys/un.h>
+-#include <sys/syslog.h>
+-#include <sys/time.h>
+-#include <sys/sysctl.h>
+-
+-#ifdef __PROPOLICE_BLOCK_SEGV__
+-#define SSP_SIGTYPE SIGSEGV
+-#elif __PROPOLICE_BLOCK_KILL__
+-#define SSP_SIGTYPE SIGKILL
+-#else
+-#define SSP_SIGTYPE SIGABRT
+-#endif
++#include <fcntl.h>
+ 
+-unsigned long __guard = 0UL;
++long __guard[8] = {0, 0, 0, 0, 0, 0, 0, 0};
++void __guard_setup(void) __attribute__ ((constructor));
++void __stack_smash_handler(char func[], int damaged __attribute__((unused)));
+ 
+-void __guard_setup(void)
++void __guard_setup (void)
+ {
+-	size_t size;
+-	struct timeval tv;
+-
+-#ifdef HAVE_DEV_ERANDOM
+-	int mib[3];
+-#endif
++	int i, mib[3];
++	size_t len;
+ 
+-	if (__guard != 0UL)
++	if (__guard[0] != 0)
+ 		return;
+ 
+-#ifndef __SSP_QUICK_CANARY__
+-#ifdef HAVE_DEV_ERANDOM
+ 	/* Random is another depth in Linux, hence an array of 3. */
+ 	mib[0] = CTL_KERN;
+ 	mib[1] = KERN_RANDOM;
+ 	mib[2] = RANDOM_ERANDOM;
+ 
+-	size = sizeof(unsigned long);
+-	if (__sysctl(mib, 3, &__guard, &size, NULL, 0) != (-1))
+-		if (__guard != 0UL)
+-			return;
+-#endif
+-	/* 
+-	 * Attempt to open kernel pseudo random device if one exists before 
+-	 * opening urandom to avoid system entropy depletion.
+-	 */
+-	{
+-		int fd;
+-
+-#ifdef HAVE_DEV_ERANDOM
+-		if ((fd = open("/dev/erandom", O_RDONLY)) == (-1))
+-#endif
+-			fd = open("/dev/urandom", O_RDONLY);
+-		if (fd != (-1)) {
+-			size = read(fd, (char *) &__guard, sizeof(__guard));
+-			close(fd);
+-			if (size == sizeof(__guard))
+-				return;
+-		}
++	len = 4;
++	for (i = 0; i < sizeof(__guard) / 4; i++) {
++		if (sysctl(mib, 3, (char *)&((int *)__guard)[i],
++		    &len, NULL, 0) == -1)
++			break;
+ 	}
+-#endif
+-	/* If sysctl was unsuccessful, use the "terminator canary". */
+-	__guard = 0xFF0A0D00UL;
+ 
+-	/* Everything failed? Or we are using a weakened model of the 
+-	 * terminator canary */
++	if (i < sizeof(__guard) / 4) {
++		int fd;
++		size_t size;
++		/* Sysctl Erandom doesn't work? Try /dev/urandom */
++		fd = open ("/dev/urandom", O_RDONLY);
++		if (fd != -1) {
++		 size = read (fd, (char*)&__guard, sizeof(__guard));
++		 close (fd) ;
++		 if (size == sizeof(__guard))
++			return;
++		 } else {
+ 
+-	gettimeofday(&tv, NULL);
+-	__guard ^= tv.tv_usec ^ tv.tv_sec;
++			/* If above was unsuccessful, use the time. */
++			struct timeval tv;
++			gettimeofday (&tv, NULL);
++			((unsigned char *)__guard)[0] ^= tv.tv_usec ^ tv.tv_sec;
++			((unsigned char *)__guard)[1] = 0;
++			((unsigned char *)__guard)[2] = '\n';
++			((unsigned char *)__guard)[3] = 255;
++			}
++		}
+ }
+ 
+-void __stack_smash_handler(char func[], int damaged)
++void __stack_smash_handler (char func[], int damaged)
+ {
+ 	extern char *__progname;
+ 	const char message[] = ": stack smashing attack in function ";
+ 	struct sigaction sa;
+ 	sigset_t mask;
+ 
++	/* Immediately block all signal handlers from running code */
+ 	sigfillset(&mask);
++	sigdelset(&mask, SIGABRT);
++	sigprocmask(SIG_BLOCK, &mask, NULL);
+ 
+-	sigdelset(&mask, SSP_SIGTYPE);	/* Block all signal handlers */
+-	sigprocmask(SIG_BLOCK, &mask, NULL);	/* except SIGABRT */
+-
+-	/* print error message to stderr and syslog */
++	/* Print error message to stderr. */
+ 	fprintf(stderr, "%s%s%s()\n", __progname, message, func);
+-	syslog(LOG_INFO, "%s%s%s()", __progname, message, func);
++	/* Then to syslog. This may fail on a chroot jail... */
++	syslog(LOG_CRIT, "%s%s%s()", __progname, message, func);
+ 
+-	/* Make sure the default handler is associated with the our signal handler */
+-	memset(&sa, 0, sizeof(struct sigaction));
+-	sigfillset(&sa.sa_mask);	/* Block all signals */
++	bzero(&sa, sizeof(struct sigaction));
++	sigemptyset(&sa.sa_mask);
+ 	sa.sa_flags = 0;
+ 	sa.sa_handler = SIG_DFL;
+-	sigaction(SSP_SIGTYPE, &sa, NULL);
+-	(void) kill(getpid(), SSP_SIGTYPE);
++	sigaction(SIGABRT, &sa, NULL);
++
++	kill(getpid(), SIGABRT);
++
+ 	_exit(127);
+ }
++
