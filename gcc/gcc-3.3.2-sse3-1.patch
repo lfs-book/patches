@@ -1,78 +1,24 @@
 Submitted By: Zack Winkles <winkie@linuxfromscratch.org>
-Date: 2003-11-05
-Initial Package Version: gcc 3.3.2
-Origin: cvs -r gcc-3_3-branch
-Description: Support for Prescott New Instructions patched against 3.3.2
-	for those of you too weenie to use CVS.
-
-2003-11-04  H.J. Lu  <hongjiu.lu@intel.com>
-
-	Backport from 3.4-branch
-
-	2003-07-13  Andreas Jaeger  <aj@suse.de>
-
-	* config.gcc: Add pmmintrin.h for x86_64-*-*.
-
-	2003-06-26  H.J. Lu  <hongjiu.lu@intel.com>
-
-	* config.gcc (extra_headers): Add pmmintrin.h for i[34567]86-*-*.
-
-	* config/i386/i386.c (override_options): Turn on MASK_SSE2
-	for -mpni.
-	(bdesc_2arg): Add PNI builtins with 2 args.
-	(bdesc_1arg): Add PNI builtins with 1 arg.
-	(ix86_init_mmx_sse_builtins): Handle PNI builtins.
-	(ix86_expand_builtin): Likewise.
-
-	* config/i386/i386.h (MASK_3DNOW, MASK_3DNOW_A,
-	MASK_128BIT_LONG_DOUBLE, MASK_64BIT, MASK_MS_BITFIELD_LAYOUT,
-	MASK_TLS_DIRECT_SEG_REFS): Renumbered.
-	(TARGET_PNI): New.
-	(TARGET_SWITCHES): Add -mpni and -mno-pni.
-	(TARGET_CPU_CPP_BUILTINS): Defined __PNI__ for PNI.
-	(ix86_builtins): Add PNI builtins.
-	(config/i386/i386.md): Add PNI patterns.
-
-	* config/i386/pmmintrin.h: New file.
-
-	* config/i386/i386.c (override_options): Turn on MASK_SSE for
-	-msse2.
-	(MASK_SSE1): Removed.
-	(MASK_SSE164): Removed.
-	(MASK_SSE264): Removed.
-	(bdesc_2arg): Replace MASK_SSE1 with MASK_SSE. Replace
-	MASK_SSE164 with MASK_SSE | MASK_64BIT. Replace MASK_SSE264
-	with MASK_SSE2 | MASK_64BIT.
-	(bdesc_1arg): Likewise.
-	(ix86_init_mmx_sse_builtins): Likewise.
-
-	* config/i386/i386.h (TARGET_SSE): Remove MASK_SSE2.
-
-	2003-06-20  H.J. Lu  <hongjiu.lu@intel.com>
-
-	* doc/extend.texi: Document new builtin functions for Intel
-	Prescott New Instructions.
-
-	* doc/invoke.texi: Document new command-line options, -mpni and
-	-mno-pni, for Intel Prescott New Instructions.
-
-	2003-06-05  H.J. Lu  <hongjiu.lu@intel.com>
-
-	* config.gcc (extra_headers): Add emmintrin.h for i[34567]86-*-*
-	and x86_64-*-*.
-
-	* config/i386/mmintrin.h: Update version and add alternate
-	intrinsic names.
-	* config/i386/xmmintrin.h: Likewise.
-
-	* config/i386/xmmintrin.h: Include <emmintrin.h>. Move SSE2
-	intrinsics to ...
-	* config/i386/emmintrin.h: Here. New file.
+Date: 2004-02-03
+Initial Package Version: 3.3.2
+Origin:	http://gcc.gnu.org/ml/gcc-cvs/2003-11/msg00096.html
+	http://gcc.gnu.org/ml/gcc/2004-02/msg00209.html
+Upstream Status: PNI in CVS, PNI->SSE3 not yet merged.
+Description: Support for SSE3, formerly known as PNI.
 
 diff -Naur gcc-3.3.2.orig/gcc/ChangeLog gcc-3.3.2/gcc/ChangeLog
 --- gcc-3.3.2.orig/gcc/ChangeLog	2003-10-16 15:43:18.000000000 -0400
-+++ gcc-3.3.2/gcc/ChangeLog	2003-11-05 13:28:02.000000000 -0500
-@@ -1,3 +1,67 @@
++++ gcc-3.3.2/gcc/ChangeLog	2004-02-03 18:15:48.961923536 -0500
+@@ -1,3 +1,76 @@
++2004-02-03  Kelley Cook  <kcook@gcc.gnu.org>
++
++	* config/i386/i386.c: rename pni to sse3.
++	* config/i386/i386.h: Likewise.
++	* config/i386/i386.md: Likewise.
++	* config/i386/pmmintrin.h: Likewise.
++	* doc/extend.texi: Likewise.
++	* doc/invoke.texi: Likewise.
++
 +2003-11-04  H.J. Lu  <hongjiu.lu@intel.com>
 +
 +	Backport from 3.4-branch
@@ -142,7 +88,7 @@ diff -Naur gcc-3.3.2.orig/gcc/ChangeLog gcc-3.3.2/gcc/ChangeLog
  	* GCC 3.3.2 Released.
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/emmintrin.h gcc-3.3.2/gcc/config/i386/emmintrin.h
 --- gcc-3.3.2.orig/gcc/config/i386/emmintrin.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.2/gcc/config/i386/emmintrin.h	2003-11-05 13:30:14.209122168 -0500
++++ gcc-3.3.2/gcc/config/i386/emmintrin.h	2004-02-03 18:06:48.000000000 -0500
 @@ -0,0 +1,1499 @@
 +/* Copyright (C) 2003 Free Software Foundation, Inc.
 +
@@ -1645,13 +1591,13 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/emmintrin.h gcc-3.3.2/gcc/config/i386/
 +#endif /* _EMMINTRIN_H_INCLUDED */
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.c gcc-3.3.2/gcc/config/i386/i386.c
 --- gcc-3.3.2.orig/gcc/config/i386/i386.c	2003-09-09 15:51:59.000000000 -0400
-+++ gcc-3.3.2/gcc/config/i386/i386.c	2003-11-05 13:30:14.348101040 -0500
++++ gcc-3.3.2/gcc/config/i386/i386.c	2004-02-03 18:07:00.000000000 -0500
 @@ -1257,6 +1257,14 @@
    if (x86_arch_always_fancy_math_387 & (1 << ix86_arch))
      target_flags &= ~MASK_NO_FANCY_MATH_387;
  
-+  /* Turn on SSE2 builtins for -mpni.  */
-+  if (TARGET_PNI)
++  /* Turn on SSE2 builtins for -msse3.  */
++  if (TARGET_SSE3)
 +    target_flags |= MASK_SSE2;
 +
 +  /* Turn on SSE builtins for -msse2.  */
@@ -1862,13 +1808,13 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.c gcc-3.3.2/gcc/config/i386/i386.
 -  { MASK_SSE2, CODE_FOR_cvtss2sd, 0, IX86_BUILTIN_CVTSS2SD, 0, 0 }
 +  { MASK_SSE2, CODE_FOR_cvtss2sd, 0, IX86_BUILTIN_CVTSS2SD, 0, 0 },
 +
-+  /* PNI MMX */
-+  { MASK_PNI, CODE_FOR_addsubv4sf3, "__builtin_ia32_addsubps", IX86_BUILTIN_ADDSUBPS, 0, 0 },
-+  { MASK_PNI, CODE_FOR_addsubv2df3, "__builtin_ia32_addsubpd", IX86_BUILTIN_ADDSUBPD, 0, 0 },
-+  { MASK_PNI, CODE_FOR_haddv4sf3, "__builtin_ia32_haddps", IX86_BUILTIN_HADDPS, 0, 0 },
-+  { MASK_PNI, CODE_FOR_haddv2df3, "__builtin_ia32_haddpd", IX86_BUILTIN_HADDPD, 0, 0 },
-+  { MASK_PNI, CODE_FOR_hsubv4sf3, "__builtin_ia32_hsubps", IX86_BUILTIN_HSUBPS, 0, 0 },
-+  { MASK_PNI, CODE_FOR_hsubv2df3, "__builtin_ia32_hsubpd", IX86_BUILTIN_HSUBPD, 0, 0 }
++  /* SSE3 MMX */
++  { MASK_SSE3, CODE_FOR_addsubv4sf3, "__builtin_ia32_addsubps", IX86_BUILTIN_ADDSUBPS, 0, 0 },
++  { MASK_SSE3, CODE_FOR_addsubv2df3, "__builtin_ia32_addsubpd", IX86_BUILTIN_ADDSUBPD, 0, 0 },
++  { MASK_SSE3, CODE_FOR_haddv4sf3, "__builtin_ia32_haddps", IX86_BUILTIN_HADDPS, 0, 0 },
++  { MASK_SSE3, CODE_FOR_haddv2df3, "__builtin_ia32_haddpd", IX86_BUILTIN_HADDPD, 0, 0 },
++  { MASK_SSE3, CODE_FOR_hsubv4sf3, "__builtin_ia32_hsubps", IX86_BUILTIN_HSUBPS, 0, 0 },
++  { MASK_SSE3, CODE_FOR_hsubv2df3, "__builtin_ia32_hsubpd", IX86_BUILTIN_HSUBPD, 0, 0 }
  };
  
  static const struct builtin_description bdesc_1arg[] =
@@ -1917,10 +1863,10 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.c gcc-3.3.2/gcc/config/i386/i386.
 -  { MASK_SSE2, CODE_FOR_sse2_movq, 0, IX86_BUILTIN_MOVQ, 0, 0 }
 +  { MASK_SSE2, CODE_FOR_sse2_movq, 0, IX86_BUILTIN_MOVQ, 0, 0 },
 +
-+  /* PNI */
-+  { MASK_PNI, CODE_FOR_movshdup, 0, IX86_BUILTIN_MOVSHDUP, 0, 0 },
-+  { MASK_PNI, CODE_FOR_movsldup, 0, IX86_BUILTIN_MOVSLDUP, 0, 0 },
-+  { MASK_PNI, CODE_FOR_movddup,  0, IX86_BUILTIN_MOVDDUP, 0, 0 }
++  /* SSE3 */
++  { MASK_SSE3, CODE_FOR_movshdup, 0, IX86_BUILTIN_MOVSHDUP, 0, 0 },
++  { MASK_SSE3, CODE_FOR_movsldup, 0, IX86_BUILTIN_MOVSLDUP, 0, 0 },
++  { MASK_SSE3, CODE_FOR_movddup,  0, IX86_BUILTIN_MOVDDUP, 0, 0 }
  };
  
  void
@@ -2079,23 +2025,23 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.c gcc-3.3.2/gcc/config/i386/i386.
    def_builtin (MASK_SSE2, "__builtin_ia32_pmaddwd128", v4si_ftype_v8hi_v8hi, IX86_BUILTIN_PMADDWD128);
 +
 +  /* Prescott New Instructions.  */
-+  def_builtin (MASK_PNI, "__builtin_ia32_monitor",
++  def_builtin (MASK_SSE3, "__builtin_ia32_monitor",
 +	       void_ftype_pcvoid_unsigned_unsigned,
 +	       IX86_BUILTIN_MONITOR);
-+  def_builtin (MASK_PNI, "__builtin_ia32_mwait",
++  def_builtin (MASK_SSE3, "__builtin_ia32_mwait",
 +	       void_ftype_unsigned_unsigned,
 +	       IX86_BUILTIN_MWAIT);
-+  def_builtin (MASK_PNI, "__builtin_ia32_movshdup",
++  def_builtin (MASK_SSE3, "__builtin_ia32_movshdup",
 +	       v4sf_ftype_v4sf,
 +	       IX86_BUILTIN_MOVSHDUP);
-+  def_builtin (MASK_PNI, "__builtin_ia32_movsldup",
++  def_builtin (MASK_SSE3, "__builtin_ia32_movsldup",
 +	       v4sf_ftype_v4sf,
 +	       IX86_BUILTIN_MOVSLDUP);
-+  def_builtin (MASK_PNI, "__builtin_ia32_lddqu",
++  def_builtin (MASK_SSE3, "__builtin_ia32_lddqu",
 +	       v16qi_ftype_pcchar, IX86_BUILTIN_LDDQU);
-+  def_builtin (MASK_PNI, "__builtin_ia32_loadddup",
++  def_builtin (MASK_SSE3, "__builtin_ia32_loadddup",
 +	       v2df_ftype_pcdouble, IX86_BUILTIN_LOADDDUP);
-+  def_builtin (MASK_PNI, "__builtin_ia32_movddup",
++  def_builtin (MASK_SSE3, "__builtin_ia32_movddup",
 +	       v2df_ftype_v2df, IX86_BUILTIN_MOVDDUP);
  }
  
@@ -2144,7 +2090,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.c gcc-3.3.2/gcc/config/i386/i386.
      }
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.h
 --- gcc-3.3.2.orig/gcc/config/i386/i386.h	2003-06-25 17:18:31.000000000 -0400
-+++ gcc-3.3.2/gcc/config/i386/i386.h	2003-11-05 13:30:14.476081584 -0500
++++ gcc-3.3.2/gcc/config/i386/i386.h	2004-02-03 18:11:05.000000000 -0500
 @@ -114,10 +114,11 @@
  #define MASK_MMX		0x00002000	/* Support MMX regs/builtins */
  #define MASK_SSE		0x00004000	/* Support SSE regs/builtins */
@@ -2153,7 +2099,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.
 -#define MASK_3DNOW_A		0x00020000	/* Support Athlon 3Dnow builtins */
 -#define MASK_128BIT_LONG_DOUBLE 0x00040000	/* long double size is 128bit */
 -#define MASK_64BIT		0x00080000	/* Produce 64bit code */
-+#define MASK_PNI		0x00010000	/* Support PNI builtins */
++#define MASK_SSE3		0x00010000	/* Support SSE3 regs/builtins */
 +#define MASK_3DNOW		0x00020000	/* Support 3Dnow builtins */
 +#define MASK_3DNOW_A		0x00040000	/* Support Athlon 3Dnow builtins */
 +#define MASK_128BIT_LONG_DOUBLE 0x00080000	/* long double size is 128bit */
@@ -2168,7 +2114,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.
 -#define TARGET_SSE ((target_flags & (MASK_SSE | MASK_SSE2)) != 0)
 +#define TARGET_SSE ((target_flags & MASK_SSE) != 0)
  #define TARGET_SSE2 ((target_flags & MASK_SSE2) != 0)
-+#define TARGET_PNI ((target_flags & MASK_PNI) != 0)
++#define TARGET_SSE3 ((target_flags & MASK_SSE3) != 0)
  #define TARGET_SSE_MATH ((ix86_fpmath & FPMATH_SSE) != 0)
  #define TARGET_MIX_SSE_I387 ((ix86_fpmath & FPMATH_SSE) \
  			     && (ix86_fpmath & FPMATH_387))
@@ -2176,10 +2122,10 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.
      N_("Support MMX, SSE and SSE2 built-in functions and code generation") }, \
    { "no-sse2",			 -MASK_SSE2,				      \
      N_("Do not support MMX, SSE and SSE2 built-in functions and code generation") },    \
-+  { "pni",			 MASK_PNI,				      \
-+    N_("Support MMX, SSE, SSE2 and PNI built-in functions and code generation") }, \
-+  { "no-pni",			 -MASK_PNI,				      \
-+    N_("Do not support MMX, SSE, SSE2 and PNI built-in functions and code generation") }, \
++  { "sse3",			 MASK_SSE3,				      \
++    N_("Support MMX, SSE, SSE2 and SSE3 built-in functions and code generation") },\
++  { "no-sse3",			 -MASK_SSE3,				      \
++    N_("Do not support MMX, SSE, SSE2 and SSE3 built-in functions and code generation") },\
    { "128bit-long-double",	 MASK_128BIT_LONG_DOUBLE,		      \
      N_("sizeof(long double) is 16") },					      \
    { "96bit-long-double",	-MASK_128BIT_LONG_DOUBLE,		      \
@@ -2187,8 +2133,8 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.
  	builtin_define ("__SSE__");				\
        if (TARGET_SSE2)						\
  	builtin_define ("__SSE2__");				\
-+      if (TARGET_PNI)						\
-+	builtin_define ("__PNI__");				\
++      if (TARGET_SSE3)						\
++	builtin_define ("__SSE3__");				\
        if (TARGET_SSE_MATH && TARGET_SSE)			\
  	builtin_define ("__SSE_MATH__");			\
        if (TARGET_SSE_MATH && TARGET_SSE2)			\
@@ -2217,7 +2163,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.h gcc-3.3.2/gcc/config/i386/i386.
  
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386.md
 --- gcc-3.3.2.orig/gcc/config/i386/i386.md	2003-07-08 15:16:42.000000000 -0400
-+++ gcc-3.3.2/gcc/config/i386/i386.md	2003-11-05 13:30:14.859023368 -0500
++++ gcc-3.3.2/gcc/config/i386/i386.md	2004-02-03 18:07:00.000000000 -0500
 @@ -110,6 +110,13 @@
     (UNSPEC_MFENCE		59)
     (UNSPEC_LFENCE		60)
@@ -2246,13 +2192,13 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
    [(set_attr "type" "sse")
     (set_attr "memory" "unknown")])
 +
-+;; PNI
++;; SSE3
 +
 +(define_insn "mwait"
 +  [(unspec_volatile [(match_operand:SI 0 "register_operand" "a")
 +		     (match_operand:SI 1 "register_operand" "c")]
 +		    UNSPECV_MWAIT)]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "mwait\t%0, %1"
 +  [(set_attr "length" "3")])
 +
@@ -2261,18 +2207,18 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +		     (match_operand:SI 1 "register_operand" "c")
 +		     (match_operand:SI 2 "register_operand" "d")]
 +		    UNSPECV_MONITOR)]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "monitor\t%0, %1, %2"
 +  [(set_attr "length" "3")])
 +
-+;; PNI arithmetic
++;; SSE3 arithmetic
 +
 +(define_insn "addsubv4sf3"
 +  [(set (match_operand:V4SF 0 "register_operand" "=x")
 +        (unspec:V4SF [(match_operand:V4SF 1 "register_operand" "0")
 +		      (match_operand:V4SF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_ADDSUB))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "addsubps\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V4SF")])
@@ -2282,7 +2228,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +        (unspec:V2DF [(match_operand:V2DF 1 "register_operand" "0")
 +		      (match_operand:V2DF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_ADDSUB))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "addsubpd\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V2DF")])
@@ -2292,7 +2238,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +        (unspec:V4SF [(match_operand:V4SF 1 "register_operand" "0")
 +		      (match_operand:V4SF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_HADD))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "haddps\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V4SF")])
@@ -2302,7 +2248,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +        (unspec:V2DF [(match_operand:V2DF 1 "register_operand" "0")
 +		      (match_operand:V2DF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_HADD))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "haddpd\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V2DF")])
@@ -2312,7 +2258,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +        (unspec:V4SF [(match_operand:V4SF 1 "register_operand" "0")
 +		      (match_operand:V4SF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_HSUB))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "hsubps\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V4SF")])
@@ -2322,7 +2268,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +        (unspec:V2DF [(match_operand:V2DF 1 "register_operand" "0")
 +		      (match_operand:V2DF 2 "nonimmediate_operand" "xm")]
 +		     UNSPEC_HSUB))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "hsubpd\t{%2, %0|%0, %2}"
 +  [(set_attr "type" "sseadd")
 +   (set_attr "mode" "V2DF")])
@@ -2331,7 +2277,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +  [(set (match_operand:V4SF 0 "register_operand" "=x")
 +        (unspec:V4SF
 +	 [(match_operand:V4SF 1 "nonimmediate_operand" "xm")] UNSPEC_MOVSHDUP))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "movshdup\t{%1, %0|%0, %1}"
 +  [(set_attr "type" "sse")
 +   (set_attr "mode" "V4SF")])
@@ -2340,7 +2286,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +  [(set (match_operand:V4SF 0 "register_operand" "=x")
 +        (unspec:V4SF
 +	 [(match_operand:V4SF 1 "nonimmediate_operand" "xm")] UNSPEC_MOVSLDUP))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "movsldup\t{%1, %0|%0, %1}"
 +  [(set_attr "type" "sse")
 +   (set_attr "mode" "V4SF")])
@@ -2349,7 +2295,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +  [(set (match_operand:V16QI 0 "register_operand" "=x")
 +	(unspec:V16QI [(match_operand:V16QI 1 "memory_operand" "m")]
 +		       UNSPEC_LDQQU))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "lddqu\t{%1, %0|%0, %1}"
 +  [(set_attr "type" "ssecvt")
 +   (set_attr "mode" "TI")])
@@ -2357,7 +2303,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +(define_insn "loadddup"
 +  [(set (match_operand:V2DF 0 "register_operand" "=x")
 +	(vec_duplicate:V2DF (match_operand:DF 1 "memory_operand" "m")))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "movddup\t{%1, %0|%0, %1}"
 +  [(set_attr "type" "ssecvt")
 +   (set_attr "mode" "DF")])
@@ -2367,13 +2313,13 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/i386.md gcc-3.3.2/gcc/config/i386/i386
 +	(vec_duplicate:V2DF
 +	 (vec_select:DF (match_operand:V2DF 1 "register_operand" "x")
 +			(parallel [(const_int 0)]))))]
-+  "TARGET_PNI"
++  "TARGET_SSE3"
 +  "movddup\t{%1, %0|%0, %1}"
 +  [(set_attr "type" "ssecvt")
 +   (set_attr "mode" "DF")])
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/mmintrin.h gcc-3.3.2/gcc/config/i386/mmintrin.h
 --- gcc-3.3.2.orig/gcc/config/i386/mmintrin.h	2003-02-22 05:04:13.000000000 -0500
-+++ gcc-3.3.2/gcc/config/i386/mmintrin.h	2003-11-05 13:30:14.862022912 -0500
++++ gcc-3.3.2/gcc/config/i386/mmintrin.h	2004-02-03 18:06:48.000000000 -0500
 @@ -25,7 +25,7 @@
     Public License.  */
  
@@ -3078,7 +3024,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/mmintrin.h gcc-3.3.2/gcc/config/i386/m
  _mm_setzero_si64 (void)
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/pmmintrin.h gcc-3.3.2/gcc/config/i386/pmmintrin.h
 --- gcc-3.3.2.orig/gcc/config/i386/pmmintrin.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-3.3.2/gcc/config/i386/pmmintrin.h	2003-11-05 13:30:14.863022760 -0500
++++ gcc-3.3.2/gcc/config/i386/pmmintrin.h	2004-02-03 18:07:00.200307520 -0500
 @@ -0,0 +1,132 @@
 +/* Copyright (C) 2003 Free Software Foundation, Inc.
 +
@@ -3112,7 +3058,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/pmmintrin.h gcc-3.3.2/gcc/config/i386/
 +#ifndef _PMMINTRIN_H_INCLUDED
 +#define _PMMINTRIN_H_INCLUDED
 +
-+#ifdef __PNI__
++#ifdef __SSE3__
 +#include <xmmintrin.h>
 +#include <emmintrin.h>
 +
@@ -3209,12 +3155,12 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/pmmintrin.h gcc-3.3.2/gcc/config/i386/
 +#define _mm_mwait(E, H)		__builtin_ia32_mwait ((E), (H))
 +#endif
 +
-+#endif /* __PNI__ */
++#endif /* __SSE3__ */
 +
 +#endif /* _PMMINTRIN_H_INCLUDED */
 diff -Naur gcc-3.3.2.orig/gcc/config/i386/xmmintrin.h gcc-3.3.2/gcc/config/i386/xmmintrin.h
 --- gcc-3.3.2.orig/gcc/config/i386/xmmintrin.h	2003-02-22 05:04:13.000000000 -0500
-+++ gcc-3.3.2/gcc/config/i386/xmmintrin.h	2003-11-05 13:30:14.941010904 -0500
++++ gcc-3.3.2/gcc/config/i386/xmmintrin.h	2004-02-03 18:06:48.000000000 -0500
 @@ -1,4 +1,4 @@
 -/* Copyright (C) 2002 Free Software Foundation, Inc.
 +/* Copyright (C) 2002, 2003 Free Software Foundation, Inc.
@@ -4963,7 +4909,7 @@ diff -Naur gcc-3.3.2.orig/gcc/config/i386/xmmintrin.h gcc-3.3.2/gcc/config/i386/
  #endif /* _XMMINTRIN_H_INCLUDED */
 diff -Naur gcc-3.3.2.orig/gcc/config.gcc gcc-3.3.2/gcc/config.gcc
 --- gcc-3.3.2.orig/gcc/config.gcc	2003-10-01 15:07:01.000000000 -0400
-+++ gcc-3.3.2/gcc/config.gcc	2003-11-05 13:30:14.975005736 -0500
++++ gcc-3.3.2/gcc/config.gcc	2004-02-03 18:06:48.183134408 -0500
 @@ -298,11 +298,11 @@
  	;;
  i[34567]86-*-*)
@@ -4980,12 +4926,12 @@ diff -Naur gcc-3.3.2.orig/gcc/config.gcc gcc-3.3.2/gcc/config.gcc
  	extra_headers=ia64intrin.h
 diff -Naur gcc-3.3.2.orig/gcc/doc/extend.texi gcc-3.3.2/gcc/doc/extend.texi
 --- gcc-3.3.2.orig/gcc/doc/extend.texi	2003-10-04 07:08:27.000000000 -0400
-+++ gcc-3.3.2/gcc/doc/extend.texi	2003-11-05 13:30:15.006001024 -0500
++++ gcc-3.3.2/gcc/doc/extend.texi	2004-02-03 18:07:00.000000000 -0500
 @@ -5315,6 +5315,31 @@
  Generates the @code{movlps} machine instruction as a store to memory.
  @end table
  
-+The following built-in functions are available when @option{-mpni} is used.
++The following built-in functions are available when @option{-msse3} is used.
 +All of them generate the machine instruction that is part of the name.
 +
 +@example
@@ -5003,7 +4949,7 @@ diff -Naur gcc-3.3.2.orig/gcc/doc/extend.texi gcc-3.3.2/gcc/doc/extend.texi
 +void __builtin_ia32_mwait (unsigned int, unsigned int)
 +@end example
 +
-+The following built-in functions are available when @option{-mpni} is used.
++The following built-in functions are available when @option{-msse3} is used.
 +
 +@table @code
 +@item v2df __builtin_ia32_loadddup (double const *)
@@ -5015,13 +4961,13 @@ diff -Naur gcc-3.3.2.orig/gcc/doc/extend.texi gcc-3.3.2/gcc/doc/extend.texi
  
 diff -Naur gcc-3.3.2.orig/gcc/doc/invoke.texi gcc-3.3.2/gcc/doc/invoke.texi
 --- gcc-3.3.2.orig/gcc/doc/invoke.texi	2003-07-21 07:19:57.000000000 -0400
-+++ gcc-3.3.2/gcc/doc/invoke.texi	2003-11-05 13:30:15.087988560 -0500
++++ gcc-3.3.2/gcc/doc/invoke.texi	2004-02-03 18:08:07.927011496 -0500
 @@ -473,7 +473,7 @@
  -mno-fp-ret-in-387  -msoft-float  -msvr3-shlib @gol
  -mno-wide-multiply  -mrtd  -malign-double @gol
  -mpreferred-stack-boundary=@var{num} @gol
 --mmmx  -msse  -msse2  -m3dnow @gol
-+-mmmx  -msse  -msse2 -mpni -m3dnow @gol
++-mmmx  -msse  -msse2 -msse3 -m3dnow @gol
  -mthreads  -mno-align-stringops  -minline-all-stringops @gol
  -mpush-args  -maccumulate-outgoing-args  -m128bit-long-double @gol
  -m96bit-long-double  -mregparm=@var{num}  -momit-leaf-frame-pointer @gol
@@ -5029,9 +4975,9 @@ diff -Naur gcc-3.3.2.orig/gcc/doc/invoke.texi gcc-3.3.2/gcc/doc/invoke.texi
  
  This is the default choice for x86-64 compiler.
  
-+@item pni
++@item sse3
 +Use all SSE extensions enabled by @option{-msse2} as well as the new
-+SSE extensions in Prescott New Intrunctions. @option{-mpni} also
++SSE extensions in Prescott New Instructions. @option{-msse3} also
 +enables 2 builtin functions, @code{__builtin_ia32_monitor} and
 +@code{__builtin_ia32_mwait}, for new intrunctions @code{monitor} and
 +@code{mwait}. 
@@ -5043,8 +4989,8 @@ diff -Naur gcc-3.3.2.orig/gcc/doc/invoke.texi gcc-3.3.2/gcc/doc/invoke.texi
  @itemx -mno-sse
  @item -msse2
  @itemx -mno-sse2
-+@item -mpni
-+@itemx -mno-pni
++@item -msse3
++@itemx -mno-sse3
  @item -m3dnow
  @itemx -mno-3dnow
  @opindex mmmx
