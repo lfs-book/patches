@@ -1,0 +1,171 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-01-31
+Initial Package Version: 2.15.94.0.2
+Upstream Status: Not submitted
+Origin: None
+Description: Use gcc -fpie, -fpic, and ld -pie, -z relro, -z now.
+
+See:
+http://www.linuxfromscratch.org/~robert/Homogenic/
+
+diff -Naur binutils-2.15.94.0.2.orig/Makefile.in binutils-2.15.94.0.2/Makefile.in
+--- binutils-2.15.94.0.2.orig/Makefile.in	2005-01-31 09:50:32.437129768 +0000
++++ binutils-2.15.94.0.2/Makefile.in	2005-01-31 10:15:08.060213808 +0000
+@@ -543,23 +543,14 @@
+ 	"SHELL=$(SHELL)" \
+ 	"YACC=$(YACC)" \
+ 	"AR_FLAGS=$(AR_FLAGS)" \
+-	"CFLAGS=$(CFLAGS)" \
+-	"CXXFLAGS=$(CXXFLAGS)" \
+-	"LDFLAGS=$(LDFLAGS)" \
+-	"LIBCFLAGS=$(LIBCFLAGS)" \
+-	"LIBCXXFLAGS=$(LIBCXXFLAGS)" \
+ 	"AR_FOR_TARGET=$(AR_FOR_TARGET)" \
+ 	"AS_FOR_TARGET=$(AS_FOR_TARGET)" \
+ 	"CC_FOR_TARGET=$(CC_FOR_TARGET)" \
+-	"CFLAGS_FOR_TARGET=$(CFLAGS_FOR_TARGET)" \
+ 	"CXX_FOR_TARGET=$(CXX_FOR_TARGET)" \
+-	"CXXFLAGS_FOR_TARGET=$(CXXFLAGS_FOR_TARGET)" \
+ 	"DLLTOOL_FOR_TARGET=$(DLLTOOL_FOR_TARGET)" \
+ 	"GCJ_FOR_TARGET=$(GCJ_FOR_TARGET)" \
+ 	"GFORTRAN_FOR_TARGET=$(GFORTRAN_FOR_TARGET)" \
+ 	"LD_FOR_TARGET=$(LD_FOR_TARGET)" \
+-	"LIBCFLAGS_FOR_TARGET=$(LIBCFLAGS_FOR_TARGET)" \
+-	"LIBCXXFLAGS_FOR_TARGET=$(LIBCXXFLAGS_FOR_TARGET)" \
+ 	"NM_FOR_TARGET=$(NM_FOR_TARGET)" \
+ 	"PICFLAG_FOR_TARGET=$(PICFLAG_FOR_TARGET)" \
+ 	"RANLIB_FOR_TARGET=$(RANLIB_FOR_TARGET)" \
+@@ -613,13 +604,9 @@
+ 	'AR=$$(AR_FOR_TARGET)' \
+ 	'AS=$$(AS_FOR_TARGET)' \
+ 	'CC=$$(CC_FOR_TARGET)' \
+-	'CFLAGS=$$(CFLAGS_FOR_TARGET)' \
+ 	'CXX=$$(CXX_FOR_TARGET)' \
+-	'CXXFLAGS=$$(CXXFLAGS_FOR_TARGET)' \
+ 	'DLLTOOL=$$(DLLTOOL_FOR_TARGET)' \
+ 	'LD=$$(LD_FOR_TARGET)' \
+-	'LIBCFLAGS=$$(LIBCFLAGS_FOR_TARGET)' \
+-	'LIBCXXFLAGS=$$(LIBCXXFLAGS_FOR_TARGET)' \
+ 	'NM=$$(NM_FOR_TARGET)' \
+ 	'PICFLAG=$$(PICFLAG_FOR_TARGET)' \
+ 	'RANLIB=$$(RANLIB_FOR_TARGET)' \
+diff -Naur binutils-2.15.94.0.2.orig/bfd/Makefile.in binutils-2.15.94.0.2/bfd/Makefile.in
+--- binutils-2.15.94.0.2.orig/bfd/Makefile.in	2005-01-31 09:50:32.483122776 +0000
++++ binutils-2.15.94.0.2/bfd/Makefile.in	2005-01-31 10:15:44.830623856 +0000
+@@ -124,7 +124,7 @@
+ CC = @CC@
+ CCDEPMODE = @CCDEPMODE@
+ CC_FOR_BUILD = @CC_FOR_BUILD@
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -fpic
+ COREFILE = @COREFILE@
+ COREFLAG = @COREFLAG@
+ CPP = @CPP@
+diff -Naur binutils-2.15.94.0.2.orig/binutils/Makefile.in binutils-2.15.94.0.2/binutils/Makefile.in
+--- binutils-2.15.94.0.2.orig/binutils/Makefile.in	2005-01-31 09:50:33.010042672 +0000
++++ binutils-2.15.94.0.2/binutils/Makefile.in	2005-01-31 10:15:08.066212896 +0000
+@@ -343,7 +343,7 @@
+ 
+ DEFS = @DEFS@ -I. -I$(srcdir) -I.
+ CPPFLAGS = @CPPFLAGS@
+-LDFLAGS = @LDFLAGS@
++LDFLAGS = @LDFLAGS@ -z relro -z now -pie
+ LIBS = @LIBS@
+ nlmconv_OBJECTS =  nlmconv.$(OBJEXT) nlmheader.$(OBJEXT) \
+ bucomm.$(OBJEXT) version.$(OBJEXT) filemode.$(OBJEXT)
+@@ -441,7 +441,7 @@
+ LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
+ LEXLIB = @LEXLIB@
+ YLWRAP = $(top_srcdir)/../ylwrap
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -pie -fpie
+ COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+ CCLD = $(CC)
+diff -Naur binutils-2.15.94.0.2.orig/gas/Makefile.in binutils-2.15.94.0.2/gas/Makefile.in
+--- binutils-2.15.94.0.2.orig/gas/Makefile.in	2005-01-31 09:50:33.457974576 +0000
++++ binutils-2.15.94.0.2/gas/Makefile.in	2005-01-31 10:15:08.075211528 +0000
+@@ -129,7 +129,7 @@
+ CATOBJEXT = @CATOBJEXT@
+ CC = @CC@
+ CCDEPMODE = @CCDEPMODE@
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -pie -fpie
+ CPP = @CPP@
+ CPPFLAGS = @CPPFLAGS@
+ CYGPATH_W = @CYGPATH_W@
+@@ -155,7 +155,7 @@
+ INTLDEPS = @INTLDEPS@
+ INTLLIBS = @INTLLIBS@
+ INTLOBJS = @INTLOBJS@
+-LDFLAGS = @LDFLAGS@
++LDFLAGS = @LDFLAGS@ -z relro -z now -pie
+ LEX = `if [ -f ../flex/flex ] ; then echo ../flex/flex ; else echo @LEX@ ; fi`
+ LEXLIB = @LEXLIB@
+ LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
+diff -Naur binutils-2.15.94.0.2.orig/gprof/Makefile.in binutils-2.15.94.0.2/gprof/Makefile.in
+--- binutils-2.15.94.0.2.orig/gprof/Makefile.in	2005-01-31 09:50:36.577500336 +0000
++++ binutils-2.15.94.0.2/gprof/Makefile.in	2005-01-31 10:15:08.078211072 +0000
+@@ -129,7 +129,7 @@
+ CATOBJEXT = @CATOBJEXT@
+ CC = @CC@
+ CCDEPMODE = @CCDEPMODE@
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -pie -fpie
+ CPP = @CPP@
+ CPPFLAGS = @CPPFLAGS@
+ CYGPATH_W = @CYGPATH_W@
+@@ -154,7 +154,7 @@
+ INTLDEPS = @INTLDEPS@
+ INTLLIBS = @INTLLIBS@
+ INTLOBJS = @INTLOBJS@
+-LDFLAGS = @LDFLAGS@
++LDFLAGS = @LDFLAGS@ -z relro -z now -pie
+ LIBOBJS = @LIBOBJS@
+ LIBS = @LIBS@
+ LIBTOOL = @LIBTOOL@
+diff -Naur binutils-2.15.94.0.2.orig/ld/Makefile.in binutils-2.15.94.0.2/ld/Makefile.in
+--- binutils-2.15.94.0.2.orig/ld/Makefile.in	2005-01-31 09:50:37.014433912 +0000
++++ binutils-2.15.94.0.2/ld/Makefile.in	2005-01-31 10:15:08.084210160 +0000
+@@ -270,7 +270,7 @@
+ 
+ DEFS = @DEFS@ -I. -I$(srcdir) -I.
+ CPPFLAGS = @CPPFLAGS@
+-LDFLAGS = @LDFLAGS@
++LDFLAGS = @LDFLAGS@ -z relro -z now -pie
+ LIBS = @LIBS@
+ ld_new_OBJECTS =  ldgram.$(OBJEXT) ldlex.$(OBJEXT) lexsup.$(OBJEXT) \
+ ldlang.$(OBJEXT) mri.$(OBJEXT) ldctor.$(OBJEXT) ldmain.$(OBJEXT) \
+@@ -280,7 +280,7 @@
+ LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
+ LEXLIB = @LEXLIB@
+ YLWRAP = $(top_srcdir)/../ylwrap
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -pie -fpie
+ COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+ CCLD = $(CC)
+diff -Naur binutils-2.15.94.0.2.orig/libiberty/Makefile.in binutils-2.15.94.0.2/libiberty/Makefile.in
+--- binutils-2.15.94.0.2.orig/libiberty/Makefile.in	2005-01-31 09:50:38.595193600 +0000
++++ binutils-2.15.94.0.2/libiberty/Makefile.in	2005-01-31 10:16:52.518333760 +0000
+@@ -60,7 +60,7 @@
+ AR_FLAGS = rc
+ 
+ CC = @CC@
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -fpic
+ LIBCFLAGS = $(CFLAGS)
+ LOADLIBES = @LIBS@
+ RANLIB = @RANLIB@
+diff -Naur binutils-2.15.94.0.2.orig/opcodes/Makefile.in binutils-2.15.94.0.2/opcodes/Makefile.in
+--- binutils-2.15.94.0.2.orig/opcodes/Makefile.in	2005-01-31 09:50:38.799162592 +0000
++++ binutils-2.15.94.0.2/opcodes/Makefile.in	2005-01-31 10:17:15.437849464 +0000
+@@ -115,7 +115,7 @@
+ CC = @CC@
+ CCDEPMODE = @CCDEPMODE@
+ CC_FOR_BUILD = @CC_FOR_BUILD@
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -fpic
+ CGEN_MAINT_FALSE = @CGEN_MAINT_FALSE@
+ CGEN_MAINT_TRUE = @CGEN_MAINT_TRUE@
+ CPP = @CPP@
