@@ -1,13 +1,13 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
-Date: 2004-03-15
+Date: 2004-03-16
 Initial Package Version: 2.95.3
 Origin: Based on gcc-3.3.2-pie-ssp.patch by Alexander Gabert
 Description: See description in the sspspecs.h hunk below the copyright.
 This patch will also work on gcc-3.x with fuzz
 
-diff -Naur gcc-2.95.3.orig/gcc/gcc.c gcc-2.95.3/gcc/gcc.c
---- gcc-2.95.3.orig/gcc/gcc.c	2001-01-25 09:03:16.000000000 -0500
-+++ gcc-2.95.3/gcc/gcc.c	2004-03-15 10:42:40.000000000 -0500
+diff -Naur gcc-2.95.3.orig/gcc/gcc.c gcc-2.95.3.sspspecs/gcc/gcc.c
+--- gcc-2.95.3.orig/gcc/gcc.c	2004-03-16 00:56:22.000000000 -0500
++++ gcc-2.95.3.sspspecs/gcc/gcc.c	2004-03-16 00:56:42.000000000 -0500
 @@ -407,6 +407,7 @@
  
  /* config.h can define CC1_SPEC to provide extra args to cc1 and cc1plus
@@ -16,10 +16,10 @@ diff -Naur gcc-2.95.3.orig/gcc/gcc.c gcc-2.95.3/gcc/gcc.c
  #ifndef CC1_SPEC
  #define CC1_SPEC ""
  #endif
-diff -Naur gcc-2.95.3.orig/gcc/sspspecs.h gcc-2.95.3/gcc/sspspecs.h
+diff -Naur gcc-2.95.3.orig/gcc/sspspecs.h gcc-2.95.3.sspspecs/gcc/sspspecs.h
 --- gcc-2.95.3.orig/gcc/sspspecs.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-2.95.3/gcc/sspspecs.h	2004-03-15 10:41:49.000000000 -0500
-@@ -0,0 +1,89 @@
++++ gcc-2.95.3.sspspecs/gcc/sspspecs.h	2004-03-16 00:59:07.000000000 -0500
+@@ -0,0 +1,91 @@
 +/* Adds spec for RTL buffer overflow protection function
 +Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +1999, 2000, 2001, 2002 Free Software Foundation, Inc.
@@ -89,12 +89,14 @@ diff -Naur gcc-2.95.3.orig/gcc/sspspecs.h gcc-2.95.3/gcc/sspspecs.h
 +	NSPEC("DIN_GCC",					\
 +	NSPEC("DIN_LIBGCC",					\
 +	NSPEC("DIN_LIBGCC2",				\
++	NSPEC("nostartfiles",				\
++	NSPEC("nostdinc",				\
 +	NSPEC("nostdlib",					\
 +	NSPEC("nodefaultlibs",				\
 +	NSPEC("fno-stack-protector",		\
 +	NSPEC("fno-stack-protector-all",	\
 +	flag								\
-+	))))))))
++	))))))))))
 +#endif
 +
 +/* -fforce-addr has been heavily tested by Gentoo and should be safe. */
