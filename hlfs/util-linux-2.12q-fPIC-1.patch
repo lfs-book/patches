@@ -1,0 +1,58 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-10-30
+Initial Package Version: 2.12h
+Origin: Modified from:
+http://ftp.belnet.be/linux/gentoo-portage/sys-apps/util-linux/files/\
+	util-linux-2.12b-pic.patch
+Upstream Status: Submitted
+Description: This is needed for Grsec. http://www..grsecurity.net/
+Util linux doesn't build with position independence without this patch.
+
+Also see:
+http://www.linuxfromscratch.org/hlfs/
+
+diff -Naur util-linux-2.12h.orig/fdisk/llseek.c util-linux-2.12h.pax_fpic/fdisk/llseek.c
+--- util-linux-2.12h.orig/fdisk/llseek.c	2003-07-13 21:13:33.000000000 +0000
++++ util-linux-2.12h.pax_fpic/fdisk/llseek.c	2004-10-30 17:09:20.800092632 +0000
+@@ -19,7 +19,7 @@
+ 
+ #else	/* HAVE_LLSEEK */
+ 
+-#if defined(__alpha__) || defined(__ia64__) || defined(__s390x__)
++#if defined(__PIC__) || defined(__pic__) || defined(__alpha__) || defined(__ia64__) || defined(__s390x__) || defined(__hppa__)
+ 
+ #define my_llseek lseek
+ 
+diff -Naur util-linux-2.12h.orig/fdisk/sfdisk.c util-linux-2.12h.pax_fpic/fdisk/sfdisk.c
+--- util-linux-2.12h.orig/fdisk/sfdisk.c	2004-09-28 17:10:21.000000000 +0000
++++ util-linux-2.12h.pax_fpic/fdisk/sfdisk.c	2004-10-30 17:17:03.430762080 +0000
+@@ -160,7 +160,7 @@
+ #define use_lseek
+ #endif
+ 
+-#ifndef use_lseek
++#if !defined(use_lseek) && !defined(__PIC__) && !defined(__pic__)
+ static __attribute__used
+ _syscall5(int,  _llseek,  unsigned int,  fd, ulong, hi, ulong, lo,
+        loff_t *, res, unsigned int, wh);
+@@ -172,7 +172,7 @@
+     in = ((loff_t) s << 9);
+     out = 1;
+ 
+-#ifndef use_lseek
++#if !defined(use_lseek) && !defined(__PIC__) && !defined(__pic__)
+     if (_llseek (fd, in>>32, in & 0xffffffff, &out, SEEK_SET) != 0) {
+ #else
+     if ((out = lseek(fd, in, SEEK_SET)) != in) {
+diff -Naur util-linux-2.12h.orig/partx/partx.c util-linux-2.12h.pax_fpic/partx/partx.c
+--- util-linux-2.12h.orig/partx/partx.c	2004-08-23 20:13:27.000000000 +0000
++++ util-linux-2.12h.pax_fpic/partx/partx.c	2004-10-30 16:49:54.127453832 +0000
+@@ -333,7 +333,7 @@
+ /*
+  * sseek: seek to specified sector
+  */
+-#if !defined (__alpha__) && !defined (__ia64__) && !defined (__s390x__) && !defined(__x86_64__)
++#if !defined (__alpha__) && !defined (__ia64__) && !defined (__s390x__) && !defined(__x86_64__) && !defined(__PIC__) && !defined(__hppa__)
+ #define NEED__llseek
+ #endif
+ 
