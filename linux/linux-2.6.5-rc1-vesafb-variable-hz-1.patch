@@ -1,7 +1,7 @@
 Submitted By: Zack Winkles <winkie@linuxfromscratch.org>
 Date: 2004-03-16
 Initial Package Version: 2.6.5-rc1
-Origin: -love patchset (http://www.linuxmall.us/~lovepatch/love-sources)
+Origin: http://www.spock.mga.com.pl/eng/spock/myprogs.php
 Description: Enable the use of refresh rates greater than 60 with vesafb.
 
 diff -Naur linux-2.6.5-rc1.orig/arch/i386/boot/vesafb_modes.h linux-2.6.5-rc1/arch/i386/boot/vesafb_modes.h
