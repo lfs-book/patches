@@ -4,7 +4,7 @@ Initial Package Version: 2.3.2
 Origin: http://emu.gentoo.org/~pappy/gentoo-x86/sys-libs/glibc/ \
 	glibc-2.3.2-propolice-guard-functions.patch
 Description: ProPolice Stack Gaurd - Move functions to Glibc
-ftp://twocents.mooo.com/pub/
+ftp://twocents.mooo.com/pub/hcc/propolice.txt
 
 diff -u -r -N glibc-2.3.2.ORIG/sysdeps/generic/libc-start.c glibc-2.3.2/sysdeps/generic/libc-start.c
 --- glibc-2.3.2.ORIG/sysdeps/generic/libc-start.c	2003-02-14 23:59:15.000000000 +0100
