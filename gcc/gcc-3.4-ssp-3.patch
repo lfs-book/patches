@@ -1,5 +1,5 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2004-10-22
+Date: 2004-11-07
 Initial Package Version: 3.4
 Upstream Status: Rejected Upstream
 Origin: http://www.research.ibm.com/trl/projects/security/ssp/
@@ -7,13 +7,15 @@ Description: Smashing Stack Protector - protector-3.4.1-1.tar.gz
 This patch is made specifically to work with the Glibc SSP patch. All guard
 functions have been removed. Developers are encouraged to check the
 differences between this patch, the original from ibm, and the Glibc patch.
-The gcc/libgcc2.c, gcc/libgcc-std.ver, and gcc/config/t-linux hunks were not used.
+The gcc/libgcc2.c, gcc/libgcc-std.ver, gcc/config/t-linux, gcc/configure,
+and the "ENABLESSP" hunk of gcc/Makefile.in hunks were not used.
 Equivilent to using -D_LIBC_PROVIDES_SSP_ (-DHAVE_SYSLOG is related).
+The gcc/configure and gcc/Makefile.in hunks were removed because they
+conflict with other patches and we don't use the configure option anyway.
 
-This version uses the "--enable-stack-protector" configure switch. A man page entry for
--fstack-protector was also added. To set the version string do something like this:
+To set the version string do something like this:
 
-sed -e 's/3.4.2/3.4.2 ssp/' -i gcc/version.c &&
+sed -e 's/3.4.3/3.4.3 ssp/' -i gcc/version.c &&
 sed -e 's@http://gcc.gnu.org/bugs.html@http://bugs.linuxfromscratch.org/@' \
   -i gcc/version.c
 
@@ -26,9 +28,9 @@ http://www.linuxfromscratch.org/hlfs/
 http://www.linuxfromscratch.org/hints/downloads/files/ssp.txt
 http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
 
-diff -Naur gcc-3.4.2.orig/gcc/Makefile.in gcc-3.4.2.ssp/gcc/Makefile.in
---- gcc-3.4.2.orig/gcc/Makefile.in	2004-06-17 21:56:58.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/Makefile.in	2004-10-22 21:48:47.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/Makefile.in gcc-3.4.0.ssp/gcc/Makefile.in
+--- gcc-3.4.0.orig/gcc/Makefile.in	2004-04-01 16:47:54.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/Makefile.in	2004-11-08 02:15:45.742545000 +0000
 @@ -859,7 +859,7 @@
   sibcall.o simplify-rtx.o sreal.o stmt.o stor-layout.o stringpool.o 	   \
   targhooks.o timevar.o toplev.o tracer.o tree.o tree-dump.o unroll.o	   \
@@ -38,16 +40,7 @@ diff -Naur gcc-3.4.2.orig/gcc/Makefile.in gcc-3.4.2.ssp/gcc/Makefile.in
  
  OBJS-md = $(out_object_file)
  OBJS-archive = $(EXTRA_OBJS) $(host_hook_obj) hashtable.o tree-inline.o	   \
-@@ -1532,7 +1532,7 @@
-    langhooks.h insn-flags.h cfglayout.h real.h cfgloop.h \
-    hosthooks.h $(LANGHOOKS_DEF_H) cgraph.h $(COVERAGE_H) alloc-pool.h
- 	$(CC) $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
--	  -DTARGET_NAME=\"$(target_noncanonical)\" \
-+	  -DTARGET_NAME=\"$(target_noncanonical)\" @ENABLESSP@ \
- 	  -c $(srcdir)/toplev.c $(OUTPUT_OPTION)
- main.o : main.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) toplev.h
- 
-@@ -1835,6 +1835,10 @@
+@@ -1834,6 +1834,10 @@
  params.o : params.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(PARAMS_H) toplev.h
  hooks.o: hooks.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(HOOKS_H)
  pretty-print.o: $(CONFIG_H) $(SYSTEM_H) pretty-print.c $(PRETTY_PRINT_H)
@@ -58,9 +51,9 @@ diff -Naur gcc-3.4.2.orig/gcc/Makefile.in gcc-3.4.2.ssp/gcc/Makefile.in
  
  $(out_object_file): $(out_file) $(CONFIG_H) coretypes.h $(TM_H) $(TREE_H) $(GGC_H) \
     $(RTL_H) $(REGS_H) hard-reg-set.h real.h insn-config.h conditions.h \
-diff -Naur gcc-3.4.2.orig/gcc/c-cppbuiltin.c gcc-3.4.2.ssp/gcc/c-cppbuiltin.c
---- gcc-3.4.2.orig/gcc/c-cppbuiltin.c	2004-03-04 10:24:54.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/c-cppbuiltin.c	2004-10-22 21:48:47.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/c-cppbuiltin.c gcc-3.4.0.ssp/gcc/c-cppbuiltin.c
+--- gcc-3.4.0.orig/gcc/c-cppbuiltin.c	2004-03-04 10:24:54.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/c-cppbuiltin.c	2004-11-08 01:51:36.000000000 +0000
 @@ -408,6 +408,12 @@
    if (c_dialect_objc () && flag_next_runtime)
      cpp_define (pfile, "__NEXT_RUNTIME__");
@@ -74,9 +67,9 @@ diff -Naur gcc-3.4.2.orig/gcc/c-cppbuiltin.c gcc-3.4.2.ssp/gcc/c-cppbuiltin.c
    /* A straightforward target hook doesn't work, because of problems
       linking that hook's body when part of non-C front ends.  */
  # define preprocessing_asm_p() (cpp_get_options (pfile)->lang == CLK_ASM)
-diff -Naur gcc-3.4.2.orig/gcc/calls.c gcc-3.4.2.ssp/gcc/calls.c
---- gcc-3.4.2.orig/gcc/calls.c	2004-06-24 07:26:50.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/calls.c	2004-10-22 21:48:47.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/calls.c gcc-3.4.0.ssp/gcc/calls.c
+--- gcc-3.4.0.orig/gcc/calls.c	2004-03-15 23:22:42.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/calls.c	2004-11-08 01:51:36.000000000 +0000
 @@ -2321,8 +2321,12 @@
  	  {
  	    /* For variable-sized objects, we must be called with a target
@@ -92,9 +85,9 @@ diff -Naur gcc-3.4.2.orig/gcc/calls.c gcc-3.4.2.ssp/gcc/calls.c
  
  	    mark_temp_addr_taken (d);
  	    structure_value_addr = XEXP (d, 0);
-diff -Naur gcc-3.4.2.orig/gcc/combine.c gcc-3.4.2.ssp/gcc/combine.c
---- gcc-3.4.2.orig/gcc/combine.c	2004-07-06 21:12:12.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/combine.c	2004-10-22 21:48:47.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/combine.c gcc-3.4.0.ssp/gcc/combine.c
+--- gcc-3.4.0.orig/gcc/combine.c	2004-02-21 13:24:43.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/combine.c	2004-11-08 01:51:37.000000000 +0000
 @@ -1401,6 +1401,10 @@
  	      && ! fixed_regs[REGNO (dest)]
  	      && CLASS_LIKELY_SPILLED_P (REGNO_REG_CLASS (REGNO (dest))))))
@@ -159,9 +152,9 @@ diff -Naur gcc-3.4.2.orig/gcc/combine.c gcc-3.4.2.ssp/gcc/combine.c
  	return gen_binary (MINUS, mode,
  			   gen_binary (MINUS, mode, XEXP (x, 0),
  				       XEXP (XEXP (x, 1), 0)),
-diff -Naur gcc-3.4.2.orig/gcc/common.opt gcc-3.4.2.ssp/gcc/common.opt
---- gcc-3.4.2.orig/gcc/common.opt	2004-02-18 00:09:04.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/common.opt	2004-10-22 21:48:47.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/common.opt gcc-3.4.0.ssp/gcc/common.opt
+--- gcc-3.4.0.orig/gcc/common.opt	2004-02-18 00:09:04.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/common.opt	2004-11-08 01:51:37.000000000 +0000
 @@ -152,6 +152,10 @@
  Common
  Warn when a variable is unused
@@ -188,9 +181,9 @@ diff -Naur gcc-3.4.2.orig/gcc/common.opt gcc-3.4.2.ssp/gcc/common.opt
  g
  Common JoinedOrMissing
  Generate debug information in default format
-diff -Naur gcc-3.4.2.orig/gcc/config/arm/arm.md gcc-3.4.2.ssp/gcc/config/arm/arm.md
---- gcc-3.4.2.orig/gcc/config/arm/arm.md	2004-08-25 15:46:19.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/config/arm/arm.md	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/config/arm/arm.md gcc-3.4.0.ssp/gcc/config/arm/arm.md
+--- gcc-3.4.0.orig/gcc/config/arm/arm.md	2004-01-13 13:24:37.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/config/arm/arm.md	2004-11-08 01:51:37.000000000 +0000
 @@ -3840,7 +3840,13 @@
  	(match_operand:DI 1 "general_operand" ""))]
    "TARGET_EITHER"
@@ -206,57 +199,10 @@ diff -Naur gcc-3.4.2.orig/gcc/config/arm/arm.md gcc-3.4.2.ssp/gcc/config/arm/arm
      {
        if (!no_new_pseudos)
          {
-diff -Naur gcc-3.4.2.orig/gcc/configure gcc-3.4.2.ssp/gcc/configure
---- gcc-3.4.2.orig/gcc/configure	2004-07-13 06:58:29.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/configure	2004-10-22 21:48:48.000000000 +0000
-@@ -308,7 +308,7 @@
- # include <unistd.h>
- #endif"
- 
--ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os build_subdir host_subdir target_subdir GENINSRC CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT NO_MINUS_C_MINUS_O OUTPUT_OPTION CPP GNATBIND ac_ct_GNATBIND strict1_warn warn_cflags WERROR nocommon_flag EGREP valgrind_path valgrind_path_defines valgrind_command coverage_flags enable_multilib enable_shared TARGET_SYSTEM_ROOT TARGET_SYSTEM_ROOT_DEFINE CROSS_SYSTEM_HEADER_DIR onestep SET_MAKE AWK LN LN_S RANLIB ac_ct_RANLIB INSTALL INSTALL_PROGRAM INSTALL_DATA make_compare_target have_mktemp_command MAKEINFO BUILD_INFO GENERATED_MANPAGES FLEX BISON stage1_cflags COLLECT2_LIBS GNAT_LIBEXC LDEXP_LIB TARGET_GETGROUPS_T LIBICONV LIBICONV_DEP manext objext extra_modes_file FORBUILD PACKAGE VERSION USE_NLS LIBINTL LIBINTL_DEP INCINTL XGETTEXT GMSGFMT POSUB CATALOGS CROSS ALL SYSTEM_HEADER_DIR inhibit_libc BUILD_PREFIX BUILD_PREFIX_1 CC_FOR_BUILD BUILD_CFLAGS STMP_FIXINC STMP_FIXPROTO libgcc_visibility gthread_flags GGC zlibdir zlibinc MAINT gcc_tooldir dollar slibdir objdir subdirs srcdir all_boot_languages all_compilers all_gtfiles all_gtfiles_files_langs all_gtfiles_files_files all_lang_makefrags all_lang_makefiles all_languages all_stagestuff build_exeext build_install_headers_dir build_xm_file_list build_xm_include_list build_xm_defines check_languages cc_set_by_configure quoted_cc_set_by_configure cpp_install_dir xmake_file tmake_file extra_gcc_objs extra_headers_list extra_objs extra_parts extra_passes extra_programs float_h_file gcc_config_arguments gcc_gxx_include_dir libstdcxx_incdir gcc_version gcc_version_full gcc_version_trigger host_exeext host_xm_file_list host_xm_include_list host_xm_defines out_host_hook_obj install lang_opt_files lang_specs_files lang_tree_files local_prefix md_file objc_boehm_gc out_file out_object_file stage_prefix_set_by_configure quoted_stage_prefix_set_by_configure symbolic_link thread_file tm_file_list tm_include_list tm_defines tm_p_file_list tm_p_include_list xm_file_list xm_include_list xm_defines target_noncanonical c_target_objs cxx_target_objs target_cpu_default LIBOBJS LTLIBOBJS'
-+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os build_subdir host_subdir target_subdir GENINSRC CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT NO_MINUS_C_MINUS_O OUTPUT_OPTION CPP GNATBIND ac_ct_GNATBIND strict1_warn warn_cflags WERROR nocommon_flag EGREP valgrind_path valgrind_path_defines valgrind_command coverage_flags enable_multilib enable_shared TARGET_SYSTEM_ROOT TARGET_SYSTEM_ROOT_DEFINE CROSS_SYSTEM_HEADER_DIR onestep ENABLESSP SET_MAKE AWK LN LN_S RANLIB ac_ct_RANLIB INSTALL INSTALL_PROGRAM INSTALL_DATA make_compare_target have_mktemp_command MAKEINFO BUILD_INFO GENERATED_MANPAGES FLEX BISON stage1_cflags COLLECT2_LIBS GNAT_LIBEXC LDEXP_LIB TARGET_GETGROUPS_T LIBICONV LIBICONV_DEP manext objext extra_modes_file FORBUILD PACKAGE VERSION USE_NLS LIBINTL LIBINTL_DEP INCINTL XGETTEXT GMSGFMT POSUB CATALOGS CROSS ALL SYSTEM_HEADER_DIR inhibit_libc BUILD_PREFIX BUILD_PREFIX_1 CC_FOR_BUILD BUILD_CFLAGS STMP_FIXINC STMP_FIXPROTO libgcc_visibility gthread_flags GGC zlibdir zlibinc MAINT gcc_tooldir dollar slibdir objdir subdirs srcdir all_boot_languages all_compilers all_gtfiles all_gtfiles_files_langs all_gtfiles_files_files all_lang_makefrags all_lang_makefiles all_languages all_stagestuff build_exeext build_install_headers_dir build_xm_file_list build_xm_include_list build_xm_defines check_languages cc_set_by_configure quoted_cc_set_by_configure cpp_install_dir xmake_file tmake_file extra_gcc_objs extra_headers_list extra_objs extra_parts extra_passes extra_programs float_h_file gcc_config_arguments gcc_gxx_include_dir libstdcxx_incdir gcc_version gcc_version_full gcc_version_trigger host_exeext host_xm_file_list host_xm_include_list host_xm_defines out_host_hook_obj install lang_opt_files lang_specs_files lang_tree_files local_prefix md_file objc_boehm_gc out_file out_object_file stage_prefix_set_by_configure quoted_stage_prefix_set_by_configure symbolic_link thread_file tm_file_list tm_include_list tm_defines tm_p_file_list tm_p_include_list xm_file_list xm_include_list xm_defines target_noncanonical c_target_objs cxx_target_objs target_cpu_default LIBOBJS LTLIBOBJS'
- ac_subst_files='language_hooks'
- 
- # Initialize some variables set by options.
-@@ -878,6 +878,7 @@
-   --enable-sjlj-exceptions
-                           arrange to use setjmp/longjmp exception handling
-   --enable-libunwind-exceptions  force use libunwind for exceptions
-+  --enable-stack-protector	force use stack protection as defaults
-   --disable-win32-registry
-                           disable lookup of installation paths in the
-                           Registry on Windows hosts
-@@ -4589,6 +4590,18 @@
- fi;
- 
- 
-+
-+# Determine whether or not stack protection is enabled.
-+# Check whether --enable-stack-protector or --disable-stack-protector was given.
-+if test "${enable_stack_protector+set}" = set; then
-+  ENABLESSP="-DSTACK_PROTECTOR"
-+
-+else
-+  ENABLESSP=""
-+fi;
-+
-+
-+
- # -------------------------
- # Checks for other programs
- # -------------------------
-@@ -12515,6 +12528,7 @@
- s,@TARGET_SYSTEM_ROOT_DEFINE@,$TARGET_SYSTEM_ROOT_DEFINE,;t t
- s,@CROSS_SYSTEM_HEADER_DIR@,$CROSS_SYSTEM_HEADER_DIR,;t t
- s,@onestep@,$onestep,;t t
-+s,@ENABLESSP@,$ENABLESSP,;t t
- s,@SET_MAKE@,$SET_MAKE,;t t
- s,@AWK@,$AWK,;t t
- s,@LN@,$LN,;t t
-diff -Naur gcc-3.4.2.orig/gcc/cse.c gcc-3.4.2.ssp/gcc/cse.c
---- gcc-3.4.2.orig/gcc/cse.c	2004-06-21 23:32:58.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/cse.c	2004-10-22 21:48:48.000000000 +0000
-@@ -4207,7 +4207,14 @@
+diff -Naur gcc-3.4.0.orig/gcc/cse.c gcc-3.4.0.ssp/gcc/cse.c
+--- gcc-3.4.0.orig/gcc/cse.c	2004-03-21 23:01:49.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/cse.c	2004-11-08 01:51:37.000000000 +0000
+@@ -4203,7 +4203,14 @@
  
  	      if (new_const == 0)
  		break;
@@ -272,7 +218,7 @@ diff -Naur gcc-3.4.2.orig/gcc/cse.c gcc-3.4.2.ssp/gcc/cse.c
  	      /* If we are associating shift operations, don't let this
  		 produce a shift of the size of the object or larger.
  		 This could occur when we follow a sign-extend by a right
-@@ -4739,6 +4746,14 @@
+@@ -4735,6 +4742,14 @@
        if (SET_DEST (x) == pc_rtx
  	  && GET_CODE (SET_SRC (x)) == LABEL_REF)
  	;
@@ -287,9 +233,9 @@ diff -Naur gcc-3.4.2.orig/gcc/cse.c gcc-3.4.2.ssp/gcc/cse.c
  
        /* Don't count call-insns, (set (reg 0) (call ...)), as a set.
  	 The hard function value register is used only once, to copy to
-diff -Naur gcc-3.4.2.orig/gcc/doc/invoke.texi gcc-3.4.2.ssp/gcc/doc/invoke.texi
---- gcc-3.4.2.orig/gcc/doc/invoke.texi	2004-07-13 10:43:39.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/doc/invoke.texi	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/doc/invoke.texi gcc-3.4.0.ssp/gcc/doc/invoke.texi
+--- gcc-3.4.0.orig/gcc/doc/invoke.texi	2004-04-18 23:05:36.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/doc/invoke.texi	2004-11-08 01:51:37.000000000 +0000
 @@ -227,7 +227,7 @@
  -Wno-multichar  -Wnonnull  -Wpacked  -Wpadded @gol
  -Wparentheses  -Wpointer-arith  -Wredundant-decls @gol
@@ -299,7 +245,7 @@ diff -Naur gcc-3.4.2.orig/gcc/doc/invoke.texi gcc-3.4.2.ssp/gcc/doc/invoke.texi
  -Wswitch  -Wswitch-default  -Wswitch-enum @gol
  -Wsystem-headers  -Wtrigraphs  -Wundef  -Wuninitialized @gol
  -Wunknown-pragmas  -Wunreachable-code @gol
-@@ -672,6 +672,7 @@
+@@ -671,6 +671,7 @@
  -fshort-double  -fshort-wchar @gol
  -fverbose-asm  -fpack-struct  -fstack-check @gol
  -fstack-limit-register=@var{reg}  -fstack-limit-symbol=@var{sym} @gol
@@ -307,7 +253,7 @@ diff -Naur gcc-3.4.2.orig/gcc/doc/invoke.texi gcc-3.4.2.ssp/gcc/doc/invoke.texi
  -fargument-alias  -fargument-noalias @gol
  -fargument-noalias-global  -fleading-underscore @gol
  -ftls-model=@var{model} @gol
-@@ -2990,6 +2991,10 @@
+@@ -2989,6 +2990,10 @@
  complex; GCC will refuse to optimize programs when the optimization
  itself is likely to take inordinate amounts of time.
  
@@ -318,7 +264,7 @@ diff -Naur gcc-3.4.2.orig/gcc/doc/invoke.texi gcc-3.4.2.ssp/gcc/doc/invoke.texi
  @item -Werror
  @opindex Werror
  Make all warnings into errors.
-@@ -11186,6 +11191,24 @@
+@@ -11159,6 +11164,24 @@
  @option{-Wl,--defsym,__stack_limit=0x7ffe0000} to enforce a stack limit
  of 128KB@.  Note that this may only work with the GNU linker.
  
@@ -343,9 +289,9 @@ diff -Naur gcc-3.4.2.orig/gcc/doc/invoke.texi gcc-3.4.2.ssp/gcc/doc/invoke.texi
  @cindex aliasing of parameters
  @cindex parameters, aliased
  @item -fargument-alias
-diff -Naur gcc-3.4.2.orig/gcc/explow.c gcc-3.4.2.ssp/gcc/explow.c
---- gcc-3.4.2.orig/gcc/explow.c	2004-04-02 23:05:26.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/explow.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/explow.c gcc-3.4.0.ssp/gcc/explow.c
+--- gcc-3.4.0.orig/gcc/explow.c	2004-04-02 23:05:26.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/explow.c	2004-11-08 01:51:38.000000000 +0000
 @@ -84,7 +84,8 @@
    rtx tem;
    int all_constant = 0;
@@ -395,9 +341,9 @@ diff -Naur gcc-3.4.2.orig/gcc/explow.c gcc-3.4.2.ssp/gcc/explow.c
        /* Perform machine-dependent transformations on X
  	 in certain cases.  This is not necessary since the code
  	 below can handle all possible cases, but machine-dependent
-diff -Naur gcc-3.4.2.orig/gcc/expr.c gcc-3.4.2.ssp/gcc/expr.c
---- gcc-3.4.2.orig/gcc/expr.c	2004-05-27 19:35:17.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/expr.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/expr.c gcc-3.4.0.ssp/gcc/expr.c
+--- gcc-3.4.0.orig/gcc/expr.c	2004-04-02 23:05:28.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/expr.c	2004-11-08 01:51:38.000000000 +0000
 @@ -48,6 +48,7 @@
  #include "intl.h"
  #include "tm_p.h"
@@ -485,7 +431,7 @@ diff -Naur gcc-3.4.2.orig/gcc/expr.c gcc-3.4.2.ssp/gcc/expr.c
  
        cst = (*data->constfun) (data->constfundata, data->offset, mode);
        emit_insn ((*genfun) (to1, cst));
-@@ -5701,7 +5722,9 @@
+@@ -5700,7 +5721,9 @@
  	  && GET_CODE (XEXP (value, 0)) == PLUS
  	  && GET_CODE (XEXP (XEXP (value, 0), 0)) == REG
  	  && REGNO (XEXP (XEXP (value, 0), 0)) >= FIRST_VIRTUAL_REGISTER
@@ -496,9 +442,9 @@ diff -Naur gcc-3.4.2.orig/gcc/expr.c gcc-3.4.2.ssp/gcc/expr.c
  	{
  	  rtx temp = expand_simple_binop (GET_MODE (value), code,
  					  XEXP (XEXP (value, 0), 0), op2,
-diff -Naur gcc-3.4.2.orig/gcc/flags.h gcc-3.4.2.ssp/gcc/flags.h
---- gcc-3.4.2.orig/gcc/flags.h	2004-02-18 00:09:04.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/flags.h	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/flags.h gcc-3.4.0.ssp/gcc/flags.h
+--- gcc-3.4.0.orig/gcc/flags.h	2004-02-18 00:09:04.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/flags.h	2004-11-08 01:51:38.000000000 +0000
 @@ -186,6 +186,10 @@
  
  extern bool warn_strict_aliasing;
@@ -523,9 +469,9 @@ diff -Naur gcc-3.4.2.orig/gcc/flags.h gcc-3.4.2.ssp/gcc/flags.h
 +extern int flag_stack_protection;
 +
  #endif /* ! GCC_FLAGS_H */
-diff -Naur gcc-3.4.2.orig/gcc/function.c gcc-3.4.2.ssp/gcc/function.c
---- gcc-3.4.2.orig/gcc/function.c	2004-06-22 23:54:02.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/function.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/function.c gcc-3.4.0.ssp/gcc/function.c
+--- gcc-3.4.0.orig/gcc/function.c	2004-03-15 23:22:47.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/function.c	2004-11-08 01:51:38.000000000 +0000
 @@ -63,6 +63,7 @@
  #include "integrate.h"
  #include "langhooks.h"
@@ -643,9 +589,9 @@ diff -Naur gcc-3.4.2.orig/gcc/function.c gcc-3.4.2.ssp/gcc/function.c
  		emit_insn_before (gen_move_insn (temp, new_offset), object);
  	      else
  		{
-diff -Naur gcc-3.4.2.orig/gcc/gcse.c gcc-3.4.2.ssp/gcc/gcse.c
---- gcc-3.4.2.orig/gcc/gcse.c	2004-09-01 20:30:28.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/gcse.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/gcse.c gcc-3.4.0.ssp/gcc/gcse.c
+--- gcc-3.4.0.orig/gcc/gcse.c	2004-03-25 16:44:42.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/gcse.c	2004-11-08 01:51:38.000000000 +0000
 @@ -4176,9 +4176,13 @@
  	continue;
  
@@ -662,9 +608,9 @@ diff -Naur gcc-3.4.2.orig/gcc/gcse.c gcc-3.4.2.ssp/gcc/gcse.c
  	continue;
  
        pat = set->expr;
-diff -Naur gcc-3.4.2.orig/gcc/integrate.c gcc-3.4.2.ssp/gcc/integrate.c
---- gcc-3.4.2.orig/gcc/integrate.c	2004-01-23 23:36:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/integrate.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/integrate.c gcc-3.4.0.ssp/gcc/integrate.c
+--- gcc-3.4.0.orig/gcc/integrate.c	2004-01-23 23:36:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/integrate.c	2004-11-08 01:51:38.000000000 +0000
 @@ -393,6 +393,11 @@
    /* These args would always appear unused, if not for this.  */
    TREE_USED (copy) = 1;
@@ -690,10 +636,10 @@ diff -Naur gcc-3.4.2.orig/gcc/integrate.c gcc-3.4.2.ssp/gcc/integrate.c
  	      emit_insn_after (seq, map->insns_at_start);
  	      return temp;
  	    }
-diff -Naur gcc-3.4.2.orig/gcc/loop.c gcc-3.4.2.ssp/gcc/loop.c
---- gcc-3.4.2.orig/gcc/loop.c	2004-07-13 15:29:08.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/loop.c	2004-10-22 21:48:48.000000000 +0000
-@@ -6514,6 +6514,14 @@
+diff -Naur gcc-3.4.0.orig/gcc/loop.c gcc-3.4.0.ssp/gcc/loop.c
+--- gcc-3.4.0.orig/gcc/loop.c	2004-02-14 14:46:03.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/loop.c	2004-11-08 01:51:38.000000000 +0000
+@@ -6513,6 +6513,14 @@
    if (GET_CODE (*mult_val) == USE)
      *mult_val = XEXP (*mult_val, 0);
  
@@ -708,21 +654,21 @@ diff -Naur gcc-3.4.2.orig/gcc/loop.c gcc-3.4.2.ssp/gcc/loop.c
    if (is_addr)
      *pbenefit += address_cost (orig_x, addr_mode) - reg_address_cost;
    else
-diff -Naur gcc-3.4.2.orig/gcc/mklibgcc.in gcc-3.4.2.ssp/gcc/mklibgcc.in
---- gcc-3.4.2.orig/gcc/mklibgcc.in	2004-07-17 21:18:48.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/mklibgcc.in	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/mklibgcc.in gcc-3.4.0.ssp/gcc/mklibgcc.in
+--- gcc-3.4.0.orig/gcc/mklibgcc.in	2003-11-21 04:53:09.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/mklibgcc.in	2004-11-08 01:51:38.000000000 +0000
 @@ -51,7 +51,7 @@
- 	_enable_execute_stack _trampoline __main _absvsi2 _absvdi2 _addvsi3
- 	_addvdi3 _subvsi3 _subvdi3 _mulvsi3 _mulvdi3 _negvsi2 _negvdi2 _ctors
+ 	_trampoline __main _absvsi2 _absvdi2 _addvsi3 _addvdi3
+ 	_subvsi3 _subvdi3 _mulvsi3 _mulvdi3 _negvsi2 _negvdi2 _ctors
  	_ffssi2 _ffsdi2 _clz _clzsi2 _clzdi2 _ctzsi2 _ctzdi2 _popcount_tab
 -	_popcountsi2 _popcountdi2 _paritysi2 _paritydi2'
 +	_popcountsi2 _popcountdi2 _paritysi2 _paritydi2 _stack_smash_handler'
  
  # Disable SHLIB_LINK if shared libgcc not enabled.
  if [ "@enable_shared@" = "no" ]; then
-diff -Naur gcc-3.4.2.orig/gcc/optabs.c gcc-3.4.2.ssp/gcc/optabs.c
---- gcc-3.4.2.orig/gcc/optabs.c	2004-03-03 00:45:01.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/optabs.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/optabs.c gcc-3.4.0.ssp/gcc/optabs.c
+--- gcc-3.4.0.orig/gcc/optabs.c	2004-03-03 00:45:01.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/optabs.c	2004-11-08 01:51:38.000000000 +0000
 @@ -678,6 +678,27 @@
    if (target)
      target = protect_from_queue (target, 1);
@@ -751,9 +697,9 @@ diff -Naur gcc-3.4.2.orig/gcc/optabs.c gcc-3.4.2.ssp/gcc/optabs.c
    if (flag_force_mem)
      {
        /* Load duplicate non-volatile operands once.  */
-diff -Naur gcc-3.4.2.orig/gcc/opts.c gcc-3.4.2.ssp/gcc/opts.c
---- gcc-3.4.2.orig/gcc/opts.c	2004-02-18 00:09:04.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/opts.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/opts.c gcc-3.4.0.ssp/gcc/opts.c
+--- gcc-3.4.0.orig/gcc/opts.c	2004-02-18 00:09:04.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/opts.c	2004-11-08 01:51:38.000000000 +0000
 @@ -125,6 +125,9 @@
  bool warn_unused_variable;
  bool warn_unused_value;
@@ -790,9 +736,9 @@ diff -Naur gcc-3.4.2.orig/gcc/opts.c gcc-3.4.2.ssp/gcc/opts.c
      case OPT_fstrength_reduce:
        flag_strength_reduce = value;
        break;
-diff -Naur gcc-3.4.2.orig/gcc/protector.c gcc-3.4.2.ssp/gcc/protector.c
---- gcc-3.4.2.orig/gcc/protector.c	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/protector.c	2004-09-02 09:36:11.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/protector.c gcc-3.4.0.ssp/gcc/protector.c
+--- gcc-3.4.0.orig/gcc/protector.c	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/protector.c	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,2730 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 2003 Free Software Foundation, Inc.
@@ -3524,9 +3470,9 @@ diff -Naur gcc-3.4.2.orig/gcc/protector.c gcc-3.4.2.ssp/gcc/protector.c
 +  return FALSE;
 +}
 +#endif
-diff -Naur gcc-3.4.2.orig/gcc/protector.h gcc-3.4.2.ssp/gcc/protector.h
---- gcc-3.4.2.orig/gcc/protector.h	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/protector.h	2004-01-20 02:01:39.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/protector.h gcc-3.4.0.ssp/gcc/protector.h
+--- gcc-3.4.0.orig/gcc/protector.h	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/protector.h	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,55 @@
 +/* RTL buffer overflow protection function for GNU C compiler
 +   Copyright (C) 2003 Free Software Foundation, Inc.
@@ -3583,9 +3529,9 @@ diff -Naur gcc-3.4.2.orig/gcc/protector.h gcc-3.4.2.ssp/gcc/protector.h
 +					      HOST_WIDE_INT, int);
 +
 +#endif
-diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
---- gcc-3.4.2.orig/gcc/reload1.c	2004-05-02 12:37:17.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/reload1.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/reload1.c gcc-3.4.0.ssp/gcc/reload1.c
+--- gcc-3.4.0.orig/gcc/reload1.c	2004-03-25 16:44:42.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/reload1.c	2004-11-08 01:51:38.000000000 +0000
 @@ -43,6 +43,7 @@
  #include "toplev.h"
  #include "except.h"
@@ -3594,7 +3540,7 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  
  /* This file contains the reload pass of the compiler, which is
     run after register allocation has been done.  It checks that
-@@ -891,7 +892,7 @@
+@@ -881,7 +882,7 @@
        if (cfun->stack_alignment_needed)
          assign_stack_local (BLKmode, 0, cfun->stack_alignment_needed);
  
@@ -3603,7 +3549,7 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  
        set_initial_elim_offsets ();
        set_initial_label_offsets ();
-@@ -955,7 +956,7 @@
+@@ -945,7 +946,7 @@
  	setup_save_areas ();
  
        /* If we allocated another stack slot, redo elimination bookkeeping.  */
@@ -3612,7 +3558,7 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  	continue;
  
        if (caller_save_needed)
-@@ -974,7 +975,7 @@
+@@ -964,7 +965,7 @@
  
        /* If we allocated any new memory locations, make another pass
  	 since it might have changed elimination offsets.  */
@@ -3621,7 +3567,7 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  	something_changed = 1;
  
        {
-@@ -1066,11 +1067,11 @@
+@@ -1056,11 +1057,11 @@
    if (insns_need_reload != 0 || something_needs_elimination
        || something_needs_operands_changed)
      {
@@ -3635,7 +3581,7 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  	abort ();
  
        if (num_eliminable)
-@@ -1957,8 +1958,10 @@
+@@ -1947,8 +1948,10 @@
  	 inherent space, and no less total space, then the previous slot.  */
        if (from_reg == -1)
  	{
@@ -3648,9 +3594,9 @@ diff -Naur gcc-3.4.2.orig/gcc/reload1.c gcc-3.4.2.ssp/gcc/reload1.c
  				  inherent_size == total_size ? 0 : -1);
  	  if (BYTES_BIG_ENDIAN)
  	    /* Cancel the  big-endian correction done in assign_stack_local.
-diff -Naur gcc-3.4.2.orig/gcc/rtl.h gcc-3.4.2.ssp/gcc/rtl.h
---- gcc-3.4.2.orig/gcc/rtl.h	2004-07-26 14:42:11.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/rtl.h	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/rtl.h gcc-3.4.0.ssp/gcc/rtl.h
+--- gcc-3.4.0.orig/gcc/rtl.h	2004-03-25 16:44:43.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/rtl.h	2004-11-08 01:51:38.000000000 +0000
 @@ -473,6 +473,18 @@
  			     __FUNCTION__);				\
     _rtx; })
@@ -3701,10 +3647,10 @@ diff -Naur gcc-3.4.2.orig/gcc/rtl.h gcc-3.4.2.ssp/gcc/rtl.h
  /* 1 if RTX is a mem that refers to an aggregate, either to the
     aggregate itself of to a field of the aggregate.  If zero, RTX may
     or may not be such a reference.  */
-diff -Naur gcc-3.4.2.orig/gcc/simplify-rtx.c gcc-3.4.2.ssp/gcc/simplify-rtx.c
---- gcc-3.4.2.orig/gcc/simplify-rtx.c	2004-06-14 17:48:02.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/simplify-rtx.c	2004-10-22 21:48:48.000000000 +0000
-@@ -2286,6 +2286,7 @@
+diff -Naur gcc-3.4.0.orig/gcc/simplify-rtx.c gcc-3.4.0.ssp/gcc/simplify-rtx.c
+--- gcc-3.4.0.orig/gcc/simplify-rtx.c	2004-01-24 11:05:08.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/simplify-rtx.c	2004-11-08 01:51:38.000000000 +0000
+@@ -2252,6 +2252,7 @@
    int n_ops = 2, input_ops = 2, input_consts = 0, n_consts;
    int first, changed;
    int i, j;
@@ -3712,7 +3658,7 @@ diff -Naur gcc-3.4.2.orig/gcc/simplify-rtx.c gcc-3.4.2.ssp/gcc/simplify-rtx.c
  
    memset (ops, 0, sizeof ops);
  
-@@ -2311,6 +2312,10 @@
+@@ -2277,6 +2278,10 @@
  	  switch (this_code)
  	    {
  	    case PLUS:
@@ -3723,7 +3669,7 @@ diff -Naur gcc-3.4.2.orig/gcc/simplify-rtx.c gcc-3.4.2.ssp/gcc/simplify-rtx.c
  	    case MINUS:
  	      if (n_ops == 7)
  		return NULL_RTX;
-@@ -2472,11 +2477,24 @@
+@@ -2438,11 +2443,24 @@
        && GET_CODE (ops[n_ops - 1].op) == CONST_INT
        && CONSTANT_P (ops[n_ops - 2].op))
      {
@@ -3753,7 +3699,7 @@ diff -Naur gcc-3.4.2.orig/gcc/simplify-rtx.c gcc-3.4.2.ssp/gcc/simplify-rtx.c
      }
  
    /* Count the number of CONSTs that we generated.  */
-@@ -2494,6 +2512,59 @@
+@@ -2460,6 +2478,59 @@
  	  || (n_ops + n_consts == input_ops && n_consts <= input_consts)))
      return NULL_RTX;
  
@@ -3813,9 +3759,9 @@ diff -Naur gcc-3.4.2.orig/gcc/simplify-rtx.c gcc-3.4.2.ssp/gcc/simplify-rtx.c
    /* Put a non-negated operand first, if possible.  */
  
    for (i = 0; i < n_ops && ops[i].neg; i++)
-diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.dg/ssp-warn.c gcc-3.4.2.ssp/gcc/testsuite/gcc.dg/ssp-warn.c
---- gcc-3.4.2.orig/gcc/testsuite/gcc.dg/ssp-warn.c	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/testsuite/gcc.dg/ssp-warn.c	2003-11-21 08:41:19.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/testsuite/gcc.dg/ssp-warn.c gcc-3.4.0.ssp/gcc/testsuite/gcc.dg/ssp-warn.c
+--- gcc-3.4.0.orig/gcc/testsuite/gcc.dg/ssp-warn.c	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/testsuite/gcc.dg/ssp-warn.c	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,32 @@
 +/* { dg-do compile } */
 +/* { dg-options "-fstack-protector" } */
@@ -3849,9 +3795,9 @@ diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.dg/ssp-warn.c gcc-3.4.2.ssp/gcc/test
 +
 +  buf[0] = 0;
 +} /* { dg-bogus "not protecting function: buffer is less than 8 bytes long" } */
-diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute.exp gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute.exp
---- gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute.exp	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute.exp	2004-06-02 11:23:36.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute.exp gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute.exp
+--- gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute.exp	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute.exp	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,35 @@
 +#   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 +
@@ -3888,9 +3834,9 @@ diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute.exp gcc-3.4.2
 +
 +    c-torture-execute $src -fstack-protector
 +}
-diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute1.c gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute1.c
---- gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute1.c	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute1.c	2004-02-16 05:15:39.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute1.c gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute1.c
+--- gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute1.c	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute1.c	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,54 @@
 +/* Test location changes of character array.  */
 +
@@ -3946,9 +3892,9 @@ diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute1.c gcc-3.4.2.
 +
 +
 +  
-diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute2.c gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute2.c
---- gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute2.c	1970-01-01 00:00:00.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute2.c	2003-11-22 08:44:33.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute2.c gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute2.c
+--- gcc-3.4.0.orig/gcc/testsuite/gcc.misc-tests/ssp-execute2.c	1970-01-01 00:00:00.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/testsuite/gcc.misc-tests/ssp-execute2.c	2004-11-08 01:51:38.000000000 +0000
 @@ -0,0 +1,49 @@
 +void
 +test(int i, char *j, int k)
@@ -3999,9 +3945,9 @@ diff -Naur gcc-3.4.2.orig/gcc/testsuite/gcc.misc-tests/ssp-execute2.c gcc-3.4.2.
 +
 +
 +  
-diff -Naur gcc-3.4.2.orig/gcc/toplev.c gcc-3.4.2.ssp/gcc/toplev.c
---- gcc-3.4.2.orig/gcc/toplev.c	2004-07-26 14:42:11.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/toplev.c	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/toplev.c gcc-3.4.0.ssp/gcc/toplev.c
+--- gcc-3.4.0.orig/gcc/toplev.c	2004-02-20 08:40:49.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/toplev.c	2004-11-08 01:51:38.000000000 +0000
 @@ -79,6 +79,7 @@
  #include "coverage.h"
  #include "value-prof.h"
@@ -4048,7 +3994,7 @@ diff -Naur gcc-3.4.2.orig/gcc/toplev.c gcc-3.4.2.ssp/gcc/toplev.c
  };
  
  /* Here is a table, controlled by the tm.h file, listing each -m switch
-@@ -2686,6 +2702,9 @@
+@@ -2687,6 +2703,9 @@
  
    insns = get_insns ();
  
@@ -4058,7 +4004,7 @@ diff -Naur gcc-3.4.2.orig/gcc/toplev.c gcc-3.4.2.ssp/gcc/toplev.c
    /* Dump the rtl code if we are dumping rtl.  */
  
    if (open_dump_file (DFI_rtl, decl))
-@@ -4483,6 +4502,12 @@
+@@ -4482,6 +4501,12 @@
      /* The presence of IEEE signaling NaNs, implies all math can trap.  */
      if (flag_signaling_nans)
        flag_trapping_math = 1;
@@ -4071,9 +4017,9 @@ diff -Naur gcc-3.4.2.orig/gcc/toplev.c gcc-3.4.2.ssp/gcc/toplev.c
  }
  
  /* Initialize the compiler back end.  */
-diff -Naur gcc-3.4.2.orig/gcc/tree.h gcc-3.4.2.ssp/gcc/tree.h
---- gcc-3.4.2.orig/gcc/tree.h	2004-08-23 18:02:42.000000000 +0000
-+++ gcc-3.4.2.ssp/gcc/tree.h	2004-10-22 21:48:48.000000000 +0000
+diff -Naur gcc-3.4.0.orig/gcc/tree.h gcc-3.4.0.ssp/gcc/tree.h
+--- gcc-3.4.0.orig/gcc/tree.h	2004-02-08 01:52:43.000000000 +0000
++++ gcc-3.4.0.ssp/gcc/tree.h	2004-11-08 01:51:38.000000000 +0000
 @@ -1489,6 +1489,10 @@
     where it is called.  */
  #define DECL_INLINE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.inline_flag)
