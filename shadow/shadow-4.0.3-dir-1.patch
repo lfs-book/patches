@@ -1,0 +1,17 @@
+Submitter: Jim Gifford (patches at jg555 dot com)
+Origin: Shadow Mailing List
+Date: 02-14-2003
+Description: Fixes mkinstalldirs Issues
+
+diff -Naur shadow-4.0.3.orig/po/Makefile.in.in shadow-4.0.3/po/Makefile.in.in
+--- shadow-4.0.3.orig/po/Makefile.in.in	2002-03-13 11:03:23.000000000 -0000
++++ shadow-4.0.3/po/Makefile.in.in	2003-06-26 21:59:37.000000000 -0000
+@@ -29,7 +29,7 @@
+ INSTALL = @INSTALL@
+ INSTALL_DATA = @INSTALL_DATA@
+ MKINSTALLDIRS = @MKINSTALLDIRS@
+-mkinstalldirs = $(SHELL) `case "$(MKINSTALLDIRS)" in /*) echo "$(MKINSTALLDIRS)" ;; *) echo "$(top_builddir)/$(MKINSTALLDIRS)" ;; esac`
++mkinstalldirs = $(SHELL) `case "$(MKINSTALLDIRS)" in /*) echo "$(MKINSTALLDIRS)" ;; *) echo "$(MKINSTALLDIRS)" ;; esac`
+ 
+ CC = @CC@
+ GMSGFMT = @GMSGFMT@
