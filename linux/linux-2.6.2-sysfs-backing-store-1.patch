@@ -5,7 +5,7 @@ Upstream Status: submitted
 Origin: http://marc.theaimsgroup.com/?l=linux-kernel&m=107589464818859&w=2
 Description:
 
-Date: Wed, 4 Feb 2004 17:07:58 +0530
+> Date: Wed, 4 Feb 2004 17:07:58 +0530
 From: Maneesh Soni <maneesh@in.ibm.com>
 To: LKML <linux-kernel@vger.kernel.org>
 Subject: [RFC/T 0/6] sysfs backing store (with symlink)
