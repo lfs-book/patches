@@ -380,7 +380,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +
 +int temp_boundary_mark;
 +
- 
+ 
  /* This structure is used to record MEMs or pseudos used to replace VAR, any
     SUBREGs of VAR, and any MEMs containing VAR as an address.  We need to
 @@ -917,7 +925,8 @@
@@ -505,7 +505,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
    __terminate ();
  }
  #endif
-+
++
 +#ifdef L_stack_smash_handler
 +#include <stdio.h>
 +#include <string.h>
@@ -3400,7 +3400,7 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
 +  {"stack-protector", &warn_stack_protector, 1,
 +   "Warn when disabling stack protector for some reason"}
  };
- 
+ 
  /* Output files for assembler code (real compiler output)
 @@ -3608,6 +3623,10 @@
    int failure = 0;
@@ -3427,4 +3427,4 @@ diff -Naur gcc-2.95.3.orig/gcc/protector.h gcc-2.95.3/gcc/protector.h
 +++ gcc-2.95.3/gcc/version.c	2003-10-26 11:21:59.000000000 -0500
 @@ -1 +1 @@
 -char *version_string = "2.95.3 20010315 (release)";
-+char *version_string = "2.95.3 20010315 (release - propolice)";
++char *version_string = "2.95.3 20010315 (release - propolice_only)";

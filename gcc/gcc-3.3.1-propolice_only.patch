@@ -305,7 +305,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +/* Current boundary mark for character arrays.  */
 +int temp_boundary_mark = 0;
 +
- 
+ 
  /* In order to evaluate some expressions, such as function calls returning
     structures in memory, we need to temporarily allocate stack locations.
 @@ -195,6 +200,8 @@
@@ -315,7 +315,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
 +  /* Boundary mark of a character array and the others. This info is for propolice */
 +  int boundary_mark;
  };
- 
+ 
  /* This structure is used to record MEMs or pseudos used to replace VAR, any
 @@ -629,6 +636,7 @@
     whose lifetime is controlled by CLEANUP_POINT_EXPRs.  KEEP is 3
@@ -454,7 +454,7 @@ Description: ProPolice Stack Gaurd _ONLY_. More info at http://www.linuxfromscra
  #endif /* NEED_ATEXIT */
  
  #endif /* L_exit */
-+
++
 +#ifdef L_stack_smash_handler
 +#include <stdio.h>
 +#include <string.h>
@@ -3452,7 +3452,7 @@ diff -Naur gcc-3.3.1.orig/gcc/protector.h gcc-3.3.1/gcc/protector.h
     organization's name in parentheses at the end of the string.  */
  
 -const char version_string[] = "3.3.1";
-+const char version_string[] = "3.3.1 (propolice)";
++const char version_string[] = "3.3.1 (propolice_only)";
  
  /* This is the location of the online document giving instructions for
     reporting bugs.  If you distribute a modified version of GCC,
