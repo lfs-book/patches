@@ -1,6 +1,6 @@
 Submitted By: BLFS Book <blfs-book@linuxfromscratch.org>
 Date: 2003-10-05
-Initial Package VersionL 6.1
+Initial Package Version: 6.1
 Origin: LFS Book
 Description: Uses FHS compliant locations for vimrc and gvimrc.
 diff -ur vim61.orig/src/feature.h vim61/src/feature.h
