@@ -2,7 +2,7 @@ Submitted By: Alexander E. Patrakov
 Date: 2004-02-15
 Initial Package Version: 1.0.2
 Origin: Alexander E. Patrakov
-Upstream status: Submitted to ALSA bug tracking system
+Upstream status: Patch accepted for inclusion in next release
 Description: With ncurses 5.4 or later, it is necessary to have the
 correct LC_CTYPE setting before calling initscr(). Otherwise, the line
 drawing characters and boxes are not visible on Linux console in UTF-8 mode,
