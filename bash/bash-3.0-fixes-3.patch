@@ -8,6 +8,7 @@ Description: This is all the patches that were release by
 	     next release. The original patches are at
 	     ftp://ftp.cwru.edu/pub/bash/bash-3.0-patches
 	     This patch contains 001-016 
+
 diff -Naur bash-3.0.orig/array.c bash-3.0/array.c
 --- bash-3.0.orig/array.c	2004-05-06 12:24:13.000000000 +0000
 +++ bash-3.0/array.c	2005-01-08 05:40:02.059798512 +0000
