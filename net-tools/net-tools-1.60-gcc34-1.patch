@@ -1,0 +1,44 @@
+Submitted By: Zack Winkles <winkie AT linuxfromscratch DOT org>
+Date: 2004-04-06
+Initial Package Version: 1.60
+Origin: N/A
+Description: FIx some occurrences of syntax that GCC 3.4.0 doesn't like.
+
+diff -Naur net-tools-1.60.orig/hostname.c net-tools-1.60/hostname.c
+--- net-tools-1.60.orig/hostname.c	2001-04-08 17:04:23.000000000 +0000
++++ net-tools-1.60/hostname.c	2004-04-06 16:26:51.858651045 +0000
+@@ -98,6 +98,7 @@
+ 	    fprintf(stderr, _("%s: name too long\n"), program_name);
+ 	    break;
+ 	default:
++	    ((void)0);
+ 	}
+ 	exit(1);
+     };
+@@ -117,6 +118,7 @@
+ 	    fprintf(stderr, _("%s: name too long\n"), program_name);
+ 	    break;
+ 	default:
++	    ((void)0);
+ 	}
+ 	exit(1);
+     };
+@@ -174,6 +176,7 @@
+ 	printf("%s\n", hp->h_name);
+ 	break;
+     default:
++	((void)0);
+     }
+ }
+ 
+diff -Naur net-tools-1.60.orig/lib/inet_sr.c net-tools-1.60/lib/inet_sr.c
+--- net-tools-1.60.orig/lib/inet_sr.c	2000-02-20 21:46:45.000000000 +0000
++++ net-tools-1.60/lib/inet_sr.c	2004-04-06 16:25:50.587104542 +0000
+@@ -105,6 +105,7 @@
+     case 2:
+        isnet = 0; break;
+     default:
++       ((void)0);
+     }
+ 
+     /* Fill in the other fields. */
