@@ -1,0 +1,252 @@
+Submitted By: Ronald Hummelink <ronald at hummelink dot xs4all dot nl>
+Date: 2003-08-16
+Initial Package Version: 3.3
+Origin: Zack Winkles page at l14h.org:
+http://linuxfromscratch.org/~winkie/downloads/patches/gcc-3.3-specs-4.patch.bz2
+Description: Adjust spec file for LFS chapter 5 purposes. Applies to gcc 3.3 and gcc 3.3.1 (with 1 line offset)
+
+diff -Naur gcc-3.3.orig/gcc/config/alpha/linux-elf.h gcc-3.3/gcc/config/alpha/linux-elf.h
+--- gcc-3.3.orig/gcc/config/alpha/linux-elf.h	2002-12-10 05:55:31.000000000 -0500
++++ gcc-3.3/gcc/config/alpha/linux-elf.h	2003-05-13 17:55:07.265468608 -0400
+@@ -28,9 +28,9 @@
+ { "elf_dynamic_linker", ELF_DYNAMIC_LINKER },
+ 
+ #ifdef USE_GNULIBC_1
+-#define ELF_DYNAMIC_LINKER	"/lib/ld.so.1"
++#define ELF_DYNAMIC_LINKER	"/stage1/lib/ld.so.1"
+ #else
+-#define ELF_DYNAMIC_LINKER	"/lib/ld-linux.so.2"
++#define ELF_DYNAMIC_LINKER	"/stage1/lib/ld-linux.so.2"
+ #endif
+ 
+ #define LINK_SPEC "-m elf64alpha %{G*} %{relax:-relax}		\
+diff -Naur gcc-3.3.orig/gcc/config/arm/linux-elf.h gcc-3.3/gcc/config/arm/linux-elf.h
+--- gcc-3.3.orig/gcc/config/arm/linux-elf.h	2002-12-10 05:55:31.000000000 -0500
++++ gcc-3.3/gcc/config/arm/linux-elf.h	2003-05-13 17:55:07.322459944 -0400
+@@ -84,7 +84,7 @@
+    %{shared:-shared} \
+    %{symbolic:-Bsymbolic} \
+    %{rdynamic:-export-dynamic} \
+-   %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2} \
++   %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2} \
+    -X \
+    %{mbig-endian:-EB}" \
+    SUBTARGET_EXTRA_LINK_SPEC
+diff -Naur gcc-3.3.orig/gcc/config/i386/linux.h gcc-3.3/gcc/config/i386/linux.h
+--- gcc-3.3.orig/gcc/config/i386/linux.h	2002-11-15 09:57:12.000000000 -0500
++++ gcc-3.3/gcc/config/i386/linux.h	2003-05-13 17:55:07.350455688 -0400
+@@ -141,7 +141,7 @@
+     %{!ibcs: \
+       %{!static: \
+ 	%{rdynamic:-export-dynamic} \
+-	%{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
++	%{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2}} \
+ 	%{static:-static}}}"
+ #endif
+ 
+diff -Naur gcc-3.3.orig/gcc/config/i386/linux64.h gcc-3.3/gcc/config/i386/linux64.h
+--- gcc-3.3.orig/gcc/config/i386/linux64.h	2003-03-14 01:31:16.000000000 -0500
++++ gcc-3.3/gcc/config/i386/linux64.h	2003-05-13 17:55:07.356454776 -0400
+@@ -67,8 +67,8 @@
+   %{!shared: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{m32:%{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
+-      %{!m32:%{!dynamic-linker:-dynamic-linker /lib64/ld-linux-x86-64.so.2}}} \
++      %{m32:%{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2}} \
++      %{!m32:%{!dynamic-linker:-dynamic-linker /stage1/lib64/ld-linux-x86-64.so.2}}} \
+     %{static:-static}}"
+ 
+ #undef  STARTFILE_SPEC
+diff -Naur gcc-3.3.orig/gcc/config/ia64/linux.h gcc-3.3/gcc/config/ia64/linux.h
+--- gcc-3.3.orig/gcc/config/ia64/linux.h	2002-09-03 17:09:54.000000000 -0400
++++ gcc-3.3/gcc/config/ia64/linux.h	2003-05-13 17:55:07.379451280 -0400
+@@ -43,7 +43,7 @@
+   %{!shared: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{!dynamic-linker:-dynamic-linker /lib/ld-linux-ia64.so.2}} \
++      %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux-ia64.so.2}} \
+       %{static:-static}}"
+ 
+ 
+diff -Naur gcc-3.3.orig/gcc/config/m68k/linux.h gcc-3.3/gcc/config/m68k/linux.h
+--- gcc-3.3.orig/gcc/config/m68k/linux.h	2003-01-28 17:18:15.000000000 -0500
++++ gcc-3.3/gcc/config/m68k/linux.h	2003-05-13 17:55:07.386450216 -0400
+@@ -164,14 +164,14 @@
+   %{!shared:%{!symbolic: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{!dynamic-linker*:-dynamic-linker /lib/elf/ld-linux.so.1} \
+-      %{!rpath*:-rpath /lib/elf/}} %{static}}}"
++      %{!dynamic-linker*:-dynamic-linker /stage1/lib/elf/ld-linux.so.1} \
++      %{!rpath*:-rpath /stage1/lib/elf/}} %{static}}}"
+ #else
+ #define LINK_SPEC "-m m68kelf %{shared} %{symbolic:-shared -Bsymbolic} \
+   %{!shared:%{!symbolic: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{!dynamic-linker*:-dynamic-linker /lib/ld-linux.so.1}} \
++      %{!dynamic-linker*:-dynamic-linker /stage1/lib/ld-linux.so.1}} \
+     %{static}}}"
+ #endif
+ #else
+@@ -179,7 +179,7 @@
+   %{!shared: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{!dynamic-linker*:-dynamic-linker /lib/ld.so.1}} \
++      %{!dynamic-linker*:-dynamic-linker /stage1/lib/ld.so.1}} \
+     %{static}}"
+ #endif
+ 
+diff -Naur gcc-3.3.orig/gcc/config/mips/linux.h gcc-3.3/gcc/config/mips/linux.h
+--- gcc-3.3.orig/gcc/config/mips/linux.h	2003-05-08 13:31:34.000000000 -0400
++++ gcc-3.3/gcc/config/mips/linux.h	2003-05-13 17:55:07.416445656 -0400
+@@ -182,7 +182,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}} \
+         %{static:-static}}}"
+ 
+ #undef SUBTARGET_ASM_SPEC
+diff -Naur gcc-3.3.orig/gcc/config/pa/pa-linux.h gcc-3.3/gcc/config/pa/pa-linux.h
+--- gcc-3.3.orig/gcc/config/pa/pa-linux.h	2002-12-10 05:55:31.000000000 -0500
++++ gcc-3.3/gcc/config/pa/pa-linux.h	2003-05-13 17:55:07.449440640 -0400
+@@ -88,7 +88,7 @@
+   %{!shared: \
+     %{!static: \
+       %{rdynamic:-export-dynamic} \
+-      %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}} \
++      %{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}} \
+       %{static:-static}}"
+ 
+ /* glibc's profiling functions don't need gcc to allocate counters.  */
+diff -Naur gcc-3.3.orig/gcc/config/rs6000/sysv4.h gcc-3.3/gcc/config/rs6000/sysv4.h
+--- gcc-3.3.orig/gcc/config/rs6000/sysv4.h	2003-05-05 12:49:17.000000000 -0400
++++ gcc-3.3/gcc/config/rs6000/sysv4.h	2003-05-13 17:55:07.491434256 -0400
+@@ -1145,7 +1145,7 @@
+ 
+ #define LINK_OS_LINUX_SPEC "-m elf32ppclinux %{!shared: %{!static: \
+   %{rdynamic:-export-dynamic} \
+-  %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}}}"
++  %{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}}}"
+ 
+ #if !defined(USE_GNULIBC_1) && defined(HAVE_LD_EH_FRAME_HDR)
+ # define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
+@@ -1185,7 +1185,7 @@
+ 
+ #define LINK_OS_GNU_SPEC "-m elf32ppclinux %{!shared: %{!static: \
+   %{rdynamic:-export-dynamic} \
+-  %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}}}"
++  %{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}}}"
+ 
+ #define CPP_OS_GNU_SPEC "-D__unix__ -D__gnu_hurd__ -D__GNU__	\
+ %{!undef:					                \
+diff -Naur gcc-3.3.orig/gcc/config/s390/linux.h gcc-3.3/gcc/config/s390/linux.h
+--- gcc-3.3.orig/gcc/config/s390/linux.h	2002-11-21 07:03:49.000000000 -0500
++++ gcc-3.3/gcc/config/s390/linux.h	2003-05-13 17:55:07.507431824 -0400
+@@ -94,7 +94,7 @@
+       %{static:-static} \
+       %{!static: \
+ 	%{rdynamic:-export-dynamic} \
+-	%{!dynamic-linker:-dynamic-linker /lib/ld.so.1}}}"
++	%{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}}}"
+ 
+ #define LINK_ARCH64_SPEC \
+   "-m elf64_s390 \
+@@ -103,7 +103,7 @@
+       %{static:-static} \
+       %{!static: \
+ 	%{rdynamic:-export-dynamic} \
+-	%{!dynamic-linker:-dynamic-linker /lib/ld64.so.1}}}"
++	%{!dynamic-linker:-dynamic-linker /stage1/lib/ld64.so.1}}}"
+ 
+ #ifdef DEFAULT_TARGET_64BIT
+ #undef  LINK_SPEC
+diff -Naur gcc-3.3.orig/gcc/config/sh/linux.h gcc-3.3/gcc/config/sh/linux.h
+--- gcc-3.3.orig/gcc/config/sh/linux.h	2002-06-13 15:23:27.000000000 -0400
++++ gcc-3.3/gcc/config/sh/linux.h	2003-05-13 17:55:07.520429848 -0400
+@@ -48,7 +48,7 @@
+   "%{shared:-shared} \
+    %{!static: \
+      %{rdynamic:-export-dynamic} \
+-     %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2} \
++     %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2} \
+      %{!rpath:-rpath /lib}} \
+    %{static:-static}"
+ 
+diff -Naur gcc-3.3.orig/gcc/config/sparc/linux.h gcc-3.3/gcc/config/sparc/linux.h
+--- gcc-3.3.orig/gcc/config/sparc/linux.h	2002-12-10 05:55:32.000000000 -0500
++++ gcc-3.3/gcc/config/sparc/linux.h	2003-05-13 17:55:07.535427568 -0400
+@@ -158,7 +158,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/elf/ld-linux.so.1} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/elf/ld-linux.so.1} \
+         %{!rpath:-rpath /lib/elf/}} %{static:-static}}}"
+ #else
+ #define LINK_SPEC "-m elf32_sparc -Y P,/usr/lib %{shared:-shared} \
+@@ -166,7 +166,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.1}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.1}} \
+         %{static:-static}}}"
+ #endif
+ #else
+@@ -176,7 +176,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2}} \
+         %{static:-static}}}"
+ #endif
+ 
+diff -Naur gcc-3.3.orig/gcc/config/sparc/linux64.h gcc-3.3/gcc/config/sparc/linux64.h
+--- gcc-3.3.orig/gcc/config/sparc/linux64.h	2002-12-10 05:55:32.000000000 -0500
++++ gcc-3.3/gcc/config/sparc/linux64.h	2003-05-13 17:55:07.565423008 -0400
+@@ -158,7 +158,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/ld-linux.so.2}} \
+         %{static:-static}}} \
+ "
+ 
+@@ -167,7 +167,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib64/ld-linux.so.2}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib64/ld-linux.so.2}} \
+         %{static:-static}}} \
+ "
+ 
+@@ -227,7 +227,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib64/ld-linux.so.2}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib64/ld-linux.so.2}} \
+         %{static:-static}}} \
+ %{mlittle-endian:-EL} \
+ %{!mno-relax:%{!r:-relax}} \
+diff -Naur gcc-3.3.orig/gcc/config/xtensa/linux.h gcc-3.3/gcc/config/xtensa/linux.h
+--- gcc-3.3.orig/gcc/config/xtensa/linux.h	2003-04-25 20:43:44.000000000 -0400
++++ gcc-3.3/gcc/config/xtensa/linux.h	2003-05-13 17:55:07.583420272 -0400
+@@ -52,7 +52,7 @@
+     %{!ibcs: \
+       %{!static: \
+         %{rdynamic:-export-dynamic} \
+-        %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}} \
++        %{!dynamic-linker:-dynamic-linker /stage1/lib/ld.so.1}} \
+       %{static:-static}}}"
+ 
+ #undef LOCAL_LABEL_PREFIX
