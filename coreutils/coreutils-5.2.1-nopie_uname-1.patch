@@ -1,12 +1,12 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2004-12-04
+Date: 2004-12-26
 Initial Package Version: 5.2.1
-Upstream Status: Not Submitted - Hack
+Upstream Status: Not Submitted
 Origin: None
 Description: This patch is needed if you are building uname with the uname
 patch and a compiler that is PIC by default. The uname patch uses non-PIC
-assembly code and will not build with -fPIC. This patch will force uname
-to be linked statically.
+assembly code and will not build with -fPIC. This patch will pass -no-pie
+when compiling uname.
 
 --- coreutils-5.2.1.orig/src/Makefile.in	2004-03-11 08:59:23.000000000 +0000
 +++ coreutils-5.2.1/src/Makefile.in	2004-12-05 02:02:23.878212024 +0000
@@ -14,8 +14,8 @@ to be linked statically.
  tail_LDADD = $(nanosec_libs)
  uptime_LDADD = $(LDADD) $(GETLOADAVG_LIBS)
  su_LDADD = $(LDADD) $(LIB_CRYPT)
-+uname_CFLAGS = $(CFLAGS) -static
-+uname_LDFLAGS = $(LDFLAGS) -static
++uname_CFLAGS = $(CFLAGS) -no-pie
++uname_LDFLAGS = $(LDFLAGS)
  SUFFIXES = .sh
  installed_su = $(DESTDIR)$(bindir)/`echo su|sed '$(transform)'`
  setuid_root_mode = a=rx,u+s
