@@ -1,0 +1,26 @@
+Submitted By: Michael Labuschke (michael at labuschke dot de)
+Date: 2004-11-14
+Initial Package Version: 3.0.1
+Origin: made myself
+Upstream Status: not send
+Description: it compiles (i'm pretty sure its not the right way of fixing it) In file included from raw.c:53:
+/root/dhcp-3.0.1/includes/dhcpd.h:309: error: mode `byte' applied to inappropriate type
+/root/dhcp-3.0.1/includes/dhcpd.h:310: error: mode `byte' applied to inappropriate type
+/root/dhcp-3.0.1/includes/dhcpd.h:311: error: mode `byte' applied to inappropriate type
+ 
+diff -Naur dhcp-3.0.1.orig/includes/dhcpd.h dhcp-3.0.1/includes/dhcpd.h
+--- dhcp-3.0.1.orig/includes/dhcpd.h	2004-06-10 17:59:29.000000000 +0000
++++ dhcp-3.0.1/includes/dhcpd.h	2004-11-14 13:44:16.818742527 +0000
+@@ -306,9 +306,9 @@
+ #	define EPHEMERAL_FLAGS		(MS_NULL_TERMINATION | \
+ 					 UNICAST_BROADCAST_HACK)
+ 
+-	binding_state_t __attribute__ ((mode (__byte__))) binding_state;
+-	binding_state_t __attribute__ ((mode (__byte__))) next_binding_state;
+-	binding_state_t __attribute__ ((mode (__byte__))) desired_binding_state;
++	binding_state_t binding_state;
++	binding_state_t next_binding_state;
++	binding_state_t desired_binding_state;
+ 	
+ 	struct lease_state *state;
+ 
