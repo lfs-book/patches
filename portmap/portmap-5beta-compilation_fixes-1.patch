@@ -1,5 +1,5 @@
-Submitted By: Kevin P. Fleming <kpfleming at linuxfromscratch dot org>
-Date: 2004-05-02
+Submitted By: Tushar Teredesai <tushar@linuxfromscratch.org>
+Date: 2003-10-04
 Initial Package Version: 5beta
 Origin: http://archives.linuxfromscratch.org/mail-archives/blfs-dev/2003-January/001960.html
 Description: The patch was created from the portmap modified package by Mark Heerdink.
@@ -8,9 +8,6 @@ This patch provides the following improvements:
     * Create an install target for portmap.
     * Compilation and security fixes.
     * Documentation fixes.
-
-Originally created by Tushar Teredesai, updated by kpfleming to ensure
-portmap will compile without tcp_wrappers installed.
 diff -Naur portmap_5beta/BLURB portmap_5beta.gimli/BLURB
 --- portmap_5beta/BLURB	1996-07-06 16:09:46.000000000 -0500
 +++ portmap_5beta.gimli/BLURB	2002-01-07 09:13:58.000000000 -0600
@@ -190,15 +187,13 @@ diff -Naur portmap_5beta/pmap_check.c portmap_5beta.gimli/pmap_check.c
  static char sccsid[] = "@(#) pmap_check.c 1.8 96/07/07 10:49:10";
  #endif
  
-@@ -45,6 +45,11 @@
+@@ -45,6 +45,9 @@
  #include <netinet/in.h>
  #include <rpc/rpcent.h>
  #endif
 +#include <sys/types.h>
 +#include <unistd.h>
-+#ifdef HOSTS_ACCESS
 +#include <tcpd.h>
-+#endif
  
  extern char *inet_ntoa();
  
@@ -447,7 +442,7 @@ diff -Naur portmap_5beta/portmap.8 portmap_5beta.gimli/portmap.8
 +.\" SUCH DAMAGE.
 +.\"
 +.\"     from: @(#)portmap.8	5.3 (Berkeley) 3/16/91
-+.\"	$Id: portmap-5beta-compilation-fixes-3.patch,v 1.1 2004/05/03 16:56:00 jim Exp $
++.\"	$Id: portmap-5beta-compilation_fixes-1.patch,v 1.1 2004/06/08 04:53:09 jim Exp $
 +.\"
 +.Dd March 16, 1991
 +.Dt PORTMAP 8

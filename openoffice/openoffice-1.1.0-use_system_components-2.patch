@@ -369,7 +369,7 @@ diff -Nur oo_1.1_src.orig/sablot/Sablot-0.52.patch oo_1.1_src/sablot/Sablot-0.52
 +--- 1,167 ----
  ! #*************************************************************************
  ! #
- ! #   $RCSfile: openoffice-1.1.0-use-system-components-002.patch,v $
+ ! #   $RCSfile: openoffice-1.1.0-use_system_components-2.patch,v $
 @@ -77,6 +77,10 @@
  ! 
  ! .INCLUDE: settings.mk

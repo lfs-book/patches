@@ -442,7 +442,7 @@ diff -Naur portmap_5beta/portmap.8 portmap_5beta.gimli/portmap.8
 +.\" SUCH DAMAGE.
 +.\"
 +.\"     from: @(#)portmap.8	5.3 (Berkeley) 3/16/91
-+.\"	$Id: portmap-5beta-compilation-fixes.patch,v 1.2 2003/10/31 19:29:21 tushar Exp $
++.\"	$Id: portmap-5beta-compilation_fixes-2.patch,v 1.1 2004/06/08 04:53:09 jim Exp $
 +.\"
 +.Dd March 16, 1991
 +.Dt PORTMAP 8
