@@ -1,0 +1,2024 @@
+Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
+Date: 2004-06-09
+Initial Package Version: 0.77
+Origin: PAM CVS
+Upstream Status: Already Applied 
+Description: Two bug fixes in one: don't trust getlogin() and sanely lower the
+	     time the password databases are locked in pam_unix.
+
+	     Go to the url below for more details
+	     http://www.securiteam.com/unixfocus/5UP0J1PAAQ.html
+
+
+ 
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/Makefile Linux-PAM-0.77/modules/pam_unix/Makefile
+--- Linux-PAM-0.77.orig/modules/pam_unix/Makefile	2001-02-11 06:33:53.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/Makefile	2004-06-09 18:28:23.922188125 +0000
+@@ -41,8 +41,10 @@
+ 
+ ########################################################################
+ 
+-CFLAGS += $(USE_CRACKLIB) $(USE_LCKPWDF) $(NEED_LCKPWDF) $(EXTRAS)
+-LDLIBS = $(EXTRALS)
++CFLAGS += $(USE_CRACKLIB) $(USE_LCKPWDF) $(NEED_LCKPWDF) $(EXTRAS) \
++	 -I../pammodutil/include
++
++LDLIBS = $(EXTRALS) -L../pammodutil -lpammodutil
+ 
+ ifdef USE_CRACKLIB
+ CRACKLIB = -lcrack
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/Makefile~ Linux-PAM-0.77/modules/pam_unix/Makefile~
+--- Linux-PAM-0.77.orig/modules/pam_unix/Makefile~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/Makefile~	2001-02-11 06:33:53.000000000 +0000
+@@ -0,0 +1,167 @@
++# $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++#
++# This Makefile controls a build process of the pam_unix modules
++# for Linux-PAM. You should not modify this Makefile.
++#
++
++include ../../Make.Rules
++
++########################################################################
++# some options... uncomment to take effect
++########################################################################
++
++# Unless someone wants to work out how to make this work with the new
++# autoconf stuff, you should use a separate module for this type of thing
++# pam_cracklib perhaps..?
++# do you want cracklib?
++#ifeq ($(HAVE_CRACKLIB),yes)
++#USE_CRACKLIB=-D"USE_CRACKLIB"
++#endif
++
++# do you want to use lckpwdf?
++ifeq ($(WITH_LCKPWDF),yes)
++USE_LCKPWDF=-D"USE_LCKPWDF"
++# do you need to include the locking functions in the source?
++ifeq ($(HAVE_LCKPWDF),no)
++  NEED_LCKPWDF=-D"NEED_LCKPWDF"
++endif
++endif
++
++ifeq ($(HAVE_LIBNSL),yes)
++  LIBNSL = -lnsl
++endif
++
++ifeq ($(HAVE_LIBCRYPT),yes)
++  LIBCRYPT=-lcrypt
++endif
++
++CHKPWD=unix_chkpwd
++
++EXTRAS += -DCHKPWD_HELPER=\"$(SUPLEMENTED)/$(CHKPWD)\"
++
++########################################################################
++
++CFLAGS += $(USE_CRACKLIB) $(USE_LCKPWDF) $(NEED_LCKPWDF) $(EXTRAS)
++LDLIBS = $(EXTRALS)
++
++ifdef USE_CRACKLIB
++CRACKLIB = -lcrack
++endif
++
++
++LIBOBJ = pam_unix_auth.o pam_unix_acct.o pam_unix_sess.o pam_unix_passwd.o \
++		support.o
++LIBSRC = pam_unix_auth.c pam_unix_acct.c pam_unix_sess.c pam_unix_passwd.c \
++		support.c
++LIBOBJD = $(addprefix dynamic/,$(LIBOBJ))
++LIBOBJS = $(addprefix static/,$(LIBOBJ))
++
++PLUS = md5_good.o md5_broken.o md5_crypt_good.o md5_crypt_broken.o \
++		yppasswd_xdr.o bigcrypt.o
++
++ifdef DYNAMIC
++LIBSHARED = pam_unix.so
++endif
++ifdef STATIC
++LIBSTATIC = libpam_unix.o
++endif
++
++
++########################### don't edit below #######################
++
++all: dirs info $(PLUS) $(LIBSHARED) $(LIBSTATIC) $(CHKPWD) register
++
++dynamic/%.o : %.c
++	$(CC) $(CFLAGS) $(DYNAMIC) $(CPPFLAGS) $(TARGET_ARCH) -c $< -o $@
++
++static/%.o: %.c
++	$(CC) $(CFLAGS) $(STATIC) $(CPPFLAGS) $(TARGET_ARCH) -c $< -o $@
++
++dummy:
++	@echo "**** This is not a top-level Makefile "
++	exit
++
++info:
++	@echo
++	@echo "*** Building pam-unix module of the framework..."
++	@echo
++
++dirs:
++ifdef DYNAMIC
++	mkdir -p ./dynamic
++endif
++ifdef STATIC
++	mkdir -p ./static
++endif
++
++register:
++ifdef STATIC
++	( cd .. ; ./register_static pam_unix_auth pam_unix/$(LIBSTATIC) ; \
++		./register_static pam_unix_acct  "" ; \
++		./register_static pam_unix_session "" ; \
++		./register_static pam_unix_passwd "" ; \
++	)
++endif
++
++ifdef DYNAMIC
++$(LIBOBJD): $(LIBSRC)
++
++$(LIBSHARED):	$(LIBOBJD)
++	$(LD_D) -o $@ $(LIBOBJD) $(PLUS) $(CRACKLIB) $(LDLIBS) $(LIBNSL) $(LIBCRYPT)
++endif
++
++ifdef STATIC
++$(LIBOBJS): $(LIBSRC)
++
++$(LIBSTATIC): $(LIBOBJS)
++	$(LD) -r -o $@ $(LIBOBJS) $(PLUS) $(CRACKLIB) $(LDLIBS) $(LIBNSL) $(LIBCRYPT)
++endif
++
++$(CHKPWD): unix_chkpwd.o md5_good.o md5_broken.o \
++		md5_crypt_good.o md5_crypt_broken.o \
++		bigcrypt.o
++	$(CC) -o $(CHKPWD) $^ $(LDLIBS) $(LIBCRYPT)
++
++unix_chkpwd.o: unix_chkpwd.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c $< -o $@
++
++md5_good.o: md5.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) -DHIGHFIRST -D'MD5Name(x)=Good##x' \
++		$(TARGET_ARCH) -c $< -o $@
++
++md5_broken.o: md5.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) -D'MD5Name(x)=Broken##x' \
++		$(TARGET_ARCH) -c $< -o $@
++
++md5_crypt_good.o: md5_crypt.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) -D'MD5Name(x)=Good##x' \
++		$(TARGET_ARCH) -c $< -o $@
++
++md5_crypt_broken.o: md5_crypt.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) -D'MD5Name(x)=Broken##x' \
++		$(TARGET_ARCH) -c $< -o $@
++
++install: all
++	mkdir -p $(FAKEROOT)$(SECUREDIR)
++ifdef DYNAMIC
++	install -m $(SHLIBMODE) $(LIBSHARED) $(FAKEROOT)$(SECUREDIR)
++	for x in pam_unix_auth pam_unix_acct pam_unix_passwd pam_unix_session;\
++		do ln -sf $(LIBSHARED) $(FAKEROOT)$(SECUREDIR)/$$x.so ; done
++endif
++	$(MKDIR) $(FAKEROOT)$(SUPLEMENTED)
++	install -m 4555 $(CHKPWD) $(FAKEROOT)$(SUPLEMENTED)
++
++remove:
++	rm -f $(FAKEROOT)$(SECUREDIR)/$(LIBSHARED)
++	for x in pam_unix_auth pam_unix_acct pam_unix_passwd pam_unix_session;\
++		do rm -f $(FAKEROOT)$(SECUREDIR)/$$x.so ; done
++	rm -f $(FAKEROOT)$(SUPLEMENTED)/$(CHKPWD)
++
++clean:
++	rm -f $(LIBOBJD) $(LIBOBJS) $(CHKPWD) *.o *.so core
++	rm -f *~ *.a *.out *.bak
++	rm -rf dynamic static
++
++.c.o:	
++	$(CC) -c $(CFLAGS) $<
++
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_passwd.c Linux-PAM-0.77/modules/pam_unix/pam_unix_passwd.c
+--- Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_passwd.c	2002-07-09 04:44:18.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/pam_unix_passwd.c	2004-06-09 18:28:24.058164102 +0000
+@@ -88,7 +88,7 @@
+  */
+ 
+ #ifdef NEED_LCKPWDF
+-#include "./lckpwdf.-c"
++# include "./lckpwdf.-c"
+ #endif
+ 
+ extern char *bigcrypt(const char *key, const char *salt);
+@@ -471,10 +471,7 @@
+ 
+ 	D(("called"));
+ 
+-	setpwent();
+ 	pwd = getpwnam(forwho);
+-	endpwent();
+-
+ 	if (pwd == NULL)
+ 		return PAM_AUTHTOK_ERR;
+ 
+@@ -544,6 +541,24 @@
+ 	if (save_old_password(forwho, fromwhat, remember)) {
+ 		return PAM_AUTHTOK_ERR;
+ 	}
++
++#ifdef USE_LCKPWDF
++	/*
++	 * These values for the number of attempts and the sleep time
++	 * are, of course, completely arbitrary.
++	 *
++	 * My reading of the PAM docs is that, once pam_chauthtok()
++	 * has been called with PAM_UPDATE_AUTHTOK, we are obliged to
++	 * take any reasonable steps to make sure the token is
++	 * updated; so retrying for 1/10 sec. isn't overdoing it.
++	 */
++
++	retval = lckpwdf();
++	if (retval != 0) {
++	    return PAM_AUTHTOK_LOCK_BUSY;
++	}
++#endif /* def USE_LCKPWDF */
++	
+ 	if (on(UNIX_SHADOW, ctrl) || (strcmp(pwd->pw_passwd, "x") == 0)) {
+ 		retval = _update_shadow(forwho, towhat);
+ 		if (retval == PAM_SUCCESS)
+@@ -552,6 +567,10 @@
+ 		retval = _update_passwd(pamh, forwho, towhat);
+ 	}
+ 
++#ifdef USE_LCKPWDF
++	ulckpwdf();
++#endif /* def USE_LCKPWDF */
++
+ 	return retval;
+ }
+ 
+@@ -563,9 +582,7 @@
+ 	int retval = PAM_SUCCESS;
+ 
+ 	/* UNIX passwords area */
+-	setpwent();
+ 	pwd = getpwnam(user);	/* Get password file entry... */
+-	endpwent();
+ 	if (pwd == NULL)
+ 		return PAM_AUTHINFO_UNAVAIL;	/* We don't need to do the rest... */
+ 
+@@ -679,7 +696,7 @@
+ 				int argc, const char **argv)
+ {
+ 	unsigned int ctrl, lctrl;
+-	int retval, i;
++	int retval;
+ 	int remember = -1;
+ 
+ 	/* <DO NOT free() THESE> */
+@@ -689,33 +706,12 @@
+ 
+ 	D(("called."));
+ 
+-#ifdef USE_LCKPWDF
+-	/* our current locking system requires that we lock the
+-	   entire password database.  This avoids both livelock
+-	   and deadlock. */
+-	/* These values for the number of attempts and the sleep time
+-	   are, of course, completely arbitrary.
+-	   My reading of the PAM docs is that, once pam_chauthtok() has been
+-	   called with PAM_UPDATE_AUTHTOK, we are obliged to take any
+-	   reasonable steps to make sure the token is updated; so retrying
+-	   for 1/10 sec. isn't overdoing it.
+-	   The other possibility is to call lckpwdf() on the first
+-	   pam_chauthtok() pass, and hold the lock until released in the
+-	   second pass--but is this guaranteed to work? -SRL */
+-	i=0;
+-	while((retval = lckpwdf()) != 0 && i < 100) {
+-		usleep(1000);
+-	}
+-	if(retval != 0) {
+-		return PAM_AUTHTOK_LOCK_BUSY;
+-	}
+-#endif
+ 	ctrl = _set_ctrl(pamh, flags, &remember, argc, argv);
+ 
+ 	/*
+ 	 * First get the name of a user
+ 	 */
+-	retval = pam_get_user(pamh, &user, "Username: ");
++	retval = pam_get_user(pamh, &user, NULL);
+ 	if (retval == PAM_SUCCESS) {
+ 		/*
+ 		 * Various libraries at various times have had bugs related to
+@@ -725,9 +721,6 @@
+ 		 */
+ 		if (user == NULL || !isalnum(*user)) {
+ 			_log_err(LOG_ERR, pamh, "bad username [%s]", user);
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return PAM_USER_UNKNOWN;
+ 		}
+ 		if (retval == PAM_SUCCESS && on(UNIX_DEBUG, ctrl))
+@@ -737,9 +730,6 @@
+ 		if (on(UNIX_DEBUG, ctrl))
+ 			_log_err(LOG_DEBUG, pamh,
+ 			         "password - could not identify user");
+-#ifdef USE_LCKPWDF
+-		ulckpwdf();
+-#endif
+ 		return retval;
+ 	}
+ 
+@@ -761,9 +751,6 @@
+ 		D(("prelim check"));
+ 
+ 		if (_unix_blankpasswd(ctrl, user)) {
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return PAM_SUCCESS;
+ 		} else if (off(UNIX__IAMROOT, ctrl)) {
+ 
+@@ -773,9 +760,6 @@
+ 			if (Announce == NULL) {
+ 				_log_err(LOG_CRIT, pamh,
+ 				         "password - out of memory");
+-#ifdef USE_LCKPWDF
+-				ulckpwdf();
+-#endif
+ 				return PAM_BUF_ERR;
+ 			}
+ 			(void) strcpy(Announce, greeting);
+@@ -795,9 +779,6 @@
+ 			if (retval != PAM_SUCCESS) {
+ 				_log_err(LOG_NOTICE, pamh
+ 				 ,"password - (old) token not obtained");
+-#ifdef USE_LCKPWDF
+-				ulckpwdf();
+-#endif
+ 				return retval;
+ 			}
+ 			/* verify that this is the password for this user */
+@@ -812,9 +793,6 @@
+ 		if (retval != PAM_SUCCESS) {
+ 			D(("Authentication failed"));
+ 			pass_old = NULL;
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return retval;
+ 		}
+ 		retval = pam_set_item(pamh, PAM_OLDAUTHTOK, (const void *) pass_old);
+@@ -867,17 +845,11 @@
+ 
+ 		if (retval != PAM_SUCCESS) {
+ 			_log_err(LOG_NOTICE, pamh, "user not authenticated");
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return retval;
+ 		}
+ 		retval = _unix_verify_shadow(user, ctrl);
+ 		if (retval != PAM_SUCCESS) {
+ 			_log_err(LOG_NOTICE, pamh, "user not authenticated 2");
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return retval;
+ 		}
+ 		D(("get new password now"));
+@@ -908,9 +880,6 @@
+ 						 ,"password - new password not obtained");
+ 				}
+ 				pass_old = NULL;	/* tidy up */
+-#ifdef USE_LCKPWDF
+-				ulckpwdf();
+-#endif
+ 				return retval;
+ 			}
+ 			D(("returned to _unix_chauthtok"));
+@@ -931,9 +900,6 @@
+ 			_log_err(LOG_NOTICE, pamh,
+ 			         "new password not acceptable");
+ 			pass_new = pass_old = NULL;	/* tidy up */
+-#ifdef USE_LCKPWDF
+-			ulckpwdf();
+-#endif
+ 			return retval;
+ 		}
+ 		/*
+@@ -974,9 +940,6 @@
+ 					_log_err(LOG_CRIT, pamh,
+ 					         "out of memory for password");
+ 					pass_new = pass_old = NULL;	/* tidy up */
+-#ifdef USE_LCKPWDF
+-					ulckpwdf();
+-#endif
+ 					return PAM_BUF_ERR;
+ 				}
+ 				/* copy first 8 bytes of password */
+@@ -998,6 +961,7 @@
+ 
+ 		retval = _do_setpass(pamh, user, pass_old, tpass, ctrl,
+ 		                     remember);
++
+ 		_pam_delete(tpass);
+ 		pass_old = pass_new = NULL;
+ 	} else {		/* something has broken with the module */
+@@ -1008,9 +972,6 @@
+ 
+ 	D(("retval was %d", retval));
+ 
+-#ifdef USE_LCKPWDF
+-	ulckpwdf();
+-#endif
+ 	return retval;
+ }
+ 
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c
+--- Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c	2000-12-20 05:15:05.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c	2004-06-09 18:28:24.064163042 +0000
+@@ -53,6 +53,7 @@
+ 
+ #include <security/_pam_macros.h>
+ #include <security/pam_modules.h>
++#include <security/_pam_modutil.h>
+ 
+ #ifndef LINUX_PAM
+ #include <security/pam_appl.h>
+@@ -71,6 +72,7 @@
+ 	char *user_name, *service;
+ 	unsigned int ctrl;
+ 	int retval;
++    const char *login_name;
+ 
+ 	D(("called."));
+ 
+@@ -89,9 +91,12 @@
+ 		         "open_session - error recovering service");
+ 		return PAM_SESSION_ERR;
+ 	}
+-	_log_err(LOG_INFO, pamh, "session opened for user %s by %s(uid=%d)"
+-		 ,user_name
+-		 ,PAM_getlogin() == NULL ? "" : PAM_getlogin(), getuid());
++	login_name = _pammodutil_getlogin(pamh);
++	if (login_name == NULL) {
++	    login_name = "";
++	}
++	_log_err(LOG_INFO, pamh, "session opened for user %s by %s(uid=%d)",
++		 user_name, login_name, getuid());
+ 
+ 	return PAM_SUCCESS;
+ }
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c~ Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c~
+--- Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c~	2000-12-20 05:15:05.000000000 +0000
+@@ -0,0 +1,141 @@
++/*
++ * $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++ *
++ * Copyright Alexander O. Yuriev, 1996.  All rights reserved.
++ * Copyright Jan Rêkorajski, 1999.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, and the entire permission notice in its entirety,
++ *    including the disclaimer of warranties.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote
++ *    products derived from this software without specific prior
++ *    written permission.
++ * 
++ * ALTERNATIVELY, this product may be distributed under the terms of
++ * the GNU Public License, in which case the provisions of the GPL are
++ * required INSTEAD OF the above restrictions.  (This clause is
++ * necessary due to a potential bad interaction between the GPL and
++ * the restrictions contained in a BSD-style copyright.)
++ * 
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <security/_pam_aconf.h>
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <unistd.h>
++#include <syslog.h>
++#include <fcntl.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++
++/* indicate the following groups are defined */
++
++#define PAM_SM_SESSION
++
++#include <security/_pam_macros.h>
++#include <security/pam_modules.h>
++
++#ifndef LINUX_PAM
++#include <security/pam_appl.h>
++#endif				/* LINUX_PAM */
++
++#include "support.h"
++
++/*
++ * PAM framework looks for these entry-points to pass control to the
++ * session module.
++ */
++
++PAM_EXTERN int pam_sm_open_session(pam_handle_t * pamh, int flags,
++				   int argc, const char **argv)
++{
++	char *user_name, *service;
++	unsigned int ctrl;
++	int retval;
++
++	D(("called."));
++
++	ctrl = _set_ctrl(pamh, flags, NULL, argc, argv);
++
++	retval = pam_get_item(pamh, PAM_USER, (void *) &user_name);
++	if (user_name == NULL || retval != PAM_SUCCESS) {
++		_log_err(LOG_CRIT, pamh,
++		         "open_session - error recovering username");
++		return PAM_SESSION_ERR;		/* How did we get authenticated with
++						   no username?! */
++	}
++	retval = pam_get_item(pamh, PAM_SERVICE, (void *) &service);
++	if (service == NULL || retval != PAM_SUCCESS) {
++		_log_err(LOG_CRIT, pamh,
++		         "open_session - error recovering service");
++		return PAM_SESSION_ERR;
++	}
++	_log_err(LOG_INFO, pamh, "session opened for user %s by %s(uid=%d)"
++		 ,user_name
++		 ,PAM_getlogin() == NULL ? "" : PAM_getlogin(), getuid());
++
++	return PAM_SUCCESS;
++}
++
++PAM_EXTERN int pam_sm_close_session(pam_handle_t * pamh, int flags,
++				    int argc, const char **argv)
++{
++	char *user_name, *service;
++	unsigned int ctrl;
++	int retval;
++
++	D(("called."));
++
++	ctrl = _set_ctrl(pamh, flags, NULL, argc, argv);
++
++	retval = pam_get_item(pamh, PAM_USER, (void *) &user_name);
++	if (user_name == NULL || retval != PAM_SUCCESS) {
++		_log_err(LOG_CRIT, pamh,
++		         "close_session - error recovering username");
++		return PAM_SESSION_ERR;		/* How did we get authenticated with
++						   no username?! */
++	}
++	retval = pam_get_item(pamh, PAM_SERVICE, (void *) &service);
++	if (service == NULL || retval != PAM_SUCCESS) {
++		_log_err(LOG_CRIT, pamh,
++		         "close_session - error recovering service");
++		return PAM_SESSION_ERR;
++	}
++	_log_err(LOG_INFO, pamh, "session closed for user %s"
++		 ,user_name);
++
++	return PAM_SUCCESS;
++}
++
++/* static module data */
++#ifdef PAM_STATIC
++struct pam_module _pam_unix_session_modstruct = {
++    "pam_unix_session",
++    NULL,
++    NULL,
++    NULL,
++    pam_sm_open_session,
++    pam_sm_close_session,
++    NULL,
++};
++#endif
++
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.c Linux-PAM-0.77/modules/pam_unix/support.c
+--- Linux-PAM-0.77.orig/modules/pam_unix/support.c	2002-09-23 17:33:22.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/support.c	2004-06-09 18:28:24.096157389 +0000
+@@ -20,6 +20,7 @@
+ 
+ #include <security/_pam_macros.h>
+ #include <security/pam_modules.h>
++#include <security/_pam_modutil.h>
+ 
+ #include "md5.h"
+ #include "support.h"
+@@ -107,36 +108,6 @@
+ 	return retval;
+ }
+ 
+-  /*
+-   * Beacause getlogin() is braindead and sometimes it just
+-   * doesn't work, we reimplement it here.
+-   */
+-char *PAM_getlogin(void)
+-{
+-	struct utmp *ut, line;
+-	char *curr_tty, *retval;
+-	static char curr_user[sizeof(ut->ut_user) + 4];
+-
+-	retval = NULL;
+-
+-	curr_tty = ttyname(0);
+-	if (curr_tty != NULL) {
+-		D(("PAM_getlogin ttyname: %s", curr_tty));
+-		curr_tty += 5;
+-		setutent();
+-		strncpy(line.ut_line, curr_tty, sizeof(line.ut_line));
+-		if ((ut = getutline(&line)) != NULL) {
+-			strncpy(curr_user, ut->ut_user, sizeof(ut->ut_user));
+-			curr_user[sizeof(curr_user) - 1] = '\0';
+-			retval = curr_user;
+-		}
+-		endutent();
+-	}
+-	D(("PAM_getlogin retval: %s", retval));
+-
+-	return retval;
+-}
+-
+ /*
+  * set the control flags for the UNIX module.
+  */
+@@ -668,10 +639,17 @@
+ 
+ 			if (new != NULL) {
+ 
+-				new->user = x_strdup(name ? name : "");
++			    const char *login_name;
++
++			    login_name = _pammodutil_getlogin(pamh);
++			    if (login_name == NULL) {
++				login_name = "";
++			    }
++
++			        new->user = x_strdup(name ? name : "");
+ 				new->uid = getuid();
+ 				new->euid = geteuid();
+-				new->name = x_strdup(PAM_getlogin()? PAM_getlogin() : "");
++				new->name = x_strdup(login_name);
+ 
+ 				/* any previous failures for this user ? */
+ 				pam_get_data(pamh, data_name, (const void **) &old);
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.c~ Linux-PAM-0.77/modules/pam_unix/support.c~
+--- Linux-PAM-0.77.orig/modules/pam_unix/support.c~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/support.c~	2002-09-23 17:33:22.000000000 +0000
+@@ -0,0 +1,942 @@
++/* 
++ * $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++ *
++ * Copyright information at end of file.
++ */
++
++#define _BSD_SOURCE
++
++#include <stdlib.h>
++#include <unistd.h>
++#include <stdarg.h>
++#include <string.h>
++#include <malloc.h>
++#include <pwd.h>
++#include <shadow.h>
++#include <limits.h>
++#include <utmp.h>
++#include <errno.h>
++#include <signal.h>
++
++#include <security/_pam_macros.h>
++#include <security/pam_modules.h>
++
++#include "md5.h"
++#include "support.h"
++
++extern char *crypt(const char *key, const char *salt);
++extern char *bigcrypt(const char *key, const char *salt);
++
++/* syslogging function for errors and other information */
++
++void _log_err(int err, pam_handle_t *pamh, const char *format,...)
++{
++	char *service = NULL;
++	char logname[256];
++	va_list args;
++
++	pam_get_item(pamh, PAM_SERVICE, (const void **) &service);
++	if (service) {
++		strncpy(logname, service, sizeof(logname));
++		logname[sizeof(logname) - 1 - strlen("(pam_unix)")] = '\0';
++		strncat(logname, "(pam_unix)", strlen("(pam_unix)"));
++	} else {
++		strncpy(logname, "pam_unix", sizeof(logname) - 1);
++	}
++
++	va_start(args, format);
++	openlog(logname, LOG_CONS | LOG_PID, LOG_AUTH);
++	vsyslog(err, format, args);
++	va_end(args);
++	closelog();
++}
++
++/* this is a front-end for module-application conversations */
++
++static int converse(pam_handle_t * pamh, int ctrl, int nargs
++		    ,struct pam_message **message
++		    ,struct pam_response **response)
++{
++	int retval;
++	struct pam_conv *conv;
++
++	D(("begin to converse"));
++
++	retval = pam_get_item(pamh, PAM_CONV, (const void **) &conv);
++	if (retval == PAM_SUCCESS) {
++
++		retval = conv->conv(nargs, (const struct pam_message **) message
++				    ,response, conv->appdata_ptr);
++
++		D(("returned from application's conversation function"));
++
++		if (retval != PAM_SUCCESS && on(UNIX_DEBUG, ctrl)) {
++			_log_err(LOG_DEBUG, pamh, "conversation failure [%s]"
++				 ,pam_strerror(pamh, retval));
++		}
++	} else if (retval != PAM_CONV_AGAIN) {
++		_log_err(LOG_ERR, pamh
++		         ,"couldn't obtain coversation function [%s]"
++			 ,pam_strerror(pamh, retval));
++	}
++	D(("ready to return from module conversation"));
++
++	return retval;		/* propagate error status */
++}
++
++int _make_remark(pam_handle_t * pamh, unsigned int ctrl
++		       ,int type, const char *text)
++{
++	int retval = PAM_SUCCESS;
++
++	if (off(UNIX__QUIET, ctrl)) {
++		struct pam_message *pmsg[1], msg[1];
++		struct pam_response *resp;
++
++		pmsg[0] = &msg[0];
++		msg[0].msg = text;
++		msg[0].msg_style = type;
++
++		resp = NULL;
++		retval = converse(pamh, ctrl, 1, pmsg, &resp);
++
++		if (resp) {
++			_pam_drop_reply(resp, 1);
++		}
++	}
++	return retval;
++}
++
++  /*
++   * Beacause getlogin() is braindead and sometimes it just
++   * doesn't work, we reimplement it here.
++   */
++char *PAM_getlogin(void)
++{
++	struct utmp *ut, line;
++	char *curr_tty, *retval;
++	static char curr_user[sizeof(ut->ut_user) + 4];
++
++	retval = NULL;
++
++	curr_tty = ttyname(0);
++	if (curr_tty != NULL) {
++		D(("PAM_getlogin ttyname: %s", curr_tty));
++		curr_tty += 5;
++		setutent();
++		strncpy(line.ut_line, curr_tty, sizeof(line.ut_line));
++		if ((ut = getutline(&line)) != NULL) {
++			strncpy(curr_user, ut->ut_user, sizeof(ut->ut_user));
++			curr_user[sizeof(curr_user) - 1] = '\0';
++			retval = curr_user;
++		}
++		endutent();
++	}
++	D(("PAM_getlogin retval: %s", retval));
++
++	return retval;
++}
++
++/*
++ * set the control flags for the UNIX module.
++ */
++
++int _set_ctrl(pam_handle_t *pamh, int flags, int *remember, int argc,
++              const char **argv)
++{
++	unsigned int ctrl;
++
++	D(("called."));
++
++	ctrl = UNIX_DEFAULTS;	/* the default selection of options */
++
++	/* set some flags manually */
++
++	if (getuid() == 0 && !(flags & PAM_CHANGE_EXPIRED_AUTHTOK)) {
++		D(("IAMROOT"));
++		set(UNIX__IAMROOT, ctrl);
++	}
++	if (flags & PAM_UPDATE_AUTHTOK) {
++		D(("UPDATE_AUTHTOK"));
++		set(UNIX__UPDATE, ctrl);
++	}
++	if (flags & PAM_PRELIM_CHECK) {
++		D(("PRELIM_CHECK"));
++		set(UNIX__PRELIM, ctrl);
++	}
++	if (flags & PAM_DISALLOW_NULL_AUTHTOK) {
++		D(("DISALLOW_NULL_AUTHTOK"));
++		set(UNIX__NONULL, ctrl);
++	}
++	if (flags & PAM_SILENT) {
++		D(("SILENT"));
++		set(UNIX__QUIET, ctrl);
++	}
++	/* now parse the arguments to this module */
++
++	while (argc-- > 0) {
++		int j;
++
++		D(("pam_unix arg: %s", *argv));
++
++		for (j = 0; j < UNIX_CTRLS_; ++j) {
++			if (unix_args[j].token
++			    && !strncmp(*argv, unix_args[j].token, strlen(unix_args[j].token))) {
++				break;
++			}
++		}
++
++		if (j >= UNIX_CTRLS_) {
++			_log_err(LOG_ERR, pamh,
++			         "unrecognized option [%s]", *argv);
++		} else {
++			ctrl &= unix_args[j].mask;	/* for turning things off */
++			ctrl |= unix_args[j].flag;	/* for turning things on  */
++
++			if (remember != NULL) {
++				if (j == UNIX_REMEMBER_PASSWD) {
++					*remember = strtol(*argv + 9, NULL, 10);
++					if ((*remember == LONG_MIN) || (*remember == LONG_MAX))
++						*remember = -1;
++					if (*remember > 400)
++						*remember = 400;
++				}
++			}
++		}
++
++		++argv;		/* step to next argument */
++	}
++
++	/* auditing is a more sensitive version of debug */
++
++	if (on(UNIX_AUDIT, ctrl)) {
++		set(UNIX_DEBUG, ctrl);
++	}
++	/* return the set of flags */
++
++	D(("done."));
++	return ctrl;
++}
++
++static void _cleanup(pam_handle_t * pamh, void *x, int error_status)
++{
++	_pam_delete(x);
++}
++
++/* ************************************************************** *
++ * Useful non-trivial functions                                   *
++ * ************************************************************** */
++
++  /*
++   * the following is used to keep track of the number of times a user fails
++   * to authenticate themself.
++   */
++
++#define FAIL_PREFIX                   "-UN*X-FAIL-"
++#define UNIX_MAX_RETRIES              3
++
++struct _pam_failed_auth {
++	char *user;		/* user that's failed to be authenticated */
++	char *name;		/* attempt from user with name */
++	int uid;		/* uid of calling user */
++	int euid;		/* euid of calling process */
++	int count;		/* number of failures so far */
++};
++
++#ifndef PAM_DATA_REPLACE
++#error "Need to get an updated libpam 0.52 or better"
++#endif
++
++static void _cleanup_failures(pam_handle_t * pamh, void *fl, int err)
++{
++	int quiet;
++	const char *service = NULL;
++	const char *ruser = NULL;
++	const char *rhost = NULL;
++	const char *tty = NULL;
++	struct _pam_failed_auth *failure;
++
++	D(("called"));
++
++	quiet = err & PAM_DATA_SILENT;	/* should we log something? */
++	err &= PAM_DATA_REPLACE;	/* are we just replacing data? */
++	failure = (struct _pam_failed_auth *) fl;
++
++	if (failure != NULL) {
++
++		if (!quiet && !err) {	/* under advisement from Sun,may go away */
++
++			/* log the number of authentication failures */
++			if (failure->count > 1) {
++				(void) pam_get_item(pamh, PAM_SERVICE,
++						    (const void **)&service);
++				(void) pam_get_item(pamh, PAM_RUSER,
++						    (const void **)&ruser);
++				(void) pam_get_item(pamh, PAM_RHOST,
++						    (const void **)&rhost);
++				(void) pam_get_item(pamh, PAM_TTY,
++						    (const void **)&tty);
++				_log_err(LOG_NOTICE, pamh,
++				         "%d more authentication failure%s; "
++				         "logname=%s uid=%d euid=%d "
++				         "tty=%s ruser=%s rhost=%s "
++				         "%s%s",
++				         failure->count - 1, failure->count == 2 ? "" : "s",
++				         failure->name, failure->uid, failure->euid,
++				         tty ? tty : "", ruser ? ruser : "",
++				         rhost ? rhost : "",
++				         (failure->user && failure->user[0] != '\0')
++				          ? " user=" : "", failure->user
++				);
++
++				if (failure->count > UNIX_MAX_RETRIES) {
++					_log_err(LOG_ALERT, pamh
++						 ,"service(%s) ignoring max retries; %d > %d"
++						 ,service == NULL ? "**unknown**" : service
++						 ,failure->count
++						 ,UNIX_MAX_RETRIES);
++				}
++			}
++		}
++		_pam_delete(failure->user);	/* tidy up */
++		_pam_delete(failure->name);	/* tidy up */
++		free(failure);
++	}
++}
++
++/*
++ * _unix_blankpasswd() is a quick check for a blank password
++ *
++ * returns TRUE if user does not have a password
++ * - to avoid prompting for one in such cases (CG)
++ */
++
++int _unix_blankpasswd(unsigned int ctrl, const char *name)
++{
++	struct passwd *pwd = NULL;
++	struct spwd *spwdent = NULL;
++	char *salt = NULL;
++	int retval;
++#if HAVE_GETPWNAM_R
++	char *buf = NULL;
++	int bufsize = 0;
++	struct passwd pwd_buf;
++
++	pwd = &pwd_buf;
++#endif
++
++	D(("called"));
++
++	/*
++	 * This function does not have to be too smart if something goes
++	 * wrong, return FALSE and let this case to be treated somewhere
++	 * else (CG)
++	 */
++
++	if (on(UNIX__NONULL, ctrl))
++		return 0;	/* will fail but don't let on yet */
++
++	/* UNIX passwords area */
++
++	/* Get password file entry... */
++#if HAVE_GETPWNAM_R
++	bufsize = 1024;
++	buf = malloc(bufsize);
++
++	if ((retval = getpwnam_r(name, pwd, buf, bufsize, &pwd))) {
++		pwd = NULL;
++	}
++	while (retval == ERANGE) {
++		bufsize += 1024;
++		buf = realloc(buf, bufsize);
++		if ((retval = getpwnam_r(name, pwd, buf, bufsize, &pwd))) {
++			pwd = NULL;
++		}
++	}
++#else
++	pwd = getpwnam(name);
++#endif
++
++	if (pwd != NULL) {
++		if (strcmp( pwd->pw_passwd, "*NP*" ) == 0)
++		{ /* NIS+ */                 
++			uid_t save_euid, save_uid;
++	
++			save_euid = geteuid();
++			save_uid = getuid();
++			if (save_uid == pwd->pw_uid)
++				setreuid( save_euid, save_uid );
++			else  {
++				setreuid( 0, -1 );
++				if (setreuid( -1, pwd->pw_uid ) == -1) {
++					setreuid( -1, 0 );
++					setreuid( 0, -1 );
++					if(setreuid( -1, pwd->pw_uid ) == -1)
++						/* Will fail elsewhere. */
++#if HAVE_GETPWNAM_R
++						if (buf)
++							free(buf);
++#endif
++						return 0;
++				}
++			}
++	
++			spwdent = getspnam( name );
++			if (save_uid == pwd->pw_uid)
++				setreuid( save_uid, save_euid );
++			else {
++				if (setreuid( -1, 0 ) == -1)
++				setreuid( save_uid, -1 );
++				setreuid( -1, save_euid );
++			}
++		} else if (strcmp(pwd->pw_passwd, "x") == 0) {
++			/*
++			 * ...and shadow password file entry for this user,
++			 * if shadowing is enabled
++			 */
++			spwdent = getspnam(name);
++		}
++		if (spwdent)
++			salt = x_strdup(spwdent->sp_pwdp);
++		else
++			salt = x_strdup(pwd->pw_passwd);
++	}
++	/* Does this user have a password? */
++	if (salt == NULL) {
++		retval = 0;
++	} else {
++		if (strlen(salt) == 0)
++			retval = 1;
++		else
++			retval = 0;
++	}
++
++	/* tidy up */
++
++	if (salt)
++		_pam_delete(salt);
++
++#if HAVE_GETPWNAM_R
++	if (buf)
++		free(buf);
++#endif
++
++	return retval;
++}
++
++/*
++ * verify the password of a user
++ */
++
++#include <sys/types.h>
++#include <sys/wait.h>
++
++static int _unix_run_helper_binary(pam_handle_t *pamh, const char *passwd,
++				   unsigned int ctrl, const char *user)
++{
++    int retval, child, fds[2];
++    void (*sighandler)(int) = NULL;
++
++    D(("called."));
++    /* create a pipe for the password */
++    if (pipe(fds) != 0) {
++	D(("could not make pipe"));
++	return PAM_AUTH_ERR;
++    }
++
++    if (off(UNIX_NOREAP, ctrl)) {
++	/*
++	 * This code arranges that the demise of the child does not cause
++	 * the application to receive a signal it is not expecting - which
++	 * may kill the application or worse.
++	 *
++	 * The "noreap" module argument is provided so that the admin can
++	 * override this behavior.
++	 */
++	sighandler = signal(SIGCHLD, SIG_IGN);
++    }
++
++    /* fork */
++    child = fork();
++    if (child == 0) {
++	static char *envp[] = { NULL };
++	char *args[] = { NULL, NULL, NULL };
++
++	/* XXX - should really tidy up PAM here too */
++
++	/* reopen stdin as pipe */
++	close(fds[1]);
++	dup2(fds[0], STDIN_FILENO);
++
++	/* exec binary helper */
++	args[0] = x_strdup(CHKPWD_HELPER);
++	args[1] = x_strdup(user);
++
++	execve(CHKPWD_HELPER, args, envp);
++
++	/* should not get here: exit with error */
++	D(("helper binary is not available"));
++	exit(PAM_AUTHINFO_UNAVAIL);
++    } else if (child > 0) {
++	/* wait for child */
++	/* if the stored password is NULL */
++	if (off(UNIX__NONULL, ctrl)) {	/* this means we've succeeded */
++	    write(fds[1], "nullok\0\0", 8);
++	} else {
++	    write(fds[1], "nonull\0\0", 8);
++	}
++	if (passwd != NULL) {            /* send the password to the child */
++	    write(fds[1], passwd, strlen(passwd)+1);
++	    passwd = NULL;
++	} else {
++	    write(fds[1], "", 1);                        /* blank password */
++	}
++	close(fds[0]);       /* close here to avoid possible SIGPIPE above */
++	close(fds[1]);
++	(void) waitpid(child, &retval, 0);  /* wait for helper to complete */
++	retval = (retval == 0) ? PAM_SUCCESS:PAM_AUTH_ERR;
++    } else {
++	D(("fork failed"));
++	retval = PAM_AUTH_ERR;
++    }
++
++    if (sighandler != NULL) {
++        (void) signal(SIGCHLD, sighandler);   /* restore old signal handler */
++    }
++
++    D(("returning %d", retval));
++    return retval;
++}
++
++int _unix_verify_password(pam_handle_t * pamh, const char *name
++			  ,const char *p, unsigned int ctrl)
++{
++	struct passwd *pwd = NULL;
++	struct spwd *spwdent = NULL;
++	char *salt = NULL;
++	char *pp = NULL;
++	char *data_name;
++	int retval;
++
++	D(("called"));
++
++#ifdef HAVE_PAM_FAIL_DELAY
++	if (off(UNIX_NODELAY, ctrl)) {
++		D(("setting delay"));
++		(void) pam_fail_delay(pamh, 2000000);	/* 2 sec delay for on failure */
++	}
++#endif
++
++	/* locate the entry for this user */
++
++	D(("locating user's record"));
++
++	/* UNIX passwords area */
++	pwd = getpwnam(name);	/* Get password file entry... */
++
++	if (pwd != NULL) {
++		if (strcmp( pwd->pw_passwd, "*NP*" ) == 0)
++		{ /* NIS+ */                 
++			uid_t save_euid, save_uid;
++	
++			save_euid = geteuid();
++			save_uid = getuid();
++			if (save_uid == pwd->pw_uid)
++				setreuid( save_euid, save_uid );
++			else  {
++				setreuid( 0, -1 );
++				if (setreuid( -1, pwd->pw_uid ) == -1) {
++					setreuid( -1, 0 );
++					setreuid( 0, -1 );
++					if(setreuid( -1, pwd->pw_uid ) == -1)
++						return PAM_CRED_INSUFFICIENT;
++				}
++			}
++	
++			spwdent = getspnam( name );
++			if (save_uid == pwd->pw_uid)
++				setreuid( save_uid, save_euid );
++			else {
++				if (setreuid( -1, 0 ) == -1)
++				setreuid( save_uid, -1 );
++				setreuid( -1, save_euid );
++			}
++		} else if (strcmp(pwd->pw_passwd, "x") == 0) {
++			/*
++			 * ...and shadow password file entry for this user,
++			 * if shadowing is enabled
++			 */
++			spwdent = getspnam(name);
++		}
++		if (spwdent)
++			salt = x_strdup(spwdent->sp_pwdp);
++		else
++			salt = x_strdup(pwd->pw_passwd);
++	}
++
++	data_name = (char *) malloc(sizeof(FAIL_PREFIX) + strlen(name));
++	if (data_name == NULL) {
++		_log_err(LOG_CRIT, pamh, "no memory for data-name");
++	} else {
++		strcpy(data_name, FAIL_PREFIX);
++		strcpy(data_name + sizeof(FAIL_PREFIX) - 1, name);
++	}
++
++	retval = PAM_SUCCESS;
++	if (pwd == NULL || salt == NULL || !strcmp(salt, "x")) {
++		if (geteuid()) {
++			/* we are not root perhaps this is the reason? Run helper */
++			D(("running helper binary"));
++			retval = _unix_run_helper_binary(pamh, p, ctrl, name);
++			if (pwd == NULL && !on(UNIX_AUDIT,ctrl)
++			    && retval != PAM_SUCCESS)
++			{
++				name = NULL;
++			}
++		} else {
++			D(("user's record unavailable"));
++			if (on(UNIX_AUDIT, ctrl)) {
++				/* this might be a typo and the user has given a password
++				   instead of a username. Careful with this. */
++				_log_err(LOG_ALERT, pamh,
++				         "check pass; user (%s) unknown", name);
++			} else {
++				name = NULL;
++				_log_err(LOG_ALERT, pamh,
++				         "check pass; user unknown");
++			}
++			p = NULL;
++			retval = PAM_AUTHINFO_UNAVAIL;
++		}
++	} else {
++	    int salt_len = strlen(salt);
++	    if (!salt_len) {
++		/* the stored password is NULL */
++		if (off(UNIX__NONULL, ctrl)) {/* this means we've succeeded */
++		    D(("user has empty password - access granted"));
++		    retval = PAM_SUCCESS;
++		} else {
++		    D(("user has empty password - access denied"));
++		    retval = PAM_AUTH_ERR;
++		}
++	    } else if (!p || (*salt == '*') || (salt_len < 13)) {
++		retval = PAM_AUTH_ERR;
++	    } else {
++		if (!strncmp(salt, "$1$", 3)) {
++		    pp = Goodcrypt_md5(p, salt);
++		    if (strcmp(pp, salt) != 0) {
++			_pam_delete(pp);
++			pp = Brokencrypt_md5(p, salt);
++		    }
++		} else {
++		    pp = bigcrypt(p, salt);
++		}
++		p = NULL;		/* no longer needed here */
++
++		/* the moment of truth -- do we agree with the password? */
++		D(("comparing state of pp[%s] and salt[%s]", pp, salt));
++
++		/*
++		 * Note, we are comparing the bigcrypt of the password with
++		 * the contents of the password field. If the latter was
++		 * encrypted with regular crypt (and not bigcrypt) it will
++		 * have been truncated for storage relative to the output
++		 * of bigcrypt here. As such we need to compare only the
++		 * stored string with the subset of bigcrypt's result.
++		 * Bug 521314: The strncmp comparison is for legacy support.
++		 */
++		if (strncmp(pp, salt, salt_len) == 0) {
++		    retval = PAM_SUCCESS;
++		} else {
++		    retval = PAM_AUTH_ERR;
++		}
++	    }
++	}
++
++	if (retval == PAM_SUCCESS) {
++		if (data_name)	/* reset failures */
++			pam_set_data(pamh, data_name, NULL, _cleanup_failures);
++	} else {
++		if (data_name != NULL) {
++			struct _pam_failed_auth *new = NULL;
++			const struct _pam_failed_auth *old = NULL;
++
++			/* get a failure recorder */
++
++			new = (struct _pam_failed_auth *)
++			    malloc(sizeof(struct _pam_failed_auth));
++
++			if (new != NULL) {
++
++				new->user = x_strdup(name ? name : "");
++				new->uid = getuid();
++				new->euid = geteuid();
++				new->name = x_strdup(PAM_getlogin()? PAM_getlogin() : "");
++
++				/* any previous failures for this user ? */
++				pam_get_data(pamh, data_name, (const void **) &old);
++
++				if (old != NULL) {
++					new->count = old->count + 1;
++					if (new->count >= UNIX_MAX_RETRIES) {
++						retval = PAM_MAXTRIES;
++					}
++				} else {
++					const char *service=NULL;
++					const char *ruser=NULL;
++					const char *rhost=NULL;
++					const char *tty=NULL;
++
++					(void) pam_get_item(pamh, PAM_SERVICE,
++							    (const void **)&service);
++					(void) pam_get_item(pamh, PAM_RUSER,
++							    (const void **)&ruser);
++					(void) pam_get_item(pamh, PAM_RHOST,
++							    (const void **)&rhost);
++					(void) pam_get_item(pamh, PAM_TTY,
++							    (const void **)&tty);
++
++					_log_err(LOG_NOTICE, pamh,
++					         "authentication failure; "
++					         "logname=%s uid=%d euid=%d "
++					         "tty=%s ruser=%s rhost=%s "
++					         "%s%s",
++					         new->name, new->uid, new->euid,
++					         tty ? tty : "",
++					         ruser ? ruser : "",
++					         rhost ? rhost : "",
++					         (new->user && new->user[0] != '\0')
++					          ? " user=" : "",
++					         new->user
++					);
++					new->count = 1;
++				}
++
++				pam_set_data(pamh, data_name, new, _cleanup_failures);
++
++			} else {
++				_log_err(LOG_CRIT, pamh,
++				         "no memory for failure recorder");
++			}
++		}
++	}
++
++	if (data_name)
++		_pam_delete(data_name);
++	if (salt)
++		_pam_delete(salt);
++	if (pp)
++		_pam_delete(pp);
++
++	D(("done [%d].", retval));
++
++	return retval;
++}
++
++/*
++ * obtain a password from the user
++ */
++
++int _unix_read_password(pam_handle_t * pamh
++			,unsigned int ctrl
++			,const char *comment
++			,const char *prompt1
++			,const char *prompt2
++			,const char *data_name
++			,const char **pass)
++{
++	int authtok_flag;
++	int retval;
++	char *token;
++
++	D(("called"));
++
++	/*
++	 * make sure nothing inappropriate gets returned
++	 */
++
++	*pass = token = NULL;
++
++	/*
++	 * which authentication token are we getting?
++	 */
++
++	authtok_flag = on(UNIX__OLD_PASSWD, ctrl) ? PAM_OLDAUTHTOK : PAM_AUTHTOK;
++
++	/*
++	 * should we obtain the password from a PAM item ?
++	 */
++
++	if (on(UNIX_TRY_FIRST_PASS, ctrl) || on(UNIX_USE_FIRST_PASS, ctrl)) {
++		retval = pam_get_item(pamh, authtok_flag, (const void **) pass);
++		if (retval != PAM_SUCCESS) {
++			/* very strange. */
++			_log_err(LOG_ALERT, pamh
++				 ,"pam_get_item returned error to unix-read-password"
++			    );
++			return retval;
++		} else if (*pass != NULL) {	/* we have a password! */
++			return PAM_SUCCESS;
++		} else if (on(UNIX_USE_FIRST_PASS, ctrl)) {
++			return PAM_AUTHTOK_RECOVER_ERR;		/* didn't work */
++		} else if (on(UNIX_USE_AUTHTOK, ctrl)
++			   && off(UNIX__OLD_PASSWD, ctrl)) {
++			return PAM_AUTHTOK_RECOVER_ERR;
++		}
++	}
++	/*
++	 * getting here implies we will have to get the password from the
++	 * user directly.
++	 */
++
++	{
++		struct pam_message msg[3], *pmsg[3];
++		struct pam_response *resp;
++		int i, replies;
++
++		/* prepare to converse */
++
++		if (comment != NULL && off(UNIX__QUIET, ctrl)) {
++			pmsg[0] = &msg[0];
++			msg[0].msg_style = PAM_TEXT_INFO;
++			msg[0].msg = comment;
++			i = 1;
++		} else {
++			i = 0;
++		}
++
++		pmsg[i] = &msg[i];
++		msg[i].msg_style = PAM_PROMPT_ECHO_OFF;
++		msg[i++].msg = prompt1;
++		replies = 1;
++
++		if (prompt2 != NULL) {
++			pmsg[i] = &msg[i];
++			msg[i].msg_style = PAM_PROMPT_ECHO_OFF;
++			msg[i++].msg = prompt2;
++			++replies;
++		}
++		/* so call the conversation expecting i responses */
++		resp = NULL;
++		retval = converse(pamh, ctrl, i, pmsg, &resp);
++
++		if (resp != NULL) {
++
++			/* interpret the response */
++
++			if (retval == PAM_SUCCESS) {	/* a good conversation */
++
++				token = x_strdup(resp[i - replies].resp);
++				if (token != NULL) {
++					if (replies == 2) {
++
++						/* verify that password entered correctly */
++						if (!resp[i - 1].resp
++						    || strcmp(token, resp[i - 1].resp)) {
++							_pam_delete(token);	/* mistyped */
++							retval = PAM_AUTHTOK_RECOVER_ERR;
++							_make_remark(pamh, ctrl
++								    ,PAM_ERROR_MSG, MISTYPED_PASS);
++						}
++					}
++				} else {
++					_log_err(LOG_NOTICE, pamh
++						 ,"could not recover authentication token");
++				}
++
++			}
++			/*
++			 * tidy up the conversation (resp_retcode) is ignored
++			 * -- what is it for anyway? AGM
++			 */
++
++			_pam_drop_reply(resp, i);
++
++		} else {
++			retval = (retval == PAM_SUCCESS)
++			    ? PAM_AUTHTOK_RECOVER_ERR : retval;
++		}
++	}
++
++	if (retval != PAM_SUCCESS) {
++		if (on(UNIX_DEBUG, ctrl))
++			_log_err(LOG_DEBUG, pamh,
++			         "unable to obtain a password");
++		return retval;
++	}
++	/* 'token' is the entered password */
++
++	if (off(UNIX_NOT_SET_PASS, ctrl)) {
++
++		/* we store this password as an item */
++
++		retval = pam_set_item(pamh, authtok_flag, token);
++		_pam_delete(token);	/* clean it up */
++		if (retval != PAM_SUCCESS
++		    || (retval = pam_get_item(pamh, authtok_flag
++					      ,(const void **) pass))
++		    != PAM_SUCCESS) {
++
++			*pass = NULL;
++			_log_err(LOG_CRIT, pamh, "error manipulating password");
++			return retval;
++
++		}
++	} else {
++		/*
++		 * then store it as data specific to this module. pam_end()
++		 * will arrange to clean it up.
++		 */
++
++		retval = pam_set_data(pamh, data_name, (void *) token, _cleanup);
++		if (retval != PAM_SUCCESS) {
++			_log_err(LOG_CRIT, pamh
++			         ,"error manipulating password data [%s]"
++				 ,pam_strerror(pamh, retval));
++			_pam_delete(token);
++			return retval;
++		}
++		*pass = token;
++		token = NULL;	/* break link to password */
++	}
++
++	return PAM_SUCCESS;
++}
++
++/* ****************************************************************** *
++ * Copyright (c) Jan Rêkorajski 1999.
++ * Copyright (c) Andrew G. Morgan 1996-8.
++ * Copyright (c) Alex O. Yuriev, 1996.
++ * Copyright (c) Cristian Gafton 1996.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, and the entire permission notice in its entirety,
++ *    including the disclaimer of warranties.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. The name of the author may not be used to endorse or promote
++ *    products derived from this software without specific prior
++ *    written permission.
++ * 
++ * ALTERNATIVELY, this product may be distributed under the terms of
++ * the GNU Public License, in which case the provisions of the GPL are
++ * required INSTEAD OF the above restrictions.  (This clause is
++ * necessary due to a potential bad interaction between the GPL and
++ * the restrictions contained in a BSD-style copyright.)
++ * 
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.h Linux-PAM-0.77/modules/pam_unix/support.h
+--- Linux-PAM-0.77.orig/modules/pam_unix/support.h	2002-07-11 05:43:51.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/support.h	2004-06-09 18:28:24.101156506 +0000
+@@ -125,7 +125,6 @@
+ 	_pam_drop(xx);		\
+ }
+ 
+-extern char *PAM_getlogin(void);
+ extern void _log_err(int err, pam_handle_t *pamh, const char *format,...);
+ extern int _make_remark(pam_handle_t * pamh, unsigned int ctrl
+ 		       ,int type, const char *text);
+diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.h~ Linux-PAM-0.77/modules/pam_unix/support.h~
+--- Linux-PAM-0.77.orig/modules/pam_unix/support.h~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_unix/support.h~	2002-07-11 05:43:51.000000000 +0000
+@@ -0,0 +1,146 @@
++/*
++ * $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++ */
++
++#ifndef _PAM_UNIX_SUPPORT_H
++#define _PAM_UNIX_SUPPORT_H
++
++
++/*
++ * here is the string to inform the user that the new passwords they
++ * typed were not the same.
++ */
++
++#define MISTYPED_PASS "Sorry, passwords do not match"
++
++/* type definition for the control options */
++
++typedef struct {
++	const char *token;
++	unsigned int mask;	/* shall assume 32 bits of flags */
++	unsigned int flag;
++} UNIX_Ctrls;
++
++/*
++ * macro to determine if a given flag is on
++ */
++
++#define on(x,ctrl)  (unix_args[x].flag & ctrl)
++
++/*
++ * macro to determine that a given flag is NOT on
++ */
++
++#define off(x,ctrl) (!on(x,ctrl))
++
++/*
++ * macro to turn on/off a ctrl flag manually
++ */
++
++#define set(x,ctrl)   (ctrl = ((ctrl)&unix_args[x].mask)|unix_args[x].flag)
++#define unset(x,ctrl) (ctrl &= ~(unix_args[x].flag))
++
++/* the generic mask */
++
++#define _ALL_ON_  (~0U)
++
++/* end of macro definitions definitions for the control flags */
++
++/* ****************************************************************** *
++ * ctrl flags proper..
++ */
++
++/*
++ * here are the various options recognized by the unix module. They
++ * are enumerated here and then defined below. Internal arguments are
++ * given NULL tokens.
++ */
++
++#define UNIX__OLD_PASSWD          0	/* internal */
++#define UNIX__VERIFY_PASSWD       1	/* internal */
++#define UNIX__IAMROOT             2	/* internal */
++
++#define UNIX_AUDIT                3	/* print more things than debug..
++					   some information may be sensitive */
++#define UNIX_USE_FIRST_PASS       4
++#define UNIX_TRY_FIRST_PASS       5
++#define UNIX_NOT_SET_PASS         6	/* don't set the AUTHTOK items */
++
++#define UNIX__PRELIM              7	/* internal */
++#define UNIX__UPDATE              8	/* internal */
++#define UNIX__NONULL              9	/* internal */
++#define UNIX__QUIET              10	/* internal */
++#define UNIX_USE_AUTHTOK         11	/* insist on reading PAM_AUTHTOK */
++#define UNIX_SHADOW              12	/* signal shadow on */
++#define UNIX_MD5_PASS            13	/* force the use of MD5 passwords */
++#define UNIX__NULLOK             14	/* Null token ok */
++#define UNIX_DEBUG               15	/* send more info to syslog(3) */
++#define UNIX_NODELAY             16	/* admin does not want a fail-delay */
++#define UNIX_NIS                 17	/* wish to use NIS for pwd */
++#define UNIX_BIGCRYPT            18	/* use DEC-C2 crypt()^x function */
++#define UNIX_LIKE_AUTH           19	/* need to auth for setcred to work */
++#define UNIX_REMEMBER_PASSWD     20	/* Remember N previous passwords */
++#define UNIX_NOREAP              21     /* don't reap child process */
++/* -------------- */
++#define UNIX_CTRLS_              22	/* number of ctrl arguments defined */
++
++
++static const UNIX_Ctrls unix_args[UNIX_CTRLS_] =
++{
++/* symbol                  token name          ctrl mask             ctrl     *
++ * ----------------------- ------------------- --------------------- -------- */
++
++/* UNIX__OLD_PASSWD */     {NULL,              _ALL_ON_,                  01},
++/* UNIX__VERIFY_PASSWD */  {NULL,              _ALL_ON_,                  02},
++/* UNIX__IAMROOT */        {NULL,              _ALL_ON_,                  04},
++/* UNIX_AUDIT */           {"audit",           _ALL_ON_,                 010},
++/* UNIX_USE_FIRST_PASS */  {"use_first_pass",  _ALL_ON_^(060),           020},
++/* UNIX_TRY_FIRST_PASS */  {"try_first_pass",  _ALL_ON_^(060),           040},
++/* UNIX_NOT_SET_PASS */    {"not_set_pass",    _ALL_ON_,                0100},
++/* UNIX__PRELIM */         {NULL,              _ALL_ON_^(0600),         0200},
++/* UNIX__UPDATE */         {NULL,              _ALL_ON_^(0600),         0400},
++/* UNIX__NONULL */         {NULL,              _ALL_ON_,               01000},
++/* UNIX__QUIET */          {NULL,              _ALL_ON_,               02000},
++/* UNIX_USE_AUTHTOK */     {"use_authtok",     _ALL_ON_,               04000},
++/* UNIX_SHADOW */          {"shadow",          _ALL_ON_,              010000},
++/* UNIX_MD5_PASS */        {"md5",             _ALL_ON_^(0400000),    020000},
++/* UNIX__NULLOK */         {"nullok",          _ALL_ON_^(01000),           0},
++/* UNIX_DEBUG */           {"debug",           _ALL_ON_,              040000},
++/* UNIX_NODELAY */         {"nodelay",         _ALL_ON_,             0100000},
++/* UNIX_NIS */             {"nis",             _ALL_ON_^(010000),    0200000},
++/* UNIX_BIGCRYPT */        {"bigcrypt",        _ALL_ON_^(020000),    0400000},
++/* UNIX_LIKE_AUTH */       {"likeauth",        _ALL_ON_,            01000000},
++/* UNIX_REMEMBER_PASSWD */ {"remember=",       _ALL_ON_,            02000000},
++/* UNIX_NOREAP */          {"noreap",          _ALL_ON_,            04000000},
++};
++
++#define UNIX_DEFAULTS  (unix_args[UNIX__NONULL].flag)
++
++
++/* use this to free strings. ESPECIALLY password strings */
++
++#define _pam_delete(xx)		\
++{				\
++	_pam_overwrite(xx);	\
++	_pam_drop(xx);		\
++}
++
++extern char *PAM_getlogin(void);
++extern void _log_err(int err, pam_handle_t *pamh, const char *format,...);
++extern int _make_remark(pam_handle_t * pamh, unsigned int ctrl
++		       ,int type, const char *text);
++extern int _set_ctrl(pam_handle_t * pamh, int flags, int *remember, int argc,
++		     const char **argv);
++extern int _unix_blankpasswd(unsigned int ctrl, const char *name);
++extern int _unix_verify_password(pam_handle_t * pamh, const char *name
++			  ,const char *p, unsigned int ctrl);
++extern int _unix_read_password(pam_handle_t * pamh
++			,unsigned int ctrl
++			,const char *comment
++			,const char *prompt1
++			,const char *prompt2
++			,const char *data_name
++			,const char **pass);
++
++#endif /* _PAM_UNIX_SUPPORT_H */
++
+diff -Naur Linux-PAM-0.77.orig/modules/pam_wheel/pam_wheel.c Linux-PAM-0.77/modules/pam_wheel/pam_wheel.c
+--- Linux-PAM-0.77.orig/modules/pam_wheel/pam_wheel.c	2002-07-13 05:48:19.000000000 +0000
++++ Linux-PAM-0.77/modules/pam_wheel/pam_wheel.c	2004-06-09 18:28:24.105155800 +0000
+@@ -43,6 +43,7 @@
+ #define PAM_SM_ACCOUNT
+ 
+ #include <security/pam_modules.h>
++#include <security/_pam_modutil.h>
+ 
+ /* some syslogging */
+ 
+@@ -110,7 +111,7 @@
+ 			 const char *use_group)
+ {
+     const char *username = NULL;
+-    char *fromsu;
++    const char *fromsu;
+     struct passwd *pwd, *tpwd;
+     struct group *grp;
+     int retval = PAM_AUTH_ERR;
+@@ -142,7 +143,7 @@
+ 	}
+ 	fromsu = tpwd->pw_name;
+     } else {
+-	fromsu = getlogin();
++	fromsu = _pammodutil_getlogin(pamh);
+ 	if (fromsu) {
+ 	    tpwd = getpwnam(fromsu);
+ 	}
+diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/Makefile Linux-PAM-0.77/modules/pammodutil/Makefile
+--- Linux-PAM-0.77.orig/modules/pammodutil/Makefile	2001-12-09 22:15:12.000000000 +0000
++++ Linux-PAM-0.77/modules/pammodutil/Makefile	2004-06-09 18:28:24.107155446 +0000
+@@ -18,7 +18,8 @@
+   -DLIBPAM_VERSION_MINOR=$(MINOR_REL)
+ 
+ # all the object files we care about
+-LIBOBJECTS = modutil_cleanup.o modutil_getpwnam.o modutil_getpwuid.o
++LIBOBJECTS = modutil_cleanup.o modutil_getpwnam.o modutil_getpwuid.o \
++	modutil_getlogin.o
+ 
+ # static library name
+ LIBSTATIC = $(LIBNAME).a
+diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/Makefile~ Linux-PAM-0.77/modules/pammodutil/Makefile~
+--- Linux-PAM-0.77.orig/modules/pammodutil/Makefile~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pammodutil/Makefile~	2001-12-09 22:15:12.000000000 +0000
+@@ -0,0 +1,53 @@
++#
++# $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++#
++#
++
++include ../../Make.Rules
++
++LIBNAME=libpammodutil
++
++# ---------------------------------------------
++
++dummy: all
++
++# ---------------------------------------------
++
++CFLAGS += $(PIC) $(STATIC) $(MOREFLAGS) \
++  -DLIBPAM_VERSION_MAJOR=$(MAJOR_REL) \
++  -DLIBPAM_VERSION_MINOR=$(MINOR_REL)
++
++# all the object files we care about
++LIBOBJECTS = modutil_cleanup.o modutil_getpwnam.o modutil_getpwuid.o
++
++# static library name
++LIBSTATIC = $(LIBNAME).a
++
++SLIBOBJECTS = $(addprefix static/,$(LIBOBJECTS) $(STATICOBJ))
++
++# ---------------------------------------------
++## rules
++
++all: dirs $(LIBSTATIC) ../../Make.Rules
++
++dirs:
++	$(MKDIR) static
++
++static/%.o : %.c
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c $< -o $@
++
++$(LIBSTATIC): $(SLIBOBJECTS)
++	ar cr $@ $(SLIBOBJECTS)
++	$(RANLIB) $@
++
++install:
++	@echo "at this time, we're not installing $(LIBSTATIC)"
++
++remove:
++	@echo "at this time, there is nothing to remove"
++
++clean:
++	rm -f a.out core *~ static/*.o
++	rm -f *.a *.o
++	if [ -d dynamic ]; then rmdir dynamic ; fi
++	if [ -d static ]; then rmdir static ; fi
+diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h
+--- Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h	2001-12-09 22:15:12.000000000 +0000
++++ Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h	2004-06-09 18:28:24.110154916 +0000
+@@ -15,7 +15,7 @@
+  * On systems that simply can't support thread safe programming, these
+  * functions don't support it either - sorry.
+  *
+- * Copyright (c) 2001 Andrew Morgan <morgan@kernel.org>
++ * Copyright (c) 2001-2002 Andrew Morgan <morgan@kernel.org>
+  */
+ 
+ #include <pwd.h>
+@@ -30,4 +30,6 @@
+ extern void _pammodutil_cleanup(pam_handle_t *pamh, void *data,
+ 				int error_status);
+ 
++extern const char *_pammodutil_getlogin(pam_handle_t *pamh);
++
+ #endif /* _PAM_MODUTIL_H */
+diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h~ Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h~
+--- Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.h~	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pammodutil/include/security/_pam_modutil.h~	2001-12-09 22:15:12.000000000 +0000
+@@ -0,0 +1,33 @@
++#ifndef _PAM_MODUTIL_H
++#define _PAM_MODUTIL_H
++
++/*
++ * $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++ *
++ * This file is a list of handy libc wrappers that attempt to provide some
++ * thread-safe and other convenient functionality to modules in a form that
++ * is common, but not dynamically linked with yet another dynamic pam
++ * library extension.
++ *
++ * A number of these functions reserve space in a pam_[sg]et_data item.
++ * In all cases, the name of the item is prefixed with "_pammodutil_*".
++ *
++ * On systems that simply can't support thread safe programming, these
++ * functions don't support it either - sorry.
++ *
++ * Copyright (c) 2001 Andrew Morgan <morgan@kernel.org>
++ */
++
++#include <pwd.h>
++#include <sys/types.h>
++
++extern struct passwd *_pammodutil_getpwnam(pam_handle_t *pamh,
++					   const char *user);
++
++extern struct passwd *_pammodutil_getpwuid(pam_handle_t *pamh,
++					   uid_t uid);
++
++extern void _pammodutil_cleanup(pam_handle_t *pamh, void *data,
++				int error_status);
++
++#endif /* _PAM_MODUTIL_H */
+diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/modutil_getlogin.c Linux-PAM-0.77/modules/pammodutil/modutil_getlogin.c
+--- Linux-PAM-0.77.orig/modules/pammodutil/modutil_getlogin.c	1970-01-01 00:00:00.000000000 +0000
++++ Linux-PAM-0.77/modules/pammodutil/modutil_getlogin.c	2004-06-09 18:32:32.659204375 +0000
+@@ -0,0 +1,71 @@
++/*
++ * $Id: Linux-PAM-0.77-security-3.patch,v 1.1 2004/06/09 19:02:49 jim Exp $
++ *
++ * A central point for invoking getlogin(). Hopefully, this is a
++ * little harder to spoof than all the other versions that are out
++ * there.
++ */
++
++#include <stdlib.h>
++#include <unistd.h>
++#include <utmp.h>
++
++#include "pammodutil.h"
++
++#define _PAMMODUTIL_GETLOGIN "_pammodutil_getlogin"
++
++const char *_pammodutil_getlogin(pam_handle_t *pamh)
++{
++    int status;
++    const char *logname, *curr_tty;
++    char *curr_user;
++    struct utmp *ut, line;
++
++    status = pam_get_data(pamh, _PAMMODUTIL_GETLOGIN,
++			  (const void **) &logname);
++    if (status == PAM_SUCCESS) {
++	return logname;
++    }
++
++    status = pam_get_item(pamh, PAM_TTY, (const void **) &curr_tty);
++    if ((status != PAM_SUCCESS) || (curr_tty == NULL)) {
++	curr_tty = ttyname(0);
++    }
++
++    if ((curr_tty == NULL) || memcmp(curr_tty, "/dev/", 5)) {
++	return NULL;
++    }
++
++    curr_tty += 5;  /* strlen("/dev/") */
++    logname = NULL;
++
++    setutent();
++    strncpy(line.ut_line, curr_tty, sizeof(line.ut_line));
++
++    if ((ut = getutline(&line)) == NULL) {
++	goto clean_up_and_go_home;
++    }
++
++    curr_user = calloc(sizeof(line.ut_user)+1, 1);
++    if (curr_user == NULL) {
++	goto clean_up_and_go_home;
++    }
++
++    strncpy(curr_user, ut->ut_user, sizeof(ut->ut_user));
++    curr_user[sizeof(line.ut_user)] = '\0';
++
++    status = pam_set_data(pamh, _PAMMODUTIL_GETLOGIN, logname,
++			  _pammodutil_cleanup);
++    if (status != PAM_SUCCESS) {
++	free(curr_user);
++	goto clean_up_and_go_home;
++    }
++
++    logname = curr_user;
++
++clean_up_and_go_home:
++
++    endutent();
++
++    return logname;
++}
