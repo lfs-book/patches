@@ -1,0 +1,20 @@
+Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
+Date: 2003-10-12
+Initial Package Version: 2.3.2
+Origin: Jim Gifford
+Description: Fixes GDBM Error - changed where it looks for ndbm.h
+	     *** WARNING: renaming "dbm" since importing it failed:                         
+	     build/lib.linux-i686-2.3/dbm.so: undefined symbol: dbm_firstkey  
+ 
+diff -Naur Python-2.3.2.orig/setup.py Python-2.3.2/setup.py
+--- Python-2.3.2.orig/setup.py	2003-09-22 01:19:45.000000000 +0000
++++ Python-2.3.2/setup.py	2003-10-13 04:45:04.000000000 +0000
+@@ -601,7 +601,7 @@
+                                        define_macros=[('HAVE_NDBM_H',None)],
+                                        libraries = ndbm_libs ) )
+             elif (self.compiler.find_library_file(lib_dirs, 'gdbm')
+-                  and find_file("gdbm/ndbm.h", inc_dirs, []) is not None):
++                  and find_file("ndbm.h", inc_dirs, []) is not None):
+                 exts.append( Extension('dbm', ['dbmmodule.c'],
+                                        define_macros=[('HAVE_GDBM_NDBM_H',None)],
+                                        libraries = ['gdbm'] ) )
