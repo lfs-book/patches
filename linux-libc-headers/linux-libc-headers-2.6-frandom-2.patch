@@ -1,0 +1,40 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-11-03
+Initial Package Version: 2.6
+Upstream Status: Not submitted - The kernel people think this should be entirely
+in userspace. It will not be accepted upstream.
+Origin: http://frandom.sourceforge.net/ - frandom-0.8
+Description: This is usefull for smashing stack protector, wiping
+discs, mktemp, arc4random, and more.
+
+Thanks to Eli Billauer
+http://www.billauer.co.il/
+http://frandom.sourceforge.net/
+
+Also see:
+http://www.linuxfromscratch.org/hlfs/
+http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
+http://www.linuxfromscratch.org/~robert/hlfs/hints/attachments/entropy/\
+        frandom-0.8.tar.gz
+
+diff -Naur linux-libc-headers-2.6.9.1.orig/include/linux/sysctl.h linux-libc-headers-2.6.9.1.frandom/include/linux/sysctl.h
+--- linux-libc-headers-2.6.9.1.orig/include/linux/sysctl.h	2004-10-22 21:54:09.000000000 +0000
++++ linux-libc-headers-2.6.9.1.frandom/include/linux/sysctl.h	2004-11-04 01:01:10.139178152 +0000
+@@ -194,6 +194,7 @@
+ };
+ 
+ /* /proc/sys/kernel/random */
++#define SYSCTL_ERANDOM
+ enum
+ {
+ 	RANDOM_POOLSIZE=1,
+@@ -201,7 +202,8 @@
+ 	RANDOM_READ_THRESH=3,
+ 	RANDOM_WRITE_THRESH=4,
+ 	RANDOM_BOOT_ID=5,
+-	RANDOM_UUID=6
++	RANDOM_UUID=6,
++	RANDOM_ERANDOM=7
+ };
+ 
+ /* /proc/sys/kernel/pty */
