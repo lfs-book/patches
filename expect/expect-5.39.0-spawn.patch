@@ -1,7 +1,7 @@
 Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
 Date: 2003-10-05
 Initial Package Version: 5.38
-Origin: LFS Book
+Origin: Redhat RPM (Patch by HJ Lu)
 Description: NA
 diff -uNr expect-5.38.orig/exp_chan.c expect-5.38/exp_chan.c
 --- expect-5.38.orig/exp_chan.c	2002-02-12 13:00:55.000000000 +1100
