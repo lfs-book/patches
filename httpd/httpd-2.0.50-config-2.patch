@@ -1,16 +1,20 @@
 Submitted By: BLFS Book <blfs-book@linuxfromscratch.org>
-Date: 2003-10-04
+Date: 2004-07-15
 Initial Package Version: 2.0.47
+Upstream Status: Not submitted.
 Origin: BLFS Book
-Description: Add a layout for installing Apache as per the BLFS guidelines.
---- httpd-2.0.47/config.layout.orig	2003-09-20 00:39:30.000000000 +0000
-+++ httpd-2.0.47/config.layout	2003-09-20 00:40:11.000000000 +0000
-@@ -298,3 +298,26 @@
+Description: Add a layout for installing Apache as per the FHS
+             guidelines.
+
+diff -Naur httpd-2.0.50-orig/config.layout httpd-2.0.50/config.layout
+--- httpd-2.0.50-orig/config.layout	2004-07-15 15:07:48.000000000 +0000
++++ httpd-2.0.50/config.layout	2004-07-15 15:08:03.000000000 +0000
+@@ -322,3 +322,26 @@
      installbuilddir: ${prefix}/etc/apache2/build
      errordir:      ${datadir}/error
  </Layout>
 +
-+<Layout LFS>
++<Layout FHS>
 +    prefix:             /usr
 +    exec_prefix:        ${prefix}
 +    bindir:             ${exec_prefix}/bin
@@ -19,7 +23,7 @@ Description: Add a layout for installing Apache as per the BLFS guidelines.
 +    libexecdir:         ${exec_prefix}/lib/apache
 +    mandir:             ${prefix}/share/man
 +    sysconfdir:         /etc/apache
-+    datadir:            /var/www
++    datadir:            /srv/www
 +    installbuilddir:    ${libexecdir}/build
 +    errordir:           ${datadir}/error
 +    iconsdir:           ${datadir}/icons
@@ -32,8 +36,9 @@ Description: Add a layout for installing Apache as per the BLFS guidelines.
 +    logfiledir:         /var/log/apache
 +    proxycachedir:      /var/cache/apache/proxy
 +</Layout>
---- httpd-2.0.47/srclib/apr/config.layout.orig	2003-01-07 21:06:50.000000000 +0000
-+++ httpd-2.0.47/srclib/apr/config.layout	2003-09-20 00:41:22.000000000 +0000
+diff -Naur httpd-2.0.50-orig/srclib/apr/config.layout httpd-2.0.50/srclib/apr/config.layout
+--- httpd-2.0.50-orig/srclib/apr/config.layout	2004-07-15 15:07:48.000000000 +0000
++++ httpd-2.0.50/srclib/apr/config.layout	2004-07-15 15:08:03.000000000 +0000
 @@ -11,18 +11,18 @@
  
  #   Classical APR path layout designed for parallel installs.
@@ -55,15 +60,16 @@ Description: Add a layout for installing Apache as per the BLFS guidelines.
 +    libexecdir:    ${exec_prefix}/lib/apache
 +    mandir:        ${prefix}/share/man
 +    sysconfdir:    /etc/apache
-+    datadir:       /var/www
++    datadir:       /srv/www
 +    installbuilddir: ${libexecdir}/build
 +    includedir:    ${prefix}/include/apache
 +    localstatedir: ${datadir}
      libsuffix:     -${APR_MAJOR_VERSION}
  </Layout>
  
---- httpd-2.0.47/srclib/apr-util/config.layout.orig	2003-01-07 21:13:09.000000000 +0000
-+++ httpd-2.0.47/srclib/apr-util/config.layout	2003-09-20 00:41:12.000000000 +0000
+diff -Naur httpd-2.0.50-orig/srclib/apr-util/config.layout httpd-2.0.50/srclib/apr-util/config.layout
+--- httpd-2.0.50-orig/srclib/apr-util/config.layout	2004-07-15 15:07:48.000000000 +0000
++++ httpd-2.0.50/srclib/apr-util/config.layout	2004-07-15 15:08:03.000000000 +0000
 @@ -11,18 +11,18 @@
  
  #   Classical APR-util path layout designed for parallel installs.
@@ -85,7 +91,7 @@ Description: Add a layout for installing Apache as per the BLFS guidelines.
 +    libexecdir:    ${exec_prefix}/lib/apache
 +    mandir:        ${prefix}/share/man
 +    sysconfdir:    /etc/apache
-+    datadir:       /var/www
++    datadir:       /srv/www
 +    installbuilddir: ${libexecdir}/build
 +    includedir:    ${prefix}/include/apache
 +    localstatedir: ${datadir}
