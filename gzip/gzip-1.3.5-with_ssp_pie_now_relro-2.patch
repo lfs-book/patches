@@ -1,0 +1,219 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-10-24
+Initial Package Version: 1.3.5
+Upstream Status: Submitted Upstream
+Origin: None
+Description: Four new --with switches have been added to configure to take advantage
+of new toolchain features in gcc-3.4+ and binutils-2.15+. They are all turned off by default.
+Use: ./configure --with-ssp --with-now --with-pie --with-relro
+at your discretion. Whether or not your toolchain or architecture supports the
+features will be tested for during configure. All of these features are security
+enhancements.
+
+diff -Naur gzip-1.3.5.orig/configure gzip-1.3.5.with_ssp_pie_now_relro/configure
+--- gzip-1.3.5.orig/configure	2002-09-30 09:28:51.000000000 +0000
++++ gzip-1.3.5.with_ssp_pie_now_relro/configure	2004-10-24 05:36:57.000000000 +0000
+@@ -849,6 +849,14 @@
+   --enable-dependency-tracking  Do not reject slow dependency extractors
+   --disable-largefile     omit support for large files
+ 
++Optional Packages:
++  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
++  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
++  --with-ssp              use -fstack-protector-all if available (default=no)
++  --with-now              mark gzip with non-lazy runtime binding (default=no)
++  --with-pie              build gzip as a position independent executable (default=no)
++  --with-relro            create relocation read-only header for gzip (default=no)
++
+ Some influential environment variables:
+   CC          C compiler command
+   CFLAGS      C compiler flags
+@@ -3584,6 +3592,188 @@
+ fi
+ 
+ 
++# This only works with Stack Protector of September 2, 2004 and later.
++# See http://www.trl.ibm.com/projects/security/ssp/
++# robert@linuxfromscratch.org
++
++
++# Check whether --with-ssp or --without-ssp was given.
++if test "${with_ssp+set}" = set; then
++  withval="$with_ssp"
++
++else
++  with_ssp=no
++fi;
++
++if test x$with_ssp = xyes ; then
++cat > conftest.c <<EOF
++#include <stdio.h>
++int main () {
++#if __SSP_ALL__ == 2
++        printf("-fstack-protector-all is default.\n");
++        return 0;
++#else
++#error __SSP_ALL__ is not defined, you are using an old version of Stack Protector.
++#endif
++}
++EOF
++  if test "X$CC" != "X"; then
++   echo "$as_me:$LINENO: checking whether ${CC} accepts -fstack-protector-all" >&5
++echo $ECHO_N "checking whether ${CC} accepts -fstack-protector-all... $ECHO_C" >&6
++     if { ac_try='${CC} -fstack-protector-all -o conftest.o conftest.c 2>&1'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } ; then
++         ssp_cc=yes
++         echo "$as_me:$LINENO: result: yes" >&5
++echo "${ECHO_T}yes" >&6
++     else
++         ssp_cc=no
++         echo "$as_me:$LINENO: result: no" >&5
++echo "${ECHO_T}no" >&6
++     fi
++  rm -f conftest*
++  fi
++fi
++
++if test "$ssp_cc" = "yes" ; then
++  CFLAGS="$CFLAGS -fstack-protector-all"
++fi
++
++# This adds "${LD} -z now" to gzip for non-lazy runtime binding. This only works with
++# GNU ld.
++# robert@linuxfromscratch.org
++
++
++# Check whether --with-now or --without-now was given.
++if test "${with_now+set}" = set; then
++  withval="$with_now"
++
++else
++  with_now=no
++fi;
++
++if test x$with_now = xyes ; then
++  if test "X$CC" != "X"; then
++   echo "$as_me:$LINENO: checking whether linker accepts \"-z now\"" >&5
++echo $ECHO_N "checking whether linker accepts \"-z now\"... $ECHO_C" >&6
++     if { ac_try='${CC} -Wl,--help 2>&1 | grep -q -e "z now"'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } ; then
++         now_ld=yes
++         echo "$as_me:$LINENO: result: yes" >&5
++echo "${ECHO_T}yes" >&6
++     else
++         now_ld=no
++         echo "$as_me:$LINENO: result: no" >&5
++echo "${ECHO_T}no" >&6
++    fi
++  fi
++fi
++
++if test "$now_ld" = "yes" ; then
++  LDFLAGS="$LDFLAGS -z now"
++fi
++
++# This builds gzip as a shared object (position independent executable).
++# For "${CC} -fPIE" to work it depends on "${LD} -pie", so we shouldn't need to check
++# ${LD}. The ASM code in gzip is not PIC, so DEFS="NO_ASM" must be set so gzip will build
++# without text relocation. If CFLAGS/LDFLAGS="-static" this test will fail and output why.
++# robert@linuxfromscratch.org
++
++
++# Check whether --with-pie or --without-pie was given.
++if test "${with_pie+set}" = set; then
++  withval="$with_pie"
++
++else
++  with_pie=no
++fi;
++
++if test x$with_pie = xyes ; then
++cat > conftest.c <<EOF
++#if !defined __PIC__ && !defined __pic__ && !defined PIC && !defined pic
++# error PIC is not default.
++#endif
++EOF
++  if test "X$CC" != "X"; then
++   echo "$as_me:$LINENO: checking whether ${CC} accepts -fPIE" >&5
++echo $ECHO_N "checking whether ${CC} accepts -fPIE... $ECHO_C" >&6
++     if echo $LDFLAGS $CFLAGS |grep -q "static"  ; then
++         fpie_cc=no
++         echo "$as_me:$LINENO: result: no -static" >&5
++echo "${ECHO_T}no -static" >&6
++     else
++     if { ac_try='${CC} -S -fPIE -o conftest.o conftest.c 2>&1'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } ; then
++         fpie_cc=yes
++         echo "$as_me:$LINENO: result: yes" >&5
++echo "${ECHO_T}yes" >&6
++     else
++         fpie_cc=no
++         echo "$as_me:$LINENO: result: no" >&5
++echo "${ECHO_T}no" >&6
++     fi
++     fi
++  fi
++fi
++
++rm -f conftest*
++if test "$fpie_cc" = "yes" ; then
++  CFLAGS="$CFLAGS -fPIE"
++  LDFLAGS="$LDFLAGS -pie"
++  DEFS="NO_ASM"
++fi
++
++# This adds "${LD} -z relro" to gzip to add a relocation read-only header. This only works with
++# GNU ld. Some architectures (ia64) do not take advantage of this, hence the check for
++# DATA_SEGMENT_RELRO_END.
++# robert@linuxfromscratch.org
++
++
++# Check whether --with-relro or --without-relro was given.
++if test "${with_relro+set}" = set; then
++  withval="$with_relro"
++
++else
++  with_relro=no
++fi;
++
++if test x$with_relro = xyes ; then
++  if test "X$CC" != "X"; then
++   echo "$as_me:$LINENO: checking whether linker accepts \"-z relro\"" >&5
++echo $ECHO_N "checking whether linker accepts \"-z relro\"... $ECHO_C" >&6
++     if { ac_try='${CC} -Wl,--verbose 2>&1|grep DATA_SEGMENT_RELRO_END 1>&5'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }
++       then
++         relro_ld=yes
++         echo "$as_me:$LINENO: result: yes" >&5
++echo "${ECHO_T}yes" >&6
++       else
++         relro_ld=no
++         echo "$as_me:$LINENO: result: no" >&5
++echo "${ECHO_T}no" >&6
++    fi
++  fi
++fi
++
++if test "$relro_ld" = "yes" ; then
++  LDFLAGS="$LDFLAGS -z relro"
++fi
++
+ # Try to assemble match.S.
+ # "gcc -E match.s" ignores -E, so we must use match.S.
+ echo "$as_me:$LINENO: checking for assembler" >&5

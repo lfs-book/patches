@@ -1,0 +1,139 @@
+diff -Naur gzip-1.3.5.orig/configure.in gzip-1.3.5.with_ssp_pie_now_relro/configure.in
+--- gzip-1.3.5.orig/configure.in	2002-09-30 09:28:09.000000000 +0000
++++ gzip-1.3.5.with_ssp_pie_now_relro/configure.in	2004-10-24 05:36:20.000000000 +0000
+@@ -47,6 +47,135 @@
+ fi
+ AC_OBJEXT
+ 
++# This only works with Stack Protector of September 2, 2004 and later.
++# See http://www.trl.ibm.com/projects/security/ssp/
++# robert@linuxfromscratch.org
++
++AC_ARG_WITH(ssp,
++[  --with-ssp              use -fstack-protector-all if available (default=no)], [],
++[with_ssp=no])
++
++if test x$with_ssp = xyes ; then
++cat > conftest.c <<EOF
++#include <stdio.h>
++int main () {
++#if __SSP_ALL__ == 2
++        printf("-fstack-protector-all is default.\n");
++        return 0;
++#else
++#error __SSP_ALL__ is not defined, you are using an old version of Stack Protector.
++#endif
++}
++EOF
++  if test "X$CC" != "X"; then
++   AC_MSG_CHECKING([whether ${CC} accepts -fstack-protector-all])
++     if AC_TRY_COMMAND([${CC} -fstack-protector-all -o conftest.o conftest.c 2>&1]) ; then
++         ssp_cc=yes
++         AC_MSG_RESULT(yes)
++     else
++         ssp_cc=no
++         AC_MSG_RESULT(no)
++     fi
++  rm -f conftest*
++  fi
++fi
++
++if test "$ssp_cc" = "yes" ; then
++  CFLAGS="$CFLAGS -fstack-protector-all"
++fi
++
++# This adds "${LD} -z now" to gzip for non-lazy runtime binding. This only works with
++# GNU ld.
++# robert@linuxfromscratch.org
++
++AC_ARG_WITH(now,
++[  --with-now              mark gzip with non-lazy runtime binding (default=no)], [],
++[with_now=no])
++
++if test x$with_now = xyes ; then
++  if test "X$CC" != "X"; then
++   AC_MSG_CHECKING([whether linker accepts "-z now"])
++     if AC_TRY_COMMAND([${CC} -Wl,--help 2>&1 | grep -q -e "z now"]) ; then
++         now_ld=yes
++         AC_MSG_RESULT(yes)
++     else
++         now_ld=no
++         AC_MSG_RESULT(no)
++    fi
++  fi
++fi
++
++if test "$now_ld" = "yes" ; then
++  LDFLAGS="$LDFLAGS -z now"
++fi
++
++# This builds gzip as a shared object (position independent executable).
++# For "${CC} -fPIE" to work it depends on "${LD} -pie", so we shouldn't need to check
++# ${LD}. The ASM code in gzip is not PIC, so DEFS="NO_ASM" must be set so gzip will build
++# without text relocation. If CFLAGS/LDFLAGS="-static" this test will fail and output why.
++# robert@linuxfromscratch.org
++
++AC_ARG_WITH(pie,
++[  --with-pie              build gzip as a position independent executable (default=no)], [],
++[with_pie=no])
++
++if test x$with_pie = xyes ; then
++cat > conftest.c <<EOF
++#if !defined __PIC__ && !defined __pic__ && !defined PIC && !defined pic
++# error PIC is not default.
++#endif
++EOF
++  if test "X$CC" != "X"; then
++   AC_MSG_CHECKING([whether ${CC} accepts -fPIE])
++     if echo $LDFLAGS $CFLAGS |grep -q "static"  ; then
++         fpie_cc=no
++         AC_MSG_RESULT(no -static)
++     else
++     if AC_TRY_COMMAND([${CC} -S -fPIE -o conftest.o conftest.c 2>&1]) ; then
++         fpie_cc=yes
++         AC_MSG_RESULT(yes)
++     else
++         fpie_cc=no
++         AC_MSG_RESULT(no)
++     fi
++     fi
++  fi
++fi
++
++rm -f conftest*
++if test "$fpie_cc" = "yes" ; then
++  CFLAGS="$CFLAGS -fPIE"
++  LDFLAGS="$LDFLAGS -pie"
++  DEFS="NO_ASM"
++fi
++
++# This adds "${LD} -z relro" to gzip to add a relocation read-only header. This only works with
++# GNU ld. Some architectures (ia64) do not take advantage of this, hence the check for
++# DATA_SEGMENT_RELRO_END.
++# robert@linuxfromscratch.org
++
++AC_ARG_WITH(relro,
++[  --with-relro            create relocation read-only header for gzip (default=no)], [],
++[with_relro=no])
++
++if test x$with_relro = xyes ; then
++  if test "X$CC" != "X"; then
++   AC_MSG_CHECKING([whether linker accepts "-z relro"])
++     if AC_TRY_COMMAND([${CC} -Wl,--verbose 2>&1|grep DATA_SEGMENT_RELRO_END 1>&AS_MESSAGE_LOG_FD])
++       then
++         relro_ld=yes
++         AC_MSG_RESULT(yes)
++       else
++         relro_ld=no
++         AC_MSG_RESULT(no)
++    fi
++  fi
++fi
++
++if test "$relro_ld" = "yes" ; then
++  LDFLAGS="$LDFLAGS -z relro"
++fi
++
+ # Try to assemble match.S.
+ # "gcc -E match.s" ignores -E, so we must use match.S.
+ AC_CACHE_CHECK([for assembler], [gzip_cv_assembler],
