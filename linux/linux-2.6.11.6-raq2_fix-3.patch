@@ -1,0 +1,5409 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2005-04-01
+Initial Package Version: 2.6.11.6
+Origin: http://www.linux-mips.org and http://www.colonel-panic.org/cobalt-mips
+	http://www.parisc-linux.org
+Upstream Status: Not Applied to kernel.org
+Description: Adds various fixes to the Cobalt RaQ2
+             Added MIPS64 bit fixes
+
+diff -Naur linux-2.6.11.6/arch/mips/Kconfig /cross/build/linux-2.6.11.6/arch/mips/Kconfig
+--- linux-2.6.11.6/arch/mips/Kconfig	2005-03-25 19:28:20 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/Kconfig	2005-04-01 08:56:55 -0800
+@@ -1371,7 +1371,7 @@
+ 
+ config CPU_HAS_LLSC
+ 	bool "ll/sc Instructions available" if CPU_ADVANCED
+-	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX && !CPU_TX39XX
++	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX && !CPU_TX39XX && (!MIPS_COBALT || !MIPS64)
+ 	help
+ 	  MIPS R4000 series and later provide the Load Linked (ll)
+ 	  and Store Conditional (sc) instructions. More information is
+@@ -1383,7 +1383,7 @@
+ 
+ config CPU_HAS_LLDSCD
+ 	bool "lld/scd Instructions available" if CPU_ADVANCED
+-	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX && !CPU_TX39XX && !CPU_MIPS32
++	default y if !CPU_ADVANCED && !CPU_R3000 && !CPU_VR41XX && !CPU_TX39XX && !CPU_MIPS32 && (!MIPS_COBALT || !MIPS64)
+ 	help
+ 	  Say Y here if your CPU has the lld and scd instructions, the 64-bit
+ 	  equivalents of ll and sc.  Say Y here for better performance, N if
+diff -Naur linux-2.6.11.6/arch/mips/Makefile /cross/build/linux-2.6.11.6/arch/mips/Makefile
+--- linux-2.6.11.6/arch/mips/Makefile	2005-03-25 19:28:14 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/Makefile	2005-04-01 08:56:55 -0800
+@@ -323,6 +323,7 @@
+ # Cobalt Server
+ #
+ core-$(CONFIG_MIPS_COBALT)	+= arch/mips/cobalt/
++cflags-$(CONFIG_MIPS_COBALT)	+= -Iinclude/asm-mips/cobalt
+ load-$(CONFIG_MIPS_COBALT)	+= 0xffffffff80080000
+ 
+ #
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/int-handler.S /cross/build/linux-2.6.11.6/arch/mips/cobalt/int-handler.S
+--- linux-2.6.11.6/arch/mips/cobalt/int-handler.S	2005-03-25 19:28:36 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/int-handler.S	2005-04-01 08:56:55 -0800
+@@ -18,8 +18,8 @@
+ 		SAVE_ALL
+ 		CLI
+ 
+-		la	ra, ret_from_irq
+-		move	a1, sp
++		PTR_LA	ra, ret_from_irq
++		move	a0, sp
+ 		j	cobalt_irq
+ 
+ 		END(cobalt_handle_int)
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/irq.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/irq.c
+--- linux-2.6.11.6/arch/mips/cobalt/irq.c	2005-03-25 19:28:23 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/irq.c	2005-04-01 08:56:55 -0800
+@@ -10,6 +10,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
++#include <linux/interrupt.h>
+ 
+ #include <asm/i8259.h>
+ #include <asm/irq_cpu.h>
+@@ -25,8 +26,8 @@
+  * the CPU interrupt lines, and ones that come in on the via chip. The CPU
+  * mappings are:
+  *
+- *    16,  - Software interrupt 0 (unused)	IE_SW0
+- *    17   - Software interrupt 1 (unused)	IE_SW0
++ *    16   - Software interrupt 0 (unused)	IE_SW0
++ *    17   - Software interrupt 1 (unused)	IE_SW1
+  *    18   - Galileo chip (timer)		IE_IRQ0
+  *    19   - Tulip 0 + NCR SCSI			IE_IRQ1
+  *    20   - Tulip 1				IE_IRQ2
+@@ -82,11 +83,15 @@
+ 	}
+ 
+ 	if (pending & CAUSEF_IP7) {			/* int 23 */
+-		do_IRQ(COBALT_QUBE_SLOT_IRQ, regs);
++		do_IRQ(23, regs);
+ 		return;
+ 	}
+ }
+ 
++static struct irqaction irq_via = {
++	no_action, 0, { { 0, } }, "cascade", NULL, NULL
++};
++ 
+ void __init arch_init_irq(void)
+ {
+ 	set_except_vector(0, cobalt_handle_int);
+@@ -99,4 +104,6 @@
+ 	 *  (except IE4, we already masked those at VIA level)
+ 	 */
+ 	change_c0_status(ST0_IM, IE_IRQ4);
++
++	setup_irq(COBALT_VIA_IRQ, &irq_via);
+ }
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/reset.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/reset.c
+--- linux-2.6.11.6/arch/mips/cobalt/reset.c	2005-03-25 19:28:13 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/reset.c	2005-04-01 08:56:55 -0800
+@@ -16,48 +16,45 @@
+ #include <asm/reboot.h>
+ #include <asm/system.h>
+ #include <asm/mipsregs.h>
++#include <asm/cobalt/cobalt.h>
+ 
+-void cobalt_machine_restart(char *command)
++void cobalt_machine_halt(void)
+ {
+-	*(volatile char *)0xbc000000 = 0x0f;
++	int state, last, diff;
++	unsigned long mark;
+ 
+ 	/*
+-	 * Ouch, we're still alive ... This time we take the silver bullet ...
+-	 * ... and find that we leave the hardware in a state in which the
+-	 * kernel in the flush locks up somewhen during of after the PCI
+-	 * detection stuff.
++	 * turn off bar on Qube, flash power off LED on RaQ (0.5Hz)
++	 *
++	 * restart if ENTER and SELECT are pressed
+ 	 */
+-	set_c0_status(ST0_BEV | ST0_ERL);
+-	change_c0_config(CONF_CM_CMASK, CONF_CM_UNCACHED);
+-	flush_cache_all();
+-	write_c0_wired(0);
+-	__asm__ __volatile__(
+-		"jr\t%0"
+-		:
+-		: "r" (0xbfc00000));
+-}
+ 
+-extern int led_state;
+-#define kLED            0xBC000000
+-#define LEDSet(x)       (*(volatile unsigned char *) kLED) = (( unsigned char)x)
++	last = COBALT_KEY_PORT;
+ 
+-void cobalt_machine_halt(void)
+-{
+-	int mark;
++	for (state = 0;;) {
++
++		state ^= COBALT_LED_POWER_OFF;
++		COBALT_LED_PORT = state;
++
++		diff = COBALT_KEY_PORT ^ last;
++		last ^= diff;
+ 
+-	/* Blink our cute? little LED (number 3)... */
+-	while (1) {
+-		led_state = led_state | ( 1 << 3 );
+-		LEDSet(led_state);
+-		mark = jiffies;
+-		while (jiffies<(mark+HZ));
+-		led_state = led_state & ~( 1 << 3 );
+-		LEDSet(led_state);
+-		mark = jiffies;
+-		while (jiffies<(mark+HZ));
++		if((diff & (COBALT_KEY_ENTER | COBALT_KEY_SELECT)) && !(~last & (COBALT_KEY_ENTER | COBALT_KEY_SELECT)))
++			COBALT_LED_PORT = COBALT_LED_RESET;
++
++		for (mark = jiffies; jiffies - mark < HZ;)
++			;
+ 	}
+ }
+ 
++void cobalt_machine_restart(char *command)
++{
++	COBALT_LED_PORT = COBALT_LED_RESET;
++
++	/* we should never get here */
++	cobalt_machine_halt();
++}
++
+ /*
+  * This triggers the luser mode device driver for the power switch ;-)
+  */
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/setup.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/setup.c
+--- linux-2.6.11.6/arch/mips/cobalt/setup.c	2005-03-25 19:28:14 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/setup.c	2005-04-01 08:56:55 -0800
+@@ -30,27 +30,25 @@
+ 
+ int cobalt_board_id;
+ 
+-static char my_cmdline[CL_SIZE] = {
+- "console=ttyS0,115200 "
+-#ifdef CONFIG_IP_PNP
+- "ip=on "
+-#endif
+-#ifdef CONFIG_ROOT_NFS
+- "root=/dev/nfs "
+-#else
+- "root=/dev/hda1 "
+-#endif
+- };
+-
+ const char *get_system_type(void)
+ {
++	switch (cobalt_board_id) {
++		case COBALT_BRD_ID_QUBE1:
++			return "Cobalt Qube";
++		case COBALT_BRD_ID_RAQ1:
++			return "Cobalt RaQ";
++		case COBALT_BRD_ID_QUBE2:
++			return "Cobalt Qube2";
++		case COBALT_BRD_ID_RAQ2:
++			return "Cobalt RaQ2";
++	}
+ 	return "MIPS Cobalt";
+ }
+ 
+ static void __init cobalt_timer_setup(struct irqaction *irq)
+ {
+-	/* Load timer value for 150 Hz */
+-	GALILEO_OUTL(500000, GT_TC0_OFS);
++	/* Load timer value for 1KHz */
++	GALILEO_OUTL(50*1000*1000 / 1000, GT_TC0_OFS);
+ 
+ 	/* Register our timer interrupt */
+ 	setup_irq(COBALT_TIMER_IRQ, irq);
+@@ -58,17 +56,17 @@
+ 	/* Enable timer ints */
+ 	GALILEO_OUTL((GALILEO_ENTC0 | GALILEO_SELTC0), GT_TC_CONTROL_OFS);
+ 	/* Unmask timer int */
+-	GALILEO_OUTL(0x100, GT_INTRMASK_OFS);
++	GALILEO_OUTL(GALILEO_T0EXP, GT_INTRMASK_OFS);
+ }
+ 
+ extern struct pci_ops gt64111_pci_ops;
+ 
+ static struct resource cobalt_mem_resource = {
+-	"GT64111 PCI MEM", GT64111_IO_BASE, 0xffffffffUL, IORESOURCE_MEM
++	"GT64111 PCI MEM", GT64111_MEM_BASE, GT64111_MEM_END, IORESOURCE_MEM
+ };
+ 
+ static struct resource cobalt_io_resource = {
+-	"GT64111 IO MEM", 0x00001000UL, 0x0fffffffUL, IORESOURCE_IO
++	"GT64111 IO MEM", 0x00001000UL, GT64111_IO_END - GT64111_IO_BASE, IORESOURCE_IO
+ };
+ 
+ static struct resource cobalt_io_resources[] = {
+@@ -86,10 +84,10 @@
+ 	.mem_resource	= &cobalt_mem_resource,
+ 	.mem_offset	= 0,
+ 	.io_resource	= &cobalt_io_resource,
+-	.io_offset	= 0x00001000UL - GT64111_IO_BASE
++	.io_offset	= 0 - GT64111_IO_BASE
+ };
+ 
+-static void __init cobalt_setup(void)
++static int __init cobalt_setup(void)
+ {
+ 	unsigned int devfn = PCI_DEVFN(COBALT_PCICONF_VIA, 0);
+ 	int i;
+@@ -100,7 +98,10 @@
+ 
+ 	board_timer_setup = cobalt_timer_setup;
+ 
+-        set_io_port_base(KSEG1ADDR(GT64111_IO_BASE));
++        set_io_port_base(CKSEG1ADDR(GT64111_IO_BASE));
++
++	/* IO region should cover all Galileo IO */
++	ioport_resource.end = 0x0fffffff;
+ 
+ 	/*
+ 	 * This is a prom style console. We just poke at the
+@@ -120,27 +121,50 @@
+         cobalt_board_id >>= ((VIA_COBALT_BRD_ID_REG & 3) * 8);
+         cobalt_board_id = VIA_COBALT_BRD_REG_to_ID(cobalt_board_id);
+ 
++	printk("Cobalt board ID: %d\n", cobalt_board_id);
++
+ #ifdef CONFIG_PCI
+ 	register_pci_controller(&cobalt_pci_controller);
+ #endif
++
++	return 0;
+ }
+ 
+ early_initcall(cobalt_setup);
+ 
+ /*
+  * Prom init. We read our one and only communication with the firmware.
+- * Grab the amount of installed memory
++ * Grab the amount of installed memory.
++ * Better boot loaders (CoLo) pass a command line too :-)
+  */
+ 
+ void __init prom_init(void)
+ {
+-	int argc = fw_arg0;
+-
+-	strcpy(arcs_cmdline, my_cmdline);
++	int narg, indx, posn, nchr;
++	unsigned long memsz;
++	char **argv;
+ 
+ 	mips_machgroup = MACH_GROUP_COBALT;
+ 
+-	add_memory_region(0x0, argc & 0x7fffffff, BOOT_MEM_RAM);
++	memsz = fw_arg0 & 0x7fff0000;
++	narg = fw_arg0 & 0x0000ffff;
++
++	if (narg) {
++		arcs_cmdline[0] = '\0';
++		argv = (char **) fw_arg1;
++		posn = 0;
++		for (indx = 1; indx < narg; ++indx) {
++			nchr = strlen(argv[indx]);
++			if (posn + 1 + nchr + 1 > sizeof(arcs_cmdline))
++				break;
++			if (posn)
++				arcs_cmdline[posn++] = ' ';
++			strcpy(arcs_cmdline + posn, argv[indx]);
++			posn += nchr;
++		}
++	}
++
++	add_memory_region(0x0, memsz, BOOT_MEM_RAM);
+ }
+ 
+ unsigned long __init prom_free_prom_memory(void)
+diff -Naur linux-2.6.11.6/arch/mips/kernel/Makefile /cross/build/linux-2.6.11.6/arch/mips/kernel/Makefile
+--- linux-2.6.11.6/arch/mips/kernel/Makefile	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/Makefile	2005-04-01 08:56:55 -0800
+@@ -11,11 +11,7 @@
+ binfmt_irix-objs	:= irixelf.o irixinv.o irixioctl.o irixsig.o	\
+ 			   irix5sys.o sysirix.o
+ 
+-ifdef CONFIG_MODULES
+-obj-y				+= mips_ksyms.o module.o
+-obj-$(CONFIG_MIPS32)		+= module-elf32.o
+-obj-$(CONFIG_MIPS64)		+= module-elf64.o
+-endif
++obj-$(CONFIG_MODULES)           += mips_ksyms.o module.o
+ 
+ obj-$(CONFIG_CPU_R3000)		+= r2300_fpu.o r2300_switch.o
+ obj-$(CONFIG_CPU_TX39XX)	+= r2300_fpu.o r2300_switch.o
+diff -Naur linux-2.6.11.6/arch/mips/kernel/cpu-probe.c /cross/build/linux-2.6.11.6/arch/mips/kernel/cpu-probe.c
+--- linux-2.6.11.6/arch/mips/kernel/cpu-probe.c	2005-03-25 19:28:18 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/cpu-probe.c	2005-04-01 08:56:55 -0800
+@@ -354,6 +354,17 @@
+ 		c->options = R4K_OPTS | MIPS_CPU_FPU | MIPS_CPU_32FPR |
+ 		             MIPS_CPU_DIVEC | MIPS_CPU_LLSC;
+ 		c->tlbsize = 48;
++#ifdef CONFIG_MIPS64
++		/*
++		 * ll(d) is broken on RM5231 for cached accesses to XKPHYS
++		 *
++		 * the load is always done uncached .. ugh!
++		 */
++		if ((c->processor_id & 0x00ff) == PRID_REV_RM5231) {
++			c->options &= ~MIPS_CPU_LLSC;
++			printk("RM5231: not using broken 'load linked'.\n");
++		}
++#endif
+ 		break;
+ 	case PRID_IMP_R6000:
+ 		c->cputype = CPU_R6000;
+diff -Naur linux-2.6.11.6/arch/mips/kernel/entry.S /cross/build/linux-2.6.11.6/arch/mips/kernel/entry.S
+--- linux-2.6.11.6/arch/mips/kernel/entry.S	2005-03-25 19:28:16 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/entry.S	2005-04-01 08:56:55 -0800
+@@ -19,11 +19,11 @@
+ #include <asm/war.h>
+ 
+ #ifdef CONFIG_PREEMPT
+-	.macro	preempt_stop reg=t0
++	.macro	preempt_stop
+ 	.endm
+ #else
+-	.macro	preempt_stop reg=t0
+-	local_irq_disable \reg
++	.macro	preempt_stop
++	local_irq_disable
+ 	.endm
+ #define resume_kernel	restore_all
+ #endif
+@@ -37,17 +37,18 @@
+ 	andi	t0, t0, KU_USER
+ 	beqz	t0, resume_kernel
+ 
+-FEXPORT(resume_userspace)
+-	local_irq_disable	t0	# make sure we dont miss an
++resume_userspace:
++	local_irq_disable		# make sure we dont miss an
+ 					# interrupt setting need_resched
+ 					# between sampling and return
+ 	LONG_L	a2, TI_FLAGS($28)	# current->work
+-	andi	a2, _TIF_WORK_MASK	# (ignoring syscall_trace)
+-	bnez	a2, work_pending
++	andi	t0, a2, _TIF_WORK_MASK	# (ignoring syscall_trace)
++	bnez	t0, work_pending
+ 	j	restore_all
+ 
+ #ifdef CONFIG_PREEMPT
+-ENTRY(resume_kernel)
++resume_kernel:
++	local_irq_disable
+ 	lw	t0, TI_PRE_COUNT($28)
+ 	bnez	t0, restore_all
+ need_resched:
+@@ -57,12 +58,7 @@
+ 	LONG_L	t0, PT_STATUS(sp)		# Interrupts off?
+ 	andi	t0, 1
+ 	beqz	t0, restore_all
+-	li	t0, PREEMPT_ACTIVE
+-	sw	t0, TI_PRE_COUNT($28)
+-	local_irq_enable t0
+-	jal	schedule
+-	sw	zero, TI_PRE_COUNT($28)
+-	local_irq_disable t0
++	jal	preempt_schedule_irq
+ 	b	need_resched
+ #endif
+ 
+@@ -88,13 +84,13 @@
+ 	RESTORE_SP_AND_RET
+ 	.set	at
+ 
+-FEXPORT(work_pending)
+-	andi	t0, a2, _TIF_NEED_RESCHED
++work_pending:
++	andi	t0, a2, _TIF_NEED_RESCHED # a2 is preloaded with TI_FLAGS
+ 	beqz	t0, work_notifysig
+ work_resched:
+ 	jal	schedule
+ 
+-	local_irq_disable t0		# make sure need_resched and
++	local_irq_disable		# make sure need_resched and
+ 					# signals dont change between
+ 					# sampling and return
+ 	LONG_L	a2, TI_FLAGS($28)
+@@ -113,11 +109,10 @@
+ 
+ FEXPORT(syscall_exit_work_partial)
+ 	SAVE_STATIC
+-FEXPORT(syscall_exit_work)
+-	LONG_L	t0, TI_FLAGS($28)
+-	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
+-	and	t0, t1
+-	beqz	t0, work_pending	# trace bit is set
++syscall_exit_work:
++	li	t0, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
++	and	t0, a2			# a2 is preloaded with TI_FLAGS
++	beqz	t0, work_pending	# trace bit set?
+ 	local_irq_enable		# could let do_syscall_trace()
+ 					# call schedule() instead
+ 	move	a0, sp
+@@ -128,28 +123,26 @@
+ /*
+  * Common spurious interrupt handler.
+  */
+-	.text
+-	.align  5
+ LEAF(spurious_interrupt)
+ 	/*
+ 	 * Someone tried to fool us by sending an interrupt but we
+ 	 * couldn't find a cause for it.
+ 	 */
++	PTR_LA	t1, irq_err_count
+ #ifdef CONFIG_SMP
+-	lui     t1, %hi(irq_err_count)
+-1:	ll      t0, %lo(irq_err_count)(t1)
++1:	ll      t0, (t1)
+ 	addiu   t0, 1
+-	sc      t0, %lo(irq_err_count)(t1)
++	sc      t0, (t1)
+ #if R10000_LLSC_WAR
+ 	beqzl	t0, 1b
+ #else
+ 	beqz	t0, 1b
+ #endif
+ #else
+-	lui     t1, %hi(irq_err_count)
+-	lw      t0, %lo(irq_err_count)(t1)
++	lw      t0, (t1)
+ 	addiu   t0, 1
+-	sw      t0, %lo(irq_err_count)(t1)
++	sw      t0, (t1)
+ #endif
+ 	j	ret_from_irq
+ 	END(spurious_interrupt)
++
+diff -Naur linux-2.6.11.6/arch/mips/kernel/irq_cpu.c /cross/build/linux-2.6.11.6/arch/mips/kernel/irq_cpu.c
+--- linux-2.6.11.6/arch/mips/kernel/irq_cpu.c	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/irq_cpu.c	2005-04-01 08:56:55 -0800
+@@ -3,6 +3,8 @@
+  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
+  *
+  * Copyright (C) 2001 Ralf Baechle
++ * Copyright (C) 2005  MIPS Technologies, Inc.  All rights reserved.
++ *      Author: Maciej W. Rozycki <macro@mips.com>
+  *
+  * This file define the irq handler for MIPS CPU interrupts.
+  *
+@@ -37,7 +39,6 @@
+ 
+ static inline void unmask_mips_irq(unsigned int irq)
+ {
+-	clear_c0_cause(0x100 << (irq - mips_cpu_irq_base));
+ 	set_c0_status(0x100 << (irq - mips_cpu_irq_base));
+ }
+ 
+@@ -92,14 +93,13 @@
+ }
+ 
+ static hw_irq_controller mips_cpu_irq_controller = {
+-	"MIPS",
+-	mips_cpu_irq_startup,
+-	mips_cpu_irq_shutdown,
+-	mips_cpu_irq_enable,
+-	mips_cpu_irq_disable,
+-	mips_cpu_irq_ack,
+-	mips_cpu_irq_end,
+-	NULL			/* no affinity stuff for UP */
++	.typename = "MIPS",
++	.startup = mips_cpu_irq_startup,
++	.shutdown = mips_cpu_irq_shutdown,
++	.enable = mips_cpu_irq_enable,
++	.disable = mips_cpu_irq_disable,
++	.ack = mips_cpu_irq_ack,
++	.end = mips_cpu_irq_end,
+ };
+ 
+ 
+@@ -107,6 +107,10 @@
+ {
+ 	int i;
+ 
++	/* Mask interrupts. */
++	clear_c0_status(ST0_IM);
++	clear_c0_cause(CAUSEF_IP);
++
+ 	for (i = irq_base; i < irq_base + 8; i++) {
+ 		irq_desc[i].status = IRQ_DISABLED;
+ 		irq_desc[i].action = NULL;
+diff -Naur linux-2.6.11.6/arch/mips/kernel/linux32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/linux32.c
+--- linux-2.6.11.6/arch/mips/kernel/linux32.c	2005-03-25 19:28:23 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/linux32.c	2005-04-01 08:56:55 -0800
+@@ -215,81 +215,35 @@
+ 	return(n);
+ }
+ 
+-struct rusage32 {
+-        struct compat_timeval ru_utime;
+-        struct compat_timeval ru_stime;
+-        int    ru_maxrss;
+-        int    ru_ixrss;
+-        int    ru_idrss;
+-        int    ru_isrss;
+-        int    ru_minflt;
+-        int    ru_majflt;
+-        int    ru_nswap;
+-        int    ru_inblock;
+-        int    ru_oublock;
+-        int    ru_msgsnd;
+-        int    ru_msgrcv;
+-        int    ru_nsignals;
+-        int    ru_nvcsw;
+-        int    ru_nivcsw;
+-};
++asmlinkage int compat_sys_wait4(compat_pid_t pid, unsigned int * stat_addr,
++				int options, struct compat_rusage * ru);
+ 
+-static int
+-put_rusage (struct rusage32 *ru, struct rusage *r)
++asmlinkage int
++sys32_waitpid(compat_pid_t pid, unsigned int *stat_addr, int options)
+ {
+-	int err;
+-
+-	if (verify_area(VERIFY_WRITE, ru, sizeof *ru))
+-		return -EFAULT;
+-
+-	err = __put_user (r->ru_utime.tv_sec, &ru->ru_utime.tv_sec);
+-	err |= __put_user (r->ru_utime.tv_usec, &ru->ru_utime.tv_usec);
+-	err |= __put_user (r->ru_stime.tv_sec, &ru->ru_stime.tv_sec);
+-	err |= __put_user (r->ru_stime.tv_usec, &ru->ru_stime.tv_usec);
+-	err |= __put_user (r->ru_maxrss, &ru->ru_maxrss);
+-	err |= __put_user (r->ru_ixrss, &ru->ru_ixrss);
+-	err |= __put_user (r->ru_idrss, &ru->ru_idrss);
+-	err |= __put_user (r->ru_isrss, &ru->ru_isrss);
+-	err |= __put_user (r->ru_minflt, &ru->ru_minflt);
+-	err |= __put_user (r->ru_majflt, &ru->ru_majflt);
+-	err |= __put_user (r->ru_nswap, &ru->ru_nswap);
+-	err |= __put_user (r->ru_inblock, &ru->ru_inblock);
+-	err |= __put_user (r->ru_oublock, &ru->ru_oublock);
+-	err |= __put_user (r->ru_msgsnd, &ru->ru_msgsnd);
+-	err |= __put_user (r->ru_msgrcv, &ru->ru_msgrcv);
+-	err |= __put_user (r->ru_nsignals, &ru->ru_nsignals);
+-	err |= __put_user (r->ru_nvcsw, &ru->ru_nvcsw);
+-	err |= __put_user (r->ru_nivcsw, &ru->ru_nivcsw);
+-
+-	return err;
++	return compat_sys_wait4(pid, stat_addr, options, NULL);
+ }
+ 
+-asmlinkage int
+-sys32_wait4(compat_pid_t pid, unsigned int * stat_addr, int options,
+-	    struct rusage32 * ru)
++asmlinkage long
++sysn32_waitid(int which, compat_pid_t pid,
++	      siginfo_t __user *uinfo, int options,
++	      struct compat_rusage __user *uru)
+ {
+-	if (!ru)
+-		return sys_wait4(pid, stat_addr, options, NULL);
+-	else {
+-		struct rusage r;
+-		int ret;
+-		unsigned int status;
+-		mm_segment_t old_fs = get_fs();
++	struct rusage ru;
++	long ret;
++	mm_segment_t old_fs = get_fs();
+ 
+-		set_fs(KERNEL_DS);
+-		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
+-		set_fs(old_fs);
+-		if (put_rusage (ru, &r)) return -EFAULT;
+-		if (stat_addr && put_user (status, stat_addr))
+-			return -EFAULT;
++	set_fs (KERNEL_DS);
++	ret = sys_waitid(which, pid, uinfo, options,
++			 uru ? (struct rusage __user *) &ru : NULL);
++	set_fs (old_fs);
++
++	if (ret < 0 || uinfo->si_signo == 0)
+ 		return ret;
+-	}
+-}
+ 
+-asmlinkage int
+-sys32_waitpid(compat_pid_t pid, unsigned int *stat_addr, int options)
+-{
+-	return sys32_wait4(pid, stat_addr, options, NULL);
++	if (uru)
++		ret = put_compat_rusage(&ru, uru);
++	return ret;
+ }
+ 
+ struct sysinfo32 {
+@@ -1467,3 +1421,53 @@
+ 	}
+ 	return err;
+ }
++
++struct sigevent32 { 
++	u32 sigev_value;
++	u32 sigev_signo; 
++	u32 sigev_notify; 
++	u32 payload[(64 / 4) - 3]; 
++}; 
++
++extern asmlinkage long
++sys_timer_create(clockid_t which_clock,
++		 struct sigevent __user *timer_event_spec,
++		 timer_t __user * created_timer_id);
++
++long
++sys32_timer_create(u32 clock, struct sigevent32 __user *se32, timer_t __user *timer_id)
++{
++	struct sigevent __user *p = NULL;
++	if (se32) { 
++		struct sigevent se;
++		p = compat_alloc_user_space(sizeof(struct sigevent));
++		memset(&se, 0, sizeof(struct sigevent)); 
++		if (get_user(se.sigev_value.sival_int,  &se32->sigev_value) ||
++		    __get_user(se.sigev_signo, &se32->sigev_signo) ||
++		    __get_user(se.sigev_notify, &se32->sigev_notify) ||
++		    __copy_from_user(&se._sigev_un._pad, &se32->payload, 
++				     sizeof(se32->payload)) ||
++		    copy_to_user(p, &se, sizeof(se)))
++			return -EFAULT;
++	} 
++	return sys_timer_create(clock, p, timer_id);
++} 
++
++asmlinkage long
++sysn32_rt_sigtimedwait(const sigset_t __user *uthese,
++		       siginfo_t __user *uinfo,
++		       const struct compat_timespec __user *uts32,
++		       size_t sigsetsize)
++{
++	struct timespec __user *uts = NULL;
++
++	if (uts32) {
++		struct timespec ts;
++		uts = compat_alloc_user_space(sizeof(struct timespec));
++		if (get_user(ts.tv_sec, &uts32->tv_sec) ||
++		    get_user(ts.tv_nsec, &uts32->tv_nsec) ||
++		    copy_to_user (uts, &ts, sizeof (ts)))
++			return -EFAULT;
++	}
++	return sys_rt_sigtimedwait(uthese, uinfo, uts, sigsetsize);
++}
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf32.c
+--- linux-2.6.11.6/arch/mips/kernel/module-elf32.c	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf32.c	1969-12-31 16:00:00 -0800
+@@ -1,250 +0,0 @@
+-/*
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License as published by
+- *  the Free Software Foundation; either version 2 of the License, or
+- *  (at your option) any later version.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  GNU General Public License for more details.
+- *
+- *  You should have received a copy of the GNU General Public License
+- *  along with this program; if not, write to the Free Software
+- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- *  Copyright (C) 2001 Rusty Russell.
+- *  Copyright (C) 2003, 2004 Ralf Baechle (ralf@linux-mips.org)
+- */
+-
+-#undef DEBUG
+-
+-#include <linux/moduleloader.h>
+-#include <linux/elf.h>
+-#include <linux/vmalloc.h>
+-#include <linux/slab.h>
+-#include <linux/fs.h>
+-#include <linux/string.h>
+-#include <linux/kernel.h>
+-
+-struct mips_hi16 {
+-	struct mips_hi16 *next;
+-	Elf32_Addr *addr;
+-	Elf32_Addr value;
+-};
+-
+-static struct mips_hi16 *mips_hi16_list;
+-
+-void *module_alloc(unsigned long size)
+-{
+-	if (size == 0)
+-		return NULL;
+-	return vmalloc(size);
+-}
+-
+-
+-/* Free memory returned from module_alloc */
+-void module_free(struct module *mod, void *module_region)
+-{
+-	vfree(module_region);
+-	/* FIXME: If module_region == mod->init_region, trim exception
+-           table entries. */
+-}
+-
+-int module_frob_arch_sections(Elf_Ehdr *hdr,
+-			      Elf_Shdr *sechdrs,
+-			      char *secstrings,
+-			      struct module *mod)
+-{
+-	return 0;
+-}
+-
+-static int apply_r_mips_none(struct module *me, uint32_t *location,
+-	Elf32_Addr v)
+-{
+-	return 0;
+-}
+-
+-static int apply_r_mips_32(struct module *me, uint32_t *location,
+-	Elf32_Addr v)
+-{
+-	*location += v;
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_26(struct module *me, uint32_t *location,
+-	Elf32_Addr v)
+-{
+-	if (v % 4) {
+-		printk(KERN_ERR "module %s: dangerous relocation\n", me->name);
+-		return -ENOEXEC;
+-	}
+-
+-	if ((v & 0xf0000000) != (((unsigned long)location + 4) & 0xf0000000)) {
+-		printk(KERN_ERR
+-		       "module %s: relocation overflow\n",
+-		       me->name);
+-		return -ENOEXEC;
+-	}
+-
+-	*location = (*location & ~0x03ffffff) |
+-	            ((*location + (v >> 2)) & 0x03ffffff);
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_hi16(struct module *me, uint32_t *location,
+-	Elf32_Addr v)
+-{
+-	struct mips_hi16 *n;
+-
+-	/*
+-	 * We cannot relocate this one now because we don't know the value of
+-	 * the carry we need to add.  Save the information, and let LO16 do the
+-	 * actual relocation.
+-	 */
+-	n = kmalloc(sizeof *n, GFP_KERNEL);
+-	if (!n)
+-		return -ENOMEM;
+-
+-	n->addr = location;
+-	n->value = v;
+-	n->next = mips_hi16_list;
+-	mips_hi16_list = n;
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_lo16(struct module *me, uint32_t *location,
+-	Elf32_Addr v)
+-{
+-	unsigned long insnlo = *location;
+-	Elf32_Addr val, vallo;
+-
+-	/* Sign extend the addend we extract from the lo insn.  */
+-	vallo = ((insnlo & 0xffff) ^ 0x8000) - 0x8000;
+-
+-	if (mips_hi16_list != NULL) {
+-		struct mips_hi16 *l;
+-
+-		l = mips_hi16_list;
+-		while (l != NULL) {
+-			struct mips_hi16 *next;
+-			unsigned long insn;
+-
+-			/*
+-			 * The value for the HI16 had best be the same.
+-			 */
+-			if (v != l->value)
+-				goto out_danger;
+-
+-			/*
+-			 * Do the HI16 relocation.  Note that we actually don't
+-			 * need to know anything about the LO16 itself, except
+-			 * where to find the low 16 bits of the addend needed
+-			 * by the LO16.
+-			 */
+-			insn = *l->addr;
+-			val = ((insn & 0xffff) << 16) + vallo;
+-			val += v;
+-
+-			/*
+-			 * Account for the sign extension that will happen in
+-			 * the low bits.
+-			 */
+-			val = ((val >> 16) + ((val & 0x8000) != 0)) & 0xffff;
+-
+-			insn = (insn & ~0xffff) | val;
+-			*l->addr = insn;
+-
+-			next = l->next;
+-			kfree(l);
+-			l = next;
+-		}
+-
+-		mips_hi16_list = NULL;
+-	}
+-
+-	/*
+-	 * Ok, we're done with the HI16 relocs.  Now deal with the LO16.
+-	 */
+-	val = v + vallo;
+-	insnlo = (insnlo & ~0xffff) | (val & 0xffff);
+-	*location = insnlo;
+-
+-	return 0;
+-
+-out_danger:
+-	printk(KERN_ERR "module %s: dangerous " "relocation\n", me->name);
+-
+-	return -ENOEXEC;
+-}
+-
+-static int (*reloc_handlers[]) (struct module *me, uint32_t *location,
+-	Elf32_Addr v) = {
+-	[R_MIPS_NONE]	= apply_r_mips_none,
+-	[R_MIPS_32]	= apply_r_mips_32,
+-	[R_MIPS_26]	= apply_r_mips_26,
+-	[R_MIPS_HI16]	= apply_r_mips_hi16,
+-	[R_MIPS_LO16]	= apply_r_mips_lo16
+-};
+-
+-int apply_relocate(Elf32_Shdr *sechdrs,
+-		   const char *strtab,
+-		   unsigned int symindex,
+-		   unsigned int relsec,
+-		   struct module *me)
+-{
+-	Elf32_Rel *rel = (void *) sechdrs[relsec].sh_addr;
+-	Elf32_Sym *sym;
+-	uint32_t *location;
+-	unsigned int i;
+-	Elf32_Addr v;
+-	int res;
+-
+-	pr_debug("Applying relocate section %u to %u\n", relsec,
+-	       sechdrs[relsec].sh_info);
+-
+-	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
+-		Elf32_Word r_info = rel[i].r_info;
+-
+-		/* This is where to make the change */
+-		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
+-			+ rel[i].r_offset;
+-		/* This is the symbol it is referring to */
+-		sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
+-			+ ELF32_R_SYM(r_info);
+-		if (!sym->st_value) {
+-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+-			       me->name, strtab + sym->st_name);
+-			return -ENOENT;
+-		}
+-
+-		v = sym->st_value;
+-
+-		res = reloc_handlers[ELF32_R_TYPE(r_info)](me, location, v);
+-		if (res)
+-			return res;
+-	}
+-
+-	return 0;
+-}
+-
+-int apply_relocate_add(Elf32_Shdr *sechdrs,
+-		       const char *strtab,
+-		       unsigned int symindex,
+-		       unsigned int relsec,
+-		       struct module *me)
+-{
+-	/*
+-	 * Current binutils always generate .rela relocations.  Keep smiling
+-	 * if it's empty, abort otherwise.
+-	 */
+-	if (!sechdrs[relsec].sh_size)
+-		return 0;
+-
+-	printk(KERN_ERR "module %s: ADD RELOCATION unsupported\n",
+-	       me->name);
+-	return -ENOEXEC;
+-}
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf64.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf64.c
+--- linux-2.6.11.6/arch/mips/kernel/module-elf64.c	2005-03-25 19:28:24 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf64.c	1969-12-31 16:00:00 -0800
+@@ -1,274 +0,0 @@
+-/*
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License as published by
+- *  the Free Software Foundation; either version 2 of the License, or
+- *  (at your option) any later version.
+- *
+- *  This program is distributed in the hope that it will be useful,
+- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *  GNU General Public License for more details.
+- *
+- *  You should have received a copy of the GNU General Public License
+- *  along with this program; if not, write to the Free Software
+- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- *  Copyright (C) 2001 Rusty Russell.
+- *  Copyright (C) 2003, 2004 Ralf Baechle (ralf@linux-mips.org)
+- */
+-
+-#undef DEBUG
+-
+-#include <linux/moduleloader.h>
+-#include <linux/elf.h>
+-#include <linux/vmalloc.h>
+-#include <linux/slab.h>
+-#include <linux/fs.h>
+-#include <linux/string.h>
+-#include <linux/kernel.h>
+-
+-struct mips_hi16 {
+-	struct mips_hi16 *next;
+-	Elf32_Addr *addr;
+-	Elf64_Addr value;
+-};
+-
+-static struct mips_hi16 *mips_hi16_list;
+-
+-void *module_alloc(unsigned long size)
+-{
+-	if (size == 0)
+-		return NULL;
+-	return vmalloc(size);
+-}
+-
+-
+-/* Free memory returned from module_alloc */
+-void module_free(struct module *mod, void *module_region)
+-{
+-	vfree(module_region);
+-	/* FIXME: If module_region == mod->init_region, trim exception
+-           table entries. */
+-}
+-
+-int module_frob_arch_sections(Elf_Ehdr *hdr,
+-			      Elf_Shdr *sechdrs,
+-			      char *secstrings,
+-			      struct module *mod)
+-{
+-	return 0;
+-}
+-
+-int apply_relocate(Elf64_Shdr *sechdrs,
+-		   const char *strtab,
+-		   unsigned int symindex,
+-		   unsigned int relsec,
+-		   struct module *me)
+-{
+-	/*
+-	 * We don't want to deal with REL relocations - RELA is so much saner.
+-	 */
+-	if (!sechdrs[relsec].sh_size)
+-		return 0;
+-
+-	printk(KERN_ERR "module %s: REL relocation unsupported\n",
+-	       me->name);
+-	return -ENOEXEC;
+-}
+-
+-static int apply_r_mips_none(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	return 0;
+-}
+-
+-static int apply_r_mips_32(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	*location = v;
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_26(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	if (v % 4) {
+-		printk(KERN_ERR "module %s: dangerous relocation\n", me->name);
+-		return -ENOEXEC;
+-	}
+-
+-	if ((v & 0xf0000000) != (((unsigned long)location + 4) & 0xf0000000)) {
+-		printk(KERN_ERR
+-		       "module %s: relocation overflow\n",
+-		       me->name);
+-		return -ENOEXEC;
+-	}
+-
+-	*location = (*location & ~0x03ffffff) | ((v >> 2) & 0x03ffffff);
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_hi16(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	struct mips_hi16 *n;
+-
+-	/*
+-	 * We cannot relocate this one now because we don't know the value of
+-	 * the carry we need to add.  Save the information, and let LO16 do the
+-	 * actual relocation.
+-	 */
+-	n = kmalloc(sizeof *n, GFP_KERNEL);
+-	if (!n)
+-		return -ENOMEM;
+-
+-	n->addr = location;
+-	n->value = v;
+-	n->next = mips_hi16_list;
+-	mips_hi16_list = n;
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_lo16(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	unsigned long insnlo = *location;
+-	Elf32_Addr val, vallo;
+-
+-	/* Sign extend the addend we extract from the lo insn.  */
+-	vallo = ((insnlo & 0xffff) ^ 0x8000) - 0x8000;
+-
+-	if (mips_hi16_list != NULL) {
+-		struct mips_hi16 *l;
+-
+-		l = mips_hi16_list;
+-		while (l != NULL) {
+-			struct mips_hi16 *next;
+-			unsigned long insn;
+-
+-			/*
+-			 * The value for the HI16 had best be the same.
+-			 */
+-			if (v != l->value)
+-				goto out_danger;
+-
+-			/*
+-			 * Do the HI16 relocation.  Note that we actually don't
+-			 * need to know anything about the LO16 itself, except
+-			 * where to find the low 16 bits of the addend needed
+-			 * by the LO16.
+-			 */
+-			insn = *l->addr;
+-			val = ((insn & 0xffff) << 16) + vallo;
+-			val += v;
+-
+-			/*
+-			 * Account for the sign extension that will happen in
+-			 * the low bits.
+-			 */
+-			val = ((val >> 16) + ((val & 0x8000) != 0)) & 0xffff;
+-
+-			insn = (insn & ~0xffff) | val;
+-			*l->addr = insn;
+-
+-			next = l->next;
+-			kfree(l);
+-			l = next;
+-		}
+-
+-		mips_hi16_list = NULL;
+-	}
+-
+-	/*
+-	 * Ok, we're done with the HI16 relocs.  Now deal with the LO16.
+-	 */
+-	insnlo = (insnlo & ~0xffff) | (v & 0xffff);
+-	*location = insnlo;
+-
+-	return 0;
+-
+-out_danger:
+-	printk(KERN_ERR "module %s: dangerous " "relocation\n", me->name);
+-
+-	return -ENOEXEC;
+-}
+-
+-static int apply_r_mips_64(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	*(uint64_t *) location = v;
+-
+-	return 0;
+-}
+-
+-
+-static int apply_r_mips_higher(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	*location = (*location & 0xffff0000) |
+-	            ((((long long) v + 0x80008000LL) >> 32) & 0xffff);
+-
+-	return 0;
+-}
+-
+-static int apply_r_mips_highest(struct module *me, uint32_t *location,
+-	Elf64_Addr v)
+-{
+-	*location = (*location & 0xffff0000) |
+-	            ((((long long) v + 0x800080008000LL) >> 48) & 0xffff);
+-
+-	return 0;
+-}
+-
+-static int (*reloc_handlers[]) (struct module *me, uint32_t *location,
+-	Elf64_Addr v) = {
+-	[R_MIPS_NONE]		= apply_r_mips_none,
+-	[R_MIPS_32]		= apply_r_mips_32,
+-	[R_MIPS_26]		= apply_r_mips_26,
+-	[R_MIPS_HI16]		= apply_r_mips_hi16,
+-	[R_MIPS_LO16]		= apply_r_mips_lo16,
+-	[R_MIPS_64]		= apply_r_mips_64,
+-	[R_MIPS_HIGHER]		= apply_r_mips_higher,
+-	[R_MIPS_HIGHEST]	= apply_r_mips_highest
+-};
+-
+-int apply_relocate_add(Elf64_Shdr *sechdrs,
+-		       const char *strtab,
+-		       unsigned int symindex,
+-		       unsigned int relsec,
+-		       struct module *me)
+-{
+-	Elf64_Mips_Rela *rel = (void *) sechdrs[relsec].sh_addr;
+-	Elf64_Sym *sym;
+-	uint32_t *location;
+-	unsigned int i;
+-	Elf64_Addr v;
+-	int res;
+-
+-	pr_debug("Applying relocate section %u to %u\n", relsec,
+-	       sechdrs[relsec].sh_info);
+-
+-	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
+-		/* This is where to make the change */
+-		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
+-			+ rel[i].r_offset;
+-		/* This is the symbol it is referring to */
+-		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr + rel[i].r_sym;
+-		if (!sym->st_value) {
+-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+-			       me->name, strtab + sym->st_name);
+-			return -ENOENT;
+-		}
+-
+-		v = sym->st_value;
+-
+-		res = reloc_handlers[rel[i].r_type](me, location, v);
+-		if (res)
+-			return res;
+-	}
+-
+-	return 0;
+-}
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module.c
+--- linux-2.6.11.6/arch/mips/kernel/module.c	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module.c	2005-04-01 08:56:55 -0800
+@@ -1,9 +1,345 @@
++/*
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ *  Copyright (C) 2001 Rusty Russell.
++ *  Copyright (C) 2003, 2004 Ralf Baechle (ralf@linux-mips.org)
++ *  Copyright (C) 2005 Thiemo Seufer
++ */
++
++#undef DEBUG
++
++#include <linux/moduleloader.h>
++#include <linux/elf.h>
++#include <linux/vmalloc.h>
++#include <linux/slab.h>
++#include <linux/fs.h>
++#include <linux/string.h>
++#include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/spinlock.h>
+ 
++struct mips_hi16 {
++	struct mips_hi16 *next;
++	Elf_Addr *addr;
++	Elf_Addr value;
++};
++
++static struct mips_hi16 *mips_hi16_list;
++
+ static LIST_HEAD(dbe_list);
+ static DEFINE_SPINLOCK(dbe_lock);
+ 
++void *module_alloc(unsigned long size)
++{
++	if (size == 0)
++		return NULL;
++	return vmalloc(size);
++}
++
++/* Free memory returned from module_alloc */
++void module_free(struct module *mod, void *module_region)
++{
++	vfree(module_region);
++	/* FIXME: If module_region == mod->init_region, trim exception
++           table entries. */
++}
++
++int module_frob_arch_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,
++			      char *secstrings, struct module *mod)
++{
++	return 0;
++}
++
++static int apply_r_mips_none(struct module *me, u32 *location, Elf_Addr v)
++{
++	return 0;
++}
++
++static int apply_r_mips_32_rel(struct module *me, u32 *location, Elf_Addr v)
++{
++	*location += v;
++
++	return 0;
++}
++
++static int apply_r_mips_32_rela(struct module *me, u32 *location, Elf_Addr v)
++{
++	*location = v;
++
++	return 0;
++}
++
++static int apply_r_mips_26_rel(struct module *me, u32 *location, Elf_Addr v)
++{
++	if (v % 4) {
++		printk(KERN_ERR "module %s: dangerous relocation\n", me->name);
++		return -ENOEXEC;
++	}
++
++	if ((v & 0xf0000000) != (((unsigned long)location + 4) & 0xf0000000)) {
++		printk(KERN_ERR
++		       "module %s: relocation overflow\n",
++		       me->name);
++		return -ENOEXEC;
++	}
++
++	*location = (*location & ~0x03ffffff) |
++	            ((*location + (v >> 2)) & 0x03ffffff);
++
++	return 0;
++}
++
++static int apply_r_mips_26_rela(struct module *me, u32 *location, Elf_Addr v)
++{
++	if (v % 4) {
++		printk(KERN_ERR "module %s: dangerous relocation\n", me->name);
++		return -ENOEXEC;
++	}
++
++	if ((v & 0xf0000000) != (((unsigned long)location + 4) & 0xf0000000)) {
++		printk(KERN_ERR
++		       "module %s: relocation overflow\n",
++		       me->name);
++		return -ENOEXEC;
++	}
++
++	*location = (*location & ~0x03ffffff) | ((v >> 2) & 0x03ffffff);
++
++	return 0;
++}
++
++static int apply_r_mips_hi16_rel(struct module *me, u32 *location, Elf_Addr v)
++{
++	struct mips_hi16 *n;
++
++	/*
++	 * We cannot relocate this one now because we don't know the value of
++	 * the carry we need to add.  Save the information, and let LO16 do the
++	 * actual relocation.
++	 */
++	n = kmalloc(sizeof *n, GFP_KERNEL);
++	if (!n)
++		return -ENOMEM;
++
++	n->addr = (Elf_Addr *)location;
++	n->value = v;
++	n->next = mips_hi16_list;
++	mips_hi16_list = n;
++
++	return 0;
++}
++
++static int apply_r_mips_hi16_rela(struct module *me, u32 *location, Elf_Addr v)
++{
++	*location = (*location & 0xffff0000) |
++	            ((((long long) v + 0x8000LL) >> 16) & 0xffff);
++
++	return 0;
++}
++
++static int apply_r_mips_lo16_rel(struct module *me, u32 *location, Elf_Addr v)
++{
++	unsigned long insnlo = *location;
++	Elf_Addr val, vallo;
++
++	/* Sign extend the addend we extract from the lo insn.  */
++	vallo = ((insnlo & 0xffff) ^ 0x8000) - 0x8000;
++
++	if (mips_hi16_list != NULL) {
++		struct mips_hi16 *l;
++
++		l = mips_hi16_list;
++		while (l != NULL) {
++			struct mips_hi16 *next;
++			unsigned long insn;
++
++			/*
++			 * The value for the HI16 had best be the same.
++			 */
++			if (v != l->value)
++				goto out_danger;
++
++			/*
++			 * Do the HI16 relocation.  Note that we actually don't
++			 * need to know anything about the LO16 itself, except
++			 * where to find the low 16 bits of the addend needed
++			 * by the LO16.
++			 */
++			insn = *l->addr;
++			val = ((insn & 0xffff) << 16) + vallo;
++			val += v;
++
++			/*
++			 * Account for the sign extension that will happen in
++			 * the low bits.
++			 */
++			val = ((val >> 16) + ((val & 0x8000) != 0)) & 0xffff;
++
++			insn = (insn & ~0xffff) | val;
++			*l->addr = insn;
++
++			next = l->next;
++			kfree(l);
++			l = next;
++		}
++
++		mips_hi16_list = NULL;
++	}
++
++	/*
++	 * Ok, we're done with the HI16 relocs.  Now deal with the LO16.
++	 */
++	val = v + vallo;
++	insnlo = (insnlo & ~0xffff) | (val & 0xffff);
++	*location = insnlo;
++
++	return 0;
++
++out_danger:
++	printk(KERN_ERR "module %s: dangerous " "relocation\n", me->name);
++
++	return -ENOEXEC;
++}
++
++static int apply_r_mips_lo16_rela(struct module *me, u32 *location, Elf_Addr v)
++{
++	*location = (*location & 0xffff0000) | (v & 0xffff);
++
++	return 0;
++}
++
++static int apply_r_mips_64_rela(struct module *me, u32 *location, Elf_Addr v)
++{
++	*(Elf_Addr *)location = v;
++
++	return 0;
++}
++
++static int apply_r_mips_higher_rela(struct module *me, u32 *location,
++				    Elf_Addr v)
++{
++	*location = (*location & 0xffff0000) |
++	            ((((long long) v + 0x80008000LL) >> 32) & 0xffff);
++
++	return 0;
++}
++
++static int apply_r_mips_highest_rela(struct module *me, u32 *location,
++				     Elf_Addr v)
++{
++	*location = (*location & 0xffff0000) |
++	            ((((long long) v + 0x800080008000LL) >> 48) & 0xffff);
++
++	return 0;
++}
++
++static int (*reloc_handlers_rel[]) (struct module *me, u32 *location,
++				Elf_Addr v) = {
++	[R_MIPS_NONE]		= apply_r_mips_none,
++	[R_MIPS_32]		= apply_r_mips_32_rel,
++	[R_MIPS_26]		= apply_r_mips_26_rel,
++	[R_MIPS_HI16]		= apply_r_mips_hi16_rel,
++	[R_MIPS_LO16]		= apply_r_mips_lo16_rel
++};
++
++static int (*reloc_handlers_rela[]) (struct module *me, u32 *location,
++				Elf_Addr v) = {
++	[R_MIPS_NONE]		= apply_r_mips_none,
++	[R_MIPS_32]		= apply_r_mips_32_rela,
++	[R_MIPS_26]		= apply_r_mips_26_rela,
++	[R_MIPS_HI16]		= apply_r_mips_hi16_rela,
++	[R_MIPS_LO16]		= apply_r_mips_lo16_rela,
++	[R_MIPS_64]		= apply_r_mips_64_rela,
++	[R_MIPS_HIGHER]		= apply_r_mips_higher_rela,
++	[R_MIPS_HIGHEST]	= apply_r_mips_highest_rela
++};
++
++int apply_relocate(Elf_Shdr *sechdrs, const char *strtab,
++		   unsigned int symindex, unsigned int relsec,
++		   struct module *me)
++{
++	Elf_Mips_Rel *rel = (void *) sechdrs[relsec].sh_addr;
++	Elf_Sym *sym;
++	u32 *location;
++	unsigned int i;
++	Elf_Addr v;
++	int res;
++
++	pr_debug("Applying relocate section %u to %u\n", relsec,
++	       sechdrs[relsec].sh_info);
++
++	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
++		/* This is where to make the change */
++		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
++			+ rel[i].r_offset;
++		/* This is the symbol it is referring to */
++		sym = (Elf_Sym *)sechdrs[symindex].sh_addr
++			+ ELF_MIPS_R_SYM(rel[i]);
++		if (!sym->st_value) {
++			printk(KERN_WARNING "%s: Unknown symbol %s\n",
++			       me->name, strtab + sym->st_name);
++			return -ENOENT;
++		}
++
++		v = sym->st_value;
++
++		res = reloc_handlers_rel[ELF_MIPS_R_TYPE(rel[i])](me, location, v);
++		if (res)
++			return res;
++	}
++
++	return 0;
++}
++
++int apply_relocate_add(Elf_Shdr *sechdrs, const char *strtab,
++		       unsigned int symindex, unsigned int relsec,
++		       struct module *me)
++{
++	Elf_Mips_Rela *rel = (void *) sechdrs[relsec].sh_addr;
++	Elf_Sym *sym;
++	u32 *location;
++	unsigned int i;
++	Elf_Addr v;
++	int res;
++
++	pr_debug("Applying relocate section %u to %u\n", relsec,
++	       sechdrs[relsec].sh_info);
++
++	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
++		/* This is where to make the change */
++		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
++			+ rel[i].r_offset;
++		/* This is the symbol it is referring to */
++		sym = (Elf_Sym *)sechdrs[symindex].sh_addr
++			+ ELF_MIPS_R_SYM(rel[i]);
++		if (!sym->st_value) {
++			printk(KERN_WARNING "%s: Unknown symbol %s\n",
++			       me->name, strtab + sym->st_name);
++			return -ENOENT;
++		}
++
++		v = sym->st_value + rel[i].r_addend;
++
++		res = reloc_handlers_rela[ELF_MIPS_R_TYPE(rel[i])](me, location, v);
++		if (res)
++			return res;
++	}
++
++	return 0;
++}
++
+ /* Given an address, look for it in the module exception tables. */
+ const struct exception_table_entry *search_module_dbetables(unsigned long addr)
+ {
+diff -Naur linux-2.6.11.6/arch/mips/kernel/proc.c /cross/build/linux-2.6.11.6/arch/mips/kernel/proc.c
+--- linux-2.6.11.6/arch/mips/kernel/proc.c	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/proc.c	2005-04-01 08:56:55 -0800
+@@ -19,63 +19,66 @@
+ unsigned int vced_count, vcei_count;
+ 
+ static const char *cpu_name[] = {
+-	[CPU_UNKNOWN]	"unknown",
+-	[CPU_R2000]	"R2000",
+-	[CPU_R3000]	"R3000",
+-	[CPU_R3000A]	"R3000A",
+-	[CPU_R3041]	"R3041",
+-	[CPU_R3051]	"R3051",
+-	[CPU_R3052]	"R3052",
+-	[CPU_R3081]	"R3081",
+-	[CPU_R3081E]	"R3081E",
+-	[CPU_R4000PC]	"R4000PC",
+-	[CPU_R4000SC]	"R4000SC",
+-	[CPU_R4000MC]	"R4000MC",
+-        [CPU_R4200]	"R4200",
+-	[CPU_R4400PC]	"R4400PC",
+-	[CPU_R4400SC]	"R4400SC",
+-	[CPU_R4400MC]	"R4400MC",
+-	[CPU_R4600]	"R4600",
+-	[CPU_R6000]	"R6000",
+-        [CPU_R6000A]	"R6000A",
+-	[CPU_R8000]	"R8000",
+-	[CPU_R10000]	"R10000",
+-	[CPU_R12000]	"R12000",
+-	[CPU_R4300]	"R4300",
+-	[CPU_R4650]	"R4650",
+-	[CPU_R4700]	"R4700",
+-	[CPU_R5000]	"R5000",
+-        [CPU_R5000A]	"R5000A",
+-	[CPU_R4640]	"R4640",
+-	[CPU_NEVADA]	"Nevada",
+-	[CPU_RM7000]	"RM7000",
+-	[CPU_RM9000]	"RM9000",
+-	[CPU_R5432]	"R5432",
+-	[CPU_4KC]	"MIPS 4Kc",
+-        [CPU_5KC]	"MIPS 5Kc",
+-	[CPU_R4310]	"R4310",
+-	[CPU_SB1]	"SiByte SB1",
+-	[CPU_TX3912]	"TX3912",
+-	[CPU_TX3922]	"TX3922",
+-	[CPU_TX3927]	"TX3927",
+-	[CPU_AU1000]	"Au1000",
+-	[CPU_AU1500]	"Au1500",
+-	[CPU_4KEC]	"MIPS 4KEc",
+-	[CPU_4KSC]	"MIPS 4KSc",
+-	[CPU_VR41XX]	"NEC Vr41xx",
+-	[CPU_R5500]	"R5500",
+-	[CPU_TX49XX]	"TX49xx",
+-	[CPU_20KC]	"MIPS 20Kc",
+-	[CPU_24K]	"MIPS 24K",
+-	[CPU_25KF]	"MIPS 25Kf",
+-	[CPU_VR4111]	"NEC VR4111",
+-	[CPU_VR4121]	"NEC VR4121",
+-	[CPU_VR4122]	"NEC VR4122",
+-	[CPU_VR4131]	"NEC VR4131",
+-	[CPU_VR4133]	"NEC VR4133",
+-	[CPU_VR4181]	"NEC VR4181",
+-	[CPU_VR4181A]	"NEC VR4181A",
+-	[CPU_SR71000]	"Sandcraft SR71000"
++	[CPU_UNKNOWN]	= "unknown",
++	[CPU_R2000]	= "R2000",
++	[CPU_R3000]	= "R3000",
++	[CPU_R3000A]	= "R3000A",
++	[CPU_R3041]	= "R3041",
++	[CPU_R3051]	= "R3051",
++	[CPU_R3052]	= "R3052",
++	[CPU_R3081]	= "R3081",
++	[CPU_R3081E]	= "R3081E",
++	[CPU_R4000PC]	= "R4000PC",
++	[CPU_R4000SC]	= "R4000SC",
++	[CPU_R4000MC]	= "R4000MC",
++        [CPU_R4200]	= "R4200",
++	[CPU_R4400PC]	= "R4400PC",
++	[CPU_R4400SC]	= "R4400SC",
++	[CPU_R4400MC]	= "R4400MC",
++	[CPU_R4600]	= "R4600",
++	[CPU_R6000]	= "R6000",
++        [CPU_R6000A]	= "R6000A",
++	[CPU_R8000]	= "R8000",
++	[CPU_R10000]	= "R10000",
++	[CPU_R12000]	= "R12000",
++	[CPU_R4300]	= "R4300",
++	[CPU_R4650]	= "R4650",
++	[CPU_R4700]	= "R4700",
++	[CPU_R5000]	= "R5000",
++        [CPU_R5000A]	= "R5000A",
++	[CPU_R4640]	= "R4640",
++	[CPU_NEVADA]	= "Nevada",
++	[CPU_RM7000]	= "RM7000",
++	[CPU_RM9000]	= "RM9000",
++	[CPU_R5432]	= "R5432",
++	[CPU_4KC]	= "MIPS 4Kc",
++        [CPU_5KC]	= "MIPS 5Kc",
++	[CPU_R4310]	= "R4310",
++	[CPU_SB1]	= "SiByte SB1",
++	[CPU_TX3912]	= "TX3912",
++	[CPU_TX3922]	= "TX3922",
++	[CPU_TX3927]	= "TX3927",
++	[CPU_AU1000]	= "Au1000",
++	[CPU_AU1500]	= "Au1500",
++	[CPU_AU1100]	= "Au1100",
++	[CPU_AU1550]	= "Au1550",
++	[CPU_AU1200]	= "Au1200",
++	[CPU_4KEC]	= "MIPS 4KEc",
++	[CPU_4KSC]	= "MIPS 4KSc",
++	[CPU_VR41XX]	= "NEC Vr41xx",
++	[CPU_R5500]	= "R5500",
++	[CPU_TX49XX]	= "TX49xx",
++	[CPU_20KC]	= "MIPS 20Kc",
++	[CPU_24K]	= "MIPS 24K",
++	[CPU_25KF]	= "MIPS 25Kf",
++	[CPU_VR4111]	= "NEC VR4111",
++	[CPU_VR4121]	= "NEC VR4121",
++	[CPU_VR4122]	= "NEC VR4122",
++	[CPU_VR4131]	= "NEC VR4131",
++	[CPU_VR4133]	= "NEC VR4133",
++	[CPU_VR4181]	= "NEC VR4181",
++	[CPU_VR4181A]	= "NEC VR4181A",
++	[CPU_SR71000]	= "Sandcraft SR71000"
+ };
+ 
+ 
+@@ -105,8 +108,8 @@
+ 	                           (version >> 4) & 0x0f, version & 0x0f,
+ 	                           (fp_vers >> 4) & 0x0f, fp_vers & 0x0f);
+ 	seq_printf(m, "BogoMIPS\t\t: %lu.%02lu\n",
+-	              loops_per_jiffy / (500000/HZ),
+-	              (loops_per_jiffy / (5000/HZ)) % 100);
++	              cpu_data[n].udelay_val / (500000/HZ),
++	              (cpu_data[n].udelay_val / (5000/HZ)) % 100);
+ 	seq_printf(m, "wait instruction\t: %s\n", cpu_wait ? "yes" : "no");
+ 	seq_printf(m, "microsecond timers\t: %s\n",
+ 	              cpu_has_counter ? "yes" : "no");
+diff -Naur linux-2.6.11.6/arch/mips/kernel/process.c /cross/build/linux-2.6.11.6/arch/mips/kernel/process.c
+--- linux-2.6.11.6/arch/mips/kernel/process.c	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/process.c	2005-04-01 08:56:55 -0800
+@@ -39,14 +39,6 @@
+ #include <asm/inst.h>
+ 
+ /*
+- * We use this if we don't have any better idle routine..
+- * (This to kill: kernel/platform.c.
+- */
+-void default_idle (void)
+-{
+-}
+-
+-/*
+  * The idle thread. There's no useful work to be done, so just try to conserve
+  * power and have a low exit latency (ie sit in a loop waiting for somebody to
+  * say that they'd like to reschedule)
+@@ -211,22 +203,48 @@
+ 	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
+ }
+ 
+-struct mips_frame_info {
++static struct mips_frame_info {
++	void *func;
++	int omit_fp;	/* compiled without fno-omit-frame-pointer */
+ 	int frame_offset;
+ 	int pc_offset;
++} schedule_frame, mfinfo[] = {
++	{ schedule, 0 },	/* must be first */
++	/* arch/mips/kernel/semaphore.c */
++	{ __down, 1 },
++	{ __down_interruptible, 1 },
++	/* kernel/sched.c */
++#ifdef CONFIG_PREEMPT
++	{ preempt_schedule, 0 },
++#endif
++	{ wait_for_completion, 0 },
++	{ interruptible_sleep_on, 0 },
++	{ interruptible_sleep_on_timeout, 0 },
++	{ sleep_on, 0 },
++	{ sleep_on_timeout, 0 },
++	{ yield, 0 },
++	{ io_schedule, 0 },
++	{ io_schedule_timeout, 0 },
++#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
++	{ __preempt_spin_lock, 0 },
++	{ __preempt_write_lock, 0 },
++#endif
++	/* kernel/timer.c */
++	{ schedule_timeout, 1 },
++/*	{ nanosleep_restart, 1 }, */
++	/* lib/rwsem-spinlock.c */
++	{ __down_read, 1 },
++	{ __down_write, 1 },
+ };
+-static struct mips_frame_info schedule_frame;
+-static struct mips_frame_info schedule_timeout_frame;
+-static struct mips_frame_info sleep_on_frame;
+-static struct mips_frame_info sleep_on_timeout_frame;
+-static struct mips_frame_info wait_for_completion_frame;
++
+ static int mips_frame_info_initialized;
+-static int __init get_frame_info(struct mips_frame_info *info, void *func)
++static int __init get_frame_info(struct mips_frame_info *info)
+ {
+ 	int i;
++	void *func = info->func;
+ 	union mips_instruction *ip = (union mips_instruction *)func;
+ 	info->pc_offset = -1;
+-	info->frame_offset = -1;
++	info->frame_offset = info->omit_fp ? 0 : -1;
+ 	for (i = 0; i < 128; i++, ip++) {
+ 		/* if jal, jalr, jr, stop. */
+ 		if (ip->j_format.opcode == jal_op ||
+@@ -247,14 +265,16 @@
+ 			/* sw / sd $ra, offset($sp) */
+ 			if (ip->i_format.rt == 31) {
+ 				if (info->pc_offset != -1)
+-					break;
++					continue;
+ 				info->pc_offset =
+ 					ip->i_format.simmediate / sizeof(long);
+ 			}
+ 			/* sw / sd $s8, offset($sp) */
+ 			if (ip->i_format.rt == 30) {
++//#if 0	/* gcc 3.4 does aggressive optimization... */
+ 				if (info->frame_offset != -1)
+-					break;
++					continue;
++//#endif
+ 				info->frame_offset =
+ 					ip->i_format.simmediate / sizeof(long);
+ 			}
+@@ -272,13 +292,25 @@
+ 
+ static int __init frame_info_init(void)
+ {
+-	mips_frame_info_initialized =
+-		!get_frame_info(&schedule_frame, schedule) &&
+-		!get_frame_info(&schedule_timeout_frame, schedule_timeout) &&
+-		!get_frame_info(&sleep_on_frame, sleep_on) &&
+-		!get_frame_info(&sleep_on_timeout_frame, sleep_on_timeout) &&
+-		!get_frame_info(&wait_for_completion_frame, wait_for_completion);
+-
++	int i, found;
++	for (i = 0; i < ARRAY_SIZE(mfinfo); i++)
++		if (get_frame_info(&mfinfo[i]))
++			return -1;
++	schedule_frame = mfinfo[0];
++	/* bubble sort */
++	do {
++		struct mips_frame_info tmp;
++		found = 0;
++		for (i = 1; i < ARRAY_SIZE(mfinfo); i++) {
++			if (mfinfo[i-1].func > mfinfo[i].func) {
++				tmp = mfinfo[i];
++				mfinfo[i] = mfinfo[i-1];
++				mfinfo[i-1] = tmp;
++				found = 1;
++			}
++		}
++	} while (found);
++	mips_frame_info_initialized = 1;
+ 	return 0;
+ }
+ 
+@@ -311,53 +343,27 @@
+ 	if (!mips_frame_info_initialized)
+ 		return 0;
+ 	pc = thread_saved_pc(p);
++
+ 	if (!in_sched_functions(pc))
+ 		goto out;
+ 
+-	if (pc >= (unsigned long) sleep_on_timeout)
+-		goto schedule_timeout_caller;
+-	if (pc >= (unsigned long) sleep_on)
+-		goto schedule_caller;
+-	if (pc >= (unsigned long) interruptible_sleep_on_timeout)
+-		goto schedule_timeout_caller;
+-	if (pc >= (unsigned long)interruptible_sleep_on)
+-		goto schedule_caller;
+-	if (pc >= (unsigned long)wait_for_completion)
+-		goto schedule_caller;
+-	goto schedule_timeout_caller;
+-
+-schedule_caller:
+-	frame = ((unsigned long *)p->thread.reg30)[schedule_frame.frame_offset];
+-	if (pc >= (unsigned long) sleep_on)
+-		pc = ((unsigned long *)frame)[sleep_on_frame.pc_offset];
+-	else
+-		pc = ((unsigned long *)frame)[wait_for_completion_frame.pc_offset];
+-	goto out;
+-
+-schedule_timeout_caller:
+-	/*
+-	 * The schedule_timeout frame
+-	 */
+ 	frame = ((unsigned long *)p->thread.reg30)[schedule_frame.frame_offset];
++	do {
++		int i;
++		for (i = ARRAY_SIZE(mfinfo) - 1; i >= 0; i--) {
++			if (pc >= (unsigned long) mfinfo[i].func)
++				break;
++		}
++		if (i < 0)
++			break;
+ 
+-	/*
+-	 * frame now points to sleep_on_timeout's frame
+-	 */
+-	pc    = ((unsigned long *)frame)[schedule_timeout_frame.pc_offset];
+-
+-	if (in_sched_functions(pc)) {
+-		/* schedule_timeout called by [interruptible_]sleep_on_timeout */
+-		frame = ((unsigned long *)frame)[schedule_timeout_frame.frame_offset];
+-		pc    = ((unsigned long *)frame)[sleep_on_timeout_frame.pc_offset];
+-	}
++		if (mfinfo[i].omit_fp)
++			break;
++		pc = ((unsigned long *)frame)[mfinfo[i].pc_offset];
++		frame = ((unsigned long *)frame)[mfinfo[i].frame_offset];
++	} while (in_sched_functions(pc));
+ 
+ out:
+-
+-#ifdef CONFIG_MIPS64
+-	if (current->thread.mflags & MF_32BIT_REGS) /* Kludge for 32-bit ps  */
+-		pc &= 0xffffffffUL;
+-#endif
+-
+ 	return pc;
+ }
+ 
+diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace.c /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace.c
+--- linux-2.6.11.6/arch/mips/kernel/ptrace.c	2005-03-25 19:28:38 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace.c	2005-04-01 08:56:55 -0800
+@@ -101,7 +101,7 @@
+ 		ret = -EIO;
+ 		if (copied != sizeof(tmp))
+ 			break;
+-		ret = put_user(tmp,(unsigned long *) data);
++		ret = put_user(tmp,(unsigned long __user *) data);
+ 		break;
+ 	}
+ 
+@@ -178,7 +178,7 @@
+ 			ret = -EIO;
+ 			goto out_tsk;
+ 		}
+-		ret = put_user(tmp, (unsigned long *) data);
++		ret = put_user(tmp, (unsigned long __user *) data);
+ 		break;
+ 	}
+ 
+diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace32.c
+--- linux-2.6.11.6/arch/mips/kernel/ptrace32.c	2005-03-25 19:28:20 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace32.c	2005-04-01 08:56:55 -0800
+@@ -272,6 +272,11 @@
+ 		ret = ptrace_detach(child, data);
+ 		break;
+ 
++	case PTRACE_GETEVENTMSG:
++		ret = put_user(child->ptrace_message,
++			       (unsigned int __user *) (unsigned long) data);
++		break;
++
+ 	default:
+ 		ret = ptrace_request(child, request, addr, data);
+ 		break;
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall32-o32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall32-o32.S
+--- linux-2.6.11.6/arch/mips/kernel/scall32-o32.S	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall32-o32.S	2005-04-01 08:56:55 -0800
+@@ -618,7 +618,7 @@
+ 	sys	sys_mq_notify		2	/* 4275 */
+ 	sys	sys_mq_getsetattr	3
+ 	sys	sys_ni_syscall		0	/* sys_vserver */
+-	sys	sys_waitid		4
++	sys	sys_waitid		5
+ 	sys	sys_ni_syscall		0	/* available, was setaltroot */
+ 	sys	sys_add_key		5
+ 	sys	sys_request_key		4
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-n32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-n32.S
+--- linux-2.6.11.6/arch/mips/kernel/scall64-n32.S	2005-03-25 19:28:36 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-n32.S	2005-04-01 08:56:55 -0800
+@@ -176,7 +176,7 @@
+ 	PTR	sys_fork
+ 	PTR	sys32_execve
+ 	PTR	sys_exit
+-	PTR	sys32_wait4
++	PTR	compat_sys_wait4
+ 	PTR	sys_kill			/* 6060 */
+ 	PTR	sys32_newuname
+ 	PTR	sys_semget
+@@ -243,8 +243,8 @@
+ 	PTR	sys_capget
+ 	PTR	sys_capset
+ 	PTR	sys32_rt_sigpending		/* 6125 */
+-	PTR	compat_sys_rt_sigtimedwait
+-	PTR	sys32_rt_sigqueueinfo
++	PTR	sysn32_rt_sigtimedwait
++	PTR	sys_rt_sigqueueinfo
+ 	PTR	sys32_rt_sigsuspend
+ 	PTR	sys32_sigaltstack
+ 	PTR	compat_sys_utime		/* 6130 */
+@@ -337,15 +337,15 @@
+ 	PTR	compat_sys_statfs64
+ 	PTR	compat_sys_fstatfs64
+ 	PTR	sys_sendfile64
+-	PTR	sys_timer_create		/* 6220 */
+-	PTR	sys_timer_settime
+-	PTR	sys_timer_gettime
++	PTR	sys32_timer_create		/* 6220 */
++	PTR	compat_sys_timer_settime
++	PTR	compat_sys_timer_gettime
+ 	PTR	sys_timer_getoverrun
+ 	PTR	sys_timer_delete
+-	PTR	sys_clock_settime		/* 6225 */
+-	PTR	sys_clock_gettime
+-	PTR	sys_clock_getres
+-	PTR	sys_clock_nanosleep
++	PTR	compat_sys_clock_settime		/* 6225 */
++	PTR	compat_sys_clock_gettime
++	PTR	compat_sys_clock_getres
++	PTR	compat_sys_clock_nanosleep
+ 	PTR	sys_tgkill
+ 	PTR	compat_sys_utimes		/* 6230 */
+ 	PTR	sys_ni_syscall			/* sys_mbind */
+@@ -358,7 +358,7 @@
+ 	PTR	compat_sys_mq_notify
+ 	PTR	compat_sys_mq_getsetattr
+ 	PTR	sys_ni_syscall			/* 6240, sys_vserver */
+-	PTR	sys_waitid
++	PTR	sysn32_waitid
+ 	PTR	sys_ni_syscall			/* available, was setaltroot */
+ 	PTR	sys_add_key
+ 	PTR	sys_request_key
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-o32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-o32.S
+--- linux-2.6.11.6/arch/mips/kernel/scall64-o32.S	2005-03-25 19:28:13 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-o32.S	2005-04-01 08:56:55 -0800
+@@ -316,7 +316,7 @@
+ 	PTR	sys_vhangup
+ 	PTR	sys_ni_syscall			/* was sys_idle	 */
+ 	PTR	sys_ni_syscall			/* sys_vm86 */
+-	PTR	sys32_wait4
++	PTR	compat_sys_wait4
+ 	PTR	sys_swapoff			/* 4115 */
+ 	PTR	sys32_sysinfo
+ 	PTR	sys32_ipc
+@@ -459,7 +459,7 @@
+ 	PTR	sys_fadvise64_64
+ 	PTR	compat_sys_statfs64		/* 4255 */
+ 	PTR	compat_sys_fstatfs64
+-	PTR	sys_timer_create
++	PTR	sys32_timer_create
+ 	PTR	compat_sys_timer_settime
+ 	PTR	compat_sys_timer_gettime
+ 	PTR	sys_timer_getoverrun		/* 4260 */
+@@ -480,7 +480,7 @@
+ 	PTR	compat_sys_mq_notify		/* 4275 */
+ 	PTR	compat_sys_mq_getsetattr
+ 	PTR	sys_ni_syscall			/* sys_vserver */
+-	PTR	sys_waitid
++	PTR	sys32_waitid
+ 	PTR	sys_ni_syscall			/* available, was setaltroot */
+ 	PTR	sys_add_key			/* 4280 */
+ 	PTR	sys_request_key
+diff -Naur linux-2.6.11.6/arch/mips/kernel/setup.c /cross/build/linux-2.6.11.6/arch/mips/kernel/setup.c
+--- linux-2.6.11.6/arch/mips/kernel/setup.c	2005-03-25 19:28:16 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/setup.c	2005-04-01 08:56:55 -0800
+@@ -277,7 +277,12 @@
+ 	/* Board specific code should have set up initrd_start and initrd_end */
+  	ROOT_DEV = Root_RAM0;
+ 	if (parse_rd_cmdline(&initrd_start, &initrd_end)) {
++#ifndef CONFIG_MIPS_COBALT
++		/*
++		 * Ugly! Cobalt boot loader CoLo places the initrd at the top of RAM
++		 */
+ 		reserved_end = max(reserved_end, initrd_end);
++#endif
+ 		initrd_reserve_bootmem = 1;
+ 	} else {
+ 		unsigned long tmp;
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal-common.h /cross/build/linux-2.6.11.6/arch/mips/kernel/signal-common.h
+--- linux-2.6.11.6/arch/mips/kernel/signal-common.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal-common.h	2005-04-01 08:56:55 -0800
+@@ -61,8 +61,8 @@
+ static inline int
+ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
+ {
+-	int err = 0;
+ 	unsigned int used_math;
++	int err = 0;
+ 
+ 	/* Always make any pending restarted system calls return -EINTR */
+ 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal.c /cross/build/linux-2.6.11.6/arch/mips/kernel/signal.c
+--- linux-2.6.11.6/arch/mips/kernel/signal.c	2005-03-25 19:28:47 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal.c	2005-04-01 08:56:55 -0800
+@@ -47,9 +47,10 @@
+ __attribute_used__ noinline static int
+ _sys_sigsuspend(nabi_no_regargs struct pt_regs regs)
+ {
+-	sigset_t *uset, saveset, newset;
++	sigset_t saveset, newset;
++	sigset_t __user *uset;
+ 
+-	uset = (sigset_t *) regs.regs[4];
++	uset = (sigset_t __user *) regs.regs[4];
+ 	if (copy_from_user(&newset, uset, sizeof(sigset_t)))
+ 		return -EFAULT;
+ 	sigdelsetmask(&newset, ~_BLOCKABLE);
+@@ -75,7 +76,8 @@
+ __attribute_used__ noinline static int
+ _sys_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
+ {
+-	sigset_t *unewset, saveset, newset;
++	sigset_t saveset, newset;
++	sigset_t __user *unewset;
+ 	size_t sigsetsize;
+ 
+ 	/* XXX Don't preclude handling different sized sigset_t's.  */
+@@ -83,7 +85,7 @@
+ 	if (sigsetsize != sizeof(sigset_t))
+ 		return -EINVAL;
+ 
+-	unewset = (sigset_t *) regs.regs[4];
++	unewset = (sigset_t __user *) regs.regs[4];
+ 	if (copy_from_user(&newset, unewset, sizeof(newset)))
+ 		return -EFAULT;
+ 	sigdelsetmask(&newset, ~_BLOCKABLE);
+@@ -147,8 +149,8 @@
+ 
+ asmlinkage int sys_sigaltstack(nabi_no_regargs struct pt_regs regs)
+ {
+-	const stack_t *uss = (const stack_t *) regs.regs[4];
+-	stack_t *uoss = (stack_t *) regs.regs[5];
++	const stack_t __user *uss = (const stack_t __user *) regs.regs[4];
++	stack_t __user *uoss = (stack_t __user *) regs.regs[5];
+ 	unsigned long usp = regs.regs[29];
+ 
+ 	return do_sigaltstack(uss, uoss, usp);
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/signal32.c
+--- linux-2.6.11.6/arch/mips/kernel/signal32.c	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal32.c	2005-04-01 12:58:57 -0800
+@@ -81,8 +81,10 @@
+ 
+ 		/* POSIX.1b timers */
+ 		struct {
+-			unsigned int _timer1;
+-			unsigned int _timer2;
++			timer_t _tid;		/* timer id */
++			int _overrun;		/* overrun count */
++			sigval_t32 _sigval;	/* same as below */
++			int _sys_private;       /* not to be passed to user */
+ 		} _timer;
+ 
+ 		/* POSIX.1b signals */
+@@ -264,11 +266,12 @@
+ 
+ 	if (act) {
+ 		old_sigset_t mask;
++		s32 handler;
+ 
+ 		if (!access_ok(VERIFY_READ, act, sizeof(*act)))
+ 			return -EFAULT;
+-		err |= __get_user((u32)(u64)new_ka.sa.sa_handler,
+-		                  &act->sa_handler);
++		err |= __get_user(handler, &act->sa_handler);
++		new_ka.sa.sa_handler = (void*)(s64)handler;
+ 		err |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
+ 		err |= __get_user(mask, &act->sa_mask.sig[0]);
+ 		if (err)
+@@ -416,6 +419,11 @@
+ 		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad, SI_PAD_SIZE);
+ 	else {
+ 		switch (from->si_code >> 16) {
++		case __SI_TIMER >> 16:
++			err |= __put_user(from->si_tid, &to->si_tid);
++			err |= __put_user(from->si_overrun, &to->si_overrun);
++			err |= __put_user(from->si_int, &to->si_int);
++			break;
+ 		case __SI_CHLD >> 16:
+ 			err |= __put_user(from->si_utime, &to->si_utime);
+ 			err |= __put_user(from->si_stime, &to->si_stime);
+@@ -825,12 +833,13 @@
+ 		goto out;
+ 
+ 	if (act) {
++		s32 handler;
+ 		int err = 0;
+ 
+ 		if (!access_ok(VERIFY_READ, act, sizeof(*act)))
+ 			return -EFAULT;
+-		err |= __get_user((u32)(u64)new_sa.sa.sa_handler,
+-		                  &act->sa_handler);
++		err |= __get_user(handler, &act->sa_handler);
++		new_sa.sa.sa_handler = (void*)(s64)handler;
+ 		err |= __get_user(new_sa.sa.sa_flags, &act->sa_flags);
+ 		err |= get_sigset(&new_sa.sa.sa_mask, &act->sa_mask);
+ 		if (err)
+@@ -908,3 +917,30 @@
+ 	set_fs (old_fs);
+ 	return ret;
+ }
++
++asmlinkage long
++sys32_waitid(int which, compat_pid_t pid,
++	     compat_siginfo_t __user *uinfo, int options,
++	     struct compat_rusage __user *uru)
++{
++	siginfo_t info;
++	struct rusage ru;
++	long ret;
++	mm_segment_t old_fs = get_fs();
++
++	info.si_signo = 0;
++	set_fs (KERNEL_DS);
++	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
++			 uru ? (struct rusage __user *) &ru : NULL);
++	set_fs (old_fs);
++
++	if (ret < 0 || info.si_signo == 0)
++		return ret;
++
++	if (uru && (ret = put_compat_rusage(&ru, uru)))
++		return ret;
++
++	BUG_ON(info.si_code & __SI_MASK);
++	info.si_code |= __SI_CHLD;
++	return copy_siginfo_to_user32(uinfo, &info);
++}
+diff -Naur linux-2.6.11.6/arch/mips/kernel/smp.c /cross/build/linux-2.6.11.6/arch/mips/kernel/smp.c
+--- linux-2.6.11.6/arch/mips/kernel/smp.c	2005-03-25 19:28:16 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/smp.c	2005-04-01 08:56:55 -0800
+@@ -139,7 +139,19 @@
+  * or are or have executed.
+  *
+  * You must not call this function with disabled interrupts or from a
+- * hardware interrupt handler or from a bottom half handler.
++ * hardware interrupt handler or from a bottom half handler:
++ *
++ * CPU A                               CPU B
++ * Disable interrupts
++ *                                     smp_call_function()
++ *                                     Take call_lock
++ *                                     Send IPIs
++ *                                     Wait for all cpus to acknowledge IPI
++ *                                     CPU A has not responded, spin waiting
++ *                                     for cpu A to respond, holding call_lock
++ * smp_call_function()
++ * Spin waiting for call_lock
++ * Deadlock                            Deadlock
+  */
+ int smp_call_function (void (*func) (void *info), void *info, int retry,
+ 								int wait)
+@@ -254,23 +266,31 @@
+ }
+ 
+ /*
+- * Startup the CPU with this logical number
++ * Called once for each "cpu_possible(cpu)".  Needs to spin up the cpu
++ * and keep control until "cpu_online(cpu)" is set.  Note: cpu is
++ * physical, not logical.
+  */
+-static int __init do_boot_cpu(int cpu)
++int __devinit __cpu_up(unsigned int cpu)
+ {
+ 	struct task_struct *idle;
+ 
+ 	/*
++	 * Processor goes to start_secondary(), sets online flag
+ 	 * The following code is purely to make sure
+ 	 * Linux can schedule processes on this slave.
+ 	 */
+ 	idle = fork_idle(cpu);
+-	if (IS_ERR(idle))
+-		panic("failed fork for CPU %d\n", cpu);
++	if (IS_ERR(idle)) {
++		panic(KERN_ERR "Fork failed for CPU %d\n", cpu);
++
++		return PTR_ERR(idle);
++	}
+ 
+ 	prom_boot_secondary(cpu, idle);
+ 
+-	/* XXXKW timeout */
++	/*
++	 * Trust is futile.  We should really have timeouts ...
++	 */
+ 	while (!cpu_isset(cpu, cpu_callin_map))
+ 		udelay(100);
+ 
+@@ -279,23 +299,6 @@
+ 	return 0;
+ }
+ 
+-/*
+- * Called once for each "cpu_possible(cpu)".  Needs to spin up the cpu
+- * and keep control until "cpu_online(cpu)" is set.  Note: cpu is
+- * physical, not logical.
+- */
+-int __devinit __cpu_up(unsigned int cpu)
+-{
+-	int ret;
+-
+-	/* Processor goes to start_secondary(), sets online flag */
+-	ret = do_boot_cpu(cpu);
+-	if (ret < 0)
+-		return ret;
+-
+-	return 0;
+-}
+-
+ /* Not really SMP stuff ... */
+ int setup_profiling_timer(unsigned int multiplier)
+ {
+diff -Naur linux-2.6.11.6/arch/mips/kernel/sysirix.c /cross/build/linux-2.6.11.6/arch/mips/kernel/sysirix.c
+--- linux-2.6.11.6/arch/mips/kernel/sysirix.c	2005-03-25 19:28:36 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/sysirix.c	2005-04-01 08:56:55 -0800
+@@ -73,32 +73,30 @@
+ }
+ 
+ /* The prctl commands. */
+-#define PR_MAXPROCS          1 /* Tasks/user. */
+-#define PR_ISBLOCKED         2 /* If blocked, return 1. */
+-#define PR_SETSTACKSIZE      3 /* Set largest task stack size. */
+-#define PR_GETSTACKSIZE      4 /* Get largest task stack size. */
+-#define PR_MAXPPROCS         5 /* Num parallel tasks. */
+-#define PR_UNBLKONEXEC       6 /* When task exec/exit's, unblock. */
+-#define PR_SETEXITSIG        8 /* When task exit's, set signal. */
+-#define PR_RESIDENT          9 /* Make task unswappable. */
+-#define PR_ATTACHADDR       10 /* (Re-)Connect a vma to a task. */
+-#define PR_DETACHADDR       11 /* Disconnect a vma from a task. */
+-#define PR_TERMCHILD        12 /* When parent sleeps with fishes, kill child. */
+-#define PR_GETSHMASK        13 /* Get the sproc() share mask. */
+-#define PR_GETNSHARE        14 /* Number of share group members. */
+-#define PR_COREPID          15 /* Add task pid to name when it core. */
+-#define	PR_ATTACHADDRPERM   16 /* (Re-)Connect vma, with specified prot. */
+-#define PR_PTHREADEXIT      17 /* Kill a pthread without prejudice. */
++#define PR_MAXPROCS		 1 /* Tasks/user. */
++#define PR_ISBLOCKED		 2 /* If blocked, return 1. */
++#define PR_SETSTACKSIZE		 3 /* Set largest task stack size. */
++#define PR_GETSTACKSIZE		 4 /* Get largest task stack size. */
++#define PR_MAXPPROCS		 5 /* Num parallel tasks. */
++#define PR_UNBLKONEXEC		 6 /* When task exec/exit's, unblock. */
++#define PR_SETEXITSIG		 8 /* When task exit's, set signal. */
++#define PR_RESIDENT		 9 /* Make task unswappable. */
++#define PR_ATTACHADDR		10 /* (Re-)Connect a vma to a task. */
++#define PR_DETACHADDR		11 /* Disconnect a vma from a task. */
++#define PR_TERMCHILD		12 /* Kill child if the parent dies. */
++#define PR_GETSHMASK		13 /* Get the sproc() share mask. */
++#define PR_GETNSHARE		14 /* Number of share group members. */
++#define PR_COREPID		15 /* Add task pid to name when it core. */
++#define PR_ATTACHADDRPERM	16 /* (Re-)Connect vma, with specified prot. */
++#define PR_PTHREADEXIT		17 /* Kill a pthread, only for IRIX 6.[234] */
+ 
+-asmlinkage int irix_prctl(struct pt_regs *regs)
++asmlinkage int irix_prctl(unsigned option, ...)
+ {
+-	unsigned long cmd;
+-	int error = 0, base = 0;
++	va_list args;
++	int error = 0;
+ 
+-	if (regs->regs[2] == 1000)
+-		base = 1;
+-	cmd = regs->regs[base + 4];
+-	switch (cmd) {
++	va_start(args, option);
++	switch (option) {
+ 	case PR_MAXPROCS:
+ 		printk("irix_prctl[%s:%d]: Wants PR_MAXPROCS\n",
+ 		       current->comm, current->pid);
+@@ -111,7 +109,7 @@
+ 		printk("irix_prctl[%s:%d]: Wants PR_ISBLOCKED\n",
+ 		       current->comm, current->pid);
+ 		read_lock(&tasklist_lock);
+-		task = find_task_by_pid(regs->regs[base + 5]);
++		task = find_task_by_pid(va_arg(args, pid_t));
+ 		error = -ESRCH;
+ 		if (error)
+ 			error = (task->run_list.next != NULL);
+@@ -121,7 +119,7 @@
+ 	}
+ 
+ 	case PR_SETSTACKSIZE: {
+-		long value = regs->regs[base + 5];
++		long value = va_arg(args, long);
+ 
+ 		printk("irix_prctl[%s:%d]: Wants PR_SETSTACKSIZE<%08lx>\n",
+ 		       current->comm, current->pid, (unsigned long) value);
+@@ -222,17 +220,13 @@
+ 		error = -EINVAL;
+ 		break;
+ 
+-	case PR_PTHREADEXIT:
+-		printk("irix_prctl[%s:%d]: Wants PR_PTHREADEXIT\n",
+-		       current->comm, current->pid);
+-		do_exit(regs->regs[base + 5]);
+-
+ 	default:
+ 		printk("irix_prctl[%s:%d]: Non-existant opcode %d\n",
+-		       current->comm, current->pid, (int)cmd);
++		       current->comm, current->pid, option);
+ 		error = -EINVAL;
+ 		break;
+ 	}
++	va_end(args);
+ 
+ 	return error;
+ }
+@@ -469,6 +463,7 @@
+ 		int *pageno = (int *) (regs->regs[base + 6]);
+ 		struct mm_struct *mm = current->mm;
+ 		pgd_t *pgdp;
++		pud_t *pudp;
+ 		pmd_t *pmdp;
+ 		pte_t *ptep;
+ 
+@@ -478,7 +473,8 @@
+ 
+ 		down_read(&mm->mmap_sem);
+ 		pgdp = pgd_offset(mm, addr);
+-		pmdp = pmd_offset(pgdp, addr);
++		pudp = pud_offset(pgdp, addr);
++		pmdp = pmd_offset(pudp, addr);
+ 		ptep = pte_offset(pmdp, addr);
+ 		retval = -EINVAL;
+ 		if (ptep) {
+diff -Naur linux-2.6.11.6/arch/mips/kernel/traps.c /cross/build/linux-2.6.11.6/arch/mips/kernel/traps.c
+--- linux-2.6.11.6/arch/mips/kernel/traps.c	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/traps.c	2005-04-01 08:56:55 -0800
+@@ -339,9 +339,9 @@
+ 
+ static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
+ {
+-	unsigned int *epc;
++	unsigned int __user *epc;
+ 
+-	epc = (unsigned int *) regs->cp0_epc +
++	epc = (unsigned int __user *) regs->cp0_epc +
+ 	      ((regs->cp0_cause & CAUSEF_BD) != 0);
+ 	if (!get_user(*opcode, epc))
+ 		return 0;
+@@ -371,7 +371,7 @@
+ 
+ static inline void simulate_ll(struct pt_regs *regs, unsigned int opcode)
+ {
+-	unsigned long value, *vaddr;
++	unsigned long value, __user *vaddr;
+ 	long offset;
+ 	int signal = 0;
+ 
+@@ -385,7 +385,8 @@
+ 	offset <<= 16;
+ 	offset >>= 16;
+ 
+-	vaddr = (unsigned long *)((long)(regs->regs[(opcode & BASE) >> 21]) + offset);
++	vaddr = (unsigned long __user *)
++	        ((unsigned long)(regs->regs[(opcode & BASE) >> 21]) + offset);
+ 
+ 	if ((unsigned long)vaddr & 3) {
+ 		signal = SIGBUS;
+@@ -418,7 +419,8 @@
+ 
+ static inline void simulate_sc(struct pt_regs *regs, unsigned int opcode)
+ {
+-	unsigned long *vaddr, reg;
++	unsigned long __user *vaddr;
++	unsigned long reg;
+ 	long offset;
+ 	int signal = 0;
+ 
+@@ -432,7 +434,8 @@
+ 	offset <<= 16;
+ 	offset >>= 16;
+ 
+-	vaddr = (unsigned long *)((long)(regs->regs[(opcode & BASE) >> 21]) + offset);
++	vaddr = (unsigned long __user *)
++	        ((unsigned long)(regs->regs[(opcode & BASE) >> 21]) + offset);
+ 	reg = (opcode & RT) >> 16;
+ 
+ 	if ((unsigned long)vaddr & 3) {
+@@ -498,7 +501,7 @@
+ 	info.si_code = FPE_INTOVF;
+ 	info.si_signo = SIGFPE;
+ 	info.si_errno = 0;
+-	info.si_addr = (void *)regs->cp0_epc;
++	info.si_addr = (void __user *) regs->cp0_epc;
+ 	force_sig_info(SIGFPE, &info, current);
+ }
+ 
+@@ -584,7 +587,7 @@
+ 			info.si_code = FPE_INTOVF;
+ 		info.si_signo = SIGFPE;
+ 		info.si_errno = 0;
+-		info.si_addr = (void *)regs->cp0_epc;
++		info.si_addr = (void __user *) regs->cp0_epc;
+ 		force_sig_info(SIGFPE, &info, current);
+ 		break;
+ 	default:
+@@ -621,7 +624,7 @@
+ 			info.si_code = FPE_INTOVF;
+ 		info.si_signo = SIGFPE;
+ 		info.si_errno = 0;
+-		info.si_addr = (void *)regs->cp0_epc;
++		info.si_addr = (void __user *) regs->cp0_epc;
+ 		force_sig_info(SIGFPE, &info, current);
+ 		break;
+ 	default:
+@@ -736,16 +739,12 @@
+ {
+ 	switch (current_cpu_data.cputype) {
+ 	case CPU_24K:
+-		/* 24K cache parity not currently implemented in FPGA */
+-		printk(KERN_INFO "Disable cache parity protection for "
+-		       "MIPS 24K CPU.\n");
+-		write_c0_ecc(read_c0_ecc() & ~0x80000000);
+-		break;
+ 	case CPU_5KC:
+-		/* Set the PE bit (bit 31) in the c0_ecc register. */
+-		printk(KERN_INFO "Enable cache parity protection for "
+-		       "MIPS 5KC/24K CPUs.\n");
+-		write_c0_ecc(read_c0_ecc() | 0x80000000);
++		write_c0_ecc(0x80000000);
++		back_to_back_c0_hazard();
++		/* Set the PE bit (bit 31) in the c0_errctl register. */
++		printk(KERN_INFO "Cache parity protection %sabled\n",
++		       (read_c0_ecc() & 0x80000000) ? "en" : "dis");
+ 		break;
+ 	case CPU_20KC:
+ 	case CPU_25KF:
+diff -Naur linux-2.6.11.6/arch/mips/kernel/unaligned.c /cross/build/linux-2.6.11.6/arch/mips/kernel/unaligned.c
+--- linux-2.6.11.6/arch/mips/kernel/unaligned.c	2005-03-25 19:28:44 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/kernel/unaligned.c	2005-04-01 08:56:55 -0800
+@@ -94,7 +94,7 @@
+ #endif
+ 
+ static inline int emulate_load_store_insn(struct pt_regs *regs,
+-	void *addr, unsigned long pc,
++	void __user *addr, unsigned int __user *pc,
+ 	unsigned long **regptr, unsigned long *newvalue)
+ {
+ 	union mips_instruction insn;
+@@ -107,7 +107,7 @@
+ 	/*
+ 	 * This load never faults.
+ 	 */
+-	__get_user(insn.word, (unsigned int *)pc);
++	__get_user(insn.word, pc);
+ 
+ 	switch (insn.i_format.opcode) {
+ 	/*
+@@ -494,8 +494,8 @@
+ {
+ 	unsigned long *regptr, newval;
+ 	extern int do_dsemulret(struct pt_regs *);
++	unsigned int __user *pc;
+ 	mm_segment_t seg;
+-	unsigned long pc;
+ 
+ 	/*
+ 	 * Address errors may be deliberately induced by the FPU emulator to
+@@ -515,7 +515,7 @@
+ 	if ((regs->cp0_badvaddr == regs->cp0_epc) || (regs->cp0_epc & 0x1))
+ 		goto sigbus;
+ 
+-	pc = exception_epc(regs);
++	pc = (unsigned int __user *) exception_epc(regs);
+ 	if ((current->thread.mflags & MF_FIXADE) == 0)
+ 		goto sigbus;
+ 
+@@ -526,7 +526,7 @@
+ 	seg = get_fs();
+ 	if (!user_mode(regs))
+ 		set_fs(KERNEL_DS);
+-	if (!emulate_load_store_insn(regs, (void *)regs->cp0_badvaddr, pc,
++	if (!emulate_load_store_insn(regs, (void __user *)regs->cp0_badvaddr, pc,
+ 	                             &regptr, &newval)) {
+ 		compute_return_epc(regs);
+ 		/*
+diff -Naur linux-2.6.11.6/arch/mips/lib/Makefile /cross/build/linux-2.6.11.6/arch/mips/lib/Makefile
+--- linux-2.6.11.6/arch/mips/lib/Makefile	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib/Makefile	2005-04-01 08:56:55 -0800
+@@ -2,7 +2,9 @@
+ # Makefile for MIPS-specific library files..
+ #
+ 
+-lib-y	+= csum_partial_copy.o dec_and_lock.o iomap.o memcpy.o promlib.o \
++lib-y	+= csum_partial_copy.o dec_and_lock.o memcpy.o promlib.o \
+ 	   strlen_user.o strncpy_user.o strnlen_user.o
+ 
++obj-y	+= iomap.o
++
+ EXTRA_AFLAGS := $(CFLAGS)
+diff -Naur linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c /cross/build/linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c
+--- linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c	2005-03-25 19:28:39 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c	2005-04-01 08:56:55 -0800
+@@ -16,8 +16,8 @@
+ /*
+  * copy while checksumming, otherwise like csum_partial
+  */
+-unsigned int csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst,
+-	int len, unsigned int sum)
++unsigned int csum_partial_copy_nocheck(const unsigned char *src,
++	unsigned char *dst, int len, unsigned int sum)
+ {
+ 	/*
+ 	 * It's 2:30 am and I don't feel like doing it real ...
+@@ -33,8 +33,8 @@
+  * Copy from userspace and compute checksum.  If we catch an exception
+  * then zero the rest of the buffer.
+  */
+-unsigned int csum_partial_copy_from_user (const unsigned char *src, unsigned char *dst,
+-	int len, unsigned int sum, int *err_ptr)
++unsigned int csum_partial_copy_from_user (const unsigned char *src,
++	unsigned char *dst, int len, unsigned int sum, int *err_ptr)
+ {
+ 	int missing;
+ 
+diff -Naur linux-2.6.11.6/arch/mips/lib/iomap.c /cross/build/linux-2.6.11.6/arch/mips/lib/iomap.c
+--- linux-2.6.11.6/arch/mips/lib/iomap.c	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib/iomap.c	2005-04-01 08:56:55 -0800
+@@ -27,9 +27,7 @@
+ 
+ void __iomem *ioport_map(unsigned long port, unsigned int nr)
+ {
+-	unsigned long end;
+-
+-	end = port + nr - 1UL;
++	unsigned long end = port + nr - 1UL;
+ 	if (ioport_resource.start > port ||
+ 	    ioport_resource.end < end || port > end)
+ 		return NULL;
+@@ -45,26 +43,22 @@
+ 
+ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
+ {
+-	unsigned long start, len, flags;
++        unsigned long start = pci_resource_start(dev, bar);
++        unsigned long len = pci_resource_len(dev, bar);
++        unsigned long flags = pci_resource_flags(dev, bar);
+ 
+ 	if (dev == NULL)
+ 		return NULL;
+-
+-	start = pci_resource_start(dev, bar);
+-	len = pci_resource_len(dev, bar);
+ 	if (!start || !len)
+ 		return NULL;
+-
+ 	if (maxlen != 0 && len > maxlen)
+ 		len = maxlen;
+-
+-	flags = pci_resource_flags(dev, bar);
+ 	if (flags & IORESOURCE_IO)
+ 		return ioport_map(start, len);
+ 	if (flags & IORESOURCE_MEM) {
+ 		if (flags & IORESOURCE_CACHEABLE)
+ 			return ioremap_cacheable_cow(start, len);
+-		return ioremap_nocache(start, len);
++			return ioremap_nocache(start, len);
+ 	}
+ 
+ 	return NULL;
+diff -Naur linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c
+--- linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c	2005-04-01 08:56:55 -0800
+@@ -32,8 +32,6 @@
+ 	case PM_256M:	return "256Mb";
+ #endif
+ 	}
+-
+-	return "unknown";
+ }
+ 
+ #define BARRIER()					\
+@@ -139,6 +137,7 @@
+ void dump_list_process(struct task_struct *t, void *address)
+ {
+ 	pgd_t	*page_dir, *pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte, page;
+ 	unsigned long addr, val;
+@@ -162,7 +161,10 @@
+ 		pgd = pgd_offset(t->mm, addr);
+ 	printk("pgd == %08x, ", (unsigned int) pgd);
+ 
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	printk("pud == %08x, ", (unsigned int) pud);
++
++	pmd = pmd_offset(pud, addr);
+ 	printk("pmd == %08x, ", (unsigned int) pmd);
+ 
+ 	pte = pte_offset(pmd, addr);
+@@ -195,13 +197,15 @@
+ unsigned int vtop(void *address)
+ {
+ 	pgd_t	*pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte;
+ 	unsigned int addr, paddr;
+ 
+ 	addr = (unsigned long) address;
+ 	pgd = pgd_offset(current->mm, addr);
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	pmd = pmd_offset(pud, addr);
+ 	pte = pte_offset(pmd, addr);
+ 	paddr = (KSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
+ 	paddr |= (addr & ~PAGE_MASK);
+diff -Naur linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c
+--- linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c	2005-04-01 08:56:55 -0800
+@@ -105,6 +105,7 @@
+ void dump_list_process(struct task_struct *t, void *address)
+ {
+ 	pgd_t	*page_dir, *pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte, page;
+ 	unsigned int addr;
+@@ -121,7 +122,10 @@
+ 	pgd = pgd_offset(t->mm, addr);
+ 	printk("pgd == %08x, ", (unsigned int) pgd);
+ 
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	printk("pud == %08x, ", (unsigned int) pud);
++
++	pmd = pmd_offset(pud, addr);
+ 	printk("pmd == %08x, ", (unsigned int) pmd);
+ 
+ 	pte = pte_offset(pmd, addr);
+@@ -149,13 +153,15 @@
+ unsigned int vtop(void *address)
+ {
+ 	pgd_t	*pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte;
+ 	unsigned int addr, paddr;
+ 
+ 	addr = (unsigned long) address;
+ 	pgd = pgd_offset(current->mm, addr);
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	pmd = pmd_offset(pud, addr);
+ 	pte = pte_offset(pmd, addr);
+ 	paddr = (KSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
+ 	paddr |= (addr & ~PAGE_MASK);
+diff -Naur linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c
+--- linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c	2005-03-25 19:28:47 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c	2005-04-01 08:56:55 -0800
+@@ -32,8 +32,6 @@
+ 	case PM_256M:	return "256Mb";
+ #endif
+ 	}
+-
+-	return "unknown";
+ }
+ 
+ #define BARRIER()					\
+@@ -140,6 +138,7 @@
+ void dump_list_process(struct task_struct *t, void *address)
+ {
+ 	pgd_t	*page_dir, *pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte, page;
+ 	unsigned long addr, val;
+@@ -155,7 +154,10 @@
+ 	pgd = pgd_offset(t->mm, addr);
+ 	printk("pgd == %016lx\n", (unsigned long) pgd);
+ 
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	printk("pud == %016lx\n", (unsigned long) pud);
++
++	pmd = pmd_offset(pud, addr);
+ 	printk("pmd == %016lx\n", (unsigned long) pmd);
+ 
+ 	pte = pte_offset(pmd, addr);
+@@ -184,13 +186,15 @@
+ unsigned int vtop(void *address)
+ {
+ 	pgd_t	*pgd;
++	pud_t	*pud;
+ 	pmd_t	*pmd;
+ 	pte_t	*pte;
+ 	unsigned int addr, paddr;
+ 
+ 	addr = (unsigned long) address;
+ 	pgd = pgd_offset(current->mm, addr);
+-	pmd = pmd_offset(pgd, addr);
++	pud = pud_offset(pgd, addr);
++	pmd = pmd_offset(pud, addr);
+ 	pte = pte_offset(pmd, addr);
+ 	paddr = (CKSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
+ 	paddr |= (addr & ~PAGE_MASK);
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/cp1emu.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/cp1emu.c
+--- linux-2.6.11.6/arch/mips/math-emu/cp1emu.c	2005-03-25 19:28:36 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/cp1emu.c	2005-04-01 08:56:55 -0800
+@@ -196,7 +196,7 @@
+ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
+ {
+ 	mips_instruction ir;
+-	vaddr_t emulpc, contpc;
++	void * emulpc, *contpc;
+ 	unsigned int cond;
+ 
+ 	if (get_user(ir, (mips_instruction *) xcp->cp0_epc)) {
+@@ -221,12 +221,12 @@
+ 		 * Linux MIPS branch emulator operates on context, updating the
+ 		 * cp0_epc.
+ 		 */
+-		emulpc = REG_TO_VA(xcp->cp0_epc + 4);	/* Snapshot emulation target */
++		emulpc = (void *) (xcp->cp0_epc + 4);	/* Snapshot emulation target */
+ 
+ 		if (__compute_return_epc(xcp)) {
+ #ifdef CP1DBG
+ 			printk("failed to emulate branch at %p\n",
+-				REG_TO_VA(xcp->cp0_epc));
++				(void *) (xcp->cp0_epc));
+ #endif
+ 			return SIGILL;
+ 		}
+@@ -235,13 +235,12 @@
+ 			return SIGBUS;
+ 		}
+ 		/* __compute_return_epc() will have updated cp0_epc */
+-		contpc = REG_TO_VA xcp->cp0_epc;
++		contpc = (void *)  xcp->cp0_epc;
+ 		/* In order not to confuse ptrace() et al, tweak context */
+-		xcp->cp0_epc = VA_TO_REG emulpc - 4;
+-	}
+-	else {
+-		emulpc = REG_TO_VA xcp->cp0_epc;
+-		contpc = REG_TO_VA(xcp->cp0_epc + 4);
++		xcp->cp0_epc = (unsigned long) emulpc - 4;
++	} else {
++		emulpc = (void *)  xcp->cp0_epc;
++		contpc = (void *) (xcp->cp0_epc + 4);
+ 	}
+ 
+       emul:
+@@ -249,7 +248,7 @@
+ 	switch (MIPSInst_OPCODE(ir)) {
+ #ifndef SINGLE_ONLY_FPU
+ 	case ldc1_op:{
+-		u64 *va = REG_TO_VA(xcp->regs[MIPSInst_RS(ir)] +
++		u64 *va = (void *) (xcp->regs[MIPSInst_RS(ir)] +
+ 			MIPSInst_SIMM(ir));
+ 		u64 val;
+ 
+@@ -263,7 +262,7 @@
+ 	}
+ 
+ 	case sdc1_op:{
+-		u64 *va = REG_TO_VA(xcp->regs[MIPSInst_RS(ir)] +
++		u64 *va = (void *) (xcp->regs[MIPSInst_RS(ir)] +
+ 			MIPSInst_SIMM(ir));
+ 		u64 val;
+ 
+@@ -278,7 +277,7 @@
+ #endif
+ 
+ 	case lwc1_op:{
+-		u32 *va = REG_TO_VA(xcp->regs[MIPSInst_RS(ir)] +
++		u32 *va = (void *) (xcp->regs[MIPSInst_RS(ir)] +
+ 			MIPSInst_SIMM(ir));
+ 		u32 val;
+ 
+@@ -298,7 +297,7 @@
+ 	}
+ 
+ 	case swc1_op:{
+-		u32 *va = REG_TO_VA(xcp->regs[MIPSInst_RS(ir)] +
++		u32 *va = (void *) (xcp->regs[MIPSInst_RS(ir)] +
+ 			MIPSInst_SIMM(ir));
+ 		u32 val;
+ 
+@@ -371,7 +370,7 @@
+ 				value = ctx->fcr31;
+ #ifdef CSRTRACE
+ 				printk("%p gpr[%d]<-csr=%08x\n",
+-					REG_TO_VA(xcp->cp0_epc),
++					(void *) (xcp->cp0_epc),
+ 					MIPSInst_RT(ir), value);
+ #endif
+ 			}
+@@ -398,7 +397,7 @@
+ 			if (MIPSInst_RD(ir) == FPCREG_CSR) {
+ #ifdef CSRTRACE
+ 				printk("%p gpr[%d]->csr=%08x\n",
+-					REG_TO_VA(xcp->cp0_epc),
++					(void *) (xcp->cp0_epc),
+ 					MIPSInst_RT(ir), value);
+ #endif
+ 				ctx->fcr31 = value;
+@@ -445,12 +444,12 @@
+ 				 * instruction
+ 				 */
+ 				xcp->cp0_epc += 4;
+-				contpc = REG_TO_VA
++				contpc = (void *) 
+ 					(xcp->cp0_epc +
+ 					(MIPSInst_SIMM(ir) << 2));
+ 
+ 				if (get_user(ir, (mips_instruction *)
+-						REG_TO_VA xcp->cp0_epc)) {
++						(void *)  xcp->cp0_epc)) {
+ 					fpuemuprivate.stats.errors++;
+ 					return SIGBUS;
+ 				}
+@@ -480,7 +479,7 @@
+ 				 * Single step the non-cp1
+ 				 * instruction in the dslot
+ 				 */
+-				return mips_dsemul(xcp, ir, VA_TO_REG contpc);
++				return mips_dsemul(xcp, ir, (unsigned long) contpc);
+ 			}
+ 			else {
+ 				/* branch not taken */
+@@ -539,8 +538,9 @@
+ 	}
+ 
+ 	/* we did it !! */
+-	xcp->cp0_epc = VA_TO_REG(contpc);
++	xcp->cp0_epc = (unsigned long) contpc;
+ 	xcp->cp0_cause &= ~CAUSEF_BD;
++
+ 	return 0;
+ }
+ 
+@@ -628,7 +628,7 @@
+ 
+ 		switch (MIPSInst_FUNC(ir)) {
+ 		case lwxc1_op:
+-			va = REG_TO_VA(xcp->regs[MIPSInst_FR(ir)] +
++			va = (void *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
+ 			fpuemuprivate.stats.loads++;
+@@ -648,7 +648,7 @@
+ 			break;
+ 
+ 		case swxc1_op:
+-			va = REG_TO_VA(xcp->regs[MIPSInst_FR(ir)] +
++			va = (void *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
+ 			fpuemuprivate.stats.stores++;
+@@ -724,7 +724,7 @@
+ 
+ 		switch (MIPSInst_FUNC(ir)) {
+ 		case ldxc1_op:
+-			va = REG_TO_VA(xcp->regs[MIPSInst_FR(ir)] +
++			va = (void *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
+ 			fpuemuprivate.stats.loads++;
+@@ -736,7 +736,7 @@
+ 			break;
+ 
+ 		case sdxc1_op:
+-			va = REG_TO_VA(xcp->regs[MIPSInst_FR(ir)] +
++			va = (void *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
+ 			fpuemuprivate.stats.stores++;
+@@ -1282,7 +1282,7 @@
+ int fpu_emulator_cop1Handler(int xcptno, struct pt_regs *xcp,
+ 	struct mips_fpu_soft_struct *ctx)
+ {
+-	gpreg_t oldepc, prevepc;
++	unsigned long oldepc, prevepc;
+ 	mips_instruction insn;
+ 	int sig = 0;
+ 
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.c
+--- linux-2.6.11.6/arch/mips/math-emu/dsemul.c	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.c	2005-04-01 08:56:55 -0800
+@@ -28,9 +28,6 @@
+ #endif
+ #define __mips 4
+ 
+-extern struct mips_fpu_emulator_private fpuemuprivate;
+-
+-
+ /*
+  * Emulate the arbritrary instruction ir at xcp->cp0_epc.  Required when
+  * we have to emulate the instruction in a COP1 branch delay slot.  Do
+@@ -52,10 +49,10 @@
+ 	mips_instruction	emul;
+ 	mips_instruction	badinst;
+ 	mips_instruction	cookie;
+-	gpreg_t			epc;
++	unsigned long		epc;
+ };
+ 
+-int mips_dsemul(struct pt_regs *regs, mips_instruction ir, gpreg_t cpc)
++int mips_dsemul(struct pt_regs *regs, mips_instruction ir, unsigned long cpc)
+ {
+ 	extern asmlinkage void handle_dsemulret(void);
+ 	mips_instruction *dsemul_insns;
+@@ -91,7 +88,7 @@
+ 	 */
+ 
+ 	/* Ensure that the two instructions are in the same cache line */
+-	dsemul_insns = (mips_instruction *) REG_TO_VA ((regs->regs[29] - sizeof(struct emuframe)) & ~0x7);
++	dsemul_insns = (mips_instruction *) ((regs->regs[29] - sizeof(struct emuframe)) & ~0x7);
+ 	fr = (struct emuframe *) dsemul_insns;
+ 
+ 	/* Verify that the stack pointer is not competely insane */
+@@ -108,7 +105,7 @@
+ 		return SIGBUS;
+ 	}
+ 
+-	regs->cp0_epc = VA_TO_REG & fr->emul;
++	regs->cp0_epc = (unsigned long) &fr->emul;
+ 
+ 	flush_cache_sigtramp((unsigned long)&fr->badinst);
+ 
+@@ -118,7 +115,7 @@
+ int do_dsemulret(struct pt_regs *xcp)
+ {
+ 	struct emuframe *fr;
+-	gpreg_t epc;
++	unsigned long epc;
+ 	u32 insn, cookie;
+ 	int err = 0;
+ 
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.h /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.h
+--- linux-2.6.11.6/arch/mips/math-emu/dsemul.h	2005-03-25 19:28:23 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.h	2005-04-01 08:56:55 -0800
+@@ -1,11 +1,5 @@
+-typedef long gpreg_t;
+-typedef void *vaddr_t;
+-
+-#define REG_TO_VA (vaddr_t)
+-#define VA_TO_REG (gpreg_t)
+-
+-int mips_dsemul(struct pt_regs *regs, mips_instruction ir, gpreg_t cpc);
+-int do_dsemulret(struct pt_regs *xcp);
++extern int mips_dsemul(struct pt_regs *regs, mips_instruction ir, unsigned long cpc);
++extern int do_dsemulret(struct pt_regs *xcp);
+ 
+ /* Instruction which will always cause an address error */
+ #define AdELOAD 0x8c000001	/* lw $0,1($0) */
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c
+--- linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c	2005-03-25 19:28:14 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c	2005-04-01 08:56:55 -0800
+@@ -27,8 +27,6 @@
+ 
+ #include <asm/fpu_emulator.h>
+ 
+-extern struct mips_fpu_emulator_private fpuemuprivate;
+-
+ #define SIGNALLING_NAN 0x7ff800007ff80000LL
+ 
+ void fpu_emulator_init_fpu(void)
+diff -Naur linux-2.6.11.6/arch/mips/mm/c-r4k.c /cross/build/linux-2.6.11.6/arch/mips/mm/c-r4k.c
+--- linux-2.6.11.6/arch/mips/mm/c-r4k.c	2005-03-25 19:28:37 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/c-r4k.c	2005-04-01 08:56:56 -0800
+@@ -372,12 +372,21 @@
+ 	int exec = vma->vm_flags & VM_EXEC;
+ 	struct mm_struct *mm = vma->vm_mm;
+ 	pgd_t *pgdp;
++	pud_t *pudp;
+ 	pmd_t *pmdp;
+ 	pte_t *ptep;
+ 
++	/*
++	 * If ownes no valid ASID yet, cannot possibly have gotten
++	 * this page into the cache.
++	 */
++	if (cpu_context(smp_processor_id(), mm) == 0)
++		return;
++
+ 	page &= PAGE_MASK;
+ 	pgdp = pgd_offset(mm, page);
+-	pmdp = pmd_offset(pgdp, page);
++	pudp = pud_offset(pgdp, page);
++	pmdp = pmd_offset(pudp, page);
+ 	ptep = pte_offset(pmdp, page);
+ 
+ 	/*
+@@ -419,8 +428,8 @@
+ 		if (cpu_has_vtag_icache) {
+ 			int cpu = smp_processor_id();
+ 
+-			if (cpu_context(cpu, vma->vm_mm) != 0)
+-				drop_mmu_context(vma->vm_mm, cpu);
++			if (cpu_context(cpu, mm) != 0)
++				drop_mmu_context(mm, cpu);
+ 		} else
+ 			r4k_blast_icache_page_indexed(page);
+ 	}
+@@ -431,13 +440,6 @@
+ {
+ 	struct flush_cache_page_args args;
+ 
+-	/*
+-	 * If ownes no valid ASID yet, cannot possibly have gotten
+-	 * this page into the cache.
+-	 */
+-	if (cpu_context(smp_processor_id(), vma->vm_mm) == 0)
+-		return;
+-
+ 	args.vma = vma;
+ 	args.page = page;
+ 
+@@ -455,8 +457,8 @@
+ }
+ 
+ struct flush_icache_range_args {
+-	unsigned long start;
+-	unsigned long end;
++	unsigned long __user start;
++	unsigned long __user end;
+ };
+ 
+ static inline void local_r4k_flush_icache_range(void *args)
+@@ -518,7 +520,8 @@
+ 	}
+ }
+ 
+-static void r4k_flush_icache_range(unsigned long start, unsigned long end)
++static void r4k_flush_icache_range(unsigned long __user start,
++	unsigned long __user end)
+ {
+ 	struct flush_icache_range_args args;
+ 
+@@ -1012,9 +1015,19 @@
+ 	 * normally they'd suffer from aliases but magic in the hardware deals
+ 	 * with that for us so we don't need to take care ourselves.
+ 	 */
+-	if (c->cputype != CPU_R10000 && c->cputype != CPU_R12000)
+-		if (c->dcache.waysize > PAGE_SIZE)
+-		        c->dcache.flags |= MIPS_CACHE_ALIASES;
++	switch (c->cputype) {
++	case CPU_20KC:
++	case CPU_25KF:
++	case CPU_R10000:
++	case CPU_R12000:
++	case CPU_SB1:
++		break;
++	case CPU_24K:
++		if (!(read_c0_config7() & (1 << 16)))
++	default:
++			if (c->dcache.waysize > PAGE_SIZE)
++				c->dcache.flags |= MIPS_CACHE_ALIASES;
++	}
+ 
+ 	switch (c->cputype) {
+ 	case CPU_20KC:
+@@ -1025,7 +1038,11 @@
+ 		c->icache.flags |= MIPS_CACHE_VTAG;
+ 		break;
+ 
++	case CPU_AU1000:
+ 	case CPU_AU1500:
++	case CPU_AU1100:
++	case CPU_AU1550:
++	case CPU_AU1200:
+ 		c->icache.flags |= MIPS_CACHE_IC_F_DC;
+ 		break;
+ 	}
+@@ -1213,9 +1230,6 @@
+ 	probe_pcache();
+ 	setup_scache();
+ 
+-	if (c->dcache.sets * c->dcache.ways > PAGE_SIZE)
+-		c->dcache.flags |= MIPS_CACHE_ALIASES;
+-
+ 	r4k_blast_dcache_page_setup();
+ 	r4k_blast_dcache_page_indexed_setup();
+ 	r4k_blast_dcache_setup();
+diff -Naur linux-2.6.11.6/arch/mips/mm/cache.c /cross/build/linux-2.6.11.6/arch/mips/mm/cache.c
+--- linux-2.6.11.6/arch/mips/mm/cache.c	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/cache.c	2005-04-01 08:56:56 -0800
+@@ -24,7 +24,8 @@
+ void (*flush_cache_range)(struct vm_area_struct *vma, unsigned long start,
+ 	unsigned long end);
+ void (*flush_cache_page)(struct vm_area_struct *vma, unsigned long page);
+-void (*flush_icache_range)(unsigned long start, unsigned long end);
++void (*flush_icache_range)(unsigned long __user start,
++	unsigned long __user end);
+ void (*flush_icache_page)(struct vm_area_struct *vma, struct page *page);
+ 
+ /* MIPS specific cache operations */
+@@ -49,10 +50,10 @@
+  * We could optimize the case where the cache argument is not BCACHE but
+  * that seems very atypical use ...
+  */
+-asmlinkage int sys_cacheflush(unsigned long addr, unsigned long int bytes,
+-	unsigned int cache)
++asmlinkage int sys_cacheflush(unsigned long __user addr,
++	unsigned long bytes, unsigned int cache)
+ {
+-	if (verify_area(VERIFY_WRITE, (void *) addr, bytes))
++	if (verify_area(VERIFY_WRITE, (void __user *) addr, bytes))
+ 		return -EFAULT;
+ 
+ 	flush_icache_range(addr, addr + bytes);
+diff -Naur linux-2.6.11.6/arch/mips/mm/fault.c /cross/build/linux-2.6.11.6/arch/mips/mm/fault.c
+--- linux-2.6.11.6/arch/mips/mm/fault.c	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/fault.c	2005-04-01 08:56:56 -0800
+@@ -25,6 +25,7 @@
+ #include <asm/system.h>
+ #include <asm/uaccess.h>
+ #include <asm/ptrace.h>
++#include <asm/highmem.h>		/* For VMALLOC_END */
+ 
+ /*
+  * This routine handles page faults.  It determines the address,
+@@ -57,7 +58,7 @@
+ 	 * only copy the information from the master page table,
+ 	 * nothing more.
+ 	 */
+-	if (unlikely(address >= VMALLOC_START))
++	if (unlikely(address >= VMALLOC_START && address <= VMALLOC_END))
+ 		goto vmalloc_fault;
+ 
+ 	/*
+@@ -140,7 +141,7 @@
+ 		info.si_signo = SIGSEGV;
+ 		info.si_errno = 0;
+ 		/* info.si_code has been set above */
+-		info.si_addr = (void *) address;
++		info.si_addr = (void __user *) address;
+ 		force_sig_info(SIGSEGV, &info, tsk);
+ 		return;
+ 	}
+@@ -196,7 +197,7 @@
+ 	info.si_signo = SIGBUS;
+ 	info.si_errno = 0;
+ 	info.si_code = BUS_ADRERR;
+-	info.si_addr = (void *) address;
++	info.si_addr = (void __user *) address;
+ 	force_sig_info(SIGBUS, &info, tsk);
+ 
+ 	return;
+@@ -212,6 +213,7 @@
+ 		 */
+ 		int offset = __pgd_offset(address);
+ 		pgd_t *pgd, *pgd_k;
++		pud_t *pud, *pud_k;
+ 		pmd_t *pmd, *pmd_k;
+ 		pte_t *pte_k;
+ 
+@@ -222,8 +224,13 @@
+ 			goto no_context;
+ 		set_pgd(pgd, *pgd_k);
+ 
+-		pmd = pmd_offset(pgd, address);
+-		pmd_k = pmd_offset(pgd_k, address);
++		pud = pud_offset(pgd, address);
++		pud_k = pud_offset(pgd_k, address);
++		if (!pud_present(*pud_k))
++			goto no_context;
++
++		pmd = pmd_offset(pud, address);
++		pmd_k = pmd_offset(pud_k, address);
+ 		if (!pmd_present(*pmd_k))
+ 			goto no_context;
+ 		set_pmd(pmd, *pmd_k);
+diff -Naur linux-2.6.11.6/arch/mips/mm/init.c /cross/build/linux-2.6.11.6/arch/mips/mm/init.c
+--- linux-2.6.11.6/arch/mips/mm/init.c	2005-03-25 19:28:25 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/init.c	2005-04-01 08:56:56 -0800
+@@ -86,7 +86,7 @@
+ EXPORT_SYMBOL(kmap_pte);
+ 
+ #define kmap_get_fixmap_pte(vaddr)					\
+-	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
++	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr)), (vaddr))
+ 
+ static void __init kmap_init(void)
+ {
+@@ -99,36 +99,42 @@
+ 	kmap_prot = PAGE_KERNEL;
+ }
+ 
+-#ifdef CONFIG_MIPS64
+-static void __init fixrange_init(unsigned long start, unsigned long end,
++#ifdef CONFIG_MIPS32
++void __init fixrange_init(unsigned long start, unsigned long end,
+ 	pgd_t *pgd_base)
+ {
+ 	pgd_t *pgd;
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+-	int i, j;
++	int i, j, k;
+ 	unsigned long vaddr;
+ 
+ 	vaddr = start;
+ 	i = __pgd_offset(vaddr);
+-	j = __pmd_offset(vaddr);
++	j = __pud_offset(vaddr);
++	k = __pmd_offset(vaddr);
+ 	pgd = pgd_base + i;
+ 
+ 	for ( ; (i < PTRS_PER_PGD) && (vaddr != end); pgd++, i++) {
+-		pmd = (pmd_t *)pgd;
+-		for (; (j < PTRS_PER_PMD) && (vaddr != end); pmd++, j++) {
+-			if (pmd_none(*pmd)) {
+-				pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+-				set_pmd(pmd, __pmd(pte));
+-				if (pte != pte_offset_kernel(pmd, 0))
+-					BUG();
++		pud = (pud_t *)pgd;
++		for ( ; (j < PTRS_PER_PUD) && (vaddr != end); pud++, j++) {
++			pmd = (pmd_t *)pud;
++			for (; (k < PTRS_PER_PMD) && (vaddr != end); pmd++, k++) {
++				if (pmd_none(*pmd)) {
++					pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
++					set_pmd(pmd, __pmd(pte));
++					if (pte != pte_offset_kernel(pmd, 0))
++						BUG();
++				}
++				vaddr += PMD_SIZE;
+ 			}
+-			vaddr += PMD_SIZE;
++			k = 0;
+ 		}
+ 		j = 0;
+ 	}
+ }
+-#endif /* CONFIG_MIPS64 */
++#endif /* CONFIG_MIPS32 */
+ #endif /* CONFIG_HIGHMEM */
+ 
+ #ifndef CONFIG_DISCONTIGMEM
+diff -Naur linux-2.6.11.6/arch/mips/mm/ioremap.c /cross/build/linux-2.6.11.6/arch/mips/mm/ioremap.c
+--- linux-2.6.11.6/arch/mips/mm/ioremap.c	2005-03-25 19:28:20 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/ioremap.c	2005-04-01 08:56:56 -0800
+@@ -79,9 +79,14 @@
+ 		BUG();
+ 	spin_lock(&init_mm.page_table_lock);
+ 	do {
++		pud_t *pud;
+ 		pmd_t *pmd;
+-		pmd = pmd_alloc(&init_mm, dir, address);
++
+ 		error = -ENOMEM;
++		pud = pud_alloc(&init_mm, dir, address);
++		if (!pud)
++			break;
++		pmd = pmd_alloc(&init_mm, pud, address);
+ 		if (!pmd)
+ 			break;
+ 		if (remap_area_pmd(pmd, address, end - address,
+@@ -141,7 +146,7 @@
+ 	 */
+ 	if (IS_LOW512(phys_addr) && IS_LOW512(last_addr) &&
+ 	    flags == _CACHE_UNCACHED)
+-		return (void *) KSEG1ADDR(phys_addr);
++		return (void *) CKSEG1ADDR(phys_addr);
+ 
+ 	/*
+ 	 * Don't allow anybody to remap normal RAM that we're using..
+@@ -180,7 +185,7 @@
+ 	return (void *) (offset + (char *)addr);
+ }
+ 
+-#define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == KSEG1)
++#define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == CKSEG1)
+ 
+ void __iounmap(volatile void __iomem *addr)
+ {
+diff -Naur linux-2.6.11.6/arch/mips/mm/pgtable-32.c /cross/build/linux-2.6.11.6/arch/mips/mm/pgtable-32.c
+--- linux-2.6.11.6/arch/mips/mm/pgtable-32.c	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/pgtable-32.c	2005-04-01 08:56:56 -0800
+@@ -10,6 +10,7 @@
+ #include <linux/mm.h>
+ #include <linux/bootmem.h>
+ #include <linux/highmem.h>
++#include <asm/fixmap.h>
+ #include <asm/pgtable.h>
+ 
+ void pgd_init(unsigned long page)
+@@ -29,42 +30,12 @@
+ 	}
+ }
+ 
+-#ifdef CONFIG_HIGHMEM
+-static void __init fixrange_init (unsigned long start, unsigned long end,
+-	pgd_t *pgd_base)
+-{
+-	pgd_t *pgd;
+-	pmd_t *pmd;
+-	pte_t *pte;
+-	int i, j;
+-	unsigned long vaddr;
+-
+-	vaddr = start;
+-	i = __pgd_offset(vaddr);
+-	j = __pmd_offset(vaddr);
+-	pgd = pgd_base + i;
+-
+-	for ( ; (i < PTRS_PER_PGD) && (vaddr != end); pgd++, i++) {
+-		pmd = (pmd_t *)pgd;
+-		for (; (j < PTRS_PER_PMD) && (vaddr != end); pmd++, j++) {
+-			if (pmd_none(*pmd)) {
+-				pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+-				set_pmd(pmd, __pmd((unsigned long)pte));
+-				if (pte != pte_offset_kernel(pmd, 0))
+-					BUG();
+-			}
+-			vaddr += PMD_SIZE;
+-		}
+-		j = 0;
+-	}
+-}
+-#endif
+-
+ void __init pagetable_init(void)
+ {
+ #ifdef CONFIG_HIGHMEM
+ 	unsigned long vaddr;
+ 	pgd_t *pgd, *pgd_base;
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ #endif
+@@ -90,7 +61,8 @@
+ 	fixrange_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
+ 
+ 	pgd = swapper_pg_dir + __pgd_offset(vaddr);
+-	pmd = pmd_offset(pgd, vaddr);
++	pud = pud_offset(pgd, vaddr);
++	pmd = pmd_offset(pud, vaddr);
+ 	pte = pte_offset_kernel(pmd, vaddr);
+ 	pkmap_page_table = pte;
+ #endif
+diff -Naur linux-2.6.11.6/arch/mips/mm/tlb-r4k.c /cross/build/linux-2.6.11.6/arch/mips/mm/tlb-r4k.c
+--- linux-2.6.11.6/arch/mips/mm/tlb-r4k.c	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/tlb-r4k.c	2005-04-01 08:56:56 -0800
+@@ -100,7 +100,7 @@
+ 					continue;
+ 				/* Make sure all entries differ. */
+ 				write_c0_entryhi(CKSEG0 +
+-				                 (idx << (PAGE_SHIFT + 1)));
++						 (idx << (PAGE_SHIFT + 1)));
+ 				mtc0_tlbw_hazard();
+ 				tlb_write_indexed();
+ 			}
+@@ -227,6 +227,7 @@
+ {
+ 	unsigned long flags;
+ 	pgd_t *pgdp;
++	pud_t *pudp;
+ 	pmd_t *pmdp;
+ 	pte_t *ptep;
+ 	int idx, pid;
+@@ -246,17 +247,18 @@
+ 	mtc0_tlbw_hazard();
+ 	tlb_probe();
+ 	BARRIER;
+-	pmdp = pmd_offset(pgdp, address);
++	pudp = pud_offset(pgdp, address);
++	pmdp = pmd_offset(pudp, address);
+ 	idx = read_c0_index();
+ 	ptep = pte_offset_map(pmdp, address);
+ 
+- #if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
+- 	write_c0_entrylo0(ptep->pte_high);
+- 	ptep++;
+- 	write_c0_entrylo1(ptep->pte_high);
++#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
++	write_c0_entrylo0(ptep->pte_high);
++	ptep++;
++	write_c0_entrylo1(ptep->pte_high);
+ #else
+-  	write_c0_entrylo0(pte_val(*ptep++) >> 6);
+-  	write_c0_entrylo1(pte_val(*ptep) >> 6);
++	write_c0_entrylo0(pte_val(*ptep++) >> 6);
++	write_c0_entrylo1(pte_val(*ptep) >> 6);
+ #endif
+ 	write_c0_entryhi(address | pid);
+ 	mtc0_tlbw_hazard();
+@@ -357,7 +359,8 @@
+ 	old_pagemask = read_c0_pagemask();
+ 	wired = read_c0_wired();
+ 	if (--temp_tlb_entry < wired) {
+-		printk(KERN_WARNING "No TLB space left for add_temporary_entry\n");
++		printk(KERN_WARNING
++		       "No TLB space left for add_temporary_entry\n");
+ 		ret = -ENOSPC;
+ 		goto out;
+ 	}
+@@ -388,7 +391,7 @@
+ 	 * is not supported, we assume R4k style.  Cpu probing already figured
+ 	 * out the number of tlb entries.
+ 	 */
+-	if ((c->processor_id  & 0xff0000) == PRID_COMP_LEGACY)
++	if ((c->processor_id & 0xff0000) == PRID_COMP_LEGACY)
+ 		return;
+ 
+ 	reg = read_c0_config1();
+diff -Naur linux-2.6.11.6/arch/mips/mm/tlbex.c /cross/build/linux-2.6.11.6/arch/mips/mm/tlbex.c
+--- linux-2.6.11.6/arch/mips/mm/tlbex.c	2005-03-25 19:28:16 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/mm/tlbex.c	2005-04-01 08:56:56 -0800
+@@ -840,6 +840,7 @@
+ 	case CPU_AU1100:
+ 	case CPU_AU1500:
+ 	case CPU_AU1550:
++	case CPU_AU1200:
+ 		i_nop(p);
+ 		tlbw(p);
+ 		break;
+@@ -1256,7 +1257,7 @@
+ 
+ /*
+  * TLB load/store/modify handlers.
+- *
++ * 
+  * Only the fastpath gets synthesized at runtime, the slowpath for
+  * do_page_fault remains normal asm.
+  */
+diff -Naur linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c /cross/build/linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c
+--- linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c	2005-03-25 19:28:20 -0800
++++ /cross/build/linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c	2005-04-01 08:56:56 -0800
+@@ -47,6 +47,7 @@
+ static void qube_raq_galileo_fixup(struct pci_dev *dev)
+ {
+ 	unsigned short galileo_id;
++	int i;
+ 
+ 	/* Fix PCI latency-timer and cache-line-size values in Galileo
+ 	 * host bridge.
+@@ -55,6 +56,13 @@
+ 	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 7);
+ 
+ 	/*
++	 * The code described by the comment below has been removed
++	 * as it causes bus mastering by the Ethernet controllers
++	 * to break under any kind of network load. We always set
++	 * the retry timeouts to their maximum.
++	 *
++	 * --x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--x--
++	 *
+ 	 * On all machines prior to Q2, we had the STOP line disconnected
+ 	 * from Galileo to VIA on PCI.  The new Galileo does not function
+ 	 * correctly unless we have it connected.
+@@ -64,19 +72,34 @@
+ 	 */
+ 	pci_read_config_word(dev, PCI_REVISION_ID, &galileo_id);
+ 	galileo_id &= 0xff;	/* mask off class info */
++
++ 	printk("Galileo ID: %u\n", galileo_id);
++
++#if 0
+ 	if (galileo_id >= 0x10) {
+ 		/* New Galileo, assumes PCI stop line to VIA is connected. */
+ 		GALILEO_OUTL(0x4020, GT_PCI0_TOR_OFS);
+-	} else if (galileo_id == 0x1 || galileo_id == 0x2) {
++	} else if (galileo_id == 0x1 || galileo_id == 0x2)
++#endif
++	{
+ 		signed int timeo;
+ 		/* XXX WE MUST DO THIS ELSE GALILEO LOCKS UP! -DaveM */
+ 		timeo = GALILEO_INL(GT_PCI0_TOR_OFS);
+ 		/* Old Galileo, assumes PCI STOP line to VIA is disconnected. */
+ 		GALILEO_OUTL(0xffff, GT_PCI0_TOR_OFS);
+ 	}
++
++	/*
++	 * hide Galileo from the kernel's PCI resource assignment. The BARs
++	 * on Galileo will already have been set up by the boot loader to
++	 * match the DRAM configuration so we don't want them being monkeyed
++	 * around with.
++	 */
++	for (i = 0; i < DEVICE_COUNT_RESOURCE; ++i)
++		dev->resource[i].start = dev->resource[i].end = dev->resource[i].flags = 0;
+ }
+ 
+-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_GALILEO, PCI_ANY_ID,
++DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID,
+ 	 qube_raq_galileo_fixup);
+ 
+ static char irq_tab_cobalt[] __initdata = {
+diff -Naur linux-2.6.11.6/drivers/char/lcd.c /cross/build/linux-2.6.11.6/drivers/char/lcd.c
+--- linux-2.6.11.6/drivers/char/lcd.c	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/drivers/char/lcd.c	2005-04-01 14:36:35 -0800
+@@ -575,8 +575,8 @@
+ 
+ static int lcd_waiters = 0;
+ 
+-static long lcd_read(struct inode *inode, struct file *file, char *buf,
+-		     unsigned long count)
++static ssize_t lcd_read(struct file *file, char *buf,
++		     size_t count, loff_t *ofs)
+ {
+ 	long buttons_now;
+ 
+diff -Naur linux-2.6.11.6/drivers/char/lcd.h /cross/build/linux-2.6.11.6/drivers/char/lcd.h
+--- linux-2.6.11.6/drivers/char/lcd.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/drivers/char/lcd.h	2005-04-01 08:56:56 -0800
+@@ -22,7 +22,7 @@
+ #define MAX_IDLE_TIME 120
+ 
+ struct lcd_display {
+-        unsigned long buttons;
++        unsigned buttons;
+         int size1;
+         int size2;
+         unsigned char line1[LCD_CHARS_PER_LINE];
+diff -Naur linux-2.6.11.6/drivers/char/rtc.c /cross/build/linux-2.6.11.6/drivers/char/rtc.c
+--- linux-2.6.11.6/drivers/char/rtc.c	2005-03-25 19:28:42 -0800
++++ /cross/build/linux-2.6.11.6/drivers/char/rtc.c	2005-04-01 08:56:56 -0800
+@@ -35,23 +35,21 @@
+  *	1.09a	Pete Zaitcev: Sun SPARC
+  *	1.09b	Jeff Garzik: Modularize, init cleanup
+  *	1.09c	Jeff Garzik: SMP cleanup
+- *	1.10    Paul Barton-Davis: add support for async I/O
++ *	1.10	Paul Barton-Davis: add support for async I/O
+  *	1.10a	Andrea Arcangeli: Alpha updates
+  *	1.10b	Andrew Morton: SMP lock fix
+  *	1.10c	Cesar Barros: SMP locking fixes and cleanup
+  *	1.10d	Paul Gortmaker: delete paranoia check in rtc_exit
+  *	1.10e	Maciej W. Rozycki: Handle DECstation's year weirdness.
+- *      1.11    Takashi Iwai: Kernel access functions
++ *	1.11	Takashi Iwai: Kernel access functions
+  *			      rtc_register/rtc_unregister/rtc_control
+  *      1.11a   Daniele Bellucci: Audit create_proc_read_entry in rtc_init
+- *	1.12	Venkatesh Pallipadi: Hooks for emulating rtc on HPET base-timer
++ *	1.12    Venkatesh Pallipadi: Hooks for emulating rtc on HPET base-timer
+  *		CONFIG_HPET_EMULATE_RTC
+- *
++ *	1.12a	Maciej W. Rozycki: Handle memory-mapped chips properly.
+  */
+ 
+-#define RTC_VERSION		"1.12"
+-
+-#define RTC_IO_EXTENT	0x8
++#define RTC_VERSION		"1.12a"
+ 
+ /*
+  *	Note that *all* calls to CMOS_READ and CMOS_WRITE are done with
+@@ -323,7 +321,15 @@
+ 	if (rtc_has_irq == 0)
+ 		return -EIO;
+ 
+-	if (count < sizeof(unsigned))
++	/*
++	 * Historically this function used to assume that sizeof(unsigned long)
++	 * is the same in userspace and kernelspace.  This lead to problems
++	 * for configurations with multiple ABIs such a the MIPS o32 and 64
++	 * ABIs supported on the same kernel.  So now we support read of both
++	 * 4 and 8 bytes and assume that's the sizeof(unsigned long) in the
++	 * userspace ABI.
++	 */
++	if (count != sizeof(unsigned int) && count !=  sizeof(unsigned long))
+ 		return -EINVAL;
+ 
+ 	add_wait_queue(&rtc_wait, &wait);
+@@ -354,10 +360,12 @@
+ 		schedule();
+ 	} while (1);
+ 
+-	if (count < sizeof(unsigned long))
+-		retval = put_user(data, (unsigned int __user *)buf) ?: sizeof(int); 
++	if (count == sizeof(unsigned int))
++		retval = put_user(data, (unsigned int __user *)buf) ?: sizeof(int);
+ 	else
+ 		retval = put_user(data, (unsigned long __user *)buf) ?: sizeof(long);
++	if (!retval)
++		retval = count;
+  out:
+ 	current->state = TASK_RUNNING;
+ 	remove_wait_queue(&rtc_wait, &wait);
+@@ -897,6 +905,9 @@
+ 	struct sparc_isa_device *isa_dev;
+ #endif
+ #endif
++#ifndef __sparc__
++	void *r;
++#endif
+ 
+ #ifdef __sparc__
+ 	for_each_ebus(ebus) {
+@@ -943,8 +954,13 @@
+ 	}
+ no_irq:
+ #else
+-	if (!request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc")) {
+-		printk(KERN_ERR "rtc: I/O port %d is not free.\n", RTC_PORT (0));
++	if (RTC_IOMAPPED)
++		r = request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc");
++	else
++		r = request_mem_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc");
++	if (!r) {
++		printk(KERN_ERR "rtc: I/O resource %lx is not free.\n",
++		       (long)(RTC_PORT(0)));
+ 		return -EIO;
+ 	}
+ 
+@@ -958,7 +974,10 @@
+ 	if(request_irq(RTC_IRQ, rtc_int_handler_ptr, SA_INTERRUPT, "rtc", NULL)) {
+ 		/* Yeah right, seeing as irq 8 doesn't even hit the bus. */
+ 		printk(KERN_ERR "rtc: IRQ %d is not free.\n", RTC_IRQ);
+-		release_region(RTC_PORT(0), RTC_IO_EXTENT);
++		if (RTC_IOMAPPED)
++			release_region(RTC_PORT(0), RTC_IO_EXTENT);
++		else
++			release_mem_region(RTC_PORT(0), RTC_IO_EXTENT);
+ 		return -EIO;
+ 	}
+ 	hpet_rtc_timer_init();
+@@ -1059,7 +1078,10 @@
+ 	if (rtc_has_irq)
+ 		free_irq (rtc_irq, &rtc_port);
+ #else
+-	release_region (RTC_PORT (0), RTC_IO_EXTENT);
++	if (RTC_IOMAPPED)
++		release_region(RTC_PORT(0), RTC_IO_EXTENT);
++	else
++		release_mem_region(RTC_PORT(0), RTC_IO_EXTENT);
+ #ifdef RTC_IRQ
+ 	if (rtc_has_irq)
+ 		free_irq (RTC_IRQ, NULL);
+diff -Naur linux-2.6.11.6/drivers/net/tulip/eeprom.c /cross/build/linux-2.6.11.6/drivers/net/tulip/eeprom.c
+--- linux-2.6.11.6/drivers/net/tulip/eeprom.c	2005-03-25 19:28:37 -0800
++++ /cross/build/linux-2.6.11.6/drivers/net/tulip/eeprom.c	2005-04-01 09:13:39 -0800
+@@ -63,6 +63,22 @@
+ 	 */
+ 	{ 0x1e00, 0x0000, 0x000b, 0x8f01, 0x0103, 0x0300, 0x0821, 0x000, 0x0001, 0x0000, 0x01e1 }
+   },
++  {"Cobalt Microserver", 0, 0x10, 0xE0, {0x1e00, /* 0 == controller #, 1e == offset	*/
++					 0x0000, /* 0 == high offset, 0 == gap		*/
++					 0x0800, /* Default Autoselect			*/
++					 0x8001, /* 1 leaf, extended type, bogus len	*/
++					 0x0003, /* Type 3 (MII), PHY #0		*/
++					 0x0400, /* 0 init instr, 4 reset instr		*/
++					 0x0801, /* Set control mode, GP0 output	*/
++					 0x0000, /* Drive GP0 Low (RST is active low)	*/
++					 0x0800, /* control mode, GP0 input (undriven)	*/
++					 0x0000, /* clear control mode			*/
++					 0x7800, /* 100TX FDX + HDX, 10bT FDX + HDX	*/
++					 0x01e0, /* Advertise all above			*/
++					 0x5000, /* FDX all above			*/
++					 0x1800, /* Set fast TTM in 100bt modes		*/
++					 0x0000, /* PHY cannot be unplugged		*/
++  }},
+   {NULL}};
+ 
+ 
+diff -Naur linux-2.6.11.6/drivers/net/tulip/interrupt.c /cross/build/linux-2.6.11.6/drivers/net/tulip/interrupt.c
+--- linux-2.6.11.6/drivers/net/tulip/interrupt.c	2005-03-25 19:28:40 -0800
++++ /cross/build/linux-2.6.11.6/drivers/net/tulip/interrupt.c	2005-04-01 08:59:41 -0800
+@@ -26,7 +26,7 @@
+ #define MIT_SIZE 15
+ #define MIT_TABLE 15 /* We use 0 or max */
+ 
+-unsigned int mit_table[MIT_SIZE+1] =
++static unsigned int mit_table[MIT_SIZE+1] =
+ {
+         /*  CRS11 21143 hardware Mitigation Control Interrupt
+             We use only RX mitigation we other techniques for
+diff -Naur linux-2.6.11.6/drivers/net/tulip/media.c /cross/build/linux-2.6.11.6/drivers/net/tulip/media.c
+--- linux-2.6.11.6/drivers/net/tulip/media.c	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/drivers/net/tulip/media.c	2005-04-01 08:57:20 -0800
+@@ -44,8 +44,10 @@
+ 
+ /* MII transceiver control section.
+    Read and write the MII registers using software-generated serial
+-   MDIO protocol.  See the MII specifications or DP83840A data sheet
+-   for details. */
++   MDIO protocol.
++   See IEEE 802.3-2002.pdf (Section 2, Chapter "22.2.4 Management functions")
++   or DP83840A data sheet for more details.
++   */
+ 
+ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
+ {
+@@ -88,7 +90,7 @@
+ 		value = ioread32(ioaddr + CSR9);
+ 		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
+ 		
+-		value = (phy_id << 21) | (location << 16) | 0x80000000;
++		value = (phy_id << 21) | (location << 16) | 0x08000000;
+ 		iowrite32(value, ioaddr + CSR10);
+ 		
+ 		while(--i > 0) {
+@@ -166,7 +168,7 @@
+ 		value = ioread32(ioaddr + CSR9);
+ 		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
+ 		
+-		value = (phy_id << 21) | (location << 16) | 0x40000000 | (val & 0xFFFF);
++		value = (phy_id << 21) | (location << 16) | 0x04000000 | (val & 0xFFFF);
+ 		iowrite32(value, ioaddr + CSR10);
+ 		
+ 		while(--i > 0) {
+@@ -307,13 +309,29 @@
+ 				int reset_length = p[2 + init_length];
+ 				misc_info = (u16*)(reset_sequence + reset_length);
+ 				if (startup) {
++					int timeout = 10;	/* max 1 ms */
+ 					iowrite32(mtable->csr12dir | 0x100, ioaddr + CSR12);
+ 					for (i = 0; i < reset_length; i++)
+ 						iowrite32(reset_sequence[i], ioaddr + CSR12);
++
++					/* flush posted writes */
++					ioread32(ioaddr + CSR12);
++
++					/* Sect 3.10.3 in DP83840A.pdf (p39) */
++					udelay(500);
++
++					/* Section 4.2 in DP83840A.pdf (p43) */
++					/* and IEEE 802.3 "22.2.4.1.1 Reset" */
++					while (timeout-- &&
++						(tulip_mdio_read (dev, phy_num, MII_BMCR) & BMCR_RESET))
++						udelay(100);
+ 				}
+ 				for (i = 0; i < init_length; i++)
+ 					iowrite32(init_sequence[i], ioaddr + CSR12);
++
++				ioread32(ioaddr + CSR12);	/* flush posted writes */
+ 			}
++
+ 			tmp_info = get_u16(&misc_info[1]);
+ 			if (tmp_info)
+ 				tp->advertising[phy_num] = tmp_info | 1;
+diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip.h /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip.h
+--- linux-2.6.11.6/drivers/net/tulip/tulip.h	2005-03-25 19:28:36 -0800
++++ /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip.h	2005-04-01 09:01:07 -0800
+@@ -475,8 +475,11 @@
+ 			udelay(10);
+ 
+ 		if (!i)
+-			printk(KERN_DEBUG "%s: tulip_stop_rxtx() failed\n",
+-					tp->pdev->slot_name);
++			printk(KERN_DEBUG "%s: tulip_stop_rxtx() failed"
++					" (CSR5 0x%x CSR6 0x%x)\n",
++					pci_name(tp->pdev),
++					ioread32(ioaddr + CSR5),
++					ioread32(ioaddr + CSR6));
+ 	}
+ }
+ 
+diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip_core.c /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip_core.c
+--- linux-2.6.11.6/drivers/net/tulip/tulip_core.c	2005-03-25 19:28:22 -0800
++++ /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip_core.c	2005-04-01 09:01:54 -0800
+@@ -22,7 +22,7 @@
+ #else
+ #define DRV_VERSION	"1.1.13"
+ #endif
+-#define DRV_RELDATE	"May 11, 2002"
++#define DRV_RELDATE	"December 15, 2004"
+ 
+ 
+ #include <linux/module.h>
+@@ -1102,15 +1102,18 @@
+ 			entry = tp->cur_tx++ % TX_RING_SIZE;
+ 
+ 			if (entry != 0) {
+-				/* Avoid a chip errata by prefixing a dummy entry. */
+-				tp->tx_buffers[entry].skb = NULL;
+-				tp->tx_buffers[entry].mapping = 0;
+-				tp->tx_ring[entry].length =
+-					(entry == TX_RING_SIZE-1) ? cpu_to_le32(DESC_RING_WRAP) : 0;
+-				tp->tx_ring[entry].buffer1 = 0;
+-				/* Must set DescOwned later to avoid race with chip */
+-				dummy = entry;
+-				entry = tp->cur_tx++ % TX_RING_SIZE;
++				/* Avoid a chip errata by prefixing a dummy entry. Don't do
++				   this on the ULI526X as it triggers a different problem */
++				if (!(tp->chip_id == ULI526X && (tp->revision = 0x40 || tp->revision == 0x50))) {
++					tp->tx_buffers[entry].skb = NULL;
++					tp->tx_buffers[entry].mapping = 0;
++					tp->tx_ring[entry].length =
++						(entry == TX_RING_SIZE-1) ? cpu_to_le32(DESC_RING_WRAP) : 0;
++					tp->tx_ring[entry].buffer1 = 0;
++					/* Must set DescOwned later to avoid race with chip */
++					dummy = entry;
++					entry = tp->cur_tx++ % TX_RING_SIZE;
++				}
+ 			}
+ 
+ 			tp->tx_buffers[entry].skb = NULL;
+@@ -1749,7 +1752,7 @@
+ 
+ #ifdef CONFIG_PM
+ 
+-static int tulip_suspend (struct pci_dev *pdev, u32 state)
++static int tulip_suspend (struct pci_dev *pdev, pm_message_t state)
+ {
+ 	struct net_device *dev = pci_get_drvdata(pdev);
+ 
+diff -Naur linux-2.6.11.6/include/asm-mips/break.h /cross/build/linux-2.6.11.6/include/asm-mips/break.h
+--- linux-2.6.11.6/include/asm-mips/break.h	2005-03-25 19:28:25 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/break.h	2005-04-01 08:56:56 -0800
+@@ -28,6 +28,7 @@
+ #define BRK_NORLD	10	/* No rld found - not used by Linux/MIPS */
+ #define _BRK_THREADBP	11	/* For threads, user bp (used by debuggers) */
+ #define BRK_BUG		512	/* Used by BUG() */
++#define BRK_KDB		513	/* Used in KDB_ENTER() */
+ #define BRK_MULOVF	1023	/* Multiply overflow */
+ 
+ #endif /* __ASM_BREAK_H */
+diff -Naur linux-2.6.11.6/include/asm-mips/cacheflush.h /cross/build/linux-2.6.11.6/include/asm-mips/cacheflush.h
+--- linux-2.6.11.6/include/asm-mips/cacheflush.h	2005-03-25 19:28:26 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/cacheflush.h	2005-04-01 08:56:56 -0800
+@@ -50,17 +50,24 @@
+ 
+ extern void (*flush_icache_page)(struct vm_area_struct *vma,
+ 	struct page *page);
+-extern void (*flush_icache_range)(unsigned long start, unsigned long end);
++extern void (*flush_icache_range)(unsigned long __user start,
++	unsigned long __user end);
+ #define flush_cache_vmap(start, end)		flush_cache_all()
+ #define flush_cache_vunmap(start, end)		flush_cache_all()
+ 
+ #define copy_to_user_page(vma, page, vaddr, dst, src, len)		\
+ do {									\
++	if (cpu_has_dc_aliases)						\
++		flush_cache_page(vma, vaddr);				\
+ 	memcpy(dst, (void *) src, len);					\
+ 	flush_icache_page(vma, page);					\
+ } while (0)
+ #define copy_from_user_page(vma, page, vaddr, dst, src, len)		\
+-	memcpy(dst, src, len)
++do {									\
++	if (cpu_has_dc_aliases)						\
++		flush_cache_page(vma, vaddr);				\
++	memcpy(dst, src, len);						\
++} while (0)
+ 
+ extern void (*flush_cache_sigtramp)(unsigned long addr);
+ extern void (*flush_icache_all)(void);
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h
+--- linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h	2005-04-01 08:56:56 -0800
+@@ -19,7 +19,10 @@
+  *     9  - PCI
+  *    14  - IDE0
+  *    15  - IDE1
+- *
++ */
++#define COBALT_QUBE_SLOT_IRQ	9
++
++/*
+  * CPU IRQs  are 16 ... 23
+  */
+ #define COBALT_TIMER_IRQ	18
+@@ -30,7 +33,6 @@
+ #define COBALT_SERIAL_IRQ	21
+ #define COBALT_SCSI_IRQ         21
+ #define COBALT_VIA_IRQ		22		/* Chained to VIA ISA bridge */
+-#define COBALT_QUBE_SLOT_IRQ	23
+ 
+ /*
+  * PCI configuration space manifest constants.  These are wired into
+@@ -69,13 +71,16 @@
+  * Most of this really should go into a separate GT64111 header file.
+  */
+ #define GT64111_IO_BASE		0x10000000UL
++#define GT64111_IO_END		0x11ffffffUL
++#define GT64111_MEM_BASE	0x12000000UL
++#define GT64111_MEM_END		0x13ffffffUL
+ #define GT64111_BASE		0x14000000UL
+-#define GALILEO_REG(ofs)	(KSEG0 + GT64111_BASE + (unsigned long)(ofs))
++#define GALILEO_REG(ofs)	CKSEG1ADDR(GT64111_BASE + (unsigned long)(ofs))
+ 
+ #define GALILEO_INL(port)	(*(volatile unsigned int *) GALILEO_REG(port))
+ #define GALILEO_OUTL(val, port)						\
+ do {									\
+-	*(volatile unsigned int *) GALILEO_REG(port) = (port);		\
++	*(volatile unsigned int *) GALILEO_REG(port) = (val);		\
+ } while (0)
+ 
+ #define GALILEO_T0EXP		0x0100
+@@ -86,5 +91,21 @@
+ 	GALILEO_OUTL((0x80000000 | (PCI_SLOT (devfn) << 11) |		\
+ 		(PCI_FUNC (devfn) << 8) | (where)), GT_PCI0_CFGADDR_OFS)
+ 
++#define COBALT_LED_PORT		(*(volatile unsigned char *) CKSEG1ADDR(0x1c000000))
++# define COBALT_LED_BAR_LEFT	(1 << 0)	/* Qube */
++# define COBALT_LED_BAR_RIGHT	(1 << 1)	/* Qube */
++# define COBALT_LED_WEB		(1 << 2)	/* RaQ */
++# define COBALT_LED_POWER_OFF	(1 << 3)	/* RaQ */
++# define COBALT_LED_RESET	0x0f
++
++#define COBALT_KEY_PORT		((~*(volatile unsigned int *) CKSEG1ADDR(0x1d000000) >> 24) & COBALT_KEY_MASK)
++# define COBALT_KEY_CLEAR	(1 << 1)
++# define COBALT_KEY_LEFT	(1 << 2)
++# define COBALT_KEY_UP		(1 << 3)
++# define COBALT_KEY_DOWN	(1 << 4)
++# define COBALT_KEY_RIGHT	(1 << 5)
++# define COBALT_KEY_ENTER	(1 << 6)
++# define COBALT_KEY_SELECT	(1 << 7)
++# define COBALT_KEY_MASK	0xfe
+ 
+ #endif /* __ASM_COBALT_H */
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/ide.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/ide.h
+--- linux-2.6.11.6/include/asm-mips/cobalt/ide.h	1969-12-31 16:00:00 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/ide.h	2005-04-01 08:56:56 -0800
+@@ -0,0 +1,83 @@
++
++/*
++ * PIO "in" transfers can cause D-cache lines to be allocated
++ * to the data being read. If the target is the page cache then
++ * the kernel can create a user space mapping of the same page
++ * without flushing it from the D-cache. This has large potential
++ * to create cache aliases. The Cobalts seem to trigger this
++ * problem easily.
++ *
++ * MIPs doesn't have a flush_dcache_range() so we roll
++ * our own.
++ *
++ * -- pdh
++ */
++
++#define MAX_HWIFS			2
++
++#include <asm/r4kcache.h>
++
++static inline void __flush_dcache(void)
++{
++	unsigned long dc_size, dc_line, addr, end;
++
++	dc_size = current_cpu_data.dcache.ways << current_cpu_data.dcache.waybit;
++	dc_line = current_cpu_data.dcache.linesz;
++
++	addr = CKSEG0;
++	end = addr + dc_size;
++
++	for (; addr < end; addr += dc_line)
++		flush_dcache_line_indexed(addr);
++}
++
++static inline void __flush_dcache_range(unsigned long start, unsigned long end)
++{
++	unsigned long dc_size, dc_line, addr;
++
++	dc_size = current_cpu_data.dcache.ways << current_cpu_data.dcache.waybit;
++	dc_line = current_cpu_data.dcache.linesz;
++
++	addr = start & ~(dc_line - 1);
++	end += dc_line - 1;
++
++	if (end - addr < dc_size)
++		for (; addr < end; addr += dc_line)
++			flush_dcache_line(addr);
++	else
++		__flush_dcache();
++}
++
++static inline void __ide_insw(unsigned long port, void *addr, unsigned int count)
++{
++	insw(port, addr, count);
++
++	__flush_dcache_range((unsigned long) addr, (unsigned long) addr + count * 2);
++}
++
++static inline void __ide_insl(unsigned long port, void *addr, unsigned int count)
++{
++	insl(port, addr, count);
++
++	__flush_dcache_range((unsigned long) addr, (unsigned long) addr + count * 4);
++}
++
++static inline void __ide_mm_insw(volatile void __iomem *port, void *addr, unsigned int count)
++{
++	readsw(port, addr, count);
++
++	__flush_dcache_range((unsigned long) addr, (unsigned long) addr + count * 2);
++}
++
++static inline void __ide_mm_insl(volatile void __iomem *port, void *addr, unsigned int count)
++{
++	readsl(port, addr, count);
++
++	__flush_dcache_range((unsigned long) addr, (unsigned long) addr + count * 4);
++}
++
++#define insw			__ide_insw
++#define insl			__ide_insl
++
++#define __ide_mm_outsw		writesw
++#define __ide_mm_outsl		writesl
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h
+--- linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h	1969-12-31 16:00:00 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h	2005-04-01 08:56:56 -0800
+@@ -0,0 +1,2 @@
++/* there's something here ... in the dark */
++
+diff -Naur linux-2.6.11.6/include/asm-mips/cpu.h /cross/build/linux-2.6.11.6/include/asm-mips/cpu.h
+--- linux-2.6.11.6/include/asm-mips/cpu.h	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/cpu.h	2005-04-01 08:56:56 -0800
+@@ -22,12 +22,17 @@
+    spec.
+ */
+ 
+-#define PRID_COMP_LEGACY       0x000000
+-#define PRID_COMP_MIPS         0x010000
+-#define PRID_COMP_BROADCOM     0x020000
+-#define PRID_COMP_ALCHEMY      0x030000
+-#define PRID_COMP_SIBYTE       0x040000
+-#define PRID_COMP_SANDCRAFT    0x050000
++#define PRID_COMP_LEGACY	0x000000
++#define PRID_COMP_MIPS		0x010000
++#define PRID_COMP_BROADCOM	0x020000
++#define PRID_COMP_ALCHEMY	0x030000
++#define PRID_COMP_SIBYTE	0x040000
++#define PRID_COMP_SANDCRAFT	0x050000
++#define PRID_COMP_PHILIPS	0x060000
++#define PRID_COMP_TOSHIBA	0x070000
++#define PRID_COMP_LSI		0x080000
++#define PRID_COMP_LEXRA		0x0b0000
++
+ 
+ /*
+  * Assigned values for the product ID register.  In order to detect a
+@@ -106,6 +111,7 @@
+ #define PRID_REV_VR4122		0x0070
+ #define PRID_REV_VR4181A	0x0070	/* Same as VR4122 */
+ #define PRID_REV_VR4130		0x0080
++#define PRID_REV_RM5231		0x00a0
+ 
+ /*
+  * FPU implementation/revision register (CP1 control register 0).
+@@ -177,7 +183,8 @@
+ #define CPU_VR4133		56
+ #define CPU_AU1550		57
+ #define CPU_24K			58
+-#define CPU_LAST		58
++#define CPU_AU1200		59
++#define CPU_LAST		59
+ 
+ /*
+  * ISA Level encodings
+diff -Naur linux-2.6.11.6/include/asm-mips/elf.h /cross/build/linux-2.6.11.6/include/asm-mips/elf.h
+--- linux-2.6.11.6/include/asm-mips/elf.h	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/elf.h	2005-04-01 08:56:56 -0800
+@@ -234,9 +234,6 @@
+ 
+ #endif /* __KERNEL__ */
+ 
+-/* This one accepts IRIX binaries.  */
+-#define irix_elf_check_arch(hdr)	((hdr)->e_flags & RHF_SGI_ONLY)
+-
+ #define USE_ELF_CORE_DUMP
+ #define ELF_EXEC_PAGESIZE	PAGE_SIZE
+ 
+diff -Naur linux-2.6.11.6/include/asm-mips/fixmap.h /cross/build/linux-2.6.11.6/include/asm-mips/fixmap.h
+--- linux-2.6.11.6/include/asm-mips/fixmap.h	2005-03-25 19:28:18 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/fixmap.h	2005-04-01 08:56:56 -0800
+@@ -107,4 +107,11 @@
+ 	return __virt_to_fix(vaddr);
+ }
+ 
++/*
++ * Called from pgtable_init()
++ */
++extern void fixrange_init(unsigned long start, unsigned long end,
++        pgd_t *pgd_base);
++
++
+ #endif
+diff -Naur linux-2.6.11.6/include/asm-mips/fpu_emulator.h /cross/build/linux-2.6.11.6/include/asm-mips/fpu_emulator.h
+--- linux-2.6.11.6/include/asm-mips/fpu_emulator.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/fpu_emulator.h	2005-04-01 08:56:56 -0800
+@@ -35,4 +35,6 @@
+ 	} stats;
+ };
+ 
++extern struct mips_fpu_emulator_private fpuemuprivate;
++
+ #endif /* _ASM_FPU_EMULATOR_H */
+diff -Naur linux-2.6.11.6/include/asm-mips/hazards.h /cross/build/linux-2.6.11.6/include/asm-mips/hazards.h
+--- linux-2.6.11.6/include/asm-mips/hazards.h	2005-03-25 19:28:25 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/hazards.h	2005-04-01 08:56:56 -0800
+@@ -107,6 +107,7 @@
+ 	"	.endm						\n\t");
+ 
+ #ifdef CONFIG_CPU_RM9000
++
+ /*
+  * RM9000 hazards.  When the JTLB is updated by tlbwi or tlbwr, a subsequent
+  * use of the JTLB for instructions should not occur for 4 cpu cycles and use
+@@ -124,6 +125,9 @@
+ 		".set\tmips32\n\t"					\
+ 		"_ssnop; _ssnop; _ssnop; _ssnop\n\t"			\
+ 		".set\tmips0")
++
++#define back_to_back_c0_hazard()	do { } while (0)
++
+ #else
+ 
+ /*
+@@ -170,6 +174,10 @@
+ 	__asm__ __volatile__(						\
+ 	"_ehb\t\t\t\t# irq_disable_hazard")
+ 
++#define back_to_back_c0_hazard()					\
++	__asm__ __volatile__(						\
++	"_ehb\t\t\t\t# back_to_back_c0_hazard")
++
+ #elif defined(CONFIG_CPU_R10000) || defined(CONFIG_CPU_RM9000)
+ 
+ /*
+@@ -186,6 +194,8 @@
+ #define irq_enable_hazard()	do { } while (0)
+ #define irq_disable_hazard()	do { } while (0)
+ 
++#define back_to_back_c0_hazard()	do { } while (0)
++
+ #else
+ 
+ /*
+@@ -210,6 +220,12 @@
+ 	__asm__ __volatile__(						\
+ 	"_ssnop; _ssnop; _ssnop;\t\t# irq_disable_hazard")
+ 
++#define back_to_back_c0_hazard()					\
++	__asm__ __volatile__(						\
++	"	.set noreorder				\n"		\
++	"	nop; nop; nop				\n"		\
++	"	.set reorder				\n")
++
+ #endif
+ 
+ #endif /* __ASSEMBLY__ */
+diff -Naur linux-2.6.11.6/include/asm-mips/io.h /cross/build/linux-2.6.11.6/include/asm-mips/io.h
+--- linux-2.6.11.6/include/asm-mips/io.h	2005-03-25 19:28:19 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/io.h	2005-04-01 08:56:56 -0800
+@@ -34,7 +34,7 @@
+ #undef CONF_SLOWDOWN_IO
+ 
+ /*
+- * Raw operations are never swapped in software.  Otoh values that raw
++ * Raw operations are never swapped in software.  OTOH values that raw
+  * operations are working on may or may not have been swapped by the bus
+  * hardware.  An example use would be for flash memory that's used for
+  * execute in place.
+@@ -43,45 +43,53 @@
+ # define __raw_ioswabw(x)	(x)
+ # define __raw_ioswabl(x)	(x)
+ # define __raw_ioswabq(x)	(x)
++# define ____raw_ioswabq(x)	(x)
+ 
+ /*
+  * Sane hardware offers swapping of PCI/ISA I/O space accesses in hardware;
+  * less sane hardware forces software to fiddle with this...
++ *
++ * Regardless, if the host bus endianness mismatches that of PCI/ISA, then
++ * you can't have the numerical value of data and byte addresses within
++ * multibyte quantities both preserved at the same time.  Hence two
++ * variations of functions: non-prefixed ones that preserve the value
++ * and prefixed ones that preserve byte addresses.  The latters are
++ * typically used for moving raw data between a peripheral and memory (cf.
++ * string I/O functions), hence the "mem_" prefix.
+  */
+ #if defined(CONFIG_SWAP_IO_SPACE)
+ 
+ # define ioswabb(x)		(x)
++# define mem_ioswabb(x)		(x)
+ # ifdef CONFIG_SGI_IP22
+ /*
+  * IP22 seems braindead enough to swap 16bits values in hardware, but
+  * not 32bits.  Go figure... Can't tell without documentation.
+  */
+ #  define ioswabw(x)		(x)
++#  define mem_ioswabw(x)	le16_to_cpu(x)
+ # else
+ #  define ioswabw(x)		le16_to_cpu(x)
++#  define mem_ioswabw(x)	(x)
+ # endif
+ # define ioswabl(x)		le32_to_cpu(x)
++# define mem_ioswabl(x)		(x)
+ # define ioswabq(x)		le64_to_cpu(x)
++# define mem_ioswabq(x)		(x)
+ 
+ #else
+ 
+ # define ioswabb(x)		(x)
++# define mem_ioswabb(x)		(x)
+ # define ioswabw(x)		(x)
++# define mem_ioswabw(x)		cpu_to_le16(x)
+ # define ioswabl(x)		(x)
++# define mem_ioswabl(x)		cpu_to_le32(x)
+ # define ioswabq(x)		(x)
++# define mem_ioswabq(x)		cpu_to_le32(x)
+ 
+ #endif
+ 
+-/*
+- * Native bus accesses never swapped.
+- */
+-#define bus_ioswabb(x)		(x)
+-#define bus_ioswabw(x)		(x)
+-#define bus_ioswabl(x)		(x)
+-#define bus_ioswabq(x)		(x)
+-
+-#define __bus_ioswabq		bus_ioswabq
+-
+ #define IO_SPACE_LIMIT 0xffff
+ 
+ /*
+@@ -319,7 +327,8 @@
+ 	else if (cpu_has_64bits) {					\
+ 		unsigned long __flags;					\
+ 									\
+-		local_irq_save(__flags);				\
++		if (irq)						\
++			local_irq_save(__flags);			\
+ 		__asm__ __volatile__(					\
+ 			".set	mips3"		"\t\t# __readq"	"\n\t"	\
+ 			"ld	%L0, %1"			"\n\t"	\
+@@ -328,7 +337,8 @@
+ 			".set	mips0"				"\n"	\
+ 			: "=r" (__val)					\
+ 			: "m" (*__mem));				\
+-		local_irq_restore(__flags);				\
++		if (irq)						\
++			local_irq_restore(__flags);			\
+ 	} else {							\
+ 		__val = 0;						\
+ 		BUG();							\
+@@ -386,15 +396,15 @@
+ 
+ #define BUILDIO(bwlq, type)						\
+ 									\
+-__BUILD_MEMORY_PFX(, bwlq, type)					\
+ __BUILD_MEMORY_PFX(__raw_, bwlq, type)					\
+-__BUILD_MEMORY_PFX(bus_, bwlq, type)					\
++__BUILD_MEMORY_PFX(, bwlq, type)					\
++__BUILD_MEMORY_PFX(mem_, bwlq, type)					\
+ __BUILD_IOPORT_PFX(, bwlq, type)					\
+-__BUILD_IOPORT_PFX(__raw_, bwlq, type)
++__BUILD_IOPORT_PFX(mem_, bwlq, type)
+ 
+ #define __BUILDIO(bwlq, type)						\
+ 									\
+-__BUILD_MEMORY_SINGLE(__bus_, bwlq, type, 0)
++__BUILD_MEMORY_SINGLE(____raw_, bwlq, type, 0)
+ 
+ BUILDIO(b, u8)
+ BUILDIO(w, u16)
+@@ -422,7 +432,7 @@
+ 	volatile type *__addr = addr;					\
+ 									\
+ 	while (count--) {						\
+-		__raw_write##bwlq(*__addr, mem);			\
++		mem_write##bwlq(*__addr, mem);				\
+ 		__addr++;						\
+ 	}								\
+ }									\
+@@ -433,7 +443,7 @@
+ 	volatile type *__addr = addr;					\
+ 									\
+ 	while (count--) {						\
+-		*__addr = __raw_read##bwlq(mem);			\
++		*__addr = mem_read##bwlq(mem);				\
+ 		__addr++;						\
+ 	}								\
+ }
+@@ -446,7 +456,7 @@
+ 	volatile type *__addr = addr;					\
+ 									\
+ 	while (count--) {						\
+-		__raw_out##bwlq(*__addr, port);				\
++		mem_out##bwlq(*__addr, port);				\
+ 		__addr++;						\
+ 	}								\
+ }									\
+@@ -457,7 +467,7 @@
+ 	volatile type *__addr = addr;					\
+ 									\
+ 	while (count--) {						\
+-		*__addr = __raw_in##bwlq(port);				\
++		*__addr = mem_in##bwlq(port);				\
+ 		__addr++;						\
+ 	}								\
+ }
+diff -Naur linux-2.6.11.6/include/asm-mips/irq.h /cross/build/linux-2.6.11.6/include/asm-mips/irq.h
+--- linux-2.6.11.6/include/asm-mips/irq.h	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/irq.h	2005-04-01 08:56:56 -0800
+@@ -24,11 +24,9 @@
+ 
+ struct pt_regs;
+ 
+-#ifdef CONFIG_PREEMPT
+-
+ extern asmlinkage unsigned int do_IRQ(unsigned int irq, struct pt_regs *regs);
+ 
+-#else
++#ifdef CONFIG_PREEMPT
+ 
+ /*
+  * do_IRQ handles all normal device IRQ's (the special
+diff -Naur linux-2.6.11.6/include/asm-mips/mipsregs.h /cross/build/linux-2.6.11.6/include/asm-mips/mipsregs.h
+--- linux-2.6.11.6/include/asm-mips/mipsregs.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/mipsregs.h	2005-04-01 08:56:56 -0800
+@@ -790,10 +790,18 @@
+ #define read_c0_config1()	__read_32bit_c0_register($16, 1)
+ #define read_c0_config2()	__read_32bit_c0_register($16, 2)
+ #define read_c0_config3()	__read_32bit_c0_register($16, 3)
++#define read_c0_config4()	__read_32bit_c0_register($16, 4)
++#define read_c0_config5()	__read_32bit_c0_register($16, 5)
++#define read_c0_config6()	__read_32bit_c0_register($16, 6)
++#define read_c0_config7()	__read_32bit_c0_register($16, 7)
+ #define write_c0_config(val)	__write_32bit_c0_register($16, 0, val)
+ #define write_c0_config1(val)	__write_32bit_c0_register($16, 1, val)
+ #define write_c0_config2(val)	__write_32bit_c0_register($16, 2, val)
+ #define write_c0_config3(val)	__write_32bit_c0_register($16, 3, val)
++#define write_c0_config4(val)	__write_32bit_c0_register($16, 4, val)
++#define write_c0_config5(val)	__write_32bit_c0_register($16, 5, val)
++#define write_c0_config6(val)	__write_32bit_c0_register($16, 6, val)
++#define write_c0_config7(val)	__write_32bit_c0_register($16, 7, val)
+ 
+ /*
+  * The WatchLo register.  There may be upto 8 of them.
+diff -Naur linux-2.6.11.6/include/asm-mips/module.h /cross/build/linux-2.6.11.6/include/asm-mips/module.h
+--- linux-2.6.11.6/include/asm-mips/module.h	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/module.h	2005-04-01 08:56:56 -0800
+@@ -14,15 +14,23 @@
+ 
+ typedef uint8_t Elf64_Byte;		/* Type for a 8-bit quantity.  */
+ 
+-typedef struct
+-{
+-  Elf64_Addr r_offset;			/* Address of relocation.  */
+-  Elf64_Word r_sym;			/* Symbol index.  */
+-  Elf64_Byte r_ssym;			/* Special symbol.  */
+-  Elf64_Byte r_type3;			/* Third relocation.  */
+-  Elf64_Byte r_type2;			/* Second relocation.  */
+-  Elf64_Byte r_type;			/* First relocation.  */
+-  Elf64_Sxword r_addend;		/* Addend.  */
++typedef struct {
++	Elf64_Addr r_offset;			/* Address of relocation.  */
++	Elf64_Word r_sym;			/* Symbol index.  */
++	Elf64_Byte r_ssym;			/* Special symbol.  */
++	Elf64_Byte r_type3;			/* Third relocation.  */
++	Elf64_Byte r_type2;			/* Second relocation.  */
++	Elf64_Byte r_type;			/* First relocation.  */
++} Elf64_Mips_Rel;
++
++typedef struct {
++	Elf64_Addr r_offset;			/* Address of relocation.  */
++	Elf64_Word r_sym;			/* Symbol index.  */
++	Elf64_Byte r_ssym;			/* Special symbol.  */
++	Elf64_Byte r_type3;			/* Third relocation.  */
++	Elf64_Byte r_type2;			/* Second relocation.  */
++	Elf64_Byte r_type;			/* First relocation.  */
++	Elf64_Sxword r_addend;			/* Addend.  */
+ } Elf64_Mips_Rela;
+ 
+ #ifdef CONFIG_MIPS32
+@@ -30,6 +38,13 @@
+ #define Elf_Shdr	Elf32_Shdr
+ #define Elf_Sym		Elf32_Sym
+ #define Elf_Ehdr	Elf32_Ehdr
++#define Elf_Addr	Elf32_Addr
++
++#define Elf_Mips_Rel	Elf32_Rel
++#define Elf_Mips_Rela	Elf32_Rela
++
++#define ELF_MIPS_R_SYM(rel) ELF32_R_SYM(rel.r_info)
++#define ELF_MIPS_R_TYPE(rel) ELF32_R_TYPE(rel.r_info)
+ 
+ #endif
+ 
+@@ -38,6 +53,13 @@
+ #define Elf_Shdr	Elf64_Shdr
+ #define Elf_Sym		Elf64_Sym
+ #define Elf_Ehdr	Elf64_Ehdr
++#define Elf_Addr	Elf64_Addr
++
++#define Elf_Mips_Rel	Elf64_Mips_Rel
++#define Elf_Mips_Rela	Elf64_Mips_Rela
++
++#define ELF_MIPS_R_SYM(rel) (rel.r_sym)
++#define ELF_MIPS_R_TYPE(rel) (rel.r_type)
+ 
+ #endif
+ 
+diff -Naur linux-2.6.11.6/include/asm-mips/page.h /cross/build/linux-2.6.11.6/include/asm-mips/page.h
+--- linux-2.6.11.6/include/asm-mips/page.h	2005-03-25 19:28:18 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/page.h	2005-04-01 08:56:56 -0800
+@@ -87,21 +87,48 @@
+ typedef struct { unsigned long pte; } pte_t;
+ #define pte_val(x)	((x).pte)
+ #endif
++#define __pte(x)	((pte_t) { (x) } )
+ 
+-typedef struct { unsigned long pmd; } pmd_t;
+-typedef struct { unsigned long pgd; } pgd_t;
+-typedef struct { unsigned long pgprot; } pgprot_t;
++/*
++ * For 3-level pagetables we defines these ourselves, for 2-level the
++ * definitions are supplied by <asm-generic/pgtable-nopmd.h>.
++ */
++#ifdef CONFIG_MIPS64
+ 
++typedef struct { unsigned long pmd; } pmd_t;
+ #define pmd_val(x)	((x).pmd)
++#define __pmd(x)	((pmd_t) { (x) } )
++
++#endif
++
++/*
++ * Right now we don't support 4-level pagetables, so all pud-related
++ * definitions come from <asm-generic/pgtable-nopud.h>.
++ */
++
++/*
++ * Finall the top of the hierarchy, the pgd
++ */
++typedef struct { unsigned long pgd; } pgd_t;
+ #define pgd_val(x)	((x).pgd)
++#define __pgd(x)	((pgd_t) { (x) } )
++
++/*
++ * Manipulate page protection bits
++ */
++typedef struct { unsigned long pgprot; } pgprot_t;
+ #define pgprot_val(x)	((x).pgprot)
++#define __pgprot(x)	((pgprot_t) { (x) } )
+ 
++/*
++ * On R4000-style MMUs where a TLB entry is mapping a adjacent even / odd
++ * pair of pages we only have a single global bit per pair of pages.  When
++ * writing to the TLB make sure we always have the bit set for both pages
++ * or none.  This macro is used to access the `buddy' of the pte we're just
++ * working on.
++ */
+ #define ptep_buddy(x)	((pte_t *)((unsigned long)(x) ^ sizeof(pte_t)))
+ 
+-#define __pte(x)	((pte_t) { (x) } )
+-#define __pmd(x)	((pmd_t) { (x) } )
+-#define __pgd(x)	((pgd_t) { (x) } )
+-#define __pgprot(x)	((pgprot_t) { (x) } )
+ 
+ /* Pure 2^n version of get_order */
+ static __inline__ int get_order(unsigned long size)
+diff -Naur linux-2.6.11.6/include/asm-mips/pgalloc.h /cross/build/linux-2.6.11.6/include/asm-mips/pgalloc.h
+--- linux-2.6.11.6/include/asm-mips/pgalloc.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/pgalloc.h	2005-04-01 08:56:56 -0800
+@@ -26,10 +26,22 @@
+ }
+ 
+ /*
++ * Initialize a new pmd table with invalid pointers.
++ */
++extern void pmd_init(unsigned long page, unsigned long pagetable);
++
++#ifdef CONFIG_MIPS64
++
++static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	set_pud(pud, __pud((unsigned long)pmd));
++}
++#endif
++
++/*
+  * Initialize a new pgd / pmd table with invalid pointers.
+  */
+ extern void pgd_init(unsigned long page);
+-extern void pmd_init(unsigned long page, unsigned long pagetable);
+ 
+ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
+ {
+@@ -86,21 +98,18 @@
+ #define __pte_free_tlb(tlb,pte)		tlb_remove_page((tlb),(pte))
+ 
+ #ifdef CONFIG_MIPS32
+-#define pgd_populate(mm, pmd, pte)	BUG()
+ 
+ /*
+  * allocating and freeing a pmd is trivial: the 1-entry pmd is
+  * inside the pgd, so has no extra memory associated with it.
+  */
+-#define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
+ #define pmd_free(x)			do { } while (0)
+ #define __pmd_free_tlb(tlb,x)		do { } while (0)
++
+ #endif
+ 
+ #ifdef CONFIG_MIPS64
+ 
+-#define pgd_populate(mm, pgd, pmd)	set_pgd(pgd, __pgd(pmd))
+-
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
+ {
+ 	pmd_t *pmd;
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-32.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-32.h
+--- linux-2.6.11.6/include/asm-mips/pgtable-32.h	2005-03-25 19:28:21 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-32.h	2005-04-01 08:56:56 -0800
+@@ -17,6 +17,8 @@
+ #include <asm/cachectl.h>
+ #include <asm/fixmap.h>
+ 
++#include <asm-generic/pgtable-nopmd.h>
++
+ /*
+  * - add_wired_entry() add a fixed TLB entry, and move wired register
+  */
+@@ -41,42 +43,38 @@
+  * works even with the cache aliasing problem the R4k and above have.
+  */
+ 
+-/* PMD_SHIFT determines the size of the area a second-level page table can map */
++/* PGDIR_SHIFT determines what a third-level page table entry can map */
+ #ifdef CONFIG_64BIT_PHYS_ADDR
+-#define PMD_SHIFT	21
++#define PGDIR_SHIFT	21
+ #else
+-#define PMD_SHIFT	22
++#define PGDIR_SHIFT	22
+ #endif
+-#define PMD_SIZE	(1UL << PMD_SHIFT)
+-#define PMD_MASK	(~(PMD_SIZE-1))
+-
+-/* PGDIR_SHIFT determines what a third-level page table entry can map */
+-#define PGDIR_SHIFT	PMD_SHIFT
+ #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
+ #define PGDIR_MASK	(~(PGDIR_SIZE-1))
+ 
+ /*
+  * Entries per page directory level: we use two-level, so
+- * we don't really have any PMD directory physically.
++ * we don't really have any PUD/PMD directory physically.
+  */
+ #ifdef CONFIG_64BIT_PHYS_ADDR
+ #define PGD_ORDER	1
+-#define PMD_ORDER	0
++#define PUD_ORDER	aieeee_attempt_to_allocate_pud
++#define PMD_ORDER	1
+ #define PTE_ORDER	0
+ #else
+ #define PGD_ORDER	0
+-#define PMD_ORDER	0
++#define PUD_ORDER	aieeee_attempt_to_allocate_pud
++#define PMD_ORDER	1
+ #define PTE_ORDER	0
+ #endif
+ 
+ #define PTRS_PER_PGD	((PAGE_SIZE << PGD_ORDER) / sizeof(pgd_t))
+-#define PTRS_PER_PMD	1
+ #define PTRS_PER_PTE	((PAGE_SIZE << PTE_ORDER) / sizeof(pte_t))
+ 
+ #define USER_PTRS_PER_PGD	(0x80000000UL/PGDIR_SIZE)
+ #define FIRST_USER_PGD_NR	0
+ 
+-#define VMALLOC_START     KSEG2
++#define VMALLOC_START     MAP_BASE
+ 
+ #ifdef CONFIG_HIGHMEM
+ # define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
+@@ -91,8 +89,6 @@
+ #define pte_ERROR(e) \
+ 	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, pte_val(e))
+ #endif
+-#define pmd_ERROR(e) \
+-	printk("%s:%d: bad pmd %08lx.\n", __FILE__, __LINE__, pmd_val(e))
+ #define pgd_ERROR(e) \
+ 	printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pgd_val(e))
+ 
+@@ -120,16 +116,6 @@
+ 	pmd_val(*pmdp) = ((unsigned long) invalid_pte_table);
+ }
+ 
+-/*
+- * The "pgd_xxx()" functions here are trivial for a folded two-level
+- * setup: the pgd is never bad, and a pmd always exists (as it's folded
+- * into the pgd entry)
+- */
+-static inline int pgd_none(pgd_t pgd)		{ return 0; }
+-static inline int pgd_bad(pgd_t pgd)		{ return 0; }
+-static inline int pgd_present(pgd_t pgd)	{ return 1; }
+-static inline void pgd_clear(pgd_t *pgdp)	{ }
+-
+ #if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32)
+ #define pte_page(x)		pfn_to_page(pte_pfn(x))
+ #define pte_pfn(x)		((unsigned long)((x).pte_high >> 6))
+@@ -156,22 +142,17 @@
+ #endif /* defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_CPU_MIPS32) */
+ 
+ #define __pgd_offset(address)	pgd_index(address)
++#define __pud_offset(address)	(((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
+ #define __pmd_offset(address)	(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+ 
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(address) pgd_offset(&init_mm, address)
+ 
+-#define pgd_index(address)	((address) >> PGDIR_SHIFT)
++#define pgd_index(address)	(((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+ 
+ /* to find an entry in a page-table-directory */
+ #define pgd_offset(mm,addr)	((mm)->pgd + pgd_index(addr))
+ 
+-/* Find an entry in the second-level page table.. */
+-static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
+-{
+-	return (pmd_t *) dir;
+-}
+-
+ /* Find an entry in the third-level page table.. */
+ #define __pte_offset(address)						\
+ 	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-64.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-64.h
+--- linux-2.6.11.6/include/asm-mips/pgtable-64.h	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-64.h	2005-04-01 08:56:56 -0800
+@@ -16,13 +16,15 @@
+ #include <asm/page.h>
+ #include <asm/cachectl.h>
+ 
++#include <asm-generic/pgtable-nopud.h>
++
+ /*
+  * Each address space has 2 4K pages as its page directory, giving 1024
+  * (== PTRS_PER_PGD) 8 byte pointers to pmd tables. Each pmd table is a
+- * pair of 4K pages, giving 1024 (== PTRS_PER_PMD) 8 byte pointers to
+- * page tables. Each page table is a single 4K page, giving 512 (==
+- * PTRS_PER_PTE) 8 byte ptes. Each pgde is initialized to point to
+- * invalid_pmd_table, each pmde is initialized to point to
++ * single 4K page, giving 512 (== PTRS_PER_PMD) 8 byte pointers to page
++ * tables. Each page table is also a single 4K page, giving 512 (==
++ * PTRS_PER_PTE) 8 byte ptes. Each pud entry is initialized to point to
++ * invalid_pmd_table, each pmd entry is initialized to point to
+  * invalid_pte_table, each pte is initialized to 0. When memory is low,
+  * and a pmd table or a page table allocation fails, empty_bad_pmd_table
+  * and empty_bad_page_table is returned back to higher layer code, so
+@@ -36,17 +38,17 @@
+  */
+ 
+ /* PMD_SHIFT determines the size of the area a second-level page table can map */
+-#define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT - 3))
++#define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT + PTE_ORDER - 3))
+ #define PMD_SIZE	(1UL << PMD_SHIFT)
+ #define PMD_MASK	(~(PMD_SIZE-1))
+ 
+ /* PGDIR_SHIFT determines what a third-level page table entry can map */
+-#define PGDIR_SHIFT	(PMD_SHIFT + (PAGE_SHIFT + 1 - 3))
++#define PGDIR_SHIFT	(PMD_SHIFT + (PAGE_SHIFT + PMD_ORDER - 3))
+ #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
+ #define PGDIR_MASK	(~(PGDIR_SIZE-1))
+ 
+ /*
+- * For 4kB page size we use a 3 level page tree and a 8kB pmd and pgds which
++ * For 4kB page size we use a 3 level page tree and an 8kB pud, which
+  * permits us mapping 40 bits of virtual address space.
+  *
+  * We used to implement 41 bits by having an order 1 pmd level but that seemed
+@@ -57,7 +59,7 @@
+  * two levels would be easy to implement.
+  *
+  * For 16kB page size we use a 2 level page tree which permits a total of
+- * 36 bits of virtual address space.  We could add a third leve. but it seems
++ * 36 bits of virtual address space.  We could add a third level but it seems
+  * like at the moment there's no need for this.
+  *
+  * For 64kB page size we use a 2 level page table tree for a total of 42 bits
+@@ -65,21 +67,25 @@
+  */
+ #ifdef CONFIG_PAGE_SIZE_4KB
+ #define PGD_ORDER		1
++#define PUD_ORDER		aieeee_attempt_to_allocate_pud
+ #define PMD_ORDER		0
+ #define PTE_ORDER		0
+ #endif
+ #ifdef CONFIG_PAGE_SIZE_8KB
+ #define PGD_ORDER		0
++#define PUD_ORDER		aieeee_attempt_to_allocate_pud
+ #define PMD_ORDER		0
+ #define PTE_ORDER		0
+ #endif
+ #ifdef CONFIG_PAGE_SIZE_16KB
+ #define PGD_ORDER		0
++#define PUD_ORDER		aieeee_attempt_to_allocate_pud
+ #define PMD_ORDER		0
+ #define PTE_ORDER		0
+ #endif
+ #ifdef CONFIG_PAGE_SIZE_64KB
+ #define PGD_ORDER		0
++#define PUD_ORDER		aieeee_attempt_to_allocate_pud
+ #define PMD_ORDER		0
+ #define PTE_ORDER		0
+ #endif
+@@ -91,7 +97,7 @@
+ #define USER_PTRS_PER_PGD	(TASK_SIZE / PGDIR_SIZE)
+ #define FIRST_USER_PGD_NR	0
+ 
+-#define VMALLOC_START		XKSEG
++#define VMALLOC_START		MAP_BASE
+ #define VMALLOC_END	\
+ 	(VMALLOC_START + PTRS_PER_PGD * PTRS_PER_PMD * PTRS_PER_PTE * PAGE_SIZE)
+ 
+@@ -102,10 +108,10 @@
+ #define pgd_ERROR(e) \
+ 	printk("%s:%d: bad pgd %016lx.\n", __FILE__, __LINE__, pgd_val(e))
+ 
+-extern pte_t invalid_pte_table[PAGE_SIZE/sizeof(pte_t)];
+-extern pte_t empty_bad_page_table[PAGE_SIZE/sizeof(pte_t)];
+-extern pmd_t invalid_pmd_table[2*PAGE_SIZE/sizeof(pmd_t)];
+-extern pmd_t empty_bad_pmd_table[2*PAGE_SIZE/sizeof(pmd_t)];
++extern pte_t invalid_pte_table[PTRS_PER_PTE];
++extern pte_t empty_bad_page_table[PTRS_PER_PTE];
++extern pmd_t invalid_pmd_table[PTRS_PER_PMD];
++extern pmd_t empty_bad_pmd_table[PTRS_PER_PMD];
+ 
+ /*
+  * Empty pmd entries point to the invalid_pte_table.
+@@ -128,23 +134,26 @@
+ }
+ 
+ /*
+- * Empty pgd entries point to the invalid_pmd_table.
++ * Empty pud entries point to the invalid_pmd_table.
+  */
+-static inline int pgd_none(pgd_t pgd)
++static inline int pud_none(pud_t pud)
+ {
+-	return pgd_val(pgd) == (unsigned long) invalid_pmd_table;
++	return pud_val(pud) == (unsigned long) invalid_pmd_table;
+ }
+ 
+-#define pgd_bad(pgd)		(pgd_val(pgd) &~ PAGE_MASK)
++static inline int pud_bad(pud_t pud)
++{
++	return pud_val(pud) & ~PAGE_MASK;
++}
+ 
+-static inline int pgd_present(pgd_t pgd)
++static inline int pud_present(pud_t pud)
+ {
+-	return pgd_val(pgd) != (unsigned long) invalid_pmd_table;
++	return pud_val(pud) != (unsigned long) invalid_pmd_table;
+ }
+ 
+-static inline void pgd_clear(pgd_t *pgdp)
++static inline void pud_clear(pud_t *pudp)
+ {
+-	pgd_val(*pgdp) = ((unsigned long) invalid_pmd_table);
++	pud_val(*pudp) = ((unsigned long) invalid_pmd_table);
+ }
+ 
+ #define pte_page(x)		pfn_to_page((unsigned long)((pte_val(x) >> PAGE_SHIFT)))
+@@ -157,25 +166,26 @@
+ #endif
+ 
+ #define __pgd_offset(address)	pgd_index(address)
++#define __pud_offset(address)	(((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
+ #define page_pte(page) page_pte_prot(page, __pgprot(0))
+ 
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(address) pgd_offset(&init_mm, 0)
+ 
+-#define pgd_index(address)		((address) >> PGDIR_SHIFT)
++#define pgd_index(address)	(((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+ 
+ /* to find an entry in a page-table-directory */
+ #define pgd_offset(mm,addr)	((mm)->pgd + pgd_index(addr))
+ 
+-static inline unsigned long pgd_page(pgd_t pgd)
++static inline unsigned long pud_page(pud_t pud)
+ {
+-	return pgd_val(pgd);
++	return pud_val(pud);
+ }
+ 
+ /* Find an entry in the second-level page table.. */
+-static inline pmd_t *pmd_offset(pgd_t * dir, unsigned long address)
++static inline pmd_t *pmd_offset(pud_t * pud, unsigned long address)
+ {
+-	return (pmd_t *) pgd_page(*dir) +
++	return (pmd_t *) pud_page(*pud) +
+ 	       ((address >> PMD_SHIFT) & (PTRS_PER_PMD - 1));
+ }
+ 
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable.h
+--- linux-2.6.11.6/include/asm-mips/pgtable.h	2005-03-25 19:28:17 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable.h	2005-04-01 08:56:56 -0800
+@@ -8,8 +8,6 @@
+ #ifndef _ASM_PGTABLE_H
+ #define _ASM_PGTABLE_H
+ 
+-#include <asm-generic/4level-fixup.h>
+-
+ #include <linux/config.h>
+ #ifdef CONFIG_MIPS32
+ #include <asm/pgtable-32.h>
+@@ -144,11 +142,18 @@
+ #endif
+ 
+ /*
+- * (pmds are folded into pgds so this doesn't get actually called,
++ * (pmds are folded into puds so this doesn't get actually called,
+  * but the define is needed for a generic inline function.)
+  */
+ #define set_pmd(pmdptr, pmdval) do { *(pmdptr) = (pmdval); } while(0)
+-#define set_pgd(pgdptr, pgdval) do { *(pgdptr) = (pgdval); } while(0)
++
++#ifdef CONFIG_MIPS64
++/*
++ * (puds are folded into pgds so this doesn't get actually called,
++ * but the define is needed for a generic inline function.)
++ */
++#define set_pud(pudptr, pudval) do { *(pudptr) = (pudval); } while(0)
++#endif
+ 
+ #define PGD_T_LOG2	ffz(~sizeof(pgd_t))
+ #define PMD_T_LOG2	ffz(~sizeof(pmd_t))
+diff -Naur linux-2.6.11.6/include/asm-mips/serial.h /cross/build/linux-2.6.11.6/include/asm-mips/serial.h
+--- linux-2.6.11.6/include/asm-mips/serial.h	2005-03-25 19:28:39 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/serial.h	2005-04-01 08:56:56 -0800
+@@ -309,9 +309,9 @@
+ #define JAGUAR_ATX_SERIAL1_BASE	0xfd000023L
+ 
+ #define _JAGUAR_ATX_SERIAL_INIT(int, base)				\
+-	{ baud_base: JAGUAR_ATX_BASE_BAUD, irq: int,			\
+-	  flags: (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST),		\
+-	  iomem_base: (u8 *) base, iomem_reg_shift: 2,			\
++	{ .baud_base = JAGUAR_ATX_BASE_BAUD, irq: int,			\
++	  .flags = (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST),		\
++	  .iomem_base = (u8 *) base, iomem_reg_shift: 2,			\
+ 	  io_type: SERIAL_IO_MEM }
+ #define MOMENCO_JAGUAR_ATX_SERIAL_PORT_DEFNS				\
+ 	_JAGUAR_ATX_SERIAL_INIT(JAGUAR_ATX_SERIAL1_IRQ, JAGUAR_ATX_SERIAL1_BASE)
+@@ -325,9 +325,9 @@
+ #define OCELOT_3_SERIAL_BASE	(signed)0xfd000020
+ 
+ #define _OCELOT_3_SERIAL_INIT(int, base)				\
+-	{ baud_base: OCELOT_3_BASE_BAUD, irq: int, 			\
+-	  flags: STD_COM_FLAGS,						\
+-	  iomem_base: (u8 *) base, iomem_reg_shift: 2,			\
++	{ .baud_base = OCELOT_3_BASE_BAUD, irq: int, 			\
++	  .flags = STD_COM_FLAGS,						\
++	  .iomem_base = (u8 *) base, iomem_reg_shift: 2,			\
+ 	  io_type: SERIAL_IO_MEM }
+ 
+ #define MOMENCO_OCELOT_3_SERIAL_PORT_DEFNS				\
+diff -Naur linux-2.6.11.6/include/asm-mips/signal.h /cross/build/linux-2.6.11.6/include/asm-mips/signal.h
+--- linux-2.6.11.6/include/asm-mips/signal.h	2005-03-25 19:28:18 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/signal.h	2005-04-01 08:56:56 -0800
+@@ -120,7 +120,8 @@
+ 				   set only the low 32 bit of the sigset.  */
+ 
+ /* Type of a signal handler.  */
+-typedef void (*__sighandler_t)(int);
++typedef void __signalfn_t(int);
++typedef __signalfn_t __user *__sighandler_t;
+ 
+ /* Fake signal functions */
+ #define SIG_DFL	((__sighandler_t)0)	/* default signal handling */
+diff -Naur linux-2.6.11.6/include/asm-mips/spinlock.h /cross/build/linux-2.6.11.6/include/asm-mips/spinlock.h
+--- linux-2.6.11.6/include/asm-mips/spinlock.h	2005-03-25 19:28:37 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/spinlock.h	2005-04-01 08:56:56 -0800
+@@ -140,6 +140,18 @@
+ 
+ #define rwlock_init(x)  do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+ 
++/*
++ * read_can_lock - would read_trylock() succeed?
++ * @lock: the rwlock in question.
++ */
++#define read_can_lock(rw)	((rw)->lock >= 0)
++
++/*
++ * write_can_lock - would write_trylock() succeed?
++ * @lock: the rwlock in question.
++ */
++#define write_can_lock(rw)	(!(rw)->lock)
++
+ static inline void _raw_read_lock(rwlock_t *rw)
+ {
+ 	unsigned int tmp;
+diff -Naur linux-2.6.11.6/include/asm-mips/stackframe.h /cross/build/linux-2.6.11.6/include/asm-mips/stackframe.h
+--- linux-2.6.11.6/include/asm-mips/stackframe.h	2005-03-25 19:28:13 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/stackframe.h	2005-04-01 08:56:56 -0800
+@@ -78,7 +78,12 @@
+ 		MFC0	k1, CP0_CONTEXT
+ 		dsrl	k1, 23
+ 		dsll	k1, k1, 3
+-		LONG_L	k1, kernelsp(k1)
++		lui	k0, %highest(kernelsp)
++		daddiu	k0, %higher(kernelsp)
++		dsll	k0, k0, 16
++		daddiu	k0, %hi(kernelsp)
++		daddu	k1, k1, k0
++		LONG_L	k1, %lo(kernelsp)(k1)
+ #endif
+ 		.endm
+ 
+diff -Naur linux-2.6.11.6/include/asm-mips/uaccess.h /cross/build/linux-2.6.11.6/include/asm-mips/uaccess.h
+--- linux-2.6.11.6/include/asm-mips/uaccess.h	2005-03-25 19:28:14 -0800
++++ /cross/build/linux-2.6.11.6/include/asm-mips/uaccess.h	2005-04-01 08:56:56 -0800
+@@ -128,7 +128,8 @@
+  *
+  * See access_ok() for more details.
+  */
+-static inline int verify_area(int type, const void * addr, unsigned long size)
++static inline int verify_area(int type, const void __user * addr,
++	unsigned long size)
+ {
+ 	return access_ok(type, addr, size) ? 0 : -EFAULT;
+ }
+@@ -218,31 +219,29 @@
+ 	__get_user_nocheck((x),(ptr),sizeof(*(ptr)))
+ 
+ struct __large_struct { unsigned long buf[100]; };
+-#define __m(x) (*(struct __large_struct *)(x))
++#define __m(x) (*(struct __large_struct __user *)(x))
+ 
+ /*
+  * Yuck.  We need two variants, one for 64bit operation and one
+  * for 32 bit mode and old iron.
+  */
+ #ifdef __mips64
+-#define __GET_USER_DW(__gu_err) __get_user_asm("ld", __gu_err)
++#define __GET_USER_DW(ptr) __get_user_asm("ld", ptr)
+ #else
+-#define __GET_USER_DW(__gu_err) __get_user_asm_ll32(__gu_err)
++#define __GET_USER_DW(ptr) __get_user_asm_ll32(ptr)
+ #endif
+ 
+ #define __get_user_nocheck(x,ptr,size)					\
+ ({									\
+ 	__typeof(*(ptr)) __gu_val = 0;					\
+-	long __gu_addr;							\
+ 	long __gu_err = 0;						\
+ 									\
+ 	might_sleep();							\
+-	__gu_addr = (long) (ptr);					\
+ 	switch (size) {							\
+-	case 1: __get_user_asm("lb", __gu_err); break;			\
+-	case 2: __get_user_asm("lh", __gu_err); break;			\
+-	case 4: __get_user_asm("lw", __gu_err); break;			\
+-	case 8: __GET_USER_DW(__gu_err); break;				\
++	case 1: __get_user_asm("lb", ptr); break;			\
++	case 2: __get_user_asm("lh", ptr); break;			\
++	case 4: __get_user_asm("lw", ptr); break;			\
++	case 8: __GET_USER_DW(ptr); break;				\
+ 	default: __get_user_unknown(); break;				\
+ 	}								\
+ 	x = (__typeof__(*(ptr))) __gu_val;				\
+@@ -251,20 +250,19 @@
+ 
+ #define __get_user_check(x,ptr,size)					\
+ ({									\
++	const __typeof__(*(ptr)) __user * __gu_addr = (ptr);		\
+ 	__typeof__(*(ptr)) __gu_val = 0;				\
+-	long __gu_addr;							\
+ 	long __gu_err;							\
+ 									\
+ 	might_sleep();							\
+-	__gu_addr = (long) (ptr);					\
+-	__gu_err = verify_area(VERIFY_READ, (void *) __gu_addr, size);	\
+ 									\
++	__gu_err = verify_area(VERIFY_READ,  __gu_addr, size);		\
+ 	if (likely(!__gu_err)) {					\
+ 		switch (size) {						\
+-		case 1: __get_user_asm("lb", __gu_err); break;		\
+-		case 2: __get_user_asm("lh", __gu_err); break;		\
+-		case 4: __get_user_asm("lw", __gu_err); break;		\
+-		case 8: __GET_USER_DW(__gu_err); break;			\
++		case 1: __get_user_asm("lb", __gu_addr); break;		\
++		case 2: __get_user_asm("lh", __gu_addr); break;		\
++		case 4: __get_user_asm("lw", __gu_addr); break;		\
++		case 8: __GET_USER_DW(__gu_addr); break;		\
+ 		default: __get_user_unknown(); break;			\
+ 		}							\
+ 	}								\
+@@ -272,7 +270,7 @@
+ 	__gu_err;							\
+ })
+ 
+-#define __get_user_asm(insn,__gu_err)					\
++#define __get_user_asm(insn, addr)					\
+ ({									\
+ 	__asm__ __volatile__(						\
+ 	"1:	" insn "	%1, %3				\n"	\
+@@ -285,20 +283,20 @@
+ 	"	"__UA_ADDR "\t1b, 3b				\n"	\
+ 	"	.previous					\n"	\
+ 	: "=r" (__gu_err), "=r" (__gu_val)				\
+-	: "0" (__gu_err), "o" (__m(__gu_addr)), "i" (-EFAULT));		\
++	: "0" (__gu_err), "o" (__m(addr)), "i" (-EFAULT));		\
+ })
+ 
+ /*
+  * Get a long long 64 using 32 bit registers.
+  */
+-#define __get_user_asm_ll32(__gu_err)					\
++#define __get_user_asm_ll32(addr)					\
+ ({									\
+ 	__asm__ __volatile__(						\
+-	"1:	lw	%1, %3					\n"	\
+-	"2:	lw	%D1, %4					\n"	\
++	"1:	lw	%1, (%3)				\n"	\
++	"2:	lw	%D1, 4(%3)				\n"	\
+ 	"	move	%0, $0					\n"	\
+ 	"3:	.section	.fixup,\"ax\"			\n"	\
+-	"4:	li	%0, %5					\n"	\
++	"4:	li	%0, %4					\n"	\
+ 	"	move	%1, $0					\n"	\
+ 	"	move	%D1, $0					\n"	\
+ 	"	j	3b					\n"	\
+@@ -308,8 +306,7 @@
+ 	"	" __UA_ADDR "	2b, 4b				\n"	\
+ 	"	.previous					\n"	\
+ 	: "=r" (__gu_err), "=&r" (__gu_val)				\
+-	: "0" (__gu_err), "o" (__m(__gu_addr)),				\
+-	  "o" (__m(__gu_addr + 4)), "i" (-EFAULT));			\
++	: "0" (__gu_err), "r" (addr), "i" (-EFAULT));			\
+ })
+ 
+ extern void __get_user_unknown(void);
+@@ -319,25 +316,23 @@
+  * for 32 bit mode and old iron.
+  */
+ #ifdef __mips64
+-#define __PUT_USER_DW(__pu_val) __put_user_asm("sd", __pu_val)
++#define __PUT_USER_DW(ptr) __put_user_asm("sd", ptr)
+ #else
+-#define __PUT_USER_DW(__pu_val) __put_user_asm_ll32(__pu_val)
++#define __PUT_USER_DW(ptr) __put_user_asm_ll32(ptr)
+ #endif
+ 
+ #define __put_user_nocheck(x,ptr,size)					\
+ ({									\
+ 	__typeof__(*(ptr)) __pu_val;					\
+-	long __pu_addr;							\
+ 	long __pu_err = 0;						\
+ 									\
+ 	might_sleep();							\
+ 	__pu_val = (x);							\
+-	__pu_addr = (long) (ptr);					\
+ 	switch (size) {							\
+-	case 1: __put_user_asm("sb", __pu_val); break;			\
+-	case 2: __put_user_asm("sh", __pu_val); break;			\
+-	case 4: __put_user_asm("sw", __pu_val); break;			\
+-	case 8: __PUT_USER_DW(__pu_val); break;				\
++	case 1: __put_user_asm("sb", ptr); break;			\
++	case 2: __put_user_asm("sh", ptr); break;			\
++	case 4: __put_user_asm("sw", ptr); break;			\
++	case 8: __PUT_USER_DW(ptr); break;				\
+ 	default: __put_user_unknown(); break;				\
+ 	}								\
+ 	__pu_err;							\
+@@ -345,28 +340,26 @@
+ 
+ #define __put_user_check(x,ptr,size)					\
+ ({									\
+-	__typeof__(*(ptr)) __pu_val;					\
+-	long __pu_addr;							\
++	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
++	__typeof__(*(ptr)) __pu_val = (x);				\
+ 	long __pu_err;							\
+ 									\
+ 	might_sleep();							\
+-	__pu_val = (x);							\
+-	__pu_addr = (long) (ptr);					\
+-	__pu_err = verify_area(VERIFY_WRITE, (void *) __pu_addr, size);	\
+ 									\
++	__pu_err = verify_area(VERIFY_WRITE, __pu_addr, size);		\
+ 	if (likely(!__pu_err)) {					\
+ 		switch (size) {						\
+-		case 1: __put_user_asm("sb", __pu_val); break;		\
+-		case 2: __put_user_asm("sh", __pu_val); break;		\
+-		case 4: __put_user_asm("sw", __pu_val); break;		\
+-		case 8: __PUT_USER_DW(__pu_val); break;			\
++		case 1: __put_user_asm("sb", __pu_addr); break;		\
++		case 2: __put_user_asm("sh", __pu_addr); break;		\
++		case 4: __put_user_asm("sw", __pu_addr); break;		\
++		case 8: __PUT_USER_DW(__pu_addr); break;		\
+ 		default: __put_user_unknown(); break;			\
+ 		}							\
+ 	}								\
+ 	__pu_err;							\
+ })
+ 
+-#define __put_user_asm(insn, __pu_val)					\
++#define __put_user_asm(insn, ptr)					\
+ ({									\
+ 	__asm__ __volatile__(						\
+ 	"1:	" insn "	%z2, %3		# __put_user_asm\n"	\
+@@ -379,18 +372,18 @@
+ 	"	" __UA_ADDR "	1b, 3b				\n"	\
+ 	"	.previous					\n"	\
+ 	: "=r" (__pu_err)						\
+-	: "0" (__pu_err), "Jr" (__pu_val), "o" (__m(__pu_addr)),	\
++	: "0" (__pu_err), "Jr" (__pu_val), "o" (__m(ptr)),		\
+ 	  "i" (-EFAULT));						\
+ })
+ 
+-#define __put_user_asm_ll32(__pu_val)					\
++#define __put_user_asm_ll32(ptr)					\
+ ({									\
+ 	__asm__ __volatile__(						\
+-	"1:	sw	%2, %3		# __put_user_asm_ll32	\n"	\
+-	"2:	sw	%D2, %4					\n"	\
++	"1:	sw	%2, (%3)	# __put_user_asm_ll32	\n"	\
++	"2:	sw	%D2, 4(%3)				\n"	\
+ 	"3:							\n"	\
+ 	"	.section	.fixup,\"ax\"			\n"	\
+-	"4:	li	%0, %5					\n"	\
++	"4:	li	%0, %4					\n"	\
+ 	"	j	3b					\n"	\
+ 	"	.previous					\n"	\
+ 	"	.section	__ex_table,\"a\"		\n"	\
+@@ -398,8 +391,8 @@
+ 	"	" __UA_ADDR "	2b, 4b				\n"	\
+ 	"	.previous"						\
+ 	: "=r" (__pu_err)						\
+-	: "0" (__pu_err), "r" (__pu_val), "o" (__m(__pu_addr)),		\
+-	  "o" (__m(__pu_addr + 4)), "i" (-EFAULT));			\
++	: "0" (__pu_err), "r" (__pu_val), "r" (ptr),			\
++	  "i" (-EFAULT));						\
+ })
+ 
+ extern void __put_user_unknown(void);
+@@ -423,7 +416,7 @@
+ 
+ #define __invoke_copy_to_user(to,from,n)				\
+ ({									\
+-	register void *__cu_to_r __asm__ ("$4");			\
++	register void __user *__cu_to_r __asm__ ("$4");			\
+ 	register const void *__cu_from_r __asm__ ("$5");		\
+ 	register long __cu_len_r __asm__ ("$6");			\
+ 									\
+@@ -455,7 +448,7 @@
+  */
+ #define __copy_to_user(to,from,n)					\
+ ({									\
+-	void *__cu_to;							\
++	void __user __user *__cu_to;					\
+ 	const void *__cu_from;						\
+ 	long __cu_len;							\
+ 									\
+@@ -485,7 +478,7 @@
+  */
+ #define copy_to_user(to,from,n)						\
+ ({									\
+-	void *__cu_to;							\
++	void __user *__cu_to;						\
+ 	const void *__cu_from;						\
+ 	long __cu_len;							\
+ 									\
+@@ -502,7 +495,7 @@
+ #define __invoke_copy_from_user(to,from,n)				\
+ ({									\
+ 	register void *__cu_to_r __asm__ ("$4");			\
+-	register const void *__cu_from_r __asm__ ("$5");		\
++	register const void __user *__cu_from_r __asm__ ("$5");		\
+ 	register long __cu_len_r __asm__ ("$6");			\
+ 									\
+ 	__cu_to_r = (to);						\
+@@ -541,7 +534,7 @@
+ #define __copy_from_user(to,from,n)					\
+ ({									\
+ 	void *__cu_to;							\
+-	const void *__cu_from;						\
++	const void __user *__cu_from;					\
+ 	long __cu_len;							\
+ 									\
+ 	might_sleep();							\
+@@ -572,7 +565,7 @@
+ #define copy_from_user(to,from,n)					\
+ ({									\
+ 	void *__cu_to;							\
+-	const void *__cu_from;						\
++	const void __user *__cu_from;					\
+ 	long __cu_len;							\
+ 									\
+ 	might_sleep();							\
+@@ -589,8 +582,8 @@
+ 
+ #define copy_in_user(to,from,n)						\
+ ({									\
+-	void *__cu_to;							\
+-	const void *__cu_from;						\
++	void __user *__cu_to;						\
++	const void __user *__cu_from;					\
+ 	long __cu_len;							\
+ 									\
+ 	might_sleep();							\
+@@ -616,7 +609,7 @@
+  * On success, this will be zero.
+  */
+ static inline __kernel_size_t
+-__clear_user(void *addr, __kernel_size_t size)
++__clear_user(void __user *addr, __kernel_size_t size)
+ {
+ 	__kernel_size_t res;
+ 
+@@ -665,7 +658,7 @@
+  * and returns @count.
+  */
+ static inline long
+-__strncpy_from_user(char *__to, const char *__from, long __len)
++__strncpy_from_user(char *__to, const char __user *__from, long __len)
+ {
+ 	long res;
+ 
+@@ -702,7 +695,7 @@
+  * and returns @count.
+  */
+ static inline long
+-strncpy_from_user(char *__to, const char *__from, long __len)
++strncpy_from_user(char *__to, const char __user *__from, long __len)
+ {
+ 	long res;
+ 
+@@ -721,7 +714,7 @@
+ }
+ 
+ /* Returns: 0 if bad, string length+1 (memory size) of string if ok */
+-static inline long __strlen_user(const char *s)
++static inline long __strlen_user(const char __user *s)
+ {
+ 	long res;
+ 
+@@ -751,7 +744,7 @@
+  * If there is a limit on the length of a valid string, you may wish to
+  * consider using strnlen_user() instead.
+  */
+-static inline long strlen_user(const char *s)
++static inline long strlen_user(const char __user *s)
+ {
+ 	long res;
+ 
+@@ -768,7 +761,7 @@
+ }
+ 
+ /* Returns: 0 if bad, string length+1 (memory size) of string if ok */
+-static inline long __strnlen_user(const char *s, long n)
++static inline long __strnlen_user(const char __user *s, long n)
+ {
+ 	long res;
+ 
+@@ -799,7 +792,7 @@
+  * If there is a limit on the length of a valid string, you may wish to
+  * consider using strnlen_user() instead.
+  */
+-static inline long strnlen_user(const char *s, long n)
++static inline long strnlen_user(const char __user *s, long n)
+ {
+ 	long res;
+ 
+diff -Naur linux-2.6.11.6/include/linux/init.h /cross/build/linux-2.6.11.6/include/linux/init.h
+--- linux-2.6.11.6/include/linux/init.h	2005-03-25 19:28:14 -0800
++++ /cross/build/linux-2.6.11.6/include/linux/init.h	2005-04-01 08:56:56 -0800
+@@ -86,6 +86,8 @@
+ 	static initcall_t __initcall_##fn __attribute_used__ \
+ 	__attribute__((__section__(".initcall" level ".init"))) = fn
+ 
++#define early_initcall(fn)		__define_initcall(".early1",fn)
++
+ #define core_initcall(fn)		__define_initcall("1",fn)
+ #define postcore_initcall(fn)		__define_initcall("2",fn)
+ #define arch_initcall(fn)		__define_initcall("3",fn)
+diff -Naur linux-2.6.11.6/include/linux/mc146818rtc.h /cross/build/linux-2.6.11.6/include/linux/mc146818rtc.h
+--- linux-2.6.11.6/include/linux/mc146818rtc.h	2005-03-25 19:28:26 -0800
++++ /cross/build/linux-2.6.11.6/include/linux/mc146818rtc.h	2005-04-01 08:56:56 -0800
+@@ -89,4 +89,12 @@
+ # define RTC_VRT 0x80		/* valid RAM and time */
+ /**********************************************************************/
+ 
++#ifndef RTC_IO_EXTENT
++#define RTC_IO_EXTENT  0x8
++#endif
++
++#ifndef RTC_IOMAPPED
++#define RTC_IOMAPPED   1       /* Default to I/O mapping. */
++#endif
++
+ #endif /* _MC146818RTC_H */
+diff -Naur linux-2.6.11.6/include/linux/pci.h /cross/build/linux-2.6.11.6/include/linux/pci.h
+--- linux-2.6.11.6/include/linux/pci.h	2005-03-25 19:28:20 -0800
++++ /cross/build/linux-2.6.11.6/include/linux/pci.h	2005-04-01 08:56:56 -0800
+@@ -1038,7 +1038,7 @@
+ 
+ /* Anonymous variables would be nice... */
+ #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, hook)	\
+-	static struct pci_fixup __pci_fixup_##name __attribute_used__	\
++	static const struct pci_fixup __pci_fixup_##name __attribute_used__ \
+ 	__attribute__((__section__(#section))) = { vendor, device, hook };
+ #define DECLARE_PCI_FIXUP_EARLY(vendor, device, hook)			\
+ 	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_early,			\
+diff -Naur linux-2.6.11.6/include/linux/serial.h /cross/build/linux-2.6.11.6/include/linux/serial.h
+--- linux-2.6.11.6/include/linux/serial.h	2005-03-25 19:28:16 -0800
++++ /cross/build/linux-2.6.11.6/include/linux/serial.h	2005-04-01 08:56:56 -0800
+@@ -75,7 +75,8 @@
+ #define PORT_16654	11
+ #define PORT_16850	12
+ #define PORT_RSA	13	/* RSA-DV II/S card */
+-#define PORT_MAX	13
++#define PORT_SB1250	14
++#define PORT_MAX	14
+ 
+ #define SERIAL_IO_PORT	0
+ #define SERIAL_IO_HUB6	1
+diff -Naur linux-2.6.11.6/include/linux/serial_core.h /cross/build/linux-2.6.11.6/include/linux/serial_core.h
+--- linux-2.6.11.6/include/linux/serial_core.h	2005-03-25 19:28:15 -0800
++++ /cross/build/linux-2.6.11.6/include/linux/serial_core.h	2005-04-01 08:56:56 -0800
+@@ -103,9 +103,6 @@
+ /* Marvell MPSC */
+ #define PORT_MPSC	63
+ 
+-/* TXX9 type number */
+-#define PORT_TXX9       64
+-
+ #ifdef __KERNEL__
+ 
+ #include <linux/config.h>
+diff -Naur linux-2.6.11.6/scripts/kallsyms.c /cross/build/linux-2.6.11.6/scripts/kallsyms.c
+--- linux-2.6.11.6/scripts/kallsyms.c	2005-03-25 19:28:38 -0800
++++ /cross/build/linux-2.6.11.6/scripts/kallsyms.c	2005-04-01 08:56:56 -0800
+@@ -145,6 +145,9 @@
+ 	else if (toupper(s->type) == 'U' ||
+ 		 is_arm_mapping_symbol(str))
+ 		return -1;
++	/* exclude also MIPS ELF local symbols ($L123 instead of .L123) */
++	else if (str[0] == '$')
++		return -1;
+ 
+ 	/* include the type field in the symbol name, so that it gets
+ 	 * compressed together */
