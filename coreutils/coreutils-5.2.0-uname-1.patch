@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
 Date: 2004-02-28
-Initial Package Version: 5.2
+Initial Package Version: 5.2.0
 Origin: lfs coreutils-5.0-uname.patch
 Description: Adds functions to uname to fix 'unknown' to display something usefull.
 

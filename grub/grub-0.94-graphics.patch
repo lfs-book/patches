@@ -1,6 +1,6 @@
 Submitted By: Remy Bosch	remybosch at zonnet dot nl
 Date: 2004-03-03
-Initial Package Version: grub-0.94
+Initial Package Version: 0.94
 Origin: http://www.momonga-linux.org/cvsweb/cvsweb.cgi/pkgs/grub/grub-0.94-graphics.patch
 Description: This patch implements support for XPM Pixmaps on the grub boot
 	      screen.  Pixmaps must be in XPM format, 640x480 resolution,

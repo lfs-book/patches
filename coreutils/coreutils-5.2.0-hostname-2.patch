@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
 Date: 2004-02-28
-Initial Package Version: 5.2
+Initial Package Version: 5.2.0
 Origin: Based entirely on patch from ttrepl@yahoo.de for v5.0
 Description: Removes installation of hostname binary, and also suppresses
 tests on that binary.

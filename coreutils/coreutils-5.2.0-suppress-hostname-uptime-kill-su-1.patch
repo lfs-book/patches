@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
 Date: 2004-02-28
-Initial Package Version: 5.2
+Initial Package Version: 5.2.0
 Origin: none
 Description: This patch supresses the building of hostname, uptime, and kill.
 The su command is built so the testsuite can run, use './src/su', but it will
