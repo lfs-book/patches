@@ -1,17 +1,15 @@
-Submitted By: DJ Lucas (dj_AT_lucasit_DOT_com)
-Date: 2004-04-28
+Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
+Date: 2004-04-22
 Initial Package Version: 2,7
-Origin: Jim Gifford, DJ Lucas, and Randy McMurchy
+Origin: Jim Gifford & DJ Lucas
 Description: Makes Cracklib a dynamic library installed at /lib
              Fixes buffer underruns
              Add's missing header
-             Installs Missing Headers
-             Fixes kerberos linking errors
-             Fixes Linux_PAM linking errors
+             Install's Missing Headers
 
 diff -Naur cracklib,2.7-orig/Makefile cracklib,2.7/Makefile
 --- cracklib,2.7-orig/Makefile	1997-12-31 04:33:53.000000000 -0600
-+++ cracklib,2.7/Makefile	2004-04-28 18:59:44.000000000 -0500
++++ cracklib,2.7/Makefile	2004-04-30 16:58:01.000000000 -0500
 @@ -7,14 +7,21 @@
  ###
  
@@ -49,7 +47,7 @@ diff -Naur cracklib,2.7-orig/Makefile cracklib,2.7/Makefile
  ###	@echo 'now go install passwd/passwd where you want it'
 diff -Naur cracklib,2.7-orig/cracklib/Makefile cracklib,2.7/cracklib/Makefile
 --- cracklib,2.7-orig/cracklib/Makefile	1997-12-14 16:49:21.000000000 -0600
-+++ cracklib,2.7/cracklib/Makefile	2004-04-28 18:59:44.000000000 -0500
++++ cracklib,2.7/cracklib/Makefile	2004-04-30 16:58:01.000000000 -0500
 @@ -6,13 +6,24 @@
  # and upwards.
  ###
@@ -84,28 +82,26 @@ diff -Naur cracklib,2.7-orig/cracklib/Makefile cracklib,2.7/cracklib/Makefile
 +	install -m 644 crack.h $(DESTDIR)/usr/include
 diff -Naur cracklib,2.7-orig/cracklib/crack.h cracklib,2.7/cracklib/crack.h
 --- cracklib,2.7-orig/cracklib/crack.h	1969-12-31 18:00:00.000000000 -0600
-+++ cracklib,2.7/cracklib/crack.h	2004-04-28 19:02:06.000000000 -0500
-@@ -0,0 +1,17 @@
++++ cracklib,2.7/cracklib/crack.h	2004-04-30 17:11:03.000000000 -0500
+@@ -0,0 +1,15 @@
 +
 +#ifndef CRACKLIB_H
 +#define CRACKLIB_H
 +
 +/* Pass this function a password (pw) and a path to the
-+ * dictionaries (CRACKLIB_DICTPATH should be specified)
++ * dictionaries (/lib/cracklib_dict should be specified)
 + * and it will either return a NULL string, meaning that the
 + * password is good, or a pointer to a string that explains the
 + * problem with the password.
 + * You must link with -lcrack
 + */
 +
-+extern char *FascistCheck(char *pw, char *dictpath, char *strings);
-+
-+#define CRACKLIB_DICTPATH "/lib/cracklib_dict"
++extern char *FascistCheck(char *pw, char *dictpath);
 +
 +#endif
 diff -Naur cracklib,2.7-orig/cracklib/fascist.c cracklib,2.7/cracklib/fascist.c
 --- cracklib,2.7-orig/cracklib/fascist.c	1997-12-31 04:26:46.000000000 -0600
-+++ cracklib,2.7/cracklib/fascist.c	2004-04-28 18:59:44.000000000 -0500
++++ cracklib,2.7/cracklib/fascist.c	2004-04-30 16:58:01.000000000 -0500
 @@ -11,6 +11,7 @@
  #include "packer.h"
  #include <sys/types.h>
@@ -114,43 +110,7 @@ diff -Naur cracklib,2.7-orig/cracklib/fascist.c cracklib,2.7/cracklib/fascist.c
  
  #define ISSKIP(x) (isspace(x) || ispunct(x))
  
-@@ -477,6 +478,23 @@
- }
- 
- char *
-+FascistStrings(password, strings)
-+    char *password;
-+    char **strings;
-+{
-+    char *p;
-+
-+    while(p = *strings++)
-+    {
-+	if(GTry(p, password))
-+	{
-+	    return ("it is based on your name");
-+	}
-+    }
-+    return ((char *) 0);
-+}
-+
-+char *
- FascistGecos(password, uid)
-     char *password;
-     int uid;
-@@ -613,9 +631,10 @@
- }
- 
- char *
--FascistLook(pwp, instring)
-+FascistLook(pwp, instring, strings)
-     PWDICT *pwp;
-     char *instring;
-+    char **strings;
- {
-     int i;
-     char *ptr;
-@@ -659,7 +678,7 @@
+@@ -659,7 +660,7 @@
  	return ("it does not contain enough DIFFERENT characters");
      }
  
@@ -159,24 +119,7 @@ diff -Naur cracklib,2.7-orig/cracklib/fascist.c cracklib,2.7/cracklib/fascist.c
  
      Trim(password);
  
-@@ -694,10 +713,16 @@
- 	return ("it looks like a National Insurance number.");
-     }
- 
-+#if 0
-     if (ptr = FascistGecos(password, getuid()))
-     {
- 	return (ptr);
-     }
-+#endif
-+    if (ptr = FascistStrings(password, strings))
-+    {
-+	return (ptr);
-+    }
- 
-     /* it should be safe to use Mangle with its reliance on STRINGSIZE
-        since password cannot be longer than TRUNCSTRINGSIZE;
-@@ -722,7 +747,7 @@
+@@ -722,7 +723,7 @@
  	}
      }
  
@@ -185,45 +128,9 @@ diff -Naur cracklib,2.7-orig/cracklib/fascist.c cracklib,2.7/cracklib/fascist.c
  
      for (i = 0; r_destructors[i]; i++)
      {
-@@ -745,9 +770,10 @@
- }
- 
- char *
--FascistCheck(password, path)
-+FascistCheck(password, path, strings)
-     char *password;
-     char *path;
-+    char **strings;
- {
-     static char lastpath[STRINGSIZE];
-     static PWDICT *pwp;
-@@ -780,5 +806,5 @@
- 	strncpy(lastpath, path, STRINGSIZE);
-     }
- 
--    return (FascistLook(pwp, pwtrunced));
-+    return (FascistLook(pwp, pwtrunced, strings));
- }
-diff -Naur cracklib,2.7-orig/cracklib/packlib.c cracklib,2.7/cracklib/packlib.c
---- cracklib,2.7-orig/cracklib/packlib.c	1993-07-09 15:22:58.000000000 -0500
-+++ cracklib,2.7/cracklib/packlib.c	2004-04-28 18:59:44.000000000 -0500
-@@ -329,6 +329,13 @@
- #ifdef DEBUG
- 	printf("%lu, %lu\n", lwm, hwm);
- #endif
-+	if (lwm > hwm) {
-+	     register int32 tmp;
-+
-+	     tmp = hwm;
-+	     hwm = lwm;
-+	     lwm = tmp;
-+	}
- 
- 	middle = lwm + ((hwm - lwm + 1) / 2);
- 
 diff -Naur cracklib,2.7-orig/util/Makefile cracklib,2.7/util/Makefile
 --- cracklib,2.7-orig/util/Makefile	1997-12-14 16:49:34.000000000 -0600
-+++ cracklib,2.7/util/Makefile	2004-04-28 18:59:44.000000000 -0500
++++ cracklib,2.7/util/Makefile	2004-04-30 16:58:01.000000000 -0500
 @@ -14,27 +14,31 @@
  #SunOS users (and others?) should consider static linking of their passwd binary
  #CFLAGS= -O -I../cracklib '-DCRACKLIB_DICTPATH="$(DICTPATH)"' -Bstatic
@@ -262,10 +169,10 @@ diff -Naur cracklib,2.7-orig/util/Makefile cracklib,2.7/util/Makefile
  	-rm teststr testnum testlib packer unpacker
 +
 +install: all create-cracklib-dict
-+	install -m 754 mkdict packer create-cracklib-dict $(DESTDIR)/usr/sbin
++	install -m 755 mkdict packer create-cracklib-dict $(DESTDIR)/usr/sbin
 diff -Naur cracklib,2.7-orig/util/create-cracklib-dict cracklib,2.7/util/create-cracklib-dict
 --- cracklib,2.7-orig/util/create-cracklib-dict	1969-12-31 18:00:00.000000000 -0600
-+++ cracklib,2.7/util/create-cracklib-dict	2004-04-28 18:59:44.000000000 -0500
++++ cracklib,2.7/util/create-cracklib-dict	2004-04-30 16:58:01.000000000 -0500
 @@ -0,0 +1,15 @@
 +#!/bin/sh
 +if [ -z "$*" ]; then
