@@ -1,0 +1,145 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-01-21
+Initial Package Version: 20041227
+Upstream Status: Not submitted.
+Origin: Based on blfs-bootscripts templates.
+Description: This patch adds bootscripts for frandom, openntpd, and rdate.
+
+diff -Naur blfs-bootscripts-20041227.orig/Makefile blfs-bootscripts-20041227/Makefile
+--- blfs-bootscripts-20041227.orig/Makefile	2005-01-21 04:56:12.053356143 +0000
++++ blfs-bootscripts-20041227/Makefile	2005-01-21 05:03:56.656439984 +0000
+@@ -274,6 +274,16 @@
+ 	ln -sf  ../init.d/openldap ${EXTDIR}/rc.d/rc5.d/S25openldap
+ 	ln -sf  ../init.d/openldap ${EXTDIR}/rc.d/rc6.d/K46openldap
+ 
++install-openntpd: create-dirs
++	install -m ${MODE} blfs/init.d/openntpd  ${EXTDIR}/rc.d/init.d/openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc0.d/K46openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc1.d/K46openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc2.d/K46openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc3.d/S26openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc4.d/S26openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc5.d/S26openntpd
++	ln -sf  ../init.d/openntpd ${EXTDIR}/rc.d/rc6.d/K46openntpd
++
+ install-portmap: create-dirs
+ 	install -m ${MODE} blfs/init.d/portmap    ${EXTDIR}/rc.d/init.d/
+ 	ln -sf  ../init.d/portmap ${EXTDIR}/rc.d/rc0.d/K49portmap
+@@ -324,6 +334,12 @@
+ 	ln -sf  ../init.d/random ${EXTDIR}/rc.d/rc5.d/S25random
+ 	ln -sf  ../init.d/random ${EXTDIR}/rc.d/rc6.d/K45random
+ 
++install-rdate: create-dirs
++	install -m ${MODE} blfs/init.d/rdate     ${EXTDIR}/rc.d/init.d/
++	ln -sf  ../init.d/rdate ${EXTDIR}/rc.d/rc3.d/S25rdate
++	ln -sf  ../init.d/rdate ${EXTDIR}/rc.d/rc4.d/S25rdate
++	ln -sf  ../init.d/rdate ${EXTDIR}/rc.d/rc5.d/S25rdate
++
+ install-rsyncd: create-dirs
+ 	install -m ${MODE} blfs/init.d/rsyncd     ${EXTDIR}/rc.d/init.d/
+ 	ln -sf  ../init.d/rsyncd ${EXTDIR}/rc.d/rc0.d/K30rsyncd
+diff -Naur blfs-bootscripts-20041227.orig/blfs/init.d/openntpd blfs-bootscripts-20041227/blfs/init.d/openntpd
+--- blfs-bootscripts-20041227.orig/blfs/init.d/openntpd	1970-01-01 00:00:00.000000000 +0000
++++ blfs-bootscripts-20041227/blfs/init.d/openntpd	2005-01-21 04:57:14.052856075 +0000
+@@ -0,0 +1,37 @@
++#!/bin/sh
++# Begin $rc_base/init.d/openntp
++
++#$LastChangedBy: robert $
++#$Date: 2005-01-18 $
++
++. /etc/sysconfig/rc
++. $rc_functions
++
++case "$1" in
++	start)
++		echo "Starting OpenNTPD..."
++		loadproc /usr/sbin/ntpd -s
++		;;
++
++	stop)
++		echo "Stopping OpenNTPD..."
++		killproc /usr/sbin/ntpd
++		;;
++
++	restart)
++		$0 stop
++		sleep 1
++		$0 start
++		;;
++
++	status)
++		statusproc /usr/sbin/ntpd
++		;;
++
++	*)
++		echo "Usage: $0 {start|stop|restart|status}"
++		exit 1
++		;;
++esac
++
++# End $rc_base/init.d/openntp
+diff -Naur blfs-bootscripts-20041227.orig/blfs/init.d/random blfs-bootscripts-20041227/blfs/init.d/random
+--- blfs-bootscripts-20041227.orig/blfs/init.d/random	2005-01-21 04:56:12.040359811 +0000
++++ blfs-bootscripts-20041227/blfs/init.d/random	2005-01-21 04:57:14.054855511 +0000
+@@ -5,8 +5,8 @@
+ # Rewritten by Gerard Beekmans  - gerard@linuxfromscratch.org
+ # Random script elements by Larry Lawrence
+ 
+-#$LastChangedBy: dj $
+-#$Date: 2004-10-02 11:57:32 -0600 (Sat, 02 Oct 2004) $
++#$LastChangedBy: robert $
++#$Date: 2005-01-18 $
+ 
+ . /etc/sysconfig/rc
+ . $rc_functions
+@@ -17,6 +17,11 @@
+ 		if [ -f /var/tmp/random-seed ]; then
+ 			/bin/cat /var/tmp/random-seed >/dev/urandom
+ 		fi
++		if [ -c /dev/frandom ]; then
++			/bin/dd if=/dev/frandom of=/dev/null \
++				count=1 &>/dev/null
++		fi
++		/bin/install -m0600 -o0 /dev/null /var/tmp/random-seed
+ 		/bin/dd if=/dev/urandom of=/var/tmp/random-seed \
+ 			count=1 &>/dev/null
+ 		evaluate_retval
+@@ -24,6 +29,7 @@
+                 
+ 	stop)
+ 		echo "Saving random seed..."
++		/bin/install -m0600 -o0 /dev/null /var/tmp/random-seed
+ 		/bin/dd if=/dev/urandom of=/var/tmp/random-seed \
+ 			count=1 &>/dev/null
+ 		evaluate_retval
+diff -Naur blfs-bootscripts-20041227.orig/blfs/init.d/rdate blfs-bootscripts-20041227/blfs/init.d/rdate
+--- blfs-bootscripts-20041227.orig/blfs/init.d/rdate	1970-01-01 00:00:00.000000000 +0000
++++ blfs-bootscripts-20041227/blfs/init.d/rdate	2005-01-21 05:59:11.107812484 +0000
+@@ -0,0 +1,26 @@
++#!/bin/sh
++# Begin $rc_base/init.d/rdate
++
++#$LastChangedBy: robert $
++#$Date: 2005-01-21 $
++
++. /etc/sysconfig/rc
++. $rc_functions
++
++case "$1" in
++	start)
++		echo "Running rdate..."
++		if [ -f /etc/rdate.conf ]; then
++		. /etc/rdate.conf
++		loadproc /usr/bin/rdate ${RDATEOPTIONS} ${RDATESERVERS}
++		else
++		echo "/etc/rdate.conf is missing. No servers are configured."
++		fi
++		;;
++	*)
++		echo "Usage: $0 start"
++		exit 1
++		;;
++esac
++
++# End $rc_base/init.d/rdate
