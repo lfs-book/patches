@@ -6,7 +6,7 @@ Upstream Status: Already Applied
 Description: This patch contains various fixes recommended
 	     by the author Chet. The original patches are
 	     avaiable at ftp://ftp.cwru.edu/pub/bash/readline-5.0-patches
-
+	     This patch contains 001-005
  
 diff -Naur readline-5.0.orig/display.c readline-5.0/display.c
 --- readline-5.0.orig/display.c	2004-05-28 02:57:51.000000000 +0000
