@@ -1,7 +1,7 @@
 Submitted By: Oliver Brakmann <obrakmann AT gmx DOT net>
 Date: 2004-10-27
-Initial Package Version: 0.91.0
-Origin: http://www.windowmaker.org/
+Initial Package Version: 0.80.2
+Origin: http://www.daniel-baumann.ch/
 Description: Changes the preference directory from ~/GNUstep to ~/.GNUstep
 
 diff -Naur WindowMaker-0.91.0-orig/ChangeLog WindowMaker-0.91.0/ChangeLog
