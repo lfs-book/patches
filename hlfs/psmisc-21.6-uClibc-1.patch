@@ -1,0 +1,114 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-03-19
+Initial Package Version: 21.6
+Upstream Status: Not submitted - Reported
+ORIGIN: psmisc-21.5
+Description: uClibc does not have rpmatch(). This patch reverts two sections to the
+way they were in psmisc-21.5.
+
+Also see:
+http://www.linuxfromscratch.org/hlfs/
+http://www.uclibc.org/
+
+diff -Naur psmisc-21.6.orig/src/fuser.c psmisc-21.6/src/fuser.c
+--- psmisc-21.6.orig/src/fuser.c	2004-12-10 11:31:28.000000000 +0000
++++ psmisc-21.6/src/fuser.c	2005-03-19 16:01:49.000000000 +0000
+@@ -580,33 +580,23 @@
+ static int
+ ask (pid_t pid)
+ {
+-  int res;
+-  size_t len;
+-  char *line;
+-
+-  line = NULL;
+-  len = 0;
++  int ch, c;
+ 
+   fflush (stdout);
+   do {
+     fprintf (stderr, _("Kill process %d ? (y/N) "), pid);
+     fflush (stderr);
+-
+-    if (getline (&line, &len, stdin) < 0)
+-      return 0;
+-    /* Check for default */
+-    if (line[0] == '\n') {
+-      free(line);
+-      return 0;
+-    }
+-    res = rpmatch(line);
+-    if (res >= 0) {
+-      free(line);
+-      return res;
+-    }
+-  } while(1);
+-  /* Never should get here */
+-  return 0;
++    do {
++      if ((ch = getchar ()) == EOF)
++        exit (0);
++      if (ch == '\n') return 0;
++    } while (ch == '\t' || ch == ' ');
++    do
++      if ((c = getchar ()) == EOF)
++	    exit (0);
++    while (c != '\n');
++  } while (ch != '\n' && ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N');
++  return ch == 'y' || ch == 'Y';
+ }
+ 
+ static void
+diff -Naur psmisc-21.6.orig/src/killall.c psmisc-21.6/src/killall.c
+--- psmisc-21.6.orig/src/killall.c	2004-12-10 11:31:29.000000000 +0000
++++ psmisc-21.6/src/killall.c	2005-03-19 16:06:05.000000000 +0000
+@@ -42,32 +42,24 @@
+ static int
+ ask (char *name, pid_t pid)
+ {
+-  int res;
+-  size_t len;
+-  char *line;
+-
+-  line = NULL;
+-  len = 0;
+-
+-  do {
+-    printf (_("Kill %s(%s%d) ? (y/N) "), name, process_group ? "pgid " : "",
+-	    pid);
+-    fflush (stdout);
+-
+-    if (getline (&line, &len, stdin) < 0)
+-      return 0;
+-    /* Check for default */
+-    if (line[0] == '\n') {
+-      free(line);
+-      return 0;
+-    }
+-    res = rpmatch(line);
+-    if (res >= 0) {
+-      free(line);
+-      return res;
++  int ch, c;
++
++  do
++    {
++      printf (_("Kill %s(%s%d) ? (y/n) "), name, process_group ? "pgid " : "",
++	      pid);
++      fflush (stdout);
++      do
++	if ((ch = getchar ()) == EOF)
++	  exit (0);
++      while (ch == '\n' || ch == '\t' || ch == ' ');
++      do
++	if ((c = getchar ()) == EOF)
++	  exit (0);
++      while (c != '\n');
+     }
+-  } while(1);
+-  /* Never should get here */
++  while (ch != 'y' && ch != 'n' && ch != 'Y' && ch != 'N');
++  return ch == 'y' || ch == 'Y';
+ }
+ 
+ #ifdef FLASK_LINUX
