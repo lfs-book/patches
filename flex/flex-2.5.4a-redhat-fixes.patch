@@ -1,7 +1,7 @@
 Submitted By: Tushar Teredesai <tushar@linuxfromscratch.org>
 Date: 2002-12-31
 Initial Package Version: 2.5.4a
-Origin: Redhat RPM
+Origin: Redhat RPM, http://archives.linuxfromscratch.org/mail-archives/lfs-dev/2003-January/031014.html
 Description: Various fixes related to the newer GCC & GLIBC releases
     * conflicting isatty() prototype w/ glibc 2.2.
     * gcc-3 related fixes.
