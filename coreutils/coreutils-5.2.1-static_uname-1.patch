@@ -1,0 +1,44 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-12-04
+Initial Package Version: 5.2.1
+Upstream Status: Not Submitted - Hack
+Origin: None
+Description: This patch is needed if you are building uname with the uname
+patch and a compiler that is PIC by default. The uname patch uses non-PIC
+assembly code and will not build with -fPIC. This patch will force uname
+to be linked statically.
+
+--- coreutils-5.2.1.orig/src/Makefile.in	2004-03-11 08:59:23.000000000 +0000
++++ coreutils-5.2.1/src/Makefile.in	2004-12-05 02:02:23.878212024 +0000
+@@ -862,6 +862,8 @@
+ tail_LDADD = $(nanosec_libs)
+ uptime_LDADD = $(LDADD) $(GETLOADAVG_LIBS)
+ su_LDADD = $(LDADD) $(LIB_CRYPT)
++uname_CFLAGS = $(CFLAGS) -static
++uname_LDFLAGS = $(LDFLAGS) -static
+ SUFFIXES = .sh
+ installed_su = $(DESTDIR)$(bindir)/`echo su|sed '$(transform)'`
+ setuid_root_mode = a=rx,u+s
+@@ -1415,6 +1417,22 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
++
++uname.o: uname.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(uname_CFLAGS) $(CFLAGS) -MT uname.o -MD -MP -MF "$(DEPDIR)/uname.Tpo" -c -o uname.o `test -f 'uname.c' || echo '$(srcdir)/'`uname.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/uname.Tpo" "$(DEPDIR)/uname.Po"; else rm -f "$(DEPDIR)/uname.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='uname.c' object='uname.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/uname.Po' tmpdepfile='$(DEPDIR)/uname.TPo' @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(uname_CFLAGS) $(CFLAGS) -c -o uname.o `test -f 'uname.c' || echo '$(srcdir)/'`uname.c
++
++uname.obj: uname.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(uname_CFLAGS) $(CFLAGS) -MT uname.obj -MD -MP -MF "$(DEPDIR)/uname.Tpo" -c -o uname.obj `if test -f 'uname.c'; then $(CYGPATH_W) 'uname.c'; else $(CYGPATH_W) '$(srcdir)/uname.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/uname.Tpo" "$(DEPDIR)/uname.Po"; else rm -f "$(DEPDIR)/uname.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='uname.c' object='uname.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/uname.Po' tmpdepfile='$(DEPDIR)/uname.TPo' @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(uname_CFLAGS) $(CFLAGS) -c -o uname.obj `if test -f 'uname.c'; then $(CYGPATH_W) 'uname.c'; else $(CYGPATH_W) '$(srcdir)/uname.c'; fi`
+ uninstall-info-am:
+ 
+ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
