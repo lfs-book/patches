@@ -1,15 +1,15 @@
 Submitted by: Jerome Pinot <ngc891@gmail.com>
-Date: 2005-02-28
-Initial Package Version: 2.12q (should apply to versions back to at least p)
+Date: 2005-03-27
+Initial Package Version: 2.12q
 Upstream Status: Not Submitted
 Origin: Jari Ruusu <http://sourceforge.net/projects/loop-aes/>
-Description: util-linux patch that adds support for AES and other ciphers 
-(from eswap-hint.txt).
+Description: util-linux patch that adds support for AES and other ciphers
+(from eswap.txt).
 
 
 diff -Naur util-linux-2.12q/mount/Makefile util-linux-2.12q-mod/mount/Makefile
 --- util-linux-2.12q/mount/Makefile	2004-12-22 09:32:08.000000000 +0000
-+++ util-linux-2.12q-mod/mount/Makefile	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/Makefile	2005-03-27 06:03:04.000000000 +0000
 @@ -29,7 +29,6 @@
  
  MAYBE = pivot_root swapoff
@@ -70,7 +70,7 @@ diff -Naur util-linux-2.12q/mount/Makefile util-linux-2.12q-mod/mount/Makefile
  
 diff -Naur util-linux-2.12q/mount/aes.c util-linux-2.12q-mod/mount/aes.c
 --- util-linux-2.12q/mount/aes.c	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/aes.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/aes.c	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,299 @@
 +// I retain copyright in this code but I encourage its free use provided
 +// that I don't carry any responsibility for the results. I am especially 
@@ -373,7 +373,7 @@ diff -Naur util-linux-2.12q/mount/aes.c util-linux-2.12q-mod/mount/aes.c
 +}
 diff -Naur util-linux-2.12q/mount/aes.h util-linux-2.12q-mod/mount/aes.h
 --- util-linux-2.12q/mount/aes.h	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/aes.h	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/aes.h	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,97 @@
 +// I retain copyright in this code but I encourage its free use provided
 +// that I don't carry any responsibility for the results. I am especially 
@@ -474,7 +474,7 @@ diff -Naur util-linux-2.12q/mount/aes.h util-linux-2.12q-mod/mount/aes.h
 +#endif  // _AES_H
 diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 --- util-linux-2.12q/mount/lomount.c	2004-12-20 22:11:04.000000000 +0000
-+++ util-linux-2.12q-mod/mount/lomount.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/lomount.c	2005-03-27 06:03:04.000000000 +0000
 @@ -1,4 +1,15 @@
 -/* Originally from Ted's losetup.c */
 +/* Taken from Ted's losetup.c - Mitch <m.dsouza@mrc-apu.cam.ac.uk> */
@@ -572,7 +572,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +char    *loopEncryptionType = (char *)0;
 +
 +static int  multiKeyMode = 0;   /* 0=single-key 64=multi-key-v2 65=multi-key-v3 1000=any */
-+static char *multiKeyPass[65];
++static char *multiKeyPass[66];
 +static char *loopFileName;
  
  #ifdef MAIN
@@ -750,7 +750,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  			continue;/* continue trying as long as devices exist */
  		}
  		break;
-@@ -176,75 +188,563 @@
+@@ -176,75 +188,571 @@
  	}
  
  	if (!somedev)
@@ -880,6 +880,13 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +	return negative ? -v : v;
 +}
 +
++static void warnAboutBadKeyData(int x)
++{
++	if((x > 1) && (x != 64) && (x != 65)) {
++		fprintf(stderr, _("Warning: Unknown key data format - using it anyway\n"));
++	}
++}
++
 +static char *do_GPG_pipe(char *pass)
 +{
 +	int     x, pfdi[2], pfdo[2];
@@ -1003,8 +1010,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +			a[x++] = "--homedir";
 +			a[x++] = gpgHomeDir;
 +		}
-+		a[x++] = "--options";
-+		a[x++] = "/dev/null";
++		a[x++] = "--no-options";
 +		a[x++] = "--quiet";
 +		a[x++] = "--batch";
 +		a[x++] = "--no-tty";
@@ -1039,7 +1045,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +	close(pfdi[1]);
 +	memset(pass, 0, x);
 +	x = 0;
-+	while(x < 65) {
++	while(x < 66) {
 +		multiKeyPass[x] = get_FD_pass(pfdo[0]);
 +		if(!multiKeyPass[x]) {
 +			/* mem alloc failed - abort */
@@ -1048,8 +1054,9 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +		}
 +		if(strlen(multiKeyPass[x]) < LOOP_PASSWORD_MIN_LENGTH) break;
 +		x++;
-+	}
-+	if(x == 65)
+ 	}
++	warnAboutBadKeyData(x);
++	if(x >= 65)
 +		multiKeyMode = 65;
 +	if(x == 64)
 +		multiKeyMode = 64;
@@ -1058,12 +1065,16 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +	if(!multiKeyPass[0]) goto nomem1;
 +	return multiKeyPass[0];
 +}
-+
+ 
+-	if (pass == NULL)
+-		return "";
 +static char *sGetPass(int minLen, int warnLen)
 +{
 +	char *p, *s, *seed;
 +	int i, ask2;
-+
+ 
+-	pass[i] = 0;
+-	return pass;
 +	if(!passFDnumber) {
 +		p = getpass(_("Password: "));
 +		ask2 = passAskTwice ? 1 : 0;
@@ -1073,13 +1084,14 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +			p = get_FD_pass(i);
 +		} else {
 +			int x = 0;
-+			while(x < 65) {
++			while(x < 66) {
 +				multiKeyPass[x] = get_FD_pass(i);
 +				if(!multiKeyPass[x]) goto nomem;
 +				if(strlen(multiKeyPass[x]) < LOOP_PASSWORD_MIN_LENGTH) break;
 +				x++;
 +			}
-+			if(x == 65) {
++			warnAboutBadKeyData(x);
++			if(x >= 65) {
 +				multiKeyMode = 65;
 +				return multiKeyPass[0];
 +			}
@@ -1137,24 +1149,26 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +			return(NULL);
 +		}
 +		memset(p, 0, i);
- 	}
++	}
 +	if(i < warnLen) {
 +		fprintf(stderr, _("WARNING - Please use longer password (%d or more characters)\n"), LOOP_PASSWORD_MIN_LENGTH);
 +	}
 +	strcat(s, seed);
 +	return(s);
-+}
+ }
  
--	if (pass == NULL)
--		return "";
+-static int
+-digits_only(const char *s) {
+-	while (*s)
+-		if (!isdigit(*s++))
+-			return 0;
+-	return 1;
 +/* this is for compatibility with historic loop-AES version */
 +static void unhashed1_key_setup(unsigned char *keyStr, int ile, unsigned char *keyBuf, int bufSize)
 +{
 +	register int    x, y, z, cnt = ile;
 +	unsigned char   *kp;
- 
--	pass[i] = 0;
--	return pass;
++
 +	memset(keyBuf, 0, bufSize);
 +	kp = keyStr;
 +	for(x = 0; x < (bufSize * 8); x += 6) {
@@ -1177,14 +1191,8 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +			keyBuf[z] |= y >> (8 - (x & 7));
 +		}
 +	}
- }
- 
--static int
--digits_only(const char *s) {
--	while (*s)
--		if (!isdigit(*s++))
--			return 0;
--	return 1;
++}
++
 +/* this is for compatibility with mainline mount */
 +static void unhashed2_key_setup(unsigned char *keyStr, int ile, unsigned char *keyBuf, int bufSize)
 +{
@@ -1299,8 +1307,8 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +	fclose(f);
 +	memset(&b[0], 0, sizeof(b));
 +	return 0;
-+}
-+
+ }
+ 
 +#if !defined(MAIN)
 +static int loop_fork_mkfs_command(char *device, char *fstype)
 +{
@@ -1345,9 +1353,9 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +		return 1;
 +	}
 +	return 0;
- }
++}
 +#endif
- 
++
  int
 -set_loop(const char *device, const char *file, unsigned long long offset,
 -	 const char *encryption, int pfd, int *loopro) {
@@ -1367,7 +1375,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  	mode = (*loopro ? O_RDONLY : O_RDWR);
  	if ((ffd = open(file, mode)) < 0) {
  		if (!*loopro && errno == EROFS)
-@@ -256,32 +756,25 @@
+@@ -256,32 +764,25 @@
  	}
  	if ((fd = open(device, mode)) < 0) {
  		perror (device);
@@ -1379,15 +1387,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 -	memset(&loopinfo64, 0, sizeof(loopinfo64));
 -
 -	xstrncpy(loopinfo64.lo_file_name, file, LO_NAME_SIZE);
-+	memset (&loopinfo, 0, sizeof (loopinfo));
-+	xstrncpy (loopinfo.lo_file_name, file, LO_NAME_SIZE);
-+	if (loopEncryptionType)
-+		loopinfo.lo_encrypt_type = loop_crypt_type (loopEncryptionType, &loopinfo.lo_encrypt_key_size, &apiName);
-+	if (loopOffsetBytes)
-+		loopinfo.lo_offset = mystrtoull(loopOffsetBytes, 1);
-+	if (loopSizeBytes)
-+		loopinfo.lo_sizelimit = mystrtoull(loopSizeBytes, 0);
- 
+-
 -	if (encryption && *encryption) {
 -		if (digits_only(encryption)) {
 -			loopinfo64.lo_encrypt_type = atoi(encryption);
@@ -1399,7 +1399,15 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 -	}
 -
 -	loopinfo64.lo_offset = offset;
--
++	memset (&loopinfo, 0, sizeof (loopinfo));
++	xstrncpy (loopinfo.lo_file_name, file, LO_NAME_SIZE);
++	if (loopEncryptionType)
++		loopinfo.lo_encrypt_type = loop_crypt_type (loopEncryptionType, &loopinfo.lo_encrypt_key_size, &apiName);
++	if (loopOffsetBytes)
++		loopinfo.lo_offset = mystrtoull(loopOffsetBytes, 1);
++	if (loopSizeBytes)
++		loopinfo.lo_sizelimit = mystrtoull(loopSizeBytes, 0);
+ 
 -#ifdef MCL_FUTURE  
 +#ifdef MCL_FUTURE
  	/*
@@ -1411,7 +1419,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  	if(mlockall(MCL_CURRENT | MCL_FUTURE)) {
  		perror("memlock");
  		fprintf(stderr, _("Couldn't lock into memory, exiting.\n"));
-@@ -289,126 +782,222 @@
+@@ -289,126 +790,222 @@
  	}
  #endif
  
@@ -1570,12 +1578,12 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  		return 1;
  	}
 -	close (ffd);
- 
+-
 -	i = ioctl(fd, LOOP_SET_STATUS64, &loopinfo64);
 -	if (i) {
 -		struct loop_info loopinfo;
 -		int errsv = errno;
--
+ 
 -		i = loop_info64_to_old(&loopinfo64, &loopinfo);
 -		if (i) {
 -			errno = errsv;
@@ -1615,13 +1623,13 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
 +		}
  	}
 -	close (fd);
- 
+-
 -	if (verbose > 1)
 -		printf(_("set_loop(%s,%s,%llu): success\n"),
 -		       device, file, offset);
 -	return 0;
 -}
--
+ 
 -int 
 -del_loop (const char *device) {
 -	int fd;
@@ -1723,7 +1731,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  	exit(1);
  }
  
-@@ -439,107 +1028,191 @@
+@@ -439,107 +1036,191 @@
  	fprintf (stderr, "\n");
  }
  
@@ -1989,7 +1997,7 @@ diff -Naur util-linux-2.12q/mount/lomount.c util-linux-2.12q-mod/mount/lomount.c
  #endif
 diff -Naur util-linux-2.12q/mount/lomount.h util-linux-2.12q-mod/mount/lomount.h
 --- util-linux-2.12q/mount/lomount.h	2004-07-11 17:23:46.000000000 +0000
-+++ util-linux-2.12q-mod/mount/lomount.h	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/lomount.h	2005-03-27 06:03:04.000000000 +0000
 @@ -1,6 +1,17 @@
  extern int verbose;
 -extern int set_loop(const char *, const char *, unsigned long long,
@@ -2012,7 +2020,7 @@ diff -Naur util-linux-2.12q/mount/lomount.h util-linux-2.12q-mod/mount/lomount.h
 +extern char *loopEncryptionType;
 diff -Naur util-linux-2.12q/mount/loop.c util-linux-2.12q-mod/mount/loop.c
 --- util-linux-2.12q/mount/loop.c	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/loop.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/loop.c	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,221 @@
 +/*
 + *  loop.c
@@ -2237,7 +2245,7 @@ diff -Naur util-linux-2.12q/mount/loop.c util-linux-2.12q-mod/mount/loop.c
 +}
 diff -Naur util-linux-2.12q/mount/loop.h util-linux-2.12q-mod/mount/loop.h
 --- util-linux-2.12q/mount/loop.h	2003-07-16 20:06:02.000000000 +0000
-+++ util-linux-2.12q-mod/mount/loop.h	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/loop.h	2005-03-27 06:03:04.000000000 +0000
 @@ -1,6 +1,20 @@
 -#define LO_CRYPT_NONE	0
 -#define LO_CRYPT_XOR	1
@@ -2349,7 +2357,7 @@ diff -Naur util-linux-2.12q/mount/loop.h util-linux-2.12q-mod/mount/loop.h
 +#endif
 diff -Naur util-linux-2.12q/mount/losetup.8 util-linux-2.12q-mod/mount/losetup.8
 --- util-linux-2.12q/mount/losetup.8	2004-12-05 01:35:54.000000000 +0000
-+++ util-linux-2.12q-mod/mount/losetup.8	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/losetup.8	2005-03-27 06:03:04.000000000 +0000
 @@ -1,42 +1,28 @@
 -.TH LOSETUP 8 "2003-07-01" "Linux" "MAINTENANCE COMMANDS"
 +.TH LOSETUP 8 "2004-11-25" "Linux" "MAINTENANCE COMMANDS"
@@ -2617,7 +2625,7 @@ diff -Naur util-linux-2.12q/mount/losetup.8 util-linux-2.12q-mod/mount/losetup.8
 +.fi
 diff -Naur util-linux-2.12q/mount/loumount.c util-linux-2.12q-mod/mount/loumount.c
 --- util-linux-2.12q/mount/loumount.c	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/loumount.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/loumount.c	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,60 @@
 +/*
 + *  loumount.c
@@ -2681,7 +2689,7 @@ diff -Naur util-linux-2.12q/mount/loumount.c util-linux-2.12q-mod/mount/loumount
 +}
 diff -Naur util-linux-2.12q/mount/mount.8 util-linux-2.12q-mod/mount/mount.8
 --- util-linux-2.12q/mount/mount.8	2004-12-19 22:30:14.000000000 +0000
-+++ util-linux-2.12q-mod/mount/mount.8	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/mount.8	2005-03-27 06:03:04.000000000 +0000
 @@ -281,6 +281,16 @@
  .B \-v
  Verbose mode.
@@ -2734,7 +2742,7 @@ diff -Naur util-linux-2.12q/mount/mount.8 util-linux-2.12q-mod/mount/mount.8
  .B mount
 diff -Naur util-linux-2.12q/mount/mount.c util-linux-2.12q-mod/mount/mount.c
 --- util-linux-2.12q/mount/mount.c	2004-12-21 22:00:36.000000000 +0000
-+++ util-linux-2.12q-mod/mount/mount.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/mount.c	2005-03-27 06:03:04.000000000 +0000
 @@ -11,6 +11,7 @@
  #include <string.h>
  #include <getopt.h>
@@ -2876,9 +2884,21 @@ diff -Naur util-linux-2.12q/mount/mount.c util-linux-2.12q-mod/mount/mount.c
  			break;
  		case 'r':		/* mount readonly */
  			readonly = 1;
+diff -Naur util-linux-2.12q/mount/mount_by_label.c util-linux-2.12q-mod/mount/mount_by_label.c
+--- util-linux-2.12q/mount/mount_by_label.c	2004-12-21 23:15:33.000000000 +0000
++++ util-linux-2.12q-mod/mount/mount_by_label.c	2005-03-27 06:03:04.000000000 +0000
+@@ -189,7 +189,7 @@
+ 	if (!procpt) {
+ 		static int warn = 0;
+ 		if (!warn++)
+-		    error (_("%s: could not open %s, so UUID and LABEL "
++		    fprintf(stderr, _("%s: could not open %s, so UUID and LABEL "
+ 			     "conversion cannot be done.\n"),
+ 			   progname, PROC_PARTITIONS);
+ 		return;
 diff -Naur util-linux-2.12q/mount/rmd160.c util-linux-2.12q-mod/mount/rmd160.c
 --- util-linux-2.12q/mount/rmd160.c	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/rmd160.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/rmd160.c	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,532 @@
 +/* rmd160.c  -	RIPE-MD160
 + *	Copyright (C) 1998 Free Software Foundation, Inc.
@@ -3414,7 +3434,7 @@ diff -Naur util-linux-2.12q/mount/rmd160.c util-linux-2.12q-mod/mount/rmd160.c
 +}
 diff -Naur util-linux-2.12q/mount/rmd160.h util-linux-2.12q-mod/mount/rmd160.h
 --- util-linux-2.12q/mount/rmd160.h	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/rmd160.h	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/rmd160.h	2005-03-27 06:03:04.000000000 +0000
 @@ -0,0 +1,9 @@
 +#ifndef RMD160_H
 +#define RMD160_H
@@ -3427,7 +3447,7 @@ diff -Naur util-linux-2.12q/mount/rmd160.h util-linux-2.12q-mod/mount/rmd160.h
 +
 diff -Naur util-linux-2.12q/mount/sha512.c util-linux-2.12q-mod/mount/sha512.c
 --- util-linux-2.12q/mount/sha512.c	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/sha512.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/sha512.c	2005-03-27 06:03:05.000000000 +0000
 @@ -0,0 +1,432 @@
 +/*
 + *  sha512.c
@@ -3863,7 +3883,7 @@ diff -Naur util-linux-2.12q/mount/sha512.c util-linux-2.12q-mod/mount/sha512.c
 +#endif
 diff -Naur util-linux-2.12q/mount/sha512.h util-linux-2.12q-mod/mount/sha512.h
 --- util-linux-2.12q/mount/sha512.h	1970-01-01 00:00:00.000000000 +0000
-+++ util-linux-2.12q-mod/mount/sha512.h	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/sha512.h	2005-03-27 06:03:05.000000000 +0000
 @@ -0,0 +1,45 @@
 +/*
 + *  sha512.h
@@ -3912,7 +3932,7 @@ diff -Naur util-linux-2.12q/mount/sha512.h util-linux-2.12q-mod/mount/sha512.h
 +extern void sha384_hash_buffer(unsigned char *, int, unsigned char *, int);
 diff -Naur util-linux-2.12q/mount/swapon.8 util-linux-2.12q-mod/mount/swapon.8
 --- util-linux-2.12q/mount/swapon.8	2004-12-21 20:59:42.000000000 +0000
-+++ util-linux-2.12q-mod/mount/swapon.8	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/swapon.8	2005-03-27 06:03:05.000000000 +0000
 @@ -142,6 +142,22 @@
  .I /proc/swaps
  or
@@ -3938,7 +3958,7 @@ diff -Naur util-linux-2.12q/mount/swapon.8 util-linux-2.12q-mod/mount/swapon.8
  .B swapon
 diff -Naur util-linux-2.12q/mount/swapon.c util-linux-2.12q-mod/mount/swapon.c
 --- util-linux-2.12q/mount/swapon.c	2004-12-22 09:50:19.000000000 +0000
-+++ util-linux-2.12q-mod/mount/swapon.c	2005-02-28 14:43:49.000000000 +0000
++++ util-linux-2.12q-mod/mount/swapon.c	2005-03-27 06:03:05.000000000 +0000
 @@ -1,22 +1,45 @@
  /*
   * A swapon(8)/swapoff(8) for Linux 0.99.

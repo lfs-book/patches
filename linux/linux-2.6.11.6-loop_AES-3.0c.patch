@@ -1,15 +1,15 @@
 Submitted by: Jerome Pinot <ngc891@gmail.com>
-Date: 2005-03-18
-Initial Package Version: 2.6.11.4 (should work for kernel >= 2.6.10)
+Date: 2005-03-27
+Initial Package Version: 2.6.11.6
 Upstream Status: Not Submitted
 Origin: Adapted from Jari Ruusu patch <http://sourceforge.net/projects/loop-aes/>
 Description: provides a loop device driver for the Linux kernel that has AES cipher
 built-in (from eswap.txt).
 
 
-diff -Naur linux-2.6.11.4/drivers/block/Kconfig linux-2.6.11.4-mod/drivers/block/Kconfig
---- linux-2.6.11.4/drivers/block/Kconfig	2005-03-16 00:09:02.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/block/Kconfig	2005-03-18 14:04:20.560441464 +0000
+diff -Naur linux-2.6.11.6/drivers/block/Kconfig linux-2.6.11.6-mod/drivers/block/Kconfig
+--- linux-2.6.11.6/drivers/block/Kconfig	2005-03-26 03:28:16.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/block/Kconfig	2005-03-27 06:19:47.000000000 +0000
 @@ -285,14 +285,6 @@
  	  bits of, say, a sound file). This is also safe if the file resides
  	  on a remote file server.
@@ -61,9 +61,9 @@ diff -Naur linux-2.6.11.4/drivers/block/Kconfig linux-2.6.11.4-mod/drivers/block
  
  config BLK_DEV_NBD
  	tristate "Network block device support"
-diff -Naur linux-2.6.11.4/drivers/block/Makefile linux-2.6.11.4-mod/drivers/block/Makefile
---- linux-2.6.11.4/drivers/block/Makefile	2005-03-16 00:09:32.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/block/Makefile	2005-03-18 14:04:20.560441464 +0000
+diff -Naur linux-2.6.11.6/drivers/block/Makefile linux-2.6.11.6-mod/drivers/block/Makefile
+--- linux-2.6.11.6/drivers/block/Makefile	2005-03-26 03:28:48.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/block/Makefile	2005-03-27 06:19:47.000000000 +0000
 @@ -1,6 +1,9 @@
  #
  # Makefile for the kernel block device drivers.
@@ -74,9 +74,9 @@ diff -Naur linux-2.6.11.4/drivers/block/Makefile linux-2.6.11.4-mod/drivers/bloc
  # 12 June 2000, Christoph Hellwig <hch@infradead.org>
  # Rewritten to use lists instead of if-statements.
  # 
-diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/loop.c
---- linux-2.6.11.4/drivers/block/loop.c	2005-03-16 00:09:07.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/block/loop.c	2005-03-18 14:04:20.564440856 +0000
+diff -Naur linux-2.6.11.6/drivers/block/loop.c linux-2.6.11.6-mod/drivers/block/loop.c
+--- linux-2.6.11.6/drivers/block/loop.c	2005-03-26 03:28:22.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/block/loop.c	2005-03-27 06:19:47.000000000 +0000
 @@ -39,18 +39,46 @@
   * Support up to 256 loop devices
   * Heinz Mauelshagen <mge@sistina.com>, Feb 2002
@@ -125,7 +125,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  #include <linux/stat.h>
  #include <linux/errno.h>
  #include <linux/major.h>
-@@ -66,45 +94,59 @@
+@@ -66,45 +94,63 @@
  #include <linux/suspend.h>
  #include <linux/writeback.h>
  #include <linux/buffer_head.h>		/* for invalidate_bdev() */
@@ -144,6 +144,10 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +#if defined(CONFIG_COMPAT)
 +# include <linux/ioctl32.h>
 +# define IOCTL32_COMPATIBLE_PTR ((void*)0)
++#endif
++
++#if (LINUX_VERSION_CODE < 0x20609) || defined(QUEUE_FLAG_ORDERED)
++# define QUEUE_ORDERED_NONE  0
 +#endif
  
  static int max_loop = 8;
@@ -178,14 +182,14 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  {
 -	char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
 -	char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
--
++	/* this code is only called from file backed loop  */
++	/* and that code expects this function to be no-op */
+ 
 -	if (cmd == READ)
 -		memcpy(loop_buf, raw_buf, size);
 -	else
 -		memcpy(raw_buf, loop_buf, size);
-+	/* this code is only called from file backed loop  */
-+	/* and that code expects this function to be no-op */
- 
+-
 -	kunmap_atomic(raw_buf, KM_USER0);
 -	kunmap_atomic(loop_buf, KM_USER1);
  	cond_resched();
@@ -209,7 +213,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  
  	if (cmd == READ) {
  		in = raw_buf;
-@@ -118,14 +160,11 @@
+@@ -118,14 +164,11 @@
  	keysize = lo->lo_encrypt_key_size;
  	for (i = 0; i < size; i++)
  		*out++ = *in++ ^ key[(i & 511) % keysize];
@@ -225,7 +229,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  {
  	if (info->lo_encrypt_key_size <= 0)
  		return -EINVAL;
-@@ -135,337 +174,1264 @@
+@@ -135,337 +178,1272 @@
  static struct loop_func_table none_funcs = {
  	.number = LO_CRYPT_NONE,
  	.transfer = transfer_none,
@@ -665,6 +669,8 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +                buf[13] = 0x80000000;
 +            }
 +            /* 4024 bits == 31 * 128 bit plaintext blocks + 56 bits of sector number */
++            /* For version 3 on-disk format this really should be 4536 bits, but can't be */
++            /* changed without breaking compatibility. V3 uses MD5-with-wrong-length IV */
 +            buf[14] = 4024;
 +            buf[15] = 0;
 +        }
@@ -702,6 +708,8 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +        buf[13] = 0x80000000;
 +    }
 +    /* 4024 bits == 31 * 128 bit plaintext blocks + 56 bits of sector number */
++    /* For version 3 on-disk format this really should be 4536 bits, but can't be */
++    /* changed without breaking compatibility. V3 uses MD5-with-wrong-length IV */
 +    buf[14] = 4024;
 +    buf[15] = 0;
 +    md5_transform_CPUbyteorder(&ivout[0], &buf[0]);
@@ -1176,7 +1184,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +			lo->lo_bio_que1 = NULL;
 +		else
 +			last->bi_next = bio->bi_next;
- 		bio->bi_next = NULL;
++		bio->bi_next = NULL;
 +		*list_nr = 1;
 +	} else if ((last = lo->lo_bio_que2)) {
 +		bio = last->bi_next;
@@ -1184,7 +1192,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +			lo->lo_bio_que2 = NULL;
 +		else
 +			last->bi_next = bio->bi_next;
-+		bio->bi_next = NULL;
+ 		bio->bi_next = NULL;
 +		*list_nr = 2;
  	}
  	spin_unlock_irq(&lo->lo_lock);
@@ -1524,13 +1532,14 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +
 +#if LINUX_VERSION_CODE >= 0x20609
 +static int loop_issue_flush(request_queue_t *q, struct gendisk *disk, sector_t *error_sector)
-+{
-+	struct loop_device *lo = q->queuedata;
+ {
+ 	struct loop_device *lo = q->queuedata;
+-	int rw = bio_rw(old_bio);
 +	struct block_device *bdev;
 +	request_queue_t *bqu;
 +	sector_t sect;
 +	int ret;
-+
+ 
 +	if(!lo)
 +		return 0;
 +	if(lo->lo_flags & LO_FLAGS_DO_BMAP)
@@ -1557,7 +1566,11 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +		}
 +		return ret;
 +	}
++#if !defined(QUEUE_FLAG_ORDERED)
++	if(bqu->ordered != QUEUE_ORDERED_TAG)
++#else
 +	if(!(bqu->queue_flags & (1 << QUEUE_FLAG_ORDERED)))
++#endif
 +		return -EOPNOTSUPP;
 +	/* encrypted loop is not flushed now, but next request that */
 +	/* arrives at loop_make_request_real() gets tagged as barrier */
@@ -1574,14 +1587,13 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +}
 +
 +static int loop_make_request_real(request_queue_t *q, struct bio *old_bio)
- {
++{
 +	struct bio *new_bio, *merge;
- 	struct loop_device *lo = q->queuedata;
--	int rw = bio_rw(old_bio);
++	struct loop_device *lo = q->queuedata;
 +	struct loop_bio_extension *extension;
 +	int rw = bio_rw(old_bio), y;
 +	char *md;
- 
++
 +	set_current_state(TASK_RUNNING);
  	if (!lo)
  		goto out;
@@ -1733,7 +1745,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  
  /*
   * worker thread that handles reads/writes to file backed loop devices,
-@@ -476,20 +1442,45 @@
+@@ -476,20 +1454,45 @@
  static int loop_thread(void *data)
  {
  	struct loop_device *lo = data;
@@ -1783,7 +1795,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	atomic_inc(&lo->lo_pending);
  
  	/*
-@@ -498,23 +1489,152 @@
+@@ -498,23 +1501,152 @@
  	up(&lo->lo_sem);
  
  	for (;;) {
@@ -1943,7 +1955,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  		 * will hit zero then
  		 */
  		if (atomic_dec_and_test(&lo->lo_pending))
-@@ -525,249 +1645,216 @@
+@@ -525,249 +1657,223 @@
  	return 0;
  }
  
@@ -2230,8 +2242,8 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +	blk_queue_max_hw_segments(lo->lo_queue, MAX_HW_SEGMENTS);
 +	blk_queue_max_sectors(lo->lo_queue, MAX_SECTORS);
 +	lo->lo_queue->queue_flags &= ~(1 << QUEUE_FLAG_CLUSTER);
-+#if defined(QUEUE_FLAG_ORDERED)
-+	blk_queue_ordered(lo->lo_queue, 0);
++#if (LINUX_VERSION_CODE >= 0x20609) || defined(QUEUE_FLAG_ORDERED)
++	blk_queue_ordered(lo->lo_queue, QUEUE_ORDERED_NONE);
 +#endif
 +#if LINUX_VERSION_CODE >= 0x20609
 +	blk_queue_issue_flush_fn(lo->lo_queue, NULL);
@@ -2244,7 +2256,14 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +		request_queue_t *q = bdev_get_queue(lo_device);
 +
 +		blk_queue_hardsect_size(lo->lo_queue, q->hardsect_size);
-+#if defined(QUEUE_FLAG_ORDERED)
++#if (LINUX_VERSION_CODE >= 0x20609) && !defined(QUEUE_FLAG_ORDERED)
++		if(q->ordered == QUEUE_ORDERED_TAG) {
++			blk_queue_ordered(lo->lo_queue, QUEUE_ORDERED_TAG);
++			if(q->issue_flush_fn) {
++				blk_queue_issue_flush_fn(lo->lo_queue, loop_issue_flush);
++			}
++		}
++#elif (LINUX_VERSION_CODE >= 0x20609) || defined(QUEUE_FLAG_ORDERED)
 +		if(q->queue_flags & (1 << QUEUE_FLAG_ORDERED)) {
 +			blk_queue_ordered(lo->lo_queue, 1);
 +#if LINUX_VERSION_CODE >= 0x20609
@@ -2328,7 +2347,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  			return -EINVAL;
  		if (xfer->init)
  			err = xfer->init(lo, i);
-@@ -784,59 +1871,54 @@
+@@ -784,59 +1890,57 @@
  	struct file *filp = lo->lo_backing_file;
  	int gfp = lo->old_gfp_mask;
  
@@ -2354,6 +2373,9 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 +		wake_up_interruptible(&lo->lo_bio_wait);
  	down(&lo->lo_sem);
  
++#if (LINUX_VERSION_CODE >= 0x20609) || defined(QUEUE_FLAG_ORDERED)
++	blk_queue_ordered(lo->lo_queue, QUEUE_ORDERED_NONE);
++#endif
 +	loop_prealloc_cleanup(lo);
  	lo->lo_backing_file = NULL;
 -
@@ -2406,7 +2428,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	if ((unsigned int) info->lo_encrypt_key_size > LO_KEY_SIZE)
  		return -EINVAL;
  
-@@ -844,6 +1926,22 @@
+@@ -844,6 +1948,22 @@
  	if (err)
  		return err;
  
@@ -2429,7 +2451,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	if (info->lo_encrypt_type) {
  		unsigned int type = info->lo_encrypt_type;
  
-@@ -852,31 +1950,20 @@
+@@ -852,31 +1972,20 @@
  		xfer = xfer_funcs[type];
  		if (xfer == NULL)
  			return -EINVAL;
@@ -2467,7 +2489,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	lo->lo_encrypt_key_size = info->lo_encrypt_key_size;
  	lo->lo_init[0] = info->lo_init[0];
  	lo->lo_init[1] = info->lo_init[1];
-@@ -886,18 +1973,16 @@
+@@ -886,18 +1995,16 @@
  		lo->lo_key_owner = current->uid;
  	}	
  
@@ -2488,7 +2510,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	error = vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
  	if (error)
  		return error;
-@@ -906,17 +1991,18 @@
+@@ -906,17 +2013,18 @@
  	info->lo_device = huge_encode_dev(stat.dev);
  	info->lo_inode = stat.ino;
  	info->lo_rdevice = huge_encode_dev(lo->lo_device ? stat.rdev : stat.dev);
@@ -2510,7 +2532,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	}
  	return 0;
  }
-@@ -930,7 +2016,6 @@
+@@ -930,7 +2038,6 @@
  	info64->lo_inode = info->lo_inode;
  	info64->lo_rdevice = info->lo_rdevice;
  	info64->lo_offset = info->lo_offset;
@@ -2518,7 +2540,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	info64->lo_encrypt_type = info->lo_encrypt_type;
  	info64->lo_encrypt_key_size = info->lo_encrypt_key_size;
  	info64->lo_flags = info->lo_flags;
-@@ -944,7 +2029,7 @@
+@@ -944,7 +2051,7 @@
  }
  
  static int
@@ -2527,7 +2549,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  {
  	memset(info, 0, sizeof(*info));
  	info->lo_number = info64->lo_number;
-@@ -967,14 +2052,15 @@
+@@ -967,14 +2074,15 @@
  	if (info->lo_device != info64->lo_device ||
  	    info->lo_rdevice != info64->lo_rdevice ||
  	    info->lo_inode != info64->lo_inode ||
@@ -2545,7 +2567,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  {
  	struct loop_info info;
  	struct loop_info64 info64;
-@@ -982,21 +2068,22 @@
+@@ -982,21 +2090,22 @@
  	if (copy_from_user(&info, arg, sizeof (struct loop_info)))
  		return -EFAULT;
  	loop_info64_from_old(&info, &info64);
@@ -2572,7 +2594,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	struct loop_info info;
  	struct loop_info64 info64;
  	int err = 0;
-@@ -1014,7 +2101,7 @@
+@@ -1014,7 +2123,7 @@
  }
  
  static int
@@ -2581,7 +2603,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	struct loop_info64 info64;
  	int err = 0;
  
-@@ -1028,61 +2115,65 @@
+@@ -1028,61 +2137,65 @@
  	return err;
  }
  
@@ -2673,7 +2695,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	return 0;
  }
  
-@@ -1096,8 +2187,6 @@
+@@ -1096,8 +2209,6 @@
  /*
   * And now the modules code and kernel interface.
   */
@@ -2682,7 +2704,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  MODULE_LICENSE("GPL");
  MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);
  
-@@ -1116,21 +2205,18 @@
+@@ -1116,21 +2227,18 @@
  	unsigned int n = number;
  	struct loop_device *lo;
  	struct loop_func_table *xfer;
@@ -2709,7 +2731,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  	return 0;
  }
  
-@@ -1141,7 +2227,7 @@
+@@ -1141,7 +2249,7 @@
  {
  	int	i;
  
@@ -2718,7 +2740,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  		printk(KERN_WARNING "loop: invalid max_loop (must be between"
  				    " 1 and 256), using default (8)\n");
  		max_loop = 8;
-@@ -1150,62 +2236,87 @@
+@@ -1150,62 +2258,87 @@
  	if (register_blkdev(LOOP_MAJOR, "loop"))
  		return -EIO;
  
@@ -2828,7 +2850,7 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
  out_mem1:
  	unregister_blkdev(LOOP_MAJOR, "loop");
  	printk(KERN_ERR "loop: ran out of memory\n");
-@@ -1218,26 +2329,31 @@
+@@ -1218,26 +2351,31 @@
  
  	for (i = 0; i < max_loop; i++) {
  		del_gendisk(disks[i]);
@@ -2871,9 +2893,9 @@ diff -Naur linux-2.6.11.4/drivers/block/loop.c linux-2.6.11.4-mod/drivers/block/
 -__setup("max_loop=", max_loop_setup);
 +EXPORT_SYMBOL(loop_add_keyscrub_fn);
  #endif
-diff -Naur linux-2.6.11.4/drivers/misc/Makefile linux-2.6.11.4-mod/drivers/misc/Makefile
---- linux-2.6.11.4/drivers/misc/Makefile	2005-03-16 00:09:18.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/Makefile	2005-03-18 14:04:20.564440856 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/Makefile linux-2.6.11.6-mod/drivers/misc/Makefile
+--- linux-2.6.11.6/drivers/misc/Makefile	2005-03-26 03:28:37.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/Makefile	2005-03-27 06:19:47.000000000 +0000
 @@ -4,3 +4,24 @@
  obj- := misc.o	# Dummy rule to force built-in.o to be made
  
@@ -2899,9 +2921,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/Makefile linux-2.6.11.4-mod/drivers/misc/
 +endif
 +endif
 +endif
-diff -Naur linux-2.6.11.4/drivers/misc/aes-amd64.S linux-2.6.11.4-mod/drivers/misc/aes-amd64.S
---- linux-2.6.11.4/drivers/misc/aes-amd64.S	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/aes-amd64.S	2005-03-18 14:04:20.571439792 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/aes-amd64.S linux-2.6.11.6-mod/drivers/misc/aes-amd64.S
+--- linux-2.6.11.6/drivers/misc/aes-amd64.S	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/aes-amd64.S	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,893 @@
 +//
 +// Copyright (c) 2001, Dr Brian Gladman <brg@gladman.uk.net>, Worcester, UK.
@@ -3796,9 +3818,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/aes-amd64.S linux-2.6.11.4-mod/drivers/mi
 +	im_data5(v3)
 +	im_data6(v3)
 +	im_data7(v3)
-diff -Naur linux-2.6.11.4/drivers/misc/aes-x86.S linux-2.6.11.4-mod/drivers/misc/aes-x86.S
---- linux-2.6.11.4/drivers/misc/aes-x86.S	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/aes-x86.S	2005-03-18 14:04:20.573439488 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/aes-x86.S linux-2.6.11.6-mod/drivers/misc/aes-x86.S
+--- linux-2.6.11.6/drivers/misc/aes-x86.S	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/aes-x86.S	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,922 @@
 +//
 +// Copyright (c) 2001, Dr Brian Gladman <brg@gladman.uk.net>, Worcester, UK.
@@ -4722,9 +4744,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/aes-x86.S linux-2.6.11.4-mod/drivers/misc
 +	im_data5(v3)
 +	im_data6(v3)
 +	im_data7(v3)
-diff -Naur linux-2.6.11.4/drivers/misc/aes.c linux-2.6.11.4-mod/drivers/misc/aes.c
---- linux-2.6.11.4/drivers/misc/aes.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/aes.c	2005-03-18 14:04:20.579438576 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/aes.c linux-2.6.11.6-mod/drivers/misc/aes.c
+--- linux-2.6.11.6/drivers/misc/aes.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/aes.c	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,1479 @@
 +// I retain copyright in this code but I encourage its free use provided
 +// that I don't carry any responsibility for the results. I am especially 
@@ -6205,9 +6227,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/aes.c linux-2.6.11.4-mod/drivers/misc/aes
 +
 +    state_out(out_blk, b0);
 +}
-diff -Naur linux-2.6.11.4/drivers/misc/aes.h linux-2.6.11.4-mod/drivers/misc/aes.h
---- linux-2.6.11.4/drivers/misc/aes.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/aes.h	2005-03-18 14:04:20.579438576 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/aes.h linux-2.6.11.6-mod/drivers/misc/aes.h
+--- linux-2.6.11.6/drivers/misc/aes.h	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/aes.h	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,113 @@
 +// I retain copyright in this code but I encourage its free use provided
 +// that I don't carry any responsibility for the results. I am especially 
@@ -6322,9 +6344,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/aes.h linux-2.6.11.4-mod/drivers/misc/aes
 +// if their parameters have not changed.
 +
 +#endif  // _AES_H
-diff -Naur linux-2.6.11.4/drivers/misc/crypto-ksym.c linux-2.6.11.4-mod/drivers/misc/crypto-ksym.c
---- linux-2.6.11.4/drivers/misc/crypto-ksym.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/crypto-ksym.c	2005-03-18 14:04:20.580438424 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/crypto-ksym.c linux-2.6.11.6-mod/drivers/misc/crypto-ksym.c
+--- linux-2.6.11.6/drivers/misc/crypto-ksym.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/crypto-ksym.c	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,7 @@
 +#include <linux/module.h>
 +#include "aes.h"
@@ -6333,9 +6355,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/crypto-ksym.c linux-2.6.11.4-mod/drivers/
 +EXPORT_SYMBOL(aes_encrypt);
 +EXPORT_SYMBOL(aes_decrypt);
 +EXPORT_SYMBOL(md5_transform_CPUbyteorder);
-diff -Naur linux-2.6.11.4/drivers/misc/md5-amd64.S linux-2.6.11.4-mod/drivers/misc/md5-amd64.S
---- linux-2.6.11.4/drivers/misc/md5-amd64.S	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/md5-amd64.S	2005-03-18 14:04:20.580438424 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/md5-amd64.S linux-2.6.11.6-mod/drivers/misc/md5-amd64.S
+--- linux-2.6.11.6/drivers/misc/md5-amd64.S	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/md5-amd64.S	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,200 @@
 +//
 +//  md5-amd64.S
@@ -6537,9 +6559,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/md5-amd64.S linux-2.6.11.4-mod/drivers/mi
 +	addl	%ecx,8(%rdi)
 +	addl	%edx,12(%rdi)
 +	ret
-diff -Naur linux-2.6.11.4/drivers/misc/md5-x86.S linux-2.6.11.4-mod/drivers/misc/md5-x86.S
---- linux-2.6.11.4/drivers/misc/md5-x86.S	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/md5-x86.S	2005-03-18 14:04:20.581438272 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/md5-x86.S linux-2.6.11.6-mod/drivers/misc/md5-x86.S
+--- linux-2.6.11.6/drivers/misc/md5-x86.S	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/md5-x86.S	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,207 @@
 +//
 +//  md5-x86.S
@@ -6748,9 +6770,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/md5-x86.S linux-2.6.11.4-mod/drivers/misc
 +	pop	%ebx
 +	pop	%ebp
 +	ret
-diff -Naur linux-2.6.11.4/drivers/misc/md5.c linux-2.6.11.4-mod/drivers/misc/md5.c
---- linux-2.6.11.4/drivers/misc/md5.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/md5.c	2005-03-18 14:04:20.581438272 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/md5.c linux-2.6.11.6-mod/drivers/misc/md5.c
+--- linux-2.6.11.6/drivers/misc/md5.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/md5.c	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,106 @@
 +/*
 + * MD5 Message Digest Algorithm (RFC1321).
@@ -6858,9 +6880,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/md5.c linux-2.6.11.4-mod/drivers/misc/md5
 +    hash[2] += c;
 +    hash[3] += d;
 +}
-diff -Naur linux-2.6.11.4/drivers/misc/md5.h linux-2.6.11.4-mod/drivers/misc/md5.h
---- linux-2.6.11.4/drivers/misc/md5.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.11.4-mod/drivers/misc/md5.h	2005-03-18 14:04:20.581438272 +0000
+diff -Naur linux-2.6.11.6/drivers/misc/md5.h linux-2.6.11.6-mod/drivers/misc/md5.h
+--- linux-2.6.11.6/drivers/misc/md5.h	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11.6-mod/drivers/misc/md5.h	2005-03-27 06:19:47.000000000 +0000
 @@ -0,0 +1,11 @@
 +/* md5.h */
 +
@@ -6873,9 +6895,9 @@ diff -Naur linux-2.6.11.4/drivers/misc/md5.h linux-2.6.11.4-mod/drivers/misc/md5
 + asmlinkage
 +#endif
 +extern void md5_transform_CPUbyteorder(u_int32_t *, u_int32_t const *);
-diff -Naur linux-2.6.11.4/include/linux/loop.h linux-2.6.11.4-mod/include/linux/loop.h
---- linux-2.6.11.4/include/linux/loop.h	2005-03-16 00:09:20.000000000 +0000
-+++ linux-2.6.11.4-mod/include/linux/loop.h	2005-03-18 14:04:20.000000000 +0000
+diff -Naur linux-2.6.11.6/include/linux/loop.h linux-2.6.11.6-mod/include/linux/loop.h
+--- linux-2.6.11.6/include/linux/loop.h	2005-03-26 03:28:38.000000000 +0000
++++ linux-2.6.11.6-mod/include/linux/loop.h	2005-03-27 06:19:47.000000000 +0000
 @@ -16,54 +16,57 @@
  #ifdef __KERNEL__
  #include <linux/bio.h>
