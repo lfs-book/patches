@@ -1,0 +1,20 @@
+Submitted By: Uwe Düffert (lfs at uwe-dueffert dot de)
+Date: 2004-05-15
+Initial Package Version: 1.4.2
+Origin: self-created, http://www.uwe-dueffert.de/lfs/ownpatches/inetutils-1.4.2-gcc35-1.patch
+Upstream Status: not reported
+Description: fix gcc35 compilation problem (invalid lvalue)
+ 
+diff -Naur inetutils-1.4.2.orig/libinetutils/ttymsg.c inetutils-1.4.2/libinetutils/ttymsg.c
+--- inetutils-1.4.2.orig/libinetutils/ttymsg.c	2001-11-01 15:52:19.000000000 +0000
++++ inetutils-1.4.2/libinetutils/ttymsg.c	2004-05-15 09:36:55.140217032 +0000
+@@ -132,7 +132,8 @@
+ 	    }
+ 	  if (wret)
+ 	    {
+-	      (char *)iov->iov_base += wret;
++	      //iov_base is void*, cast to char* not needed because sizeof(void)==1 too
++	      iov->iov_base += wret;
+ 	      iov->iov_len -= wret;
+ 	    }
+ 	  continue;
