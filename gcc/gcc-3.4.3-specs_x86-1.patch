@@ -2,7 +2,7 @@ Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
 Date: 2004-11-14
 Initial Package Version: 3.4.3
 Upstream Status: Not submitted - LFS specific
-ORIGIN: None
+Origin: None
 Description: This patch is a replacement for the LFS gcc-specs patch.
 This patch adds --with-dynamic-linker and --with-nostdinc to gcc/configure.
 The point is so the gcc source can be reused in every stage, aswell uclibc's
