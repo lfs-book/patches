@@ -1,13 +1,13 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 2004-11-05
+Date: 2004-12-20
 Initial Package Version: 3.4.3
 Origin: Jim Gifford
-Upstream Status: Not Accepted - Alternative to be made
-Description: Fixes all POSIX issues
+Upstream Status: On Hold
+Description: Makes GCC Posix Compliant
  
 diff -Naur gcc-3.4.3.orig/contrib/test_summary gcc-3.4.3/contrib/test_summary
 --- gcc-3.4.3.orig/contrib/test_summary	2004-08-26 05:49:13.000000000 +0000
-+++ gcc-3.4.3/contrib/test_summary	2004-11-05 18:05:58.913423424 +0000
++++ gcc-3.4.3/contrib/test_summary	2004-12-20 23:19:39.652260336 +0000
 @@ -106,7 +106,7 @@
      srcdir = configflags;
      sub(/\/configure .*/, "", srcdir);
@@ -19,7 +19,7 @@ diff -Naur gcc-3.4.3.orig/contrib/test_summary gcc-3.4.3/contrib/test_summary
      sub(/^[^ ]*\/configure */, " ", configflags);
 diff -Naur gcc-3.4.3.orig/gcc/configure gcc-3.4.3/gcc/configure
 --- gcc-3.4.3.orig/gcc/configure	2004-11-05 04:14:05.000000000 +0000
-+++ gcc-3.4.3/gcc/configure	2004-11-05 18:05:59.004409592 +0000
++++ gcc-3.4.3/gcc/configure	2004-12-20 23:20:41.084921152 +0000
 @@ -10631,7 +10631,7 @@
    # and we got the correct data, then succeed.
    if test x$gcc_cv_objdump != x \
@@ -31,7 +31,7 @@ diff -Naur gcc-3.4.3.orig/gcc/configure gcc-3.4.3/gcc/configure
    then
 diff -Naur gcc-3.4.3.orig/gcc/configure.ac gcc-3.4.3/gcc/configure.ac
 --- gcc-3.4.3.orig/gcc/configure.ac	2004-09-24 00:43:53.000000000 +0000
-+++ gcc-3.4.3/gcc/configure.ac	2004-11-05 18:05:59.028405944 +0000
++++ gcc-3.4.3/gcc/configure.ac	2004-12-20 23:20:49.551634016 +0000
 @@ -2008,7 +2008,7 @@
    # and we got the correct data, then succeed.
    if test x$gcc_cv_objdump != x \
@@ -43,7 +43,7 @@ diff -Naur gcc-3.4.3.orig/gcc/configure.ac gcc-3.4.3/gcc/configure.ac
    then
 diff -Naur gcc-3.4.3.orig/libjava/acinclude.m4 gcc-3.4.3/libjava/acinclude.m4
 --- gcc-3.4.3.orig/libjava/acinclude.m4	2003-12-31 08:58:29.000000000 +0000
-+++ gcc-3.4.3/libjava/acinclude.m4	2004-11-05 18:05:59.045403360 +0000
++++ gcc-3.4.3/libjava/acinclude.m4	2004-12-20 23:21:10.859394744 +0000
 @@ -250,8 +250,8 @@
  AC_MSG_CHECKING(whether 'ld' is at least 2.13)
  LD_PROG=`$CC --print-prog-name=ld`
@@ -57,7 +57,7 @@ diff -Naur gcc-3.4.3.orig/libjava/acinclude.m4 gcc-3.4.3/libjava/acinclude.m4
  else
 diff -Naur gcc-3.4.3.orig/libjava/aclocal.m4 gcc-3.4.3/libjava/aclocal.m4
 --- gcc-3.4.3.orig/libjava/aclocal.m4	2004-11-05 04:14:05.000000000 +0000
-+++ gcc-3.4.3/libjava/aclocal.m4	2004-11-05 18:05:59.058401384 +0000
++++ gcc-3.4.3/libjava/aclocal.m4	2004-12-20 23:21:52.624045552 +0000
 @@ -262,8 +262,8 @@
  AC_MSG_CHECKING(whether 'ld' is at least 2.13)
  LD_PROG=`$CC --print-prog-name=ld`
@@ -71,7 +71,7 @@ diff -Naur gcc-3.4.3.orig/libjava/aclocal.m4 gcc-3.4.3/libjava/aclocal.m4
  else
 diff -Naur gcc-3.4.3.orig/libjava/configure gcc-3.4.3/libjava/configure
 --- gcc-3.4.3.orig/libjava/configure	2004-11-05 04:14:05.000000000 +0000
-+++ gcc-3.4.3/libjava/configure	2004-11-05 18:05:59.122391656 +0000
++++ gcc-3.4.3/libjava/configure	2004-12-20 23:14:26.331892272 +0000
 @@ -3015,8 +3015,8 @@
  echo "configure:3016: checking whether 'ld' is at least 2.13" >&5
  LD_PROG=`$CC --print-prog-name=ld`
@@ -85,7 +85,7 @@ diff -Naur gcc-3.4.3.orig/libjava/configure gcc-3.4.3/libjava/configure
  else
 diff -Naur gcc-3.4.3.orig/libstdc++-v3/acinclude.m4 gcc-3.4.3/libstdc++-v3/acinclude.m4
 --- gcc-3.4.3.orig/libstdc++-v3/acinclude.m4	2004-10-28 21:52:33.000000000 +0000
-+++ gcc-3.4.3/libstdc++-v3/acinclude.m4	2004-11-05 18:05:59.136389528 +0000
++++ gcc-3.4.3/libstdc++-v3/acinclude.m4	2004-12-20 23:22:28.452598784 +0000
 @@ -273,7 +273,7 @@
    # Start by getting the version number.  I think the libtool test already
    # does some of this, but throws away the result.
@@ -97,7 +97,7 @@ diff -Naur gcc-3.4.3.orig/libstdc++-v3/acinclude.m4 gcc-3.4.3/libstdc++-v3/acinc
    glibcxx_gnu_ld_version=`echo $ldver | \
 diff -Naur gcc-3.4.3.orig/libstdc++-v3/aclocal.m4 gcc-3.4.3/libstdc++-v3/aclocal.m4
 --- gcc-3.4.3.orig/libstdc++-v3/aclocal.m4	2004-10-28 21:52:37.000000000 +0000
-+++ gcc-3.4.3/libstdc++-v3/aclocal.m4	2004-11-05 18:05:59.170384360 +0000
++++ gcc-3.4.3/libstdc++-v3/aclocal.m4	2004-12-20 23:22:41.381633272 +0000
 @@ -286,7 +286,7 @@
    # Start by getting the version number.  I think the libtool test already
    # does some of this, but throws away the result.
@@ -109,7 +109,7 @@ diff -Naur gcc-3.4.3.orig/libstdc++-v3/aclocal.m4 gcc-3.4.3/libstdc++-v3/aclocal
    glibcxx_gnu_ld_version=`echo $ldver | \
 diff -Naur gcc-3.4.3.orig/libstdc++-v3/configure gcc-3.4.3/libstdc++-v3/configure
 --- gcc-3.4.3.orig/libstdc++-v3/configure	2004-10-28 21:52:02.000000000 +0000
-+++ gcc-3.4.3/libstdc++-v3/configure	2004-11-05 18:05:59.781291488 +0000
++++ gcc-3.4.3/libstdc++-v3/configure	2004-12-20 23:15:37.415085984 +0000
 @@ -7726,7 +7726,7 @@
    # Start by getting the version number.  I think the libtool test already
    # does some of this, but throws away the result.
@@ -193,7 +193,7 @@ diff -Naur gcc-3.4.3.orig/libstdc++-v3/configure gcc-3.4.3/libstdc++-v3/configur
    glibcxx_gnu_ld_version=`echo $ldver | \
 diff -Naur gcc-3.4.3.orig/libstdc++-v3/scripts/check_survey.in gcc-3.4.3/libstdc++-v3/scripts/check_survey.in
 --- gcc-3.4.3.orig/libstdc++-v3/scripts/check_survey.in	2003-07-05 06:00:05.000000000 +0000
-+++ gcc-3.4.3/libstdc++-v3/scripts/check_survey.in	2004-11-05 18:05:59.814286472 +0000
++++ gcc-3.4.3/libstdc++-v3/scripts/check_survey.in	2004-12-20 23:23:24.699048024 +0000
 @@ -182,9 +182,9 @@
      function size_command()
      {
@@ -209,7 +209,7 @@ diff -Naur gcc-3.4.3.orig/libstdc++-v3/scripts/check_survey.in gcc-3.4.3/libstdc
    else
 diff -Naur gcc-3.4.3.orig/ltcf-c.sh gcc-3.4.3/ltcf-c.sh
 --- gcc-3.4.3.orig/ltcf-c.sh	2003-11-19 05:29:32.000000000 +0000
-+++ gcc-3.4.3/ltcf-c.sh	2004-11-05 18:05:59.821285408 +0000
++++ gcc-3.4.3/ltcf-c.sh	2004-12-20 23:23:40.046714824 +0000
 @@ -153,7 +153,7 @@
      # If the export-symbols file already is a .def file (1st line
      # is EXPORTS), use it as is.
@@ -221,7 +221,7 @@ diff -Naur gcc-3.4.3.orig/ltcf-c.sh gcc-3.4.3/ltcf-c.sh
          echo EXPORTS > $output_objdir/$soname-def;
 diff -Naur gcc-3.4.3.orig/ltcf-gcj.sh gcc-3.4.3/ltcf-gcj.sh
 --- gcc-3.4.3.orig/ltcf-gcj.sh	2003-11-19 05:29:32.000000000 +0000
-+++ gcc-3.4.3/ltcf-gcj.sh	2004-11-05 18:05:59.827284496 +0000
++++ gcc-3.4.3/ltcf-gcj.sh	2004-12-20 23:23:55.849312464 +0000
 @@ -156,7 +156,7 @@
      # If the export-symbols file already is a .def file (1st line
      # is EXPORTS), use it as is.
