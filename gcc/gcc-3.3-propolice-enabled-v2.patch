@@ -1,0 +1,20 @@
+--- gcc-3.3.2.orig/gcc/Makefile.in	2003-10-31 15:38:35.106329961 -0500
++++ gcc-3.3.2/gcc/Makefile.in	2003-10-31 15:38:53.827054963 -0500
+@@ -387,7 +387,7 @@
+ # Options to use when compiling libgcc2.a.
+ #
+ LIBGCC2_DEBUG_CFLAGS = -g
+-LIBGCC2_CFLAGS = -O2 $(LIBGCC2_INCLUDES) $(GCC_CFLAGS) $(TARGET_LIBGCC2_CFLAGS) $(LIBGCC2_DEBUG_CFLAGS) $(GTHREAD_FLAGS) -DIN_LIBGCC2 -D__GCC_FLOAT_NOT_NEEDED @inhibit_libc@
++LIBGCC2_CFLAGS = -O2 $(LIBGCC2_INCLUDES) $(GCC_CFLAGS) $(TARGET_LIBGCC2_CFLAGS) $(LIBGCC2_DEBUG_CFLAGS) $(GTHREAD_FLAGS) -DIN_LIBGCC2 -D__GCC_FLOAT_NOT_NEEDED @inhibit_libc@ -fno-stack-protector
+ 
+ # Additional options to use when compiling libgcc2.a.
+ # Some targets override this to -isystem include
+@@ -1410,7 +1410,7 @@
+    ssa.h $(PARAMS_H) $(TM_P_H) reload.h dwarf2asm.h $(TARGET_H) \
+    langhooks.h insn-flags.h options.h cfglayout.h real.h
+ 	$(CC) $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+-	  -DTARGET_NAME=\"$(target_alias)\" \
++	  -DSTACK_PROTECTOR -DTARGET_NAME=\"$(target_alias)\" \
+ 	  -c $(srcdir)/toplev.c $(OUTPUT_OPTION)
+ main.o : main.c $(CONFIG_H) $(SYSTEM_H) toplev.h
+ 
