@@ -1,0 +1,50 @@
+Submitted By: DJ Lucas (dj_AT_lucasit_DOT_com)
+Date: 2004-04-28
+Initial Package Version: 0.77
+Origin: Mandrake CVS, Jim Gifford's original patch, and myself.
+Description: Fixes linking in PAM with shadow and cracklib.
+
+diff -Naur Linux-PAM-0.77-orig/libpam_misc/Makefile Linux-PAM-0.77/libpam_misc/Makefile
+--- Linux-PAM-0.77-orig/libpam_misc/Makefile	2002-06-26 23:04:54.000000000 -0500
++++ Linux-PAM-0.77/libpam_misc/Makefile	2004-04-28 19:36:12.000000000 -0500
+@@ -38,6 +38,8 @@
+ SLIBOBJECTS = $(addprefix static/,$(LIBOBJECTS))
+ endif
+ 
++LINKLIBS += -L../libpam -lpam
++
+ # ---------------------------------------------
+ ## rules
+ 
+diff -Naur Linux-PAM-0.77-orig/modules/pam_cracklib/pam_cracklib.c Linux-PAM-0.77/modules/pam_cracklib/pam_cracklib.c
+--- Linux-PAM-0.77-orig/modules/pam_cracklib/pam_cracklib.c	2001-11-27 00:09:48.000000000 -0600
++++ Linux-PAM-0.77/modules/pam_cracklib/pam_cracklib.c	2004-04-28 19:36:29.000000000 -0500
+@@ -49,8 +49,7 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <ctype.h>
+-
+-extern char *FascistCheck(char *pw, const char *dictpath);
++#include <crack.h>
+ 
+ #ifndef CRACKLIB_DICTPATH
+ #define CRACKLIB_DICTPATH "/usr/share/dict/cracklib_dict"
+@@ -694,7 +693,7 @@
+             
+             bzero(remark,sizeof(remark));
+ 	    D(("against cracklib"));
+-            if ((crack_msg = FascistCheck(token1, cracklib_dictpath))) {
++            if ((crack_msg = FascistCheck(token1, CRACKLIB_DICTPATH, 0))) {
+                 if (ctrl && PAM_DEBUG_ARG)
+                     _pam_log(LOG_DEBUG,"bad password: %s",crack_msg);
+                 snprintf(remark,sizeof(remark),"BAD PASSWORD: %s", crack_msg);
+diff -Naur Linux-PAM-0.77-orig/modules/pam_lastlog/Makefile Linux-PAM-0.77/modules/pam_lastlog/Makefile
+--- Linux-PAM-0.77-orig/modules/pam_lastlog/Makefile	2001-02-10 16:33:10.000000000 -0600
++++ Linux-PAM-0.77/modules/pam_lastlog/Makefile	2004-04-28 19:36:12.000000000 -0500
+@@ -15,5 +15,6 @@
+ endif
+ 
+ TITLE=pam_lastlog
++MODULE_SIMPLE_EXTRALIBS=-lutil
+ 
+ include ../Simple.Rules
