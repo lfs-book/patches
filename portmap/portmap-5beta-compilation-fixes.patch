@@ -99,7 +99,7 @@ diff -Naur portmap_5beta/Makefile portmap_5beta.gimli/Makefile
  	cc $(CFLAGS) -DTEST -o $@ get_myaddress.c $(LIBS)
  
 +install: all
-+	install -o root -g root -m 0755 -s portmap ${BASEDIR}/usr/sbin
++	install -o root -g root -m 0755 -s portmap ${BASEDIR}/sbin
 +	install -o root -g root -m 0755 -s pmap_dump ${BASEDIR}/usr/sbin
 +	install -o root -g root -m 0755 -s pmap_set ${BASEDIR}/usr/sbin
 +	install -o root -g root -m 0644 portmap.8 ${BASEDIR}/usr/share/man/man8
@@ -442,7 +442,7 @@ diff -Naur portmap_5beta/portmap.8 portmap_5beta.gimli/portmap.8
 +.\" SUCH DAMAGE.
 +.\"
 +.\"     from: @(#)portmap.8	5.3 (Berkeley) 3/16/91
-+.\"	$Id: portmap-5beta-compilation-fixes.patch,v 1.1 2003/10/05 01:53:26 tushar Exp $
++.\"	$Id: portmap-5beta-compilation-fixes.patch,v 1.2 2003/10/31 19:29:21 tushar Exp $
 +.\"
 +.Dd March 16, 1991
 +.Dt PORTMAP 8
