@@ -1,0 +1,20 @@
+--- gcc-2.95.3.orig/gcc/Makefile.in	2003-10-31 15:51:26.636935035 -0500
++++ gcc-2.95.3/gcc/Makefile.in	2003-10-31 15:51:41.530738426 -0500
+@@ -1136,7 +1136,7 @@
+ 	    if [ $${name}.asm = $${file} ]; then \
+ 	      cp $${file} $${name}.s || exit 1; file=$${name}.s; \
+ 	    else true; fi; \
+-	    $(GCC_FOR_TARGET) $(LIBGCC2_CFLAGS) $(INCLUDES) -c $${file}; \
++	    $(GCC_FOR_TARGET) -fno-stack-protector $(LIBGCC2_CFLAGS) $(INCLUDES) -c $${file}; \
+ 	    if [ $$? -eq 0 ] ; then true; else exit 1; fi; \
+ 	    $(AR_FOR_TARGET) $(AR_FLAGS_FOR_TARGET) tmplibgcc2.a $${oname}$(objext); \
+ 	    rm -f $${name}.s $${oname}$(objext); \
+@@ -1463,7 +1463,7 @@
+    dwarf2out.h sdbout.h dbxout.h $(EXPR_H) $(BASIC_BLOCK_H) \
+    $(lang_options_files)
+ 	$(CC) $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $(MAYBE_USE_COLLECT2) \
+-	  -DTARGET_NAME=\"$(target_alias)\" \
++	  -DSTACK_PROTECTOR -DTARGET_NAME=\"$(target_alias)\" \
+ 	  -c `echo $(srcdir)/toplev.c | sed 's,^\./,,'`
+ 
+ rtl.o : rtl.c $(CONFIG_H) system.h $(RTL_H) bitmap.h
