@@ -1,3 +1,8 @@
+Submitted By: LFS Book <lfs-book@linuxfromscratch.org>
+Date: 2003-10-06
+Initial Package Version: 3.1.8
+Origin: LFS Development List
+Description: Incorrect LC var fix.
 diff -Naur procps-3.1.8.orig/w.c procps-3.1.8/w.c
 --- procps-3.1.8.orig/w.c	2002-12-21 06:30:33.000000000 -0700
 +++ procps-3.1.8/w.c	2003-04-24 17:00:53.000000000 -0600
