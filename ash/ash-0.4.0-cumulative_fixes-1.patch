@@ -917,7 +917,7 @@ diff -Nur ash-0.4.0.orig/bltin/times.c ash-0.4.0.fixed/bltin/times.c
 +/*
 + * Copyright (c) 1999 Herbert Xu <herbert@debian.org>
 + * This file contains code for the times builtin.
-+ * $Id: ash-0.4.0-cumulative-fixes.patch,v 1.1 2003/10/02 07:19:01 tushar Exp $
++ * $Id: ash-0.4.0-cumulative_fixes-1.patch,v 1.1 2004/06/04 10:32:01 jim Exp $
 + */
 +
 +#include <stdio.h>
