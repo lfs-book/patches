@@ -1,23 +1,23 @@
 #!/bin/bash
-#
-# <http://www.linuxfromscratch.org/patches/>
-#
-# This script generates a patch with the proper naming
-# conventions and proper headers.
+
+# This script will generate a patch with the appropriate LFS header
 # 
-# Asumptions:
-# * The script assumes that you have two directories
-#   One for the unmodified and one modified
-#   Examples: zoo-2.10 and zoo-2.10.orig
-#   The .orig is unmodified
-#   or
-#   The script assums that you have two files
-#   One for the umodified and one modified
-#   Examples: config.h and config.h.orig 
-#   The .orig is unmodified
-# * It assumes that this is a first release patch and
-#   adds -1 to end of the patch. Unless you specify the
-#   third option
+# Asumptions
+#
+# *  The script assumes that you have two directories
+#    One for the unmodified and one modified
+#    Examples: zoo-2.10 and zoo-2.10.orig
+#	   The .orig is unmodified
+#
+#    or
+#    The script assums that you have two files
+#    One for the umodified and one modified
+#    Examples: config.h and config.h.orig 
+#	   The .orig is unmodified
+#
+# *  It assumes that this is a first release patch and
+#    adds -1 to end of the patch. Unless you specify the
+#    third option
 # 
 # Script depends on the following programs that are not standard with
 # LFS (See BLFS for installation)
@@ -38,8 +38,12 @@ type="$2"
 version="$3"
 
 if [ "$dir" == "" ] || [ "$type" == "" ]
-	then
+	then	
+		echo "The command below will create a patch."
 		echo "$0 directory description version"
+		echo "or"
+		echo "The command below will allow you to submit the patch."
+		echo "$0 submit"
 		exit
 fi
 
@@ -68,7 +72,7 @@ SUBMIT_PATCH="enabled"
 mailprog="mail"
 
 # Enter name of Editor
-editorprog="vi"
+editorprog="nano"
 
 # If you want the script to be compressed
 #
@@ -110,13 +114,14 @@ YESNO ()
 # Parse Email
 #
 emailobfuscated="`echo $email|sed -e s%'@'%' at '% -e s%'\.'%' dot '%g`"
-                                                                                                                                        
+
 # Create Patch Header
 #
 echo "Submitted By: $submitter ($emailobfuscated)" > $dir-$type-$version.patch
 echo "Date: $date" >> $dir-$type-$version.patch
 echo "Initial Package Version: " >> $dir-$type-$version.patch
 echo "Origin: " >> $dir-$type-$version.patch
+echo "Upstream Status: " >> $dir-$type-$version.patch
 echo "Description: " >> $dir-$type-$version.patch
 echo " " >> $dir-$type-$version.patch
 
@@ -139,19 +144,22 @@ if [ -e $dir.orig ]
 	else
 		# Create Patch from file.orig file
 		#
-		find $dir -type f > /tmp/file.list
-		cat /tmp/file.list | grep .orig > /tmp/file.list.new
+		find $dir/ -type f > /tmp/file.list
+		cat /tmp/file.list | grep ".orig" > /tmp/file.list.new
 		sed -e 's|.orig| |g' /tmp/file.list.new > /tmp/file.list
+		nano /tmp/file.list.new
+		nano /tmp/file.list
 		file_list="`cat /tmp/file.list`"
 		for file in $file_list
 			do
-				echo "Creating patch from file $file.."
-				LC_ALL=C TZ=UTC0 diff -Naur $file.orig $file >> $dir-$type-$version.patch
+					echo "Creating patch from file $file.."
+					LC_ALL=C TZ=UTC0 diff -Naur $file.orig $file >> $dir-$type-$version.patch
 			done
 fi
+
 rm -f /tmp/file.list /tmp/file.list.new
 
-if [ "$SUBMIT_PATCH" == "enabled" ] && [ "$mailbin" != "" ]
+if [ "$SUBMIT_PATCH" == "enabled" ] && [ "$mailbin" != "" ] && [ "$email" != "" ]
 	then
 		YESNO "Are you sure you want to send $dir-$type-$version to $patches (yes/no)"
 		if [ "$OK" == "YES" ]
@@ -170,9 +178,11 @@ if [ "$SUBMIT_PATCH" == "enabled" ] && [ "$mailbin" != "" ]
 fi
 rm -f /tmp/patch.mail $dir-$type-$version.patch.$compressext /tmp/file.list /tmp/file.list.new
 
-# ChangeLog:
-# [2003-10-06]
-#  * Initial Version (Jim Gifford)
-# [2003-10-16]
-#  * Fixed typo in submission e-mail address (Ronald Hummelink)
-#  * Fixed e-mail obfuscation to handle more than one "." (Ronald Hummelink)
+ # ChangeLog:
+ # [2003-10-06]
+ #  * Initial Version (Jim Gifford)
+ # [2003-10-16]
+ #  * Fixed typo in submission e-mail address (Ronald Hummelink)
+ #  * Fixed e-mail obfuscation to handle more than one "." (Ronald Hummelink)
+ # [2004-05-04]
+ #  * Added Upstream Status Header (Jim Gifford)
