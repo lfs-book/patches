@@ -1,6 +1,6 @@
 Submitted By: Jeremy Utley (jeremy@linuxfromscratch.org)
 Date: 2004-04-10
-Initial package version: 7.6
+Initial Package Version: 7.6
 Upstream Status: Not Submitted
 Origin: Self-created, with assistance from Zack Winkles
 Description: Fixes compile problem with GCC 3.4 Prerelease  - apply on

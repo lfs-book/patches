@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
 Date: 2004-05-07
-Initial Package Version: Linux 2.6.5
+Initial Package Version: 2.6.5
 Origin: http://frandom.sourceforge.net/ - frandom-0.8
 Description: This is usefull for smashing stack protector, wiping
 discs, mktemp, and more.

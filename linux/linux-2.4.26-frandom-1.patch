@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
 Date: 2004-04-18
-Initial Package Version: Linux 2.4.26
+Initial Package Version: 2.4.26
 Origin: http://frandom.sourceforge.net/ - frandom-0.8
 Description: This is usefull for smashing stack protector, and wiping discs.
 This source was modified for 2.4.26, and is enabled by default in

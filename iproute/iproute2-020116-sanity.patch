@@ -1,7 +1,7 @@
-Submitted by: Alexander E. Patrakov (semzx at newmail dot ru)
+Submitted By: Alexander E. Patrakov (semzx at newmail dot ru)
 Origin: Alexander E. Patrakov
 Date: 2003-11-27
-Initial Package Version: iproute2-2.4.7-now-ss020116-try
+Initial Package Version: 2.4.7-now-ss020116-try
 Description: Fixes compilation problem with newer kernels (>=2.4.22)
 The inserted declarations and definitions match those in linux 2.4.22.
 Before using this patch with other kernel versions, please view

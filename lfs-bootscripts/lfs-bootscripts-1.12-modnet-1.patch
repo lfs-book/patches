@@ -1,6 +1,6 @@
 Submitted By: Nathan Coulson <conathan at conet dot dyndns dot org>
 Date: 2003-11-24
-Initial lfs-bootscripts-1.12
+Initial Package Version: 1.12
 Origin: http://conet.dyndns.org/~conathan/lfs-bootscripts
 Description: This is an enhancement to the network setup.  It allows you to
              install additional modules for different network setups,
