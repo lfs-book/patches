@@ -1,3 +1,8 @@
+Submitted By: LFS BOOK <lfs-book@linuxfromscratch.org>
+Date: 2003-10-06
+Initial Package Version: 1.1.4
+Origin: LFS Security List
+Description: See the ChangeLog entry below.
 diff -Naur zlib-1.1.4/ChangeLog zlib-1.1.4-vsnprintf/ChangeLog
 --- zlib-1.1.4/ChangeLog	2002-03-11 09:02:35.000000000 -0600
 +++ zlib-1.1.4-vsnprintf/ChangeLog	2003-03-05 13:14:50.000000000 -0600
