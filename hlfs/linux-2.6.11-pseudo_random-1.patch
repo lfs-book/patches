@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-02-12
-Initial Package Version: 2.6.10
+Date: 2005-03-04
+Initial Package Version: 2.6.11
 Upstream Status: Not submitted
 Origin: http://frandom.sourceforge.net/
 Description: This patch adds the he frandom, and erandom devices, and a
@@ -11,9 +11,9 @@ Also see:
 http://www.linuxfromscratch.org/hlfs/
 http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
 
-diff -Naur linux-2.6.10.orig/drivers/char/Kconfig linux-2.6.10/drivers/char/Kconfig
---- linux-2.6.10.orig/drivers/char/Kconfig	2004-12-24 21:33:49.000000000 +0000
-+++ linux-2.6.10/drivers/char/Kconfig	2005-02-11 13:08:21.327917144 +0000
+diff -Naur linux-2.6.11.orig/drivers/char/Kconfig linux-2.6.11/drivers/char/Kconfig
+--- linux-2.6.11.orig/drivers/char/Kconfig	2005-03-04 21:15:42.519856480 +0000
++++ linux-2.6.11/drivers/char/Kconfig	2005-03-04 21:15:47.952030664 +0000
 @@ -57,6 +57,19 @@
  
  	  If unsure, say Y.
@@ -34,9 +34,9 @@ diff -Naur linux-2.6.10.orig/drivers/char/Kconfig linux-2.6.10/drivers/char/Kcon
  config HW_CONSOLE
  	bool
  	depends on VT && !S390 && !USERMODE
-diff -Naur linux-2.6.10.orig/drivers/char/Makefile linux-2.6.10/drivers/char/Makefile
---- linux-2.6.10.orig/drivers/char/Makefile	2004-12-24 21:35:29.000000000 +0000
-+++ linux-2.6.10/drivers/char/Makefile	2005-02-11 13:09:19.614056304 +0000
+diff -Naur linux-2.6.11.orig/drivers/char/Makefile linux-2.6.11/drivers/char/Makefile
+--- linux-2.6.11.orig/drivers/char/Makefile	2005-03-04 21:15:42.529854960 +0000
++++ linux-2.6.11/drivers/char/Makefile	2005-03-04 21:15:47.952030664 +0000
 @@ -9,6 +9,8 @@
  
  obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o
@@ -46,9 +46,9 @@ diff -Naur linux-2.6.10.orig/drivers/char/Makefile linux-2.6.10/drivers/char/Mak
  obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
  obj-$(CONFIG_UNIX98_PTYS)	+= pty.o
  obj-y				+= misc.o
-diff -Naur linux-2.6.10.orig/drivers/char/frandom.c linux-2.6.10/drivers/char/frandom.c
---- linux-2.6.10.orig/drivers/char/frandom.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.10/drivers/char/frandom.c	2005-02-10 07:00:11.608466208 +0000
+diff -Naur linux-2.6.11.orig/drivers/char/frandom.c linux-2.6.11/drivers/char/frandom.c
+--- linux-2.6.11.orig/drivers/char/frandom.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.11/drivers/char/frandom.c	2005-03-04 21:15:47.953030512 +0000
 @@ -0,0 +1,387 @@
 +/*
 +** frandom.c
@@ -437,10 +437,10 @@ diff -Naur linux-2.6.10.orig/drivers/char/frandom.c linux-2.6.10/drivers/char/fr
 +module_exit(frandom_cleanup_module);
 +
 +EXPORT_SYMBOL(erandom_get_random_bytes);
-diff -Naur linux-2.6.10.orig/drivers/char/random.c linux-2.6.10/drivers/char/random.c
---- linux-2.6.10.orig/drivers/char/random.c	2004-12-24 21:33:51.000000000 +0000
-+++ linux-2.6.10/drivers/char/random.c	2005-02-11 13:12:48.400315968 +0000
-@@ -1994,6 +1994,104 @@
+diff -Naur linux-2.6.11.orig/drivers/char/random.c linux-2.6.11/drivers/char/random.c
+--- linux-2.6.11.orig/drivers/char/random.c	2005-03-04 21:15:42.519856480 +0000
++++ linux-2.6.11/drivers/char/random.c	2005-03-04 21:36:36.799177040 +0000
+@@ -1891,6 +1891,104 @@
  	return 1;
  }
  
@@ -542,10 +542,10 @@ diff -Naur linux-2.6.10.orig/drivers/char/random.c linux-2.6.10/drivers/char/ran
 +}
 +#endif
 +
+ static int sysctl_poolsize = DEFAULT_POOL_SIZE;
  ctl_table random_table[] = {
  	{
- 		.ctl_name	= RANDOM_POOLSIZE,
-@@ -2050,6 +2148,26 @@
+@@ -1947,6 +2045,26 @@
  		.proc_handler	= &proc_do_uuid,
  		.strategy	= &uuid_strategy,
  	},
@@ -572,10 +572,10 @@ diff -Naur linux-2.6.10.orig/drivers/char/random.c linux-2.6.10/drivers/char/ran
  	{ .ctl_name = 0 }
  };
  
-diff -Naur linux-2.6.10.orig/include/linux/sysctl.h linux-2.6.10/include/linux/sysctl.h
---- linux-2.6.10.orig/include/linux/sysctl.h	2004-12-24 21:34:58.000000000 +0000
-+++ linux-2.6.10/include/linux/sysctl.h	2005-02-10 00:57:23.071640864 +0000
-@@ -194,6 +194,8 @@
+diff -Naur linux-2.6.11.orig/include/linux/sysctl.h linux-2.6.11/include/linux/sysctl.h
+--- linux-2.6.11.orig/include/linux/sysctl.h	2005-03-04 21:15:46.306280856 +0000
++++ linux-2.6.11/include/linux/sysctl.h	2005-03-04 21:15:47.957029904 +0000
+@@ -195,6 +195,8 @@
  };
  
  /* /proc/sys/kernel/random */
@@ -584,7 +584,7 @@ diff -Naur linux-2.6.10.orig/include/linux/sysctl.h linux-2.6.10/include/linux/s
  enum
  {
  	RANDOM_POOLSIZE=1,
-@@ -201,7 +203,9 @@
+@@ -202,7 +204,9 @@
  	RANDOM_READ_THRESH=3,
  	RANDOM_WRITE_THRESH=4,
  	RANDOM_BOOT_ID=5,
@@ -595,9 +595,9 @@ diff -Naur linux-2.6.10.orig/include/linux/sysctl.h linux-2.6.10/include/linux/s
  };
  
  /* /proc/sys/kernel/pty */
-diff -Naur linux-2.6.10.orig/init/Kconfig linux-2.6.10/init/Kconfig
---- linux-2.6.10.orig/init/Kconfig	2004-12-24 21:35:24.000000000 +0000
-+++ linux-2.6.10/init/Kconfig	2005-02-11 13:17:10.498718928 +0000
+diff -Naur linux-2.6.11.orig/init/Kconfig linux-2.6.11/init/Kconfig
+--- linux-2.6.11.orig/init/Kconfig	2005-03-04 21:15:47.933033552 +0000
++++ linux-2.6.11/init/Kconfig	2005-03-04 21:15:47.957029904 +0000
 @@ -154,6 +154,16 @@
  	  building a kernel for install/rescue disks or your system is very
  	  limited in memory.
