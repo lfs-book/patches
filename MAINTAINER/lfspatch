@@ -147,8 +147,6 @@ if [ -e $dir.orig ]
 		find $dir/ -type f > /tmp/file.list
 		cat /tmp/file.list | grep ".orig" > /tmp/file.list.new
 		sed -e 's|.orig| |g' /tmp/file.list.new > /tmp/file.list
-		nano /tmp/file.list.new
-		nano /tmp/file.list
 		file_list="`cat /tmp/file.list`"
 		for file in $file_list
 			do
