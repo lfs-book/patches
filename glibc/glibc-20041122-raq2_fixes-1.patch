@@ -1,0 +1,223 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2004-11-22
+Initial Package Version: 20041122
+Origin: Jim Gifford
+Upstream Status: Unknown
+Description: Fixes to allow LFS to be compiled on a mips
+	     based Cobalt RaQ2 or RaQ2+
+ 
+ 
+diff -Naur glibc-20041122.orig/csu/Makefile glibc-20041122/csu/Makefile
+--- glibc-20041122.orig/csu/Makefile	2004-08-20 20:12:43.000000000 +0000
++++ glibc-20041122/csu/Makefile	2004-11-23 04:34:50.672977272 +0000
+@@ -146,7 +146,7 @@
+ subdir_lib: $(extra-objs:%=$(objpfx)%)
+ 
+ define link-relocatable
+-$(CC) -nostdlib -nostartfiles -r -o $@ $^
++$(CC) $(ABI_FLAG) -nostdlib -nostartfiles -r -o $@ $^
+ endef
+ 
+ ifndef start-installed-name-rule
+diff -Naur glibc-20041122.orig/sysdeps/mips/bits/dlfcn.h glibc-20041122/sysdeps/mips/bits/dlfcn.h
+--- glibc-20041122.orig/sysdeps/mips/bits/dlfcn.h	2001-10-27 00:03:32.000000000 +0000
++++ glibc-20041122/sysdeps/mips/bits/dlfcn.h	2004-11-23 04:35:26.619512568 +0000
+@@ -24,8 +24,9 @@
+ /* The MODE argument to `dlopen' contains one of the following: */
+ #define RTLD_LAZY	0x0001	/* Lazy function call binding.  */
+ #define RTLD_NOW	0x0002	/* Immediate function call binding.  */
+-#define	RTLD_BINDING_MASK  0x3	/* Mask of binding time value.  */
++#define RTLD_BINDING_MASK  0x3	/* Mask of binding time value.  */
+ #define RTLD_NOLOAD	0x00008	/* Do not load the object.  */
++#define RTLD_DEEPBIND	0x00010	/* Use deep binding.  */
+ 
+ /* If the following bit is set in the MODE argument to `dlopen',
+    the symbols of the loaded object and its dependencies are made
+diff -Naur glibc-20041122.orig/sysdeps/mips/fpu_control.h glibc-20041122/sysdeps/mips/fpu_control.h
+--- glibc-20041122.orig/sysdeps/mips/fpu_control.h	2001-07-06 04:56:00.000000000 +0000
++++ glibc-20041122/sysdeps/mips/fpu_control.h	2004-11-23 04:34:41.252409416 +0000
+@@ -74,7 +74,7 @@
+ #define _FPU_RC_UP      0x2
+ #define _FPU_RC_DOWN    0x3
+ 
+-#define _FPU_RESERVED 0xfe3c0000  /* Reserved bits in cw */
++#define _FPU_RESERVED   0xfebc0000  /* Reserved bits in cw */
+ 
+ 
+ /* The fdlibm code requires strict IEEE double precision arithmetic,
+diff -Naur glibc-20041122.orig/sysdeps/mips/mips64/n32/Makefile glibc-20041122/sysdeps/mips/mips64/n32/Makefile
+--- glibc-20041122.orig/sysdeps/mips/mips64/n32/Makefile	2003-03-29 08:15:28.000000000 +0000
++++ glibc-20041122/sysdeps/mips/mips64/n32/Makefile	2004-11-23 04:34:50.668977880 +0000
+@@ -4,3 +4,7 @@
+ ifeq ($(filter -mabi=n32,$(CC)),)
+ CC += -mabi=n32
+ endif
++ifeq ($(filter "-Wl,-m,elf32btsmipn32",$(LD)),)
++LD += -Wl,-m,elf32btsmipn32
++endif
++ABI_FLAG= -Wl,-m,elf32btsmipn32
+diff -Naur glibc-20041122.orig/sysdeps/mips/mips64/n64/Makefile glibc-20041122/sysdeps/mips/mips64/n64/Makefile
+--- glibc-20041122.orig/sysdeps/mips/mips64/n64/Makefile	2003-03-29 08:15:28.000000000 +0000
++++ glibc-20041122/sysdeps/mips/mips64/n64/Makefile	2004-11-23 04:34:50.669977728 +0000
+@@ -4,3 +4,10 @@
+ ifeq ($(filter -mabi=64,$(CC)),)
+ CC += -mabi=64
+ endif
++ifeq ($(filter "-Wl,-m,elf64btsmip",$(LDFLAGS)),)
++LDFLAGS += -Wl,-m,elf64btsmip
++endif
++ifeq ($(filter "-Wl,-m,elf64btsmip",$(ASFLAGS-.os)),)
++ASFLAGS-.os += -Wl,-m,elf64btsmip
++endif
++ABI_FLAG= -Wl,-m,elf64btsmip
+diff -Naur glibc-20041122.orig/sysdeps/mips/sys/regdef.h glibc-20041122/sysdeps/mips/sys/regdef.h
+--- glibc-20041122.orig/sysdeps/mips/sys/regdef.h	2003-04-09 02:51:04.000000000 +0000
++++ glibc-20041122/sysdeps/mips/sys/regdef.h	2004-11-23 04:35:33.720433064 +0000
+@@ -20,6 +20,8 @@
+ #ifndef _SYS_REGDEF_H
+ #define _SYS_REGDEF_H
+ 
++#include <sgidefs.h>
++
+ /*
+  * Symbolic register names for 32 bit ABI
+  */
+diff -Naur glibc-20041122.orig/sysdeps/mips/sys/ucontext.h glibc-20041122/sysdeps/mips/sys/ucontext.h
+--- glibc-20041122.orig/sysdeps/mips/sys/ucontext.h	2003-03-17 15:47:12.000000000 +0000
++++ glibc-20041122/sysdeps/mips/sys/ucontext.h	2004-11-23 04:35:33.723432608 +0000
+@@ -23,6 +23,7 @@
+ 
+ #include <features.h>
+ #include <signal.h>
++#include <sgidefs.h>
+ 
+ /* Type for general register.  */
+ #if _MIPS_SIM == _MIPS_SIM_ABI32
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/Versions glibc-20041122/sysdeps/unix/sysv/linux/mips/Versions
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/Versions	2002-11-06 02:53:24.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/Versions	2004-11-23 04:34:24.248994328 +0000
+@@ -29,3 +29,9 @@
+     _test_and_set;
+   }
+ }
++librt {
++  GLIBC_2.0 {
++    # c*
++    clock_gettime; clock_settime;
++  }
++}
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/bits/mman.h glibc-20041122/sysdeps/unix/sysv/linux/mips/bits/mman.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/bits/mman.h	2003-03-07 09:46:33.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/bits/mman.h	2004-11-23 04:35:23.430997296 +0000
+@@ -34,6 +34,10 @@
+ #define PROT_WRITE	0x2		/* Page can be written.  */
+ #define PROT_EXEC	0x4		/* Page can be executed.  */
+ #define PROT_NONE	0x0		/* Page can not be accessed.  */
++#define PROT_GROWSDOWN	0x01000000	/* Extend change to start of
++					   growsdown vma (mprotect only).  */
++#define PROT_GROWSUP	0x02000000	/* Extend change to start of
++					   growsup vma (mprotect only).  */
+ 
+ /* Sharing types (must choose one and only one of these).  */
+ #define MAP_SHARED	0x01		/* Share changes.  */
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/bits/socket.h glibc-20041122/sysdeps/unix/sysv/linux/mips/bits/socket.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/bits/socket.h	2001-09-26 05:23:10.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/bits/socket.h	2004-11-23 04:35:20.081506496 +0000
+@@ -261,7 +261,7 @@
+ #  define _EXTERN_INLINE extern __inline
+ # endif
+ _EXTERN_INLINE struct cmsghdr *
+-__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg) __THROW
++__NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
+ {
+   if ((size_t) __cmsg->cmsg_len < sizeof (struct cmsghdr))
+     /* The kernel header does this so there may be a reason.  */
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips32/kern64/sysdep.h glibc-20041122/sysdeps/unix/sysv/linux/mips/mips32/kern64/sysdep.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips32/kern64/sysdep.h	2003-03-29 08:15:29.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/mips32/kern64/sysdep.h	2004-11-23 04:34:58.034858096 +0000
+@@ -28,9 +28,9 @@
+    so we have to redefine the `SYS_ify' macro here.  */
+ #undef SYS_ify
+ #ifdef __STDC__
+-# define SYS_ify(syscall_name)	__NR_O32_##syscall_name
++# define SYS_ify(syscall_name)	__NR_##syscall_name
+ #else
+-# define SYS_ify(syscall_name)	__NR_O32_/**/syscall_name
++# define SYS_ify(syscall_name)	__NR_/**/syscall_name
+ #endif
+ 
+ #endif /* linux/mips/mips32/kern64/sysdep.h */
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2004-10-18 05:16:07.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2004-11-23 04:34:58.028859008 +0000
+@@ -28,9 +28,9 @@
+    so we have to redefine the `SYS_ify' macro here.  */
+ #undef SYS_ify
+ #ifdef __STDC__
+-# define SYS_ify(syscall_name)	__NR_N32_##syscall_name
++# define SYS_ify(syscall_name)	__NR_##syscall_name
+ #else
+-# define SYS_ify(syscall_name)	__NR_N32_/**/syscall_name
++# define SYS_ify(syscall_name)	__NR_/**/syscall_name
+ #endif
+ 
+ #ifdef __ASSEMBLER__
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2004-10-18 05:16:08.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2004-11-23 04:34:58.032858400 +0000
+@@ -28,9 +28,9 @@
+    so we have to redefine the `SYS_ify' macro here.  */
+ #undef SYS_ify
+ #ifdef __STDC__
+-# define SYS_ify(syscall_name)	__NR_N64_##syscall_name
++# define SYS_ify(syscall_name)	__NR_##syscall_name
+ #else
+-# define SYS_ify(syscall_name)	__NR_N64_/**/syscall_name
++# define SYS_ify(syscall_name)	__NR_/**/syscall_name
+ #endif
+ 
+ #ifdef __ASSEMBLER__
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2004-07-21 06:13:15.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2004-11-23 04:35:00.895423224 +0000
+@@ -19,3 +19,4 @@
+ semtimedop	-	semtimedop	i:ipip	semtimedop
+ semget		-	semget		i:iii	__semget	semget
+ semctl		-	semctl		i:iiii	__semctl	semctl
++semtimedop	-	semtimedop	i:ipip	semtimedop
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/sys/syscall.h glibc-20041122/sysdeps/unix/sysv/linux/mips/sys/syscall.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/sys/syscall.h	2003-03-17 15:50:05.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/sys/syscall.h	2004-11-23 04:34:54.549387968 +0000
+@@ -19,17 +19,10 @@
+ #ifndef _SYSCALL_H
+ #define _SYSCALL_H	1
+ 
+-/* This file should list the numbers of the system the system knows.
+-   But instead of duplicating this we use the information available
+-   from the kernel sources.  */
+-#ifdef _LIBC
+-/* Since the kernel doesn't define macro names in a way usable for
+-   glibc, we preprocess this header, and use it during the glibc build
+-   process.  */
+-# include <asm-unistd.h>
+-#else
++/* This file should list the numbers of the system calls the system
++   knows. But instead of duplicating this we use the information
++   available from the kernel sources.  */
+ # include <asm/unistd.h>
+-#endif
+ 
+ #ifndef _LIBC
+ /* The Linux kernel header file defines macros `__NR_<name>', but some
+diff -Naur glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/sys/tas.h glibc-20041122/sysdeps/unix/sysv/linux/mips/sys/tas.h
+--- glibc-20041122.orig/sysdeps/unix/sysv/linux/mips/sys/tas.h	2004-07-20 16:35:28.000000000 +0000
++++ glibc-20041122/sysdeps/unix/sysv/linux/mips/sys/tas.h	2004-11-23 04:35:20.084506040 +0000
+@@ -35,7 +35,7 @@
+ # endif
+ 
+ _EXTERN_INLINE int
+-_test_and_set (int *p, int v) __THROW
++__NTH (_test_and_set (int *p, int v))
+ {
+   int r, t;
+ 

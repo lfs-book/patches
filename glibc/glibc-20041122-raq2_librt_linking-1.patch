@@ -1,0 +1,30 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2004-11-22
+Initial Package Version: 20041122
+Origin: Jakub Jelinek
+Upstream Status: Recommended
+Description: Fixes the librt linking issue which displays itself as
+	librt_pic.a(mq_setattr.os)(.text+0x0): undefined reference to `__syscall_error'
+        librt_pic.a(mq_timedsend.os)(.text+0x0): undefined reference to `__syscall_error'
+        librt_pic.a(mq_timedreceive.os)(.text+0x0): undefined reference to `__syscall_error'
+ 
+
+diff -Naur glibc-20041122.orig/sysdeps/mips/Makefile glibc-20041122/sysdeps/mips/Makefile
+--- glibc-20041122.orig/sysdeps/mips/Makefile	2000-09-06 07:52:59.000000000 +0000
++++ glibc-20041122/sysdeps/mips/Makefile	2004-11-23 04:11:54.858132920 +0000
+@@ -3,6 +3,10 @@
+ 		  sys/asm.h sgidefs.h
+ endif
+ 
++ifeq ($(subdir),rt)
++librt-sysdep_routines += rt-sysdep
++endif
++
+ ifeq ($(subdir),setjmp)
+ sysdep_routines += setjmp_aux
+ endif
+diff -Naur glibc-20041122.orig/sysdeps/unix/mips/rt-sysdep.S glibc-20041122/sysdeps/unix/mips/rt-sysdep.S
+--- glibc-20041122.orig/sysdeps/unix/mips/rt-sysdep.S	1970-01-01 00:00:00.000000000 +0000
++++ glibc-20041122/sysdeps/unix/mips/rt-sysdep.S	2004-11-23 04:12:23.705747416 +0000
+@@ -0,0 +1 @@
++#include <sysdep.S>
