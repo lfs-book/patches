@@ -1,3 +1,8 @@
+Submitted By: LFS BOOK <lfs-book@linuxfromscratch.org>
+Date: 2003-10-01
+Initial Package Version: 5.3
+Origin: LFS BOOK
+Description: vscanf security fix
 diff -urN ncurses-5.3/c++/cursesw.cc ncurses-5.3.new/c++/cursesw.cc
 --- ncurses-5.3/c++/cursesw.cc	2002-07-06 16:47:52.000000000 +0100
 +++ ncurses-5.3.new/c++/cursesw.cc	2003-04-28 18:19:03.000000000 +0100

@@ -1,3 +1,8 @@
+Submitted By: LFS BOOK <lfs-book@linuxfromscratch.org>
+Date: 2003-10-01
+Initial Package Version: 5.3
+Origin: LFS BOOK
+Description: Add a missing include directory
 diff -uNr ncurses-5.3.orig/aclocal.m4 ncurses-5.3/aclocal.m4
 --- ncurses-5.3.orig/aclocal.m4	2002-09-22 10 49:14.000000000 +1000
 +++ ncurses-5.3/aclocal.m4	2003-03-19 12:34:43.000000000 +1100
