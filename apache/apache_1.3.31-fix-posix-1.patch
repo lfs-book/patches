@@ -1,6 +1,6 @@
 Submitted By: Michael Labuschke (michael at labuschke dot de)
 Date: 2004-05-13
-Initial Package Version: apache-1.3.29 
+Initial Package Version: 1.3.29 
 Origin: me
 Upstream Status: not send
 Description: Fixes head -1 and tail -1 issues. 
