@@ -1,5 +1,5 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-02-12
+Date: 2005-02-21
 Initial Package Version: 0.9.27
 Upstream Status: Not submitted
 Origin: None
@@ -8,8 +8,8 @@ more automated.
 
 diff -Naur uClibc-0.9.27.orig/.config uClibc-0.9.27/.config
 --- uClibc-0.9.27.orig/.config	1970-01-01 00:00:00.000000000 +0000
-+++ uClibc-0.9.27/.config	2005-02-12 22:52:07.648317704 +0000
-@@ -0,0 +1,177 @@
++++ uClibc-0.9.27/.config	2005-02-21 20:11:13.317085200 +0000
+@@ -0,0 +1,181 @@
 +#
 +# Automatically generated make config: don't edit
 +#
@@ -118,9 +118,13 @@ diff -Naur uClibc-0.9.27.orig/.config uClibc-0.9.27/.config
 +# UCLIBC_HAS_CTYPE_CHECKED is not set
 +# UCLIBC_HAS_CTYPE_ENFORCED is not set
 +UCLIBC_HAS_WCHAR=y
-+# UCLIBC_HAS_LOCALE is not set
++UCLIBC_HAS_LOCALE=y
++UCLIBC_PREGENERATED_LOCALE_DATA=y
++# UCLIBC_DOWNLOAD_PREGENERATED_LOCALE_DATA is not set
++# UCLIBC_HAS_XLOCALE is not set
 +# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
-+# UCLIBC_HAS_GLIBC_CUSTOM_PRINTF is not set
++# UCLIBC_HAS_GLIBC_DIGIT_GROUPING is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
 +UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
 +# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
 +# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
