@@ -1,35 +1,31 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-01-30
-Initial Package Version: 1.0.2
+Date: 2005-03-01
+Initial Package Version: 1.0.3
 Upstream Status: Not submitted
 Origin: None
-Description: Use gcc -fpie, -fpic, -fstack-protector-all, and ld -pie,
--z relro, -z now.
+Description: Use gcc -fpie, -fpic, and ld -pie, -z relro, -z now.
 
 See:
 http://www.linuxfromscratch.org/~robert/Homogenic/
 
-diff -Naur bzip2-1.0.2.orig/Makefile bzip2-1.0.2/Makefile
---- bzip2-1.0.2.orig/Makefile	2005-01-30 07:35:17.113515771 +0000
-+++ bzip2-1.0.2/Makefile	2005-01-30 07:44:23.411010119 +0000
-@@ -5,11 +5,14 @@
+diff -Naur bzip2-1.0.3.orig/Makefile bzip2-1.0.3/Makefile
+--- bzip2-1.0.3.orig/Makefile	2005-02-17 11:28:24.000000000 +0000
++++ bzip2-1.0.3/Makefile	2005-03-01 17:47:48.000000000 +0000
+@@ -5,10 +5,11 @@
  CC=gcc
  AR=ar
  RANLIB=ranlib
 -LDFLAGS=
 +LDFLAGS= -pie -z relro -z now
  
- # Suitably paranoid flags to avoid bugs in gcc-2.7
  BIGFILES=-D_FILE_OFFSET_BITS=64
--CFLAGS=-Wall -Winline -O2 -fomit-frame-pointer -fno-strength-reduce $(BIGFILES)
-+CFLAGS=-Wall -Winline -O2 -fomit-frame-pointer -fno-strength-reduce \
-+-pie -fPIE -fstack-protector-all $(BIGFILES)
-+LIBCFLAGS=-Wall -Winline -O2 -fomit-frame-pointer -fno-strength-reduce \
-+-fPIC -fstack-protector-all $(BIGFILES)
+-CFLAGS=-Wall -Winline -O -g $(BIGFILES)
++CFLAGS=-pie -fpie -Wall -Winline -O -g $(BIGFILES)
++LIBCFLAGS=-fPIC -Wall -Winline -O -g $(BIGFILES)
  
  # Where you want it installed when you do 'make install'
  PREFIX=/usr
-@@ -104,19 +107,19 @@
+@@ -102,19 +103,19 @@
  
  blocksort.o: blocksort.c
  	@cat words0
@@ -56,23 +52,21 @@ diff -Naur bzip2-1.0.2.orig/Makefile bzip2-1.0.2/Makefile
  bzip2.o: bzip2.c
  	$(CC) $(CFLAGS) -c bzip2.c
  bzip2recover.o: bzip2recover.c
-diff -Naur bzip2-1.0.2.orig/Makefile-libbz2_so bzip2-1.0.2/Makefile-libbz2_so
---- bzip2-1.0.2.orig/Makefile-libbz2_so	2005-01-30 07:35:17.138508749 +0000
-+++ bzip2-1.0.2/Makefile-libbz2_so	2005-01-30 07:44:07.143581514 +0000
-@@ -9,7 +9,10 @@
+diff -Naur bzip2-1.0.3.orig/Makefile-libbz2_so bzip2-1.0.3/Makefile-libbz2_so
+--- bzip2-1.0.3.orig/Makefile-libbz2_so	2004-10-17 17:32:13.000000000 +0000
++++ bzip2-1.0.3/Makefile-libbz2_so	2005-03-01 17:45:17.000000000 +0000
+@@ -9,7 +9,8 @@
  SHELL=/bin/sh
  CC=gcc
  BIGFILES=-D_FILE_OFFSET_BITS=64
--CFLAGS=-fpic -fPIC -Wall -Winline -O2 -fomit-frame-pointer -fno-strength-reduce $(BIGFILES)
-+LIBCFLAGS=-fPIC -Wall -Winline -O2 -fomit-frame-pointer \
-+-fno-strength-reduce -fstack-protector-all $(BIGFILES)
-+CFLAGS=-Wall -Winline -O2 -fomit-frame-pointer -fno-strength-reduce \
-+-pie -fPIE -fstack-protector-all $(BIGFILES)
+-CFLAGS=-fpic -fPIC -Wall -Winline -O -g
++LIBCFLAGS=-fpic -fPIC -Wall -Winline -O -g
++CFLAGS=-pie -fPIE -Wall -Winline -O -g
  
  OBJS= blocksort.o  \
        huffman.o    \
-@@ -29,16 +32,16 @@
- 	rm -f $(OBJS) bzip2.o libbz2.so.1.0.2 libbz2.so.1.0 bzip2-shared
+@@ -29,16 +30,16 @@
+ 	rm -f $(OBJS) bzip2.o libbz2.so.1.0.3 libbz2.so.1.0 bzip2-shared
  
  blocksort.o: blocksort.c
 -	$(CC) $(CFLAGS) -c blocksort.c
