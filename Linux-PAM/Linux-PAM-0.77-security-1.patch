@@ -1,5 +1,5 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 09-13-2003
+Date: 2003-09-13
 Initial Package Version: 0.77
 Origin: Sourceforge PAM CVS
 Description: 
@@ -14,8 +14,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/Makefile Linux-PAM-0.77/modules/
 --- Linux-PAM-0.77.orig/modules/pam_unix/Makefile	2001-02-11 06:33:53.000000000 +0000
 +++ Linux-PAM-0.77/modules/pam_unix/Makefile	2003-09-14 06:18:17.000000000 +0000
 @@ -1,4 +1,4 @@
--# $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+# $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+-# $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++# $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
  #
  # This Makefile controls a build process of the pam_unix modules
  # for Linux-PAM. You should not modify this Makefile.
@@ -276,8 +276,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/pam_unix_sess.c Linux-PAM-0.77/m
 +++ Linux-PAM-0.77/modules/pam_unix/pam_unix_sess.c	2003-09-14 06:19:12.000000000 +0000
 @@ -1,5 +1,5 @@
  /*
-- * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+- * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++ * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
   *
   * Copyright Alexander O. Yuriev, 1996.  All rights reserved.
   * Copyright Jan Rêkorajski, 1999.  All rights reserved.
@@ -318,8 +318,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.c Linux-PAM-0.77/modules
 +++ Linux-PAM-0.77/modules/pam_unix/support.c	2003-09-14 06:19:34.000000000 +0000
 @@ -1,5 +1,5 @@
  /* 
-- * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+- * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++ * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
   *
   * Copyright information at end of file.
   */
@@ -393,8 +393,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pam_unix/support.h Linux-PAM-0.77/modules
 +++ Linux-PAM-0.77/modules/pam_unix/support.h	2003-09-14 06:20:03.000000000 +0000
 @@ -1,5 +1,5 @@
  /*
-- * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+- * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++ * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
   */
  
  #ifndef _PAM_UNIX_SUPPORT_H
@@ -440,8 +440,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/Makefile Linux-PAM-0.77/module
 +++ Linux-PAM-0.77/modules/pammodutil/Makefile	2003-09-14 06:22:40.000000000 +0000
 @@ -1,5 +1,5 @@
  #
--# $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+# $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+-# $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++# $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
  #
  #
  
@@ -462,8 +462,8 @@ diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/include/security/_pam_modutil.
  #define _PAM_MODUTIL_H
  
  /*
-- * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
-+ * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
+- * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
++ * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
   *
   * This file is a list of handy libc wrappers that attempt to provide some
   * thread-safe and other convenient functionality to modules in a form that
@@ -488,7 +488,7 @@ diff -Naur Linux-PAM-0.77.orig/modules/pammodutil/modutil_getlogin.c Linux-PAM-0
 +++ Linux-PAM-0.77/modules/pammodutil/modutil_getlogin.c	2003-09-14 06:21:50.000000000 +0000
 @@ -0,0 +1,71 @@
 +/*
-+ * $Id: Linux-PAM-0.77-security-1.patch,v 1.1 2003/09/14 07:02:53 jim Exp $
++ * $Id: Linux-PAM-0.77-security-1.patch,v 1.2 2003/09/14 18:04:12 tushar Exp $
 + *
 + * A central point for invoking getlogin(). Hopefully, this is a
 + * little harder to spoof than all the other versions that are out

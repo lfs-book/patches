@@ -1,5 +1,5 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 09-12-2003
+Date: 2003-09-12
 Initial Package Version: 3.80
 Origin: http://savannah.gnu.org/bugs/?func=detailbug&bug_id=1517&group_id=71
 Description: Using $(eval ...) can lead to fatal errors about allocating too
