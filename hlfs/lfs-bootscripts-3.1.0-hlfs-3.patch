@@ -1,0 +1,152 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2005-03-19
+Initial Package Version: 3.1.0
+Upstream Status: Not submitted.
+Origin: lfs-bootscripts-2.0.5
+Description: This patch replaces syslog-ng with sysklogd.
+
+diff -Naur lfs-bootscripts-3.1.0.orig/Makefile lfs-bootscripts-3.1.0/Makefile
+--- lfs-bootscripts-3.1.0.orig/Makefile	2005-01-23 10:46:53.469742394 +0000
++++ lfs-bootscripts-3.1.0/Makefile	2005-01-23 10:47:48.521305631 +0000
+@@ -38,12 +38,12 @@
+ 	install -m ${MODE} lfs/init.d/reboot        ${EXTDIR}/rc.d/init.d/
+ 	install -m ${MODE} lfs/init.d/sendsignals   ${EXTDIR}/rc.d/init.d/
+ 	install -m ${MODE} lfs/init.d/setclock      ${EXTDIR}/rc.d/init.d/
+-	install -m ${MODE} lfs/init.d/syslog-ng	    ${EXTDIR}/rc.d/init.d
++	install -m ${MODE} lfs/init.d/sysklogd	    ${EXTDIR}/rc.d/init.d
+ 	install -m ${MODE} lfs/init.d/swap          ${EXTDIR}/rc.d/init.d/
+ 	install -m ${MODE} lfs/init.d/template      ${EXTDIR}/rc.d/init.d/
+ 	install -m ${MODE} lfs/init.d/udev          ${EXTDIR}/rc.d/init.d
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc0.d/K80network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc0.d/K90syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc0.d/K90sysklogd
+ 	ln -sf ../init.d/hotplug     ${EXTDIR}/rc.d/rc0.d/S50hotplug
+ 	ln -sf ../init.d/sendsignals ${EXTDIR}/rc.d/rc0.d/S60sendsignals
+ 	ln -sf ../init.d/mountfs     ${EXTDIR}/rc.d/rc0.d/S70mountfs
+@@ -51,17 +51,17 @@
+ 	ln -sf ../init.d/localnet    ${EXTDIR}/rc.d/rc0.d/S90localnet
+ 	ln -sf ../init.d/halt        ${EXTDIR}/rc.d/rc0.d/S99halt
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc1.d/K80network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc1.d/K90syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc1.d/K90sysklogd
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc2.d/K80network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc2.d/K90syslog-ng
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc3.d/S10syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc2.d/K90sysklogd
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc3.d/S10sysklogd
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc3.d/S20network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc4.d/S10syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc4.d/S10sysklogd
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc4.d/S20network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc5.d/S10syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc5.d/S10sysklogd
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc5.d/S20network
+ 	ln -sf ../init.d/network     ${EXTDIR}/rc.d/rc6.d/K80network
+-	ln -sf ../init.d/syslog-ng   ${EXTDIR}/rc.d/rc6.d/K90syslog-ng
++	ln -sf ../init.d/sysklogd   ${EXTDIR}/rc.d/rc6.d/K90sysklogd
+ 	ln -sf ../init.d/hotplug     ${EXTDIR}/rc.d/rc6.d/S50hotplug
+ 	ln -sf ../init.d/sendsignals ${EXTDIR}/rc.d/rc6.d/S60sendsignals
+ 	ln -sf ../init.d/mountfs     ${EXTDIR}/rc.d/rc6.d/S70mountfs
+diff -Naur lfs-bootscripts-3.1.0.orig/lfs/init.d/sysklogd lfs-bootscripts-3.1.0/lfs/init.d/sysklogd
+--- lfs-bootscripts-3.1.0.orig/lfs/init.d/sysklogd	1970-01-01 00:00:00.000000000 +0000
++++ lfs-bootscripts-3.1.0/lfs/init.d/sysklogd	2005-01-23 11:25:58.335469735 +0000
+@@ -0,0 +1,45 @@
++#!/bin/sh
++# Begin $rc_base/init.d/sysklogd - Syslogd and Klogd loaders
++
++# Based on sysklogd script from LFS-3.1 and earlier.
++# Rewritten by Gerard Beekmans  - gerard@linuxfromscratch.org
++# Modified by Robert Connolly for HLFS.
++
++. /etc/sysconfig/rc
++. $rc_functions
++
++case "$1" in
++	start)
++		echo "Starting system log daemon..."
++		loadproc syslogd -m 0
++
++		echo "Starting kernel log daemon..."
++		loadproc klogd
++		;;
++
++	stop)
++		echo "Stopping kernel log daemon..."
++		killproc klogd
++
++		echo "Stopping system log daemon..."
++		killproc syslogd
++		;;
++
++	restart)
++		$0 stop
++		sleep 1
++		$0 start
++		;;
++
++	status)
++		statusproc syslogd
++		statusproc klogd
++		;;
++
++	*)
++		echo "Usage: $0 {start|stop|restart|status}"
++		exit 1
++		;;
++esac
++
++# End $rc_base/init.d/sysklogd
+diff -Naur lfs-bootscripts-3.1.0.orig/lfs/init.d/syslog-ng lfs-bootscripts-3.1.0/lfs/init.d/syslog-ng
+--- lfs-bootscripts-3.1.0.orig/lfs/init.d/syslog-ng	2005-01-23 10:46:53.465743516 +0000
++++ lfs-bootscripts-3.1.0/lfs/init.d/syslog-ng	1970-01-01 00:00:00.000000000 +0000
+@@ -1,50 +0,0 @@
+-#!/bin/sh
+-########################################################################
+-# Begin $rc_base/init.d/syslog-ng
+-#
+-# Description : Syslog-ng loader
+-#
+-# Authors     : Gerard Beekmans - gerard@linuxfromscratch.org
+-#
+-# Version     : 00.00
+-#
+-# Notes       :
+-#
+-########################################################################
+-
+-. /etc/sysconfig/rc
+-. ${rc_functions}
+-
+-case "${1}" in
+-	start)
+-		boot_mesg "Starting system log daemon..."
+-		loadproc syslog-ng
+-		;;
+-
+-	stop)
+-		boot_mesg "Stopping system log daemon..."
+-		killproc syslog-ng
+-		;;
+-
+-	reload)
+-		boot_mesg "Reloading system log daemon config file..."
+-		reloadproc syslog-ng 1
+-		;;
+-
+-	restart)
+-		${0} stop
+-		sleep 1
+-		${0} start
+-		;;
+-
+-	status)
+-		statusproc syslog-ng
+-		;;
+-
+-	*)
+-		echo "Usage: ${0} {start|stop|reload|restart|status}"
+-		exit 1
+-		;;
+-esac
+-
+-# End $rc_base/init.d/syslog-ng
