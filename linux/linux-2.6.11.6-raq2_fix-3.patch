@@ -7,9 +7,9 @@ Upstream Status: Not Applied to kernel.org
 Description: Adds various fixes to the Cobalt RaQ2
              Added MIPS64 bit fixes
 
-diff -Naur linux-2.6.11.6/arch/mips/Kconfig /cross/build/linux-2.6.11.6/arch/mips/Kconfig
+diff -Naur linux-2.6.11.6/arch/mips/Kconfig linux-2.6.11.6/arch/mips/Kconfig
 --- linux-2.6.11.6/arch/mips/Kconfig	2005-03-25 19:28:20 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/Kconfig	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/Kconfig	2005-04-01 08:56:55 -0800
 @@ -1371,7 +1371,7 @@
  
  config CPU_HAS_LLSC
@@ -28,9 +28,9 @@ diff -Naur linux-2.6.11.6/arch/mips/Kconfig /cross/build/linux-2.6.11.6/arch/mip
  	help
  	  Say Y here if your CPU has the lld and scd instructions, the 64-bit
  	  equivalents of ll and sc.  Say Y here for better performance, N if
-diff -Naur linux-2.6.11.6/arch/mips/Makefile /cross/build/linux-2.6.11.6/arch/mips/Makefile
+diff -Naur linux-2.6.11.6/arch/mips/Makefile linux-2.6.11.6/arch/mips/Makefile
 --- linux-2.6.11.6/arch/mips/Makefile	2005-03-25 19:28:14 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/Makefile	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/Makefile	2005-04-01 08:56:55 -0800
 @@ -323,6 +323,7 @@
  # Cobalt Server
  #
@@ -39,9 +39,9 @@ diff -Naur linux-2.6.11.6/arch/mips/Makefile /cross/build/linux-2.6.11.6/arch/mi
  load-$(CONFIG_MIPS_COBALT)	+= 0xffffffff80080000
  
  #
-diff -Naur linux-2.6.11.6/arch/mips/cobalt/int-handler.S /cross/build/linux-2.6.11.6/arch/mips/cobalt/int-handler.S
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/int-handler.S linux-2.6.11.6/arch/mips/cobalt/int-handler.S
 --- linux-2.6.11.6/arch/mips/cobalt/int-handler.S	2005-03-25 19:28:36 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/int-handler.S	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/cobalt/int-handler.S	2005-04-01 08:56:55 -0800
 @@ -18,8 +18,8 @@
  		SAVE_ALL
  		CLI
@@ -53,9 +53,9 @@ diff -Naur linux-2.6.11.6/arch/mips/cobalt/int-handler.S /cross/build/linux-2.6.
  		j	cobalt_irq
  
  		END(cobalt_handle_int)
-diff -Naur linux-2.6.11.6/arch/mips/cobalt/irq.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/irq.c
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/irq.c linux-2.6.11.6/arch/mips/cobalt/irq.c
 --- linux-2.6.11.6/arch/mips/cobalt/irq.c	2005-03-25 19:28:23 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/irq.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/cobalt/irq.c	2005-04-01 08:56:55 -0800
 @@ -10,6 +10,7 @@
  #include <linux/kernel.h>
  #include <linux/init.h>
@@ -99,9 +99,9 @@ diff -Naur linux-2.6.11.6/arch/mips/cobalt/irq.c /cross/build/linux-2.6.11.6/arc
 +
 +	setup_irq(COBALT_VIA_IRQ, &irq_via);
  }
-diff -Naur linux-2.6.11.6/arch/mips/cobalt/reset.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/reset.c
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/reset.c linux-2.6.11.6/arch/mips/cobalt/reset.c
 --- linux-2.6.11.6/arch/mips/cobalt/reset.c	2005-03-25 19:28:13 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/reset.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/cobalt/reset.c	2005-04-01 08:56:55 -0800
 @@ -16,48 +16,45 @@
  #include <asm/reboot.h>
  #include <asm/system.h>
@@ -179,9 +179,9 @@ diff -Naur linux-2.6.11.6/arch/mips/cobalt/reset.c /cross/build/linux-2.6.11.6/a
  /*
   * This triggers the luser mode device driver for the power switch ;-)
   */
-diff -Naur linux-2.6.11.6/arch/mips/cobalt/setup.c /cross/build/linux-2.6.11.6/arch/mips/cobalt/setup.c
+diff -Naur linux-2.6.11.6/arch/mips/cobalt/setup.c linux-2.6.11.6/arch/mips/cobalt/setup.c
 --- linux-2.6.11.6/arch/mips/cobalt/setup.c	2005-03-25 19:28:14 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/cobalt/setup.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/cobalt/setup.c	2005-04-01 08:56:55 -0800
 @@ -30,27 +30,25 @@
  
  int cobalt_board_id;
@@ -324,9 +324,9 @@ diff -Naur linux-2.6.11.6/arch/mips/cobalt/setup.c /cross/build/linux-2.6.11.6/a
  }
  
  unsigned long __init prom_free_prom_memory(void)
-diff -Naur linux-2.6.11.6/arch/mips/kernel/Makefile /cross/build/linux-2.6.11.6/arch/mips/kernel/Makefile
+diff -Naur linux-2.6.11.6/arch/mips/kernel/Makefile linux-2.6.11.6/arch/mips/kernel/Makefile
 --- linux-2.6.11.6/arch/mips/kernel/Makefile	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/Makefile	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/Makefile	2005-04-01 08:56:55 -0800
 @@ -11,11 +11,7 @@
  binfmt_irix-objs	:= irixelf.o irixinv.o irixioctl.o irixsig.o	\
  			   irix5sys.o sysirix.o
@@ -340,9 +340,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/Makefile /cross/build/linux-2.6.11.6/
  
  obj-$(CONFIG_CPU_R3000)		+= r2300_fpu.o r2300_switch.o
  obj-$(CONFIG_CPU_TX39XX)	+= r2300_fpu.o r2300_switch.o
-diff -Naur linux-2.6.11.6/arch/mips/kernel/cpu-probe.c /cross/build/linux-2.6.11.6/arch/mips/kernel/cpu-probe.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/cpu-probe.c linux-2.6.11.6/arch/mips/kernel/cpu-probe.c
 --- linux-2.6.11.6/arch/mips/kernel/cpu-probe.c	2005-03-25 19:28:18 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/cpu-probe.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/cpu-probe.c	2005-04-01 08:56:55 -0800
 @@ -354,6 +354,17 @@
  		c->options = R4K_OPTS | MIPS_CPU_FPU | MIPS_CPU_32FPR |
  		             MIPS_CPU_DIVEC | MIPS_CPU_LLSC;
@@ -361,9 +361,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/cpu-probe.c /cross/build/linux-2.6.11
  		break;
  	case PRID_IMP_R6000:
  		c->cputype = CPU_R6000;
-diff -Naur linux-2.6.11.6/arch/mips/kernel/entry.S /cross/build/linux-2.6.11.6/arch/mips/kernel/entry.S
+diff -Naur linux-2.6.11.6/arch/mips/kernel/entry.S linux-2.6.11.6/arch/mips/kernel/entry.S
 --- linux-2.6.11.6/arch/mips/kernel/entry.S	2005-03-25 19:28:16 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/entry.S	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/entry.S	2005-04-01 08:56:55 -0800
 @@ -19,11 +19,11 @@
  #include <asm/war.h>
  
@@ -485,9 +485,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/entry.S /cross/build/linux-2.6.11.6/a
  	j	ret_from_irq
  	END(spurious_interrupt)
 +
-diff -Naur linux-2.6.11.6/arch/mips/kernel/irq_cpu.c /cross/build/linux-2.6.11.6/arch/mips/kernel/irq_cpu.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/irq_cpu.c linux-2.6.11.6/arch/mips/kernel/irq_cpu.c
 --- linux-2.6.11.6/arch/mips/kernel/irq_cpu.c	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/irq_cpu.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/irq_cpu.c	2005-04-01 08:56:55 -0800
 @@ -3,6 +3,8 @@
   * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
   *
@@ -538,9 +538,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/irq_cpu.c /cross/build/linux-2.6.11.6
  	for (i = irq_base; i < irq_base + 8; i++) {
  		irq_desc[i].status = IRQ_DISABLED;
  		irq_desc[i].action = NULL;
-diff -Naur linux-2.6.11.6/arch/mips/kernel/linux32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/linux32.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/linux32.c linux-2.6.11.6/arch/mips/kernel/linux32.c
 --- linux-2.6.11.6/arch/mips/kernel/linux32.c	2005-03-25 19:28:23 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/linux32.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/linux32.c	2005-04-01 08:56:55 -0800
 @@ -215,81 +215,35 @@
  	return(n);
  }
@@ -698,9 +698,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/linux32.c /cross/build/linux-2.6.11.6
 +	}
 +	return sys_rt_sigtimedwait(uthese, uinfo, uts, sigsetsize);
 +}
-diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf32.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf32.c linux-2.6.11.6/arch/mips/kernel/module-elf32.c
 --- linux-2.6.11.6/arch/mips/kernel/module-elf32.c	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf32.c	1969-12-31 16:00:00 -0800
++++ linux-2.6.11.6/arch/mips/kernel/module-elf32.c	1969-12-31 16:00:00 -0800
 @@ -1,250 +0,0 @@
 -/*
 - *  This program is free software; you can redistribute it and/or modify
@@ -952,9 +952,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf32.c /cross/build/linux-2.6
 -	       me->name);
 -	return -ENOEXEC;
 -}
-diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf64.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf64.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf64.c linux-2.6.11.6/arch/mips/kernel/module-elf64.c
 --- linux-2.6.11.6/arch/mips/kernel/module-elf64.c	2005-03-25 19:28:24 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module-elf64.c	1969-12-31 16:00:00 -0800
++++ linux-2.6.11.6/arch/mips/kernel/module-elf64.c	1969-12-31 16:00:00 -0800
 @@ -1,274 +0,0 @@
 -/*
 - *  This program is free software; you can redistribute it and/or modify
@@ -1230,9 +1230,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/module-elf64.c /cross/build/linux-2.6
 -
 -	return 0;
 -}
-diff -Naur linux-2.6.11.6/arch/mips/kernel/module.c /cross/build/linux-2.6.11.6/arch/mips/kernel/module.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/module.c linux-2.6.11.6/arch/mips/kernel/module.c
 --- linux-2.6.11.6/arch/mips/kernel/module.c	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/module.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/module.c	2005-04-01 08:56:55 -0800
 @@ -1,9 +1,345 @@
 +/*
 + *  This program is free software; you can redistribute it and/or modify
@@ -1579,9 +1579,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/module.c /cross/build/linux-2.6.11.6/
  /* Given an address, look for it in the module exception tables. */
  const struct exception_table_entry *search_module_dbetables(unsigned long addr)
  {
-diff -Naur linux-2.6.11.6/arch/mips/kernel/proc.c /cross/build/linux-2.6.11.6/arch/mips/kernel/proc.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/proc.c linux-2.6.11.6/arch/mips/kernel/proc.c
 --- linux-2.6.11.6/arch/mips/kernel/proc.c	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/proc.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/proc.c	2005-04-01 08:56:55 -0800
 @@ -19,63 +19,66 @@
  unsigned int vced_count, vcei_count;
  
@@ -1717,9 +1717,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/proc.c /cross/build/linux-2.6.11.6/ar
  	seq_printf(m, "wait instruction\t: %s\n", cpu_wait ? "yes" : "no");
  	seq_printf(m, "microsecond timers\t: %s\n",
  	              cpu_has_counter ? "yes" : "no");
-diff -Naur linux-2.6.11.6/arch/mips/kernel/process.c /cross/build/linux-2.6.11.6/arch/mips/kernel/process.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/process.c linux-2.6.11.6/arch/mips/kernel/process.c
 --- linux-2.6.11.6/arch/mips/kernel/process.c	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/process.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/process.c	2005-04-01 08:56:55 -0800
 @@ -39,14 +39,6 @@
  #include <asm/inst.h>
  
@@ -1912,9 +1912,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/process.c /cross/build/linux-2.6.11.6
  	return pc;
  }
  
-diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace.c /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace.c linux-2.6.11.6/arch/mips/kernel/ptrace.c
 --- linux-2.6.11.6/arch/mips/kernel/ptrace.c	2005-03-25 19:28:38 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/ptrace.c	2005-04-01 08:56:55 -0800
 @@ -101,7 +101,7 @@
  		ret = -EIO;
  		if (copied != sizeof(tmp))
@@ -1933,9 +1933,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace.c /cross/build/linux-2.6.11.6/
  		break;
  	}
  
-diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace32.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace32.c linux-2.6.11.6/arch/mips/kernel/ptrace32.c
 --- linux-2.6.11.6/arch/mips/kernel/ptrace32.c	2005-03-25 19:28:20 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/ptrace32.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/ptrace32.c	2005-04-01 08:56:55 -0800
 @@ -272,6 +272,11 @@
  		ret = ptrace_detach(child, data);
  		break;
@@ -1948,9 +1948,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/ptrace32.c /cross/build/linux-2.6.11.
  	default:
  		ret = ptrace_request(child, request, addr, data);
  		break;
-diff -Naur linux-2.6.11.6/arch/mips/kernel/scall32-o32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall32-o32.S
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall32-o32.S linux-2.6.11.6/arch/mips/kernel/scall32-o32.S
 --- linux-2.6.11.6/arch/mips/kernel/scall32-o32.S	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall32-o32.S	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/scall32-o32.S	2005-04-01 08:56:55 -0800
 @@ -618,7 +618,7 @@
  	sys	sys_mq_notify		2	/* 4275 */
  	sys	sys_mq_getsetattr	3
@@ -1960,9 +1960,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/scall32-o32.S /cross/build/linux-2.6.
  	sys	sys_ni_syscall		0	/* available, was setaltroot */
  	sys	sys_add_key		5
  	sys	sys_request_key		4
-diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-n32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-n32.S
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-n32.S linux-2.6.11.6/arch/mips/kernel/scall64-n32.S
 --- linux-2.6.11.6/arch/mips/kernel/scall64-n32.S	2005-03-25 19:28:36 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-n32.S	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/scall64-n32.S	2005-04-01 08:56:55 -0800
 @@ -176,7 +176,7 @@
  	PTR	sys_fork
  	PTR	sys32_execve
@@ -2015,9 +2015,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-n32.S /cross/build/linux-2.6.
  	PTR	sys_ni_syscall			/* available, was setaltroot */
  	PTR	sys_add_key
  	PTR	sys_request_key
-diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-o32.S /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-o32.S
+diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-o32.S linux-2.6.11.6/arch/mips/kernel/scall64-o32.S
 --- linux-2.6.11.6/arch/mips/kernel/scall64-o32.S	2005-03-25 19:28:13 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/scall64-o32.S	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/scall64-o32.S	2005-04-01 08:56:55 -0800
 @@ -316,7 +316,7 @@
  	PTR	sys_vhangup
  	PTR	sys_ni_syscall			/* was sys_idle	 */
@@ -2045,9 +2045,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/scall64-o32.S /cross/build/linux-2.6.
  	PTR	sys_ni_syscall			/* available, was setaltroot */
  	PTR	sys_add_key			/* 4280 */
  	PTR	sys_request_key
-diff -Naur linux-2.6.11.6/arch/mips/kernel/setup.c /cross/build/linux-2.6.11.6/arch/mips/kernel/setup.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/setup.c linux-2.6.11.6/arch/mips/kernel/setup.c
 --- linux-2.6.11.6/arch/mips/kernel/setup.c	2005-03-25 19:28:16 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/setup.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/setup.c	2005-04-01 08:56:55 -0800
 @@ -277,7 +277,12 @@
  	/* Board specific code should have set up initrd_start and initrd_end */
   	ROOT_DEV = Root_RAM0;
@@ -2061,9 +2061,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/setup.c /cross/build/linux-2.6.11.6/a
  		initrd_reserve_bootmem = 1;
  	} else {
  		unsigned long tmp;
-diff -Naur linux-2.6.11.6/arch/mips/kernel/signal-common.h /cross/build/linux-2.6.11.6/arch/mips/kernel/signal-common.h
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal-common.h linux-2.6.11.6/arch/mips/kernel/signal-common.h
 --- linux-2.6.11.6/arch/mips/kernel/signal-common.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal-common.h	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/signal-common.h	2005-04-01 08:56:55 -0800
 @@ -61,8 +61,8 @@
  static inline int
  restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
@@ -2074,9 +2074,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/signal-common.h /cross/build/linux-2.
  
  	/* Always make any pending restarted system calls return -EINTR */
  	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-diff -Naur linux-2.6.11.6/arch/mips/kernel/signal.c /cross/build/linux-2.6.11.6/arch/mips/kernel/signal.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal.c linux-2.6.11.6/arch/mips/kernel/signal.c
 --- linux-2.6.11.6/arch/mips/kernel/signal.c	2005-03-25 19:28:47 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/signal.c	2005-04-01 08:56:55 -0800
 @@ -47,9 +47,10 @@
  __attribute_used__ noinline static int
  _sys_sigsuspend(nabi_no_regargs struct pt_regs regs)
@@ -2120,9 +2120,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/signal.c /cross/build/linux-2.6.11.6/
  	unsigned long usp = regs.regs[29];
  
  	return do_sigaltstack(uss, uoss, usp);
-diff -Naur linux-2.6.11.6/arch/mips/kernel/signal32.c /cross/build/linux-2.6.11.6/arch/mips/kernel/signal32.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/signal32.c linux-2.6.11.6/arch/mips/kernel/signal32.c
 --- linux-2.6.11.6/arch/mips/kernel/signal32.c	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/signal32.c	2005-04-01 12:58:57 -0800
++++ linux-2.6.11.6/arch/mips/kernel/signal32.c	2005-04-01 12:58:57 -0800
 @@ -81,8 +81,10 @@
  
  		/* POSIX.1b timers */
@@ -2210,9 +2210,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/signal32.c /cross/build/linux-2.6.11.
 +	info.si_code |= __SI_CHLD;
 +	return copy_siginfo_to_user32(uinfo, &info);
 +}
-diff -Naur linux-2.6.11.6/arch/mips/kernel/smp.c /cross/build/linux-2.6.11.6/arch/mips/kernel/smp.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/smp.c linux-2.6.11.6/arch/mips/kernel/smp.c
 --- linux-2.6.11.6/arch/mips/kernel/smp.c	2005-03-25 19:28:16 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/smp.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/smp.c	2005-04-01 08:56:55 -0800
 @@ -139,7 +139,19 @@
   * or are or have executed.
   *
@@ -2295,9 +2295,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/smp.c /cross/build/linux-2.6.11.6/arc
  /* Not really SMP stuff ... */
  int setup_profiling_timer(unsigned int multiplier)
  {
-diff -Naur linux-2.6.11.6/arch/mips/kernel/sysirix.c /cross/build/linux-2.6.11.6/arch/mips/kernel/sysirix.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/sysirix.c linux-2.6.11.6/arch/mips/kernel/sysirix.c
 --- linux-2.6.11.6/arch/mips/kernel/sysirix.c	2005-03-25 19:28:36 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/sysirix.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/sysirix.c	2005-04-01 08:56:55 -0800
 @@ -73,32 +73,30 @@
  }
  
@@ -2408,9 +2408,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/sysirix.c /cross/build/linux-2.6.11.6
  		ptep = pte_offset(pmdp, addr);
  		retval = -EINVAL;
  		if (ptep) {
-diff -Naur linux-2.6.11.6/arch/mips/kernel/traps.c /cross/build/linux-2.6.11.6/arch/mips/kernel/traps.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/traps.c linux-2.6.11.6/arch/mips/kernel/traps.c
 --- linux-2.6.11.6/arch/mips/kernel/traps.c	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/traps.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/traps.c	2005-04-01 08:56:55 -0800
 @@ -339,9 +339,9 @@
  
  static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
@@ -2511,9 +2511,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/traps.c /cross/build/linux-2.6.11.6/a
  		break;
  	case CPU_20KC:
  	case CPU_25KF:
-diff -Naur linux-2.6.11.6/arch/mips/kernel/unaligned.c /cross/build/linux-2.6.11.6/arch/mips/kernel/unaligned.c
+diff -Naur linux-2.6.11.6/arch/mips/kernel/unaligned.c linux-2.6.11.6/arch/mips/kernel/unaligned.c
 --- linux-2.6.11.6/arch/mips/kernel/unaligned.c	2005-03-25 19:28:44 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/kernel/unaligned.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/kernel/unaligned.c	2005-04-01 08:56:55 -0800
 @@ -94,7 +94,7 @@
  #endif
  
@@ -2560,9 +2560,9 @@ diff -Naur linux-2.6.11.6/arch/mips/kernel/unaligned.c /cross/build/linux-2.6.11
  	                             &regptr, &newval)) {
  		compute_return_epc(regs);
  		/*
-diff -Naur linux-2.6.11.6/arch/mips/lib/Makefile /cross/build/linux-2.6.11.6/arch/mips/lib/Makefile
+diff -Naur linux-2.6.11.6/arch/mips/lib/Makefile linux-2.6.11.6/arch/mips/lib/Makefile
 --- linux-2.6.11.6/arch/mips/lib/Makefile	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib/Makefile	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib/Makefile	2005-04-01 08:56:55 -0800
 @@ -2,7 +2,9 @@
  # Makefile for MIPS-specific library files..
  #
@@ -2574,9 +2574,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib/Makefile /cross/build/linux-2.6.11.6/arc
 +obj-y	+= iomap.o
 +
  EXTRA_AFLAGS := $(CFLAGS)
-diff -Naur linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c /cross/build/linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c
+diff -Naur linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c
 --- linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c	2005-03-25 19:28:39 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c	2005-04-01 08:56:55 -0800
 @@ -16,8 +16,8 @@
  /*
   * copy while checksumming, otherwise like csum_partial
@@ -2599,9 +2599,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib/csum_partial_copy.c /cross/build/linux-2
  {
  	int missing;
  
-diff -Naur linux-2.6.11.6/arch/mips/lib/iomap.c /cross/build/linux-2.6.11.6/arch/mips/lib/iomap.c
+diff -Naur linux-2.6.11.6/arch/mips/lib/iomap.c linux-2.6.11.6/arch/mips/lib/iomap.c
 --- linux-2.6.11.6/arch/mips/lib/iomap.c	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib/iomap.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib/iomap.c	2005-04-01 08:56:55 -0800
 @@ -27,9 +27,7 @@
  
  void __iomem *ioport_map(unsigned long port, unsigned int nr)
@@ -2644,9 +2644,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib/iomap.c /cross/build/linux-2.6.11.6/arch
  	}
  
  	return NULL;
-diff -Naur linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c
+diff -Naur linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c
 --- linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c	2005-04-01 08:56:55 -0800
 @@ -32,8 +32,6 @@
  	case PM_256M:	return "256Mb";
  #endif
@@ -2693,9 +2693,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib-32/dump_tlb.c /cross/build/linux-2.6.11.
  	pte = pte_offset(pmd, addr);
  	paddr = (KSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
  	paddr |= (addr & ~PAGE_MASK);
-diff -Naur linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c
+diff -Naur linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c
 --- linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c	2005-04-01 08:56:55 -0800
 @@ -105,6 +105,7 @@
  void dump_list_process(struct task_struct *t, void *address)
  {
@@ -2733,9 +2733,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib-32/r3k_dump_tlb.c /cross/build/linux-2.6
  	pte = pte_offset(pmd, addr);
  	paddr = (KSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
  	paddr |= (addr & ~PAGE_MASK);
-diff -Naur linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c /cross/build/linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c
+diff -Naur linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c
 --- linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c	2005-03-25 19:28:47 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c	2005-04-01 08:56:55 -0800
 @@ -32,8 +32,6 @@
  	case PM_256M:	return "256Mb";
  #endif
@@ -2782,9 +2782,9 @@ diff -Naur linux-2.6.11.6/arch/mips/lib-64/dump_tlb.c /cross/build/linux-2.6.11.
  	pte = pte_offset(pmd, addr);
  	paddr = (CKSEG1 | (unsigned int) pte_val(*pte)) & PAGE_MASK;
  	paddr |= (addr & ~PAGE_MASK);
-diff -Naur linux-2.6.11.6/arch/mips/math-emu/cp1emu.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/cp1emu.c
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/cp1emu.c linux-2.6.11.6/arch/mips/math-emu/cp1emu.c
 --- linux-2.6.11.6/arch/mips/math-emu/cp1emu.c	2005-03-25 19:28:36 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/cp1emu.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/math-emu/cp1emu.c	2005-04-01 08:56:55 -0800
 @@ -196,7 +196,7 @@
  static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
  {
@@ -2962,9 +2962,9 @@ diff -Naur linux-2.6.11.6/arch/mips/math-emu/cp1emu.c /cross/build/linux-2.6.11.
  	mips_instruction insn;
  	int sig = 0;
  
-diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.c
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.c linux-2.6.11.6/arch/mips/math-emu/dsemul.c
 --- linux-2.6.11.6/arch/mips/math-emu/dsemul.c	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/math-emu/dsemul.c	2005-04-01 08:56:55 -0800
 @@ -28,9 +28,6 @@
  #endif
  #define __mips 4
@@ -3015,9 +3015,9 @@ diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.c /cross/build/linux-2.6.11.
  	u32 insn, cookie;
  	int err = 0;
  
-diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.h /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.h
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.h linux-2.6.11.6/arch/mips/math-emu/dsemul.h
 --- linux-2.6.11.6/arch/mips/math-emu/dsemul.h	2005-03-25 19:28:23 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/dsemul.h	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/math-emu/dsemul.h	2005-04-01 08:56:55 -0800
 @@ -1,11 +1,5 @@
 -typedef long gpreg_t;
 -typedef void *vaddr_t;
@@ -3032,9 +3032,9 @@ diff -Naur linux-2.6.11.6/arch/mips/math-emu/dsemul.h /cross/build/linux-2.6.11.
  
  /* Instruction which will always cause an address error */
  #define AdELOAD 0x8c000001	/* lw $0,1($0) */
-diff -Naur linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c /cross/build/linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c
+diff -Naur linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c
 --- linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c	2005-03-25 19:28:14 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c	2005-04-01 08:56:55 -0800
++++ linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c	2005-04-01 08:56:55 -0800
 @@ -27,8 +27,6 @@
  
  #include <asm/fpu_emulator.h>
@@ -3044,9 +3044,9 @@ diff -Naur linux-2.6.11.6/arch/mips/math-emu/kernel_linkage.c /cross/build/linux
  #define SIGNALLING_NAN 0x7ff800007ff80000LL
  
  void fpu_emulator_init_fpu(void)
-diff -Naur linux-2.6.11.6/arch/mips/mm/c-r4k.c /cross/build/linux-2.6.11.6/arch/mips/mm/c-r4k.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/c-r4k.c linux-2.6.11.6/arch/mips/mm/c-r4k.c
 --- linux-2.6.11.6/arch/mips/mm/c-r4k.c	2005-03-25 19:28:37 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/c-r4k.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/c-r4k.c	2005-04-01 08:56:56 -0800
 @@ -372,12 +372,21 @@
  	int exec = vma->vm_flags & VM_EXEC;
  	struct mm_struct *mm = vma->vm_mm;
@@ -3161,9 +3161,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/c-r4k.c /cross/build/linux-2.6.11.6/arch/
  	r4k_blast_dcache_page_setup();
  	r4k_blast_dcache_page_indexed_setup();
  	r4k_blast_dcache_setup();
-diff -Naur linux-2.6.11.6/arch/mips/mm/cache.c /cross/build/linux-2.6.11.6/arch/mips/mm/cache.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/cache.c linux-2.6.11.6/arch/mips/mm/cache.c
 --- linux-2.6.11.6/arch/mips/mm/cache.c	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/cache.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/cache.c	2005-04-01 08:56:56 -0800
 @@ -24,7 +24,8 @@
  void (*flush_cache_range)(struct vm_area_struct *vma, unsigned long start,
  	unsigned long end);
@@ -3188,9 +3188,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/cache.c /cross/build/linux-2.6.11.6/arch/
  		return -EFAULT;
  
  	flush_icache_range(addr, addr + bytes);
-diff -Naur linux-2.6.11.6/arch/mips/mm/fault.c /cross/build/linux-2.6.11.6/arch/mips/mm/fault.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/fault.c linux-2.6.11.6/arch/mips/mm/fault.c
 --- linux-2.6.11.6/arch/mips/mm/fault.c	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/fault.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/fault.c	2005-04-01 08:56:56 -0800
 @@ -25,6 +25,7 @@
  #include <asm/system.h>
  #include <asm/uaccess.h>
@@ -3250,9 +3250,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/fault.c /cross/build/linux-2.6.11.6/arch/
  		if (!pmd_present(*pmd_k))
  			goto no_context;
  		set_pmd(pmd, *pmd_k);
-diff -Naur linux-2.6.11.6/arch/mips/mm/init.c /cross/build/linux-2.6.11.6/arch/mips/mm/init.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/init.c linux-2.6.11.6/arch/mips/mm/init.c
 --- linux-2.6.11.6/arch/mips/mm/init.c	2005-03-25 19:28:25 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/init.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/init.c	2005-04-01 08:56:56 -0800
 @@ -86,7 +86,7 @@
  EXPORT_SYMBOL(kmap_pte);
  
@@ -3318,9 +3318,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/init.c /cross/build/linux-2.6.11.6/arch/m
  #endif /* CONFIG_HIGHMEM */
  
  #ifndef CONFIG_DISCONTIGMEM
-diff -Naur linux-2.6.11.6/arch/mips/mm/ioremap.c /cross/build/linux-2.6.11.6/arch/mips/mm/ioremap.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/ioremap.c linux-2.6.11.6/arch/mips/mm/ioremap.c
 --- linux-2.6.11.6/arch/mips/mm/ioremap.c	2005-03-25 19:28:20 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/ioremap.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/ioremap.c	2005-04-01 08:56:56 -0800
 @@ -79,9 +79,14 @@
  		BUG();
  	spin_lock(&init_mm.page_table_lock);
@@ -3355,9 +3355,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/ioremap.c /cross/build/linux-2.6.11.6/arc
  
  void __iounmap(volatile void __iomem *addr)
  {
-diff -Naur linux-2.6.11.6/arch/mips/mm/pgtable-32.c /cross/build/linux-2.6.11.6/arch/mips/mm/pgtable-32.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/pgtable-32.c linux-2.6.11.6/arch/mips/mm/pgtable-32.c
 --- linux-2.6.11.6/arch/mips/mm/pgtable-32.c	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/pgtable-32.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/pgtable-32.c	2005-04-01 08:56:56 -0800
 @@ -10,6 +10,7 @@
  #include <linux/mm.h>
  #include <linux/bootmem.h>
@@ -3420,9 +3420,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/pgtable-32.c /cross/build/linux-2.6.11.6/
  	pte = pte_offset_kernel(pmd, vaddr);
  	pkmap_page_table = pte;
  #endif
-diff -Naur linux-2.6.11.6/arch/mips/mm/tlb-r4k.c /cross/build/linux-2.6.11.6/arch/mips/mm/tlb-r4k.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/tlb-r4k.c linux-2.6.11.6/arch/mips/mm/tlb-r4k.c
 --- linux-2.6.11.6/arch/mips/mm/tlb-r4k.c	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/tlb-r4k.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/tlb-r4k.c	2005-04-01 08:56:56 -0800
 @@ -100,7 +100,7 @@
  					continue;
  				/* Make sure all entries differ. */
@@ -3485,9 +3485,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/tlb-r4k.c /cross/build/linux-2.6.11.6/arc
  		return;
  
  	reg = read_c0_config1();
-diff -Naur linux-2.6.11.6/arch/mips/mm/tlbex.c /cross/build/linux-2.6.11.6/arch/mips/mm/tlbex.c
+diff -Naur linux-2.6.11.6/arch/mips/mm/tlbex.c linux-2.6.11.6/arch/mips/mm/tlbex.c
 --- linux-2.6.11.6/arch/mips/mm/tlbex.c	2005-03-25 19:28:16 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/mm/tlbex.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/mm/tlbex.c	2005-04-01 08:56:56 -0800
 @@ -840,6 +840,7 @@
  	case CPU_AU1100:
  	case CPU_AU1500:
@@ -3505,9 +3505,9 @@ diff -Naur linux-2.6.11.6/arch/mips/mm/tlbex.c /cross/build/linux-2.6.11.6/arch/
   * Only the fastpath gets synthesized at runtime, the slowpath for
   * do_page_fault remains normal asm.
   */
-diff -Naur linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c /cross/build/linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c
+diff -Naur linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c
 --- linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c	2005-03-25 19:28:20 -0800
-+++ /cross/build/linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c	2005-04-01 08:56:56 -0800
 @@ -47,6 +47,7 @@
  static void qube_raq_galileo_fixup(struct pci_dev *dev)
  {
@@ -3567,9 +3567,9 @@ diff -Naur linux-2.6.11.6/arch/mips/pci/fixup-cobalt.c /cross/build/linux-2.6.11
  	 qube_raq_galileo_fixup);
  
  static char irq_tab_cobalt[] __initdata = {
-diff -Naur linux-2.6.11.6/drivers/char/lcd.c /cross/build/linux-2.6.11.6/drivers/char/lcd.c
+diff -Naur linux-2.6.11.6/drivers/char/lcd.c linux-2.6.11.6/drivers/char/lcd.c
 --- linux-2.6.11.6/drivers/char/lcd.c	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/char/lcd.c	2005-04-01 14:36:35 -0800
++++ linux-2.6.11.6/drivers/char/lcd.c	2005-04-01 14:36:35 -0800
 @@ -575,8 +575,8 @@
  
  static int lcd_waiters = 0;
@@ -3581,9 +3581,9 @@ diff -Naur linux-2.6.11.6/drivers/char/lcd.c /cross/build/linux-2.6.11.6/drivers
  {
  	long buttons_now;
  
-diff -Naur linux-2.6.11.6/drivers/char/lcd.h /cross/build/linux-2.6.11.6/drivers/char/lcd.h
+diff -Naur linux-2.6.11.6/drivers/char/lcd.h linux-2.6.11.6/drivers/char/lcd.h
 --- linux-2.6.11.6/drivers/char/lcd.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/char/lcd.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/drivers/char/lcd.h	2005-04-01 08:56:56 -0800
 @@ -22,7 +22,7 @@
  #define MAX_IDLE_TIME 120
  
@@ -3593,9 +3593,9 @@ diff -Naur linux-2.6.11.6/drivers/char/lcd.h /cross/build/linux-2.6.11.6/drivers
          int size1;
          int size2;
          unsigned char line1[LCD_CHARS_PER_LINE];
-diff -Naur linux-2.6.11.6/drivers/char/rtc.c /cross/build/linux-2.6.11.6/drivers/char/rtc.c
+diff -Naur linux-2.6.11.6/drivers/char/rtc.c linux-2.6.11.6/drivers/char/rtc.c
 --- linux-2.6.11.6/drivers/char/rtc.c	2005-03-25 19:28:42 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/char/rtc.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/drivers/char/rtc.c	2005-04-01 08:56:56 -0800
 @@ -35,23 +35,21 @@
   *	1.09a	Pete Zaitcev: Sun SPARC
   *	1.09b	Jeff Garzik: Modularize, init cleanup
@@ -3707,9 +3707,9 @@ diff -Naur linux-2.6.11.6/drivers/char/rtc.c /cross/build/linux-2.6.11.6/drivers
  #ifdef RTC_IRQ
  	if (rtc_has_irq)
  		free_irq (RTC_IRQ, NULL);
-diff -Naur linux-2.6.11.6/drivers/net/tulip/eeprom.c /cross/build/linux-2.6.11.6/drivers/net/tulip/eeprom.c
+diff -Naur linux-2.6.11.6/drivers/net/tulip/eeprom.c linux-2.6.11.6/drivers/net/tulip/eeprom.c
 --- linux-2.6.11.6/drivers/net/tulip/eeprom.c	2005-03-25 19:28:37 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/net/tulip/eeprom.c	2005-04-01 09:13:39 -0800
++++ linux-2.6.11.6/drivers/net/tulip/eeprom.c	2005-04-01 09:13:39 -0800
 @@ -63,6 +63,22 @@
  	 */
  	{ 0x1e00, 0x0000, 0x000b, 0x8f01, 0x0103, 0x0300, 0x0821, 0x000, 0x0001, 0x0000, 0x01e1 }
@@ -3733,9 +3733,9 @@ diff -Naur linux-2.6.11.6/drivers/net/tulip/eeprom.c /cross/build/linux-2.6.11.6
    {NULL}};
  
  
-diff -Naur linux-2.6.11.6/drivers/net/tulip/interrupt.c /cross/build/linux-2.6.11.6/drivers/net/tulip/interrupt.c
+diff -Naur linux-2.6.11.6/drivers/net/tulip/interrupt.c linux-2.6.11.6/drivers/net/tulip/interrupt.c
 --- linux-2.6.11.6/drivers/net/tulip/interrupt.c	2005-03-25 19:28:40 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/net/tulip/interrupt.c	2005-04-01 08:59:41 -0800
++++ linux-2.6.11.6/drivers/net/tulip/interrupt.c	2005-04-01 08:59:41 -0800
 @@ -26,7 +26,7 @@
  #define MIT_SIZE 15
  #define MIT_TABLE 15 /* We use 0 or max */
@@ -3745,9 +3745,9 @@ diff -Naur linux-2.6.11.6/drivers/net/tulip/interrupt.c /cross/build/linux-2.6.1
  {
          /*  CRS11 21143 hardware Mitigation Control Interrupt
              We use only RX mitigation we other techniques for
-diff -Naur linux-2.6.11.6/drivers/net/tulip/media.c /cross/build/linux-2.6.11.6/drivers/net/tulip/media.c
+diff -Naur linux-2.6.11.6/drivers/net/tulip/media.c linux-2.6.11.6/drivers/net/tulip/media.c
 --- linux-2.6.11.6/drivers/net/tulip/media.c	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/net/tulip/media.c	2005-04-01 08:57:20 -0800
++++ linux-2.6.11.6/drivers/net/tulip/media.c	2005-04-01 08:57:20 -0800
 @@ -44,8 +44,10 @@
  
  /* MII transceiver control section.
@@ -3809,9 +3809,9 @@ diff -Naur linux-2.6.11.6/drivers/net/tulip/media.c /cross/build/linux-2.6.11.6/
  			tmp_info = get_u16(&misc_info[1]);
  			if (tmp_info)
  				tp->advertising[phy_num] = tmp_info | 1;
-diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip.h /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip.h
+diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip.h linux-2.6.11.6/drivers/net/tulip/tulip.h
 --- linux-2.6.11.6/drivers/net/tulip/tulip.h	2005-03-25 19:28:36 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip.h	2005-04-01 09:01:07 -0800
++++ linux-2.6.11.6/drivers/net/tulip/tulip.h	2005-04-01 09:01:07 -0800
 @@ -475,8 +475,11 @@
  			udelay(10);
  
@@ -3826,9 +3826,9 @@ diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip.h /cross/build/linux-2.6.11.6/
  	}
  }
  
-diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip_core.c /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip_core.c
+diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip_core.c linux-2.6.11.6/drivers/net/tulip/tulip_core.c
 --- linux-2.6.11.6/drivers/net/tulip/tulip_core.c	2005-03-25 19:28:22 -0800
-+++ /cross/build/linux-2.6.11.6/drivers/net/tulip/tulip_core.c	2005-04-01 09:01:54 -0800
++++ linux-2.6.11.6/drivers/net/tulip/tulip_core.c	2005-04-01 09:01:54 -0800
 @@ -22,7 +22,7 @@
  #else
  #define DRV_VERSION	"1.1.13"
@@ -3875,9 +3875,9 @@ diff -Naur linux-2.6.11.6/drivers/net/tulip/tulip_core.c /cross/build/linux-2.6.
  {
  	struct net_device *dev = pci_get_drvdata(pdev);
  
-diff -Naur linux-2.6.11.6/include/asm-mips/break.h /cross/build/linux-2.6.11.6/include/asm-mips/break.h
+diff -Naur linux-2.6.11.6/include/asm-mips/break.h linux-2.6.11.6/include/asm-mips/break.h
 --- linux-2.6.11.6/include/asm-mips/break.h	2005-03-25 19:28:25 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/break.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/break.h	2005-04-01 08:56:56 -0800
 @@ -28,6 +28,7 @@
  #define BRK_NORLD	10	/* No rld found - not used by Linux/MIPS */
  #define _BRK_THREADBP	11	/* For threads, user bp (used by debuggers) */
@@ -3886,9 +3886,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/break.h /cross/build/linux-2.6.11.6/i
  #define BRK_MULOVF	1023	/* Multiply overflow */
  
  #endif /* __ASM_BREAK_H */
-diff -Naur linux-2.6.11.6/include/asm-mips/cacheflush.h /cross/build/linux-2.6.11.6/include/asm-mips/cacheflush.h
+diff -Naur linux-2.6.11.6/include/asm-mips/cacheflush.h linux-2.6.11.6/include/asm-mips/cacheflush.h
 --- linux-2.6.11.6/include/asm-mips/cacheflush.h	2005-03-25 19:28:26 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/cacheflush.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/cacheflush.h	2005-04-01 08:56:56 -0800
 @@ -50,17 +50,24 @@
  
  extern void (*flush_icache_page)(struct vm_area_struct *vma,
@@ -3916,9 +3916,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/cacheflush.h /cross/build/linux-2.6.1
  
  extern void (*flush_cache_sigtramp)(unsigned long addr);
  extern void (*flush_icache_all)(void);
-diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h
 --- linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h	2005-04-01 08:56:56 -0800
 @@ -19,7 +19,10 @@
   *     9  - PCI
   *    14  - IDE0
@@ -3980,9 +3980,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/cobalt.h /cross/build/linux-2.
 +# define COBALT_KEY_MASK	0xfe
  
  #endif /* __ASM_COBALT_H */
-diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/ide.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/ide.h
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/ide.h linux-2.6.11.6/include/asm-mips/cobalt/ide.h
 --- linux-2.6.11.6/include/asm-mips/cobalt/ide.h	1969-12-31 16:00:00 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/ide.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/cobalt/ide.h	2005-04-01 08:56:56 -0800
 @@ -0,0 +1,83 @@
 +
 +/*
@@ -4067,15 +4067,15 @@ diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/ide.h /cross/build/linux-2.6.1
 +
 +#define __ide_mm_outsw		writesw
 +#define __ide_mm_outsl		writesl
-diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h
+diff -Naur linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h
 --- linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h	1969-12-31 16:00:00 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/cobalt/mach-gt64120.h	2005-04-01 08:56:56 -0800
 @@ -0,0 +1,2 @@
 +/* there's something here ... in the dark */
 +
-diff -Naur linux-2.6.11.6/include/asm-mips/cpu.h /cross/build/linux-2.6.11.6/include/asm-mips/cpu.h
+diff -Naur linux-2.6.11.6/include/asm-mips/cpu.h linux-2.6.11.6/include/asm-mips/cpu.h
 --- linux-2.6.11.6/include/asm-mips/cpu.h	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/cpu.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/cpu.h	2005-04-01 08:56:56 -0800
 @@ -22,12 +22,17 @@
     spec.
  */
@@ -4118,9 +4118,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/cpu.h /cross/build/linux-2.6.11.6/inc
  
  /*
   * ISA Level encodings
-diff -Naur linux-2.6.11.6/include/asm-mips/elf.h /cross/build/linux-2.6.11.6/include/asm-mips/elf.h
+diff -Naur linux-2.6.11.6/include/asm-mips/elf.h linux-2.6.11.6/include/asm-mips/elf.h
 --- linux-2.6.11.6/include/asm-mips/elf.h	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/elf.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/elf.h	2005-04-01 08:56:56 -0800
 @@ -234,9 +234,6 @@
  
  #endif /* __KERNEL__ */
@@ -4131,9 +4131,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/elf.h /cross/build/linux-2.6.11.6/inc
  #define USE_ELF_CORE_DUMP
  #define ELF_EXEC_PAGESIZE	PAGE_SIZE
  
-diff -Naur linux-2.6.11.6/include/asm-mips/fixmap.h /cross/build/linux-2.6.11.6/include/asm-mips/fixmap.h
+diff -Naur linux-2.6.11.6/include/asm-mips/fixmap.h linux-2.6.11.6/include/asm-mips/fixmap.h
 --- linux-2.6.11.6/include/asm-mips/fixmap.h	2005-03-25 19:28:18 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/fixmap.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/fixmap.h	2005-04-01 08:56:56 -0800
 @@ -107,4 +107,11 @@
  	return __virt_to_fix(vaddr);
  }
@@ -4146,9 +4146,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/fixmap.h /cross/build/linux-2.6.11.6/
 +
 +
  #endif
-diff -Naur linux-2.6.11.6/include/asm-mips/fpu_emulator.h /cross/build/linux-2.6.11.6/include/asm-mips/fpu_emulator.h
+diff -Naur linux-2.6.11.6/include/asm-mips/fpu_emulator.h linux-2.6.11.6/include/asm-mips/fpu_emulator.h
 --- linux-2.6.11.6/include/asm-mips/fpu_emulator.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/fpu_emulator.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/fpu_emulator.h	2005-04-01 08:56:56 -0800
 @@ -35,4 +35,6 @@
  	} stats;
  };
@@ -4156,9 +4156,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/fpu_emulator.h /cross/build/linux-2.6
 +extern struct mips_fpu_emulator_private fpuemuprivate;
 +
  #endif /* _ASM_FPU_EMULATOR_H */
-diff -Naur linux-2.6.11.6/include/asm-mips/hazards.h /cross/build/linux-2.6.11.6/include/asm-mips/hazards.h
+diff -Naur linux-2.6.11.6/include/asm-mips/hazards.h linux-2.6.11.6/include/asm-mips/hazards.h
 --- linux-2.6.11.6/include/asm-mips/hazards.h	2005-03-25 19:28:25 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/hazards.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/hazards.h	2005-04-01 08:56:56 -0800
 @@ -107,6 +107,7 @@
  	"	.endm						\n\t");
  
@@ -4210,9 +4210,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/hazards.h /cross/build/linux-2.6.11.6
  #endif
  
  #endif /* __ASSEMBLY__ */
-diff -Naur linux-2.6.11.6/include/asm-mips/io.h /cross/build/linux-2.6.11.6/include/asm-mips/io.h
+diff -Naur linux-2.6.11.6/include/asm-mips/io.h linux-2.6.11.6/include/asm-mips/io.h
 --- linux-2.6.11.6/include/asm-mips/io.h	2005-03-25 19:28:19 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/io.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/io.h	2005-04-01 08:56:56 -0800
 @@ -34,7 +34,7 @@
  #undef CONF_SLOWDOWN_IO
  
@@ -4362,9 +4362,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/io.h /cross/build/linux-2.6.11.6/incl
  		__addr++;						\
  	}								\
  }
-diff -Naur linux-2.6.11.6/include/asm-mips/irq.h /cross/build/linux-2.6.11.6/include/asm-mips/irq.h
+diff -Naur linux-2.6.11.6/include/asm-mips/irq.h linux-2.6.11.6/include/asm-mips/irq.h
 --- linux-2.6.11.6/include/asm-mips/irq.h	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/irq.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/irq.h	2005-04-01 08:56:56 -0800
 @@ -24,11 +24,9 @@
  
  struct pt_regs;
@@ -4378,9 +4378,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/irq.h /cross/build/linux-2.6.11.6/inc
  
  /*
   * do_IRQ handles all normal device IRQ's (the special
-diff -Naur linux-2.6.11.6/include/asm-mips/mipsregs.h /cross/build/linux-2.6.11.6/include/asm-mips/mipsregs.h
+diff -Naur linux-2.6.11.6/include/asm-mips/mipsregs.h linux-2.6.11.6/include/asm-mips/mipsregs.h
 --- linux-2.6.11.6/include/asm-mips/mipsregs.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/mipsregs.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/mipsregs.h	2005-04-01 08:56:56 -0800
 @@ -790,10 +790,18 @@
  #define read_c0_config1()	__read_32bit_c0_register($16, 1)
  #define read_c0_config2()	__read_32bit_c0_register($16, 2)
@@ -4400,9 +4400,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/mipsregs.h /cross/build/linux-2.6.11.
  
  /*
   * The WatchLo register.  There may be upto 8 of them.
-diff -Naur linux-2.6.11.6/include/asm-mips/module.h /cross/build/linux-2.6.11.6/include/asm-mips/module.h
+diff -Naur linux-2.6.11.6/include/asm-mips/module.h linux-2.6.11.6/include/asm-mips/module.h
 --- linux-2.6.11.6/include/asm-mips/module.h	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/module.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/module.h	2005-04-01 08:56:56 -0800
 @@ -14,15 +14,23 @@
  
  typedef uint8_t Elf64_Byte;		/* Type for a 8-bit quantity.  */
@@ -4464,9 +4464,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/module.h /cross/build/linux-2.6.11.6/
  
  #endif
  
-diff -Naur linux-2.6.11.6/include/asm-mips/page.h /cross/build/linux-2.6.11.6/include/asm-mips/page.h
+diff -Naur linux-2.6.11.6/include/asm-mips/page.h linux-2.6.11.6/include/asm-mips/page.h
 --- linux-2.6.11.6/include/asm-mips/page.h	2005-03-25 19:28:18 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/page.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/page.h	2005-04-01 08:56:56 -0800
 @@ -87,21 +87,48 @@
  typedef struct { unsigned long pte; } pte_t;
  #define pte_val(x)	((x).pte)
@@ -4523,9 +4523,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/page.h /cross/build/linux-2.6.11.6/in
  
  /* Pure 2^n version of get_order */
  static __inline__ int get_order(unsigned long size)
-diff -Naur linux-2.6.11.6/include/asm-mips/pgalloc.h /cross/build/linux-2.6.11.6/include/asm-mips/pgalloc.h
+diff -Naur linux-2.6.11.6/include/asm-mips/pgalloc.h linux-2.6.11.6/include/asm-mips/pgalloc.h
 --- linux-2.6.11.6/include/asm-mips/pgalloc.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/pgalloc.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/pgalloc.h	2005-04-01 08:56:56 -0800
 @@ -26,10 +26,22 @@
  }
  
@@ -4573,9 +4573,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/pgalloc.h /cross/build/linux-2.6.11.6
  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
  {
  	pmd_t *pmd;
-diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-32.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-32.h
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-32.h linux-2.6.11.6/include/asm-mips/pgtable-32.h
 --- linux-2.6.11.6/include/asm-mips/pgtable-32.h	2005-03-25 19:28:21 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-32.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/pgtable-32.h	2005-04-01 08:56:56 -0800
 @@ -17,6 +17,8 @@
  #include <asm/cachectl.h>
  #include <asm/fixmap.h>
@@ -4688,9 +4688,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-32.h /cross/build/linux-2.6.1
  /* Find an entry in the third-level page table.. */
  #define __pte_offset(address)						\
  	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-64.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-64.h
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-64.h linux-2.6.11.6/include/asm-mips/pgtable-64.h
 --- linux-2.6.11.6/include/asm-mips/pgtable-64.h	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable-64.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/pgtable-64.h	2005-04-01 08:56:56 -0800
 @@ -16,13 +16,15 @@
  #include <asm/page.h>
  #include <asm/cachectl.h>
@@ -4858,9 +4858,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/pgtable-64.h /cross/build/linux-2.6.1
  	       ((address >> PMD_SHIFT) & (PTRS_PER_PMD - 1));
  }
  
-diff -Naur linux-2.6.11.6/include/asm-mips/pgtable.h /cross/build/linux-2.6.11.6/include/asm-mips/pgtable.h
+diff -Naur linux-2.6.11.6/include/asm-mips/pgtable.h linux-2.6.11.6/include/asm-mips/pgtable.h
 --- linux-2.6.11.6/include/asm-mips/pgtable.h	2005-03-25 19:28:17 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/pgtable.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/pgtable.h	2005-04-01 08:56:56 -0800
 @@ -8,8 +8,6 @@
  #ifndef _ASM_PGTABLE_H
  #define _ASM_PGTABLE_H
@@ -4891,9 +4891,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/pgtable.h /cross/build/linux-2.6.11.6
  
  #define PGD_T_LOG2	ffz(~sizeof(pgd_t))
  #define PMD_T_LOG2	ffz(~sizeof(pmd_t))
-diff -Naur linux-2.6.11.6/include/asm-mips/serial.h /cross/build/linux-2.6.11.6/include/asm-mips/serial.h
+diff -Naur linux-2.6.11.6/include/asm-mips/serial.h linux-2.6.11.6/include/asm-mips/serial.h
 --- linux-2.6.11.6/include/asm-mips/serial.h	2005-03-25 19:28:39 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/serial.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/serial.h	2005-04-01 08:56:56 -0800
 @@ -309,9 +309,9 @@
  #define JAGUAR_ATX_SERIAL1_BASE	0xfd000023L
  
@@ -4920,9 +4920,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/serial.h /cross/build/linux-2.6.11.6/
  	  io_type: SERIAL_IO_MEM }
  
  #define MOMENCO_OCELOT_3_SERIAL_PORT_DEFNS				\
-diff -Naur linux-2.6.11.6/include/asm-mips/signal.h /cross/build/linux-2.6.11.6/include/asm-mips/signal.h
+diff -Naur linux-2.6.11.6/include/asm-mips/signal.h linux-2.6.11.6/include/asm-mips/signal.h
 --- linux-2.6.11.6/include/asm-mips/signal.h	2005-03-25 19:28:18 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/signal.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/signal.h	2005-04-01 08:56:56 -0800
 @@ -120,7 +120,8 @@
  				   set only the low 32 bit of the sigset.  */
  
@@ -4933,9 +4933,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/signal.h /cross/build/linux-2.6.11.6/
  
  /* Fake signal functions */
  #define SIG_DFL	((__sighandler_t)0)	/* default signal handling */
-diff -Naur linux-2.6.11.6/include/asm-mips/spinlock.h /cross/build/linux-2.6.11.6/include/asm-mips/spinlock.h
+diff -Naur linux-2.6.11.6/include/asm-mips/spinlock.h linux-2.6.11.6/include/asm-mips/spinlock.h
 --- linux-2.6.11.6/include/asm-mips/spinlock.h	2005-03-25 19:28:37 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/spinlock.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/spinlock.h	2005-04-01 08:56:56 -0800
 @@ -140,6 +140,18 @@
  
  #define rwlock_init(x)  do { *(x) = RW_LOCK_UNLOCKED; } while(0)
@@ -4955,9 +4955,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/spinlock.h /cross/build/linux-2.6.11.
  static inline void _raw_read_lock(rwlock_t *rw)
  {
  	unsigned int tmp;
-diff -Naur linux-2.6.11.6/include/asm-mips/stackframe.h /cross/build/linux-2.6.11.6/include/asm-mips/stackframe.h
+diff -Naur linux-2.6.11.6/include/asm-mips/stackframe.h linux-2.6.11.6/include/asm-mips/stackframe.h
 --- linux-2.6.11.6/include/asm-mips/stackframe.h	2005-03-25 19:28:13 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/stackframe.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/stackframe.h	2005-04-01 08:56:56 -0800
 @@ -78,7 +78,12 @@
  		MFC0	k1, CP0_CONTEXT
  		dsrl	k1, 23
@@ -4972,9 +4972,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/stackframe.h /cross/build/linux-2.6.1
  #endif
  		.endm
  
-diff -Naur linux-2.6.11.6/include/asm-mips/uaccess.h /cross/build/linux-2.6.11.6/include/asm-mips/uaccess.h
+diff -Naur linux-2.6.11.6/include/asm-mips/uaccess.h linux-2.6.11.6/include/asm-mips/uaccess.h
 --- linux-2.6.11.6/include/asm-mips/uaccess.h	2005-03-25 19:28:14 -0800
-+++ /cross/build/linux-2.6.11.6/include/asm-mips/uaccess.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/asm-mips/uaccess.h	2005-04-01 08:56:56 -0800
 @@ -128,7 +128,8 @@
   *
   * See access_ok() for more details.
@@ -5328,9 +5328,9 @@ diff -Naur linux-2.6.11.6/include/asm-mips/uaccess.h /cross/build/linux-2.6.11.6
  {
  	long res;
  
-diff -Naur linux-2.6.11.6/include/linux/init.h /cross/build/linux-2.6.11.6/include/linux/init.h
+diff -Naur linux-2.6.11.6/include/linux/init.h linux-2.6.11.6/include/linux/init.h
 --- linux-2.6.11.6/include/linux/init.h	2005-03-25 19:28:14 -0800
-+++ /cross/build/linux-2.6.11.6/include/linux/init.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/linux/init.h	2005-04-01 08:56:56 -0800
 @@ -86,6 +86,8 @@
  	static initcall_t __initcall_##fn __attribute_used__ \
  	__attribute__((__section__(".initcall" level ".init"))) = fn
@@ -5340,9 +5340,9 @@ diff -Naur linux-2.6.11.6/include/linux/init.h /cross/build/linux-2.6.11.6/inclu
  #define core_initcall(fn)		__define_initcall("1",fn)
  #define postcore_initcall(fn)		__define_initcall("2",fn)
  #define arch_initcall(fn)		__define_initcall("3",fn)
-diff -Naur linux-2.6.11.6/include/linux/mc146818rtc.h /cross/build/linux-2.6.11.6/include/linux/mc146818rtc.h
+diff -Naur linux-2.6.11.6/include/linux/mc146818rtc.h linux-2.6.11.6/include/linux/mc146818rtc.h
 --- linux-2.6.11.6/include/linux/mc146818rtc.h	2005-03-25 19:28:26 -0800
-+++ /cross/build/linux-2.6.11.6/include/linux/mc146818rtc.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/linux/mc146818rtc.h	2005-04-01 08:56:56 -0800
 @@ -89,4 +89,12 @@
  # define RTC_VRT 0x80		/* valid RAM and time */
  /**********************************************************************/
@@ -5356,9 +5356,9 @@ diff -Naur linux-2.6.11.6/include/linux/mc146818rtc.h /cross/build/linux-2.6.11.
 +#endif
 +
  #endif /* _MC146818RTC_H */
-diff -Naur linux-2.6.11.6/include/linux/pci.h /cross/build/linux-2.6.11.6/include/linux/pci.h
+diff -Naur linux-2.6.11.6/include/linux/pci.h linux-2.6.11.6/include/linux/pci.h
 --- linux-2.6.11.6/include/linux/pci.h	2005-03-25 19:28:20 -0800
-+++ /cross/build/linux-2.6.11.6/include/linux/pci.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/linux/pci.h	2005-04-01 08:56:56 -0800
 @@ -1038,7 +1038,7 @@
  
  /* Anonymous variables would be nice... */
@@ -5368,9 +5368,9 @@ diff -Naur linux-2.6.11.6/include/linux/pci.h /cross/build/linux-2.6.11.6/includ
  	__attribute__((__section__(#section))) = { vendor, device, hook };
  #define DECLARE_PCI_FIXUP_EARLY(vendor, device, hook)			\
  	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_early,			\
-diff -Naur linux-2.6.11.6/include/linux/serial.h /cross/build/linux-2.6.11.6/include/linux/serial.h
+diff -Naur linux-2.6.11.6/include/linux/serial.h linux-2.6.11.6/include/linux/serial.h
 --- linux-2.6.11.6/include/linux/serial.h	2005-03-25 19:28:16 -0800
-+++ /cross/build/linux-2.6.11.6/include/linux/serial.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/linux/serial.h	2005-04-01 08:56:56 -0800
 @@ -75,7 +75,8 @@
  #define PORT_16654	11
  #define PORT_16850	12
@@ -5381,9 +5381,9 @@ diff -Naur linux-2.6.11.6/include/linux/serial.h /cross/build/linux-2.6.11.6/inc
  
  #define SERIAL_IO_PORT	0
  #define SERIAL_IO_HUB6	1
-diff -Naur linux-2.6.11.6/include/linux/serial_core.h /cross/build/linux-2.6.11.6/include/linux/serial_core.h
+diff -Naur linux-2.6.11.6/include/linux/serial_core.h linux-2.6.11.6/include/linux/serial_core.h
 --- linux-2.6.11.6/include/linux/serial_core.h	2005-03-25 19:28:15 -0800
-+++ /cross/build/linux-2.6.11.6/include/linux/serial_core.h	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/include/linux/serial_core.h	2005-04-01 08:56:56 -0800
 @@ -103,9 +103,6 @@
  /* Marvell MPSC */
  #define PORT_MPSC	63
@@ -5394,9 +5394,9 @@ diff -Naur linux-2.6.11.6/include/linux/serial_core.h /cross/build/linux-2.6.11.
  #ifdef __KERNEL__
  
  #include <linux/config.h>
-diff -Naur linux-2.6.11.6/scripts/kallsyms.c /cross/build/linux-2.6.11.6/scripts/kallsyms.c
+diff -Naur linux-2.6.11.6/scripts/kallsyms.c linux-2.6.11.6/scripts/kallsyms.c
 --- linux-2.6.11.6/scripts/kallsyms.c	2005-03-25 19:28:38 -0800
-+++ /cross/build/linux-2.6.11.6/scripts/kallsyms.c	2005-04-01 08:56:56 -0800
++++ linux-2.6.11.6/scripts/kallsyms.c	2005-04-01 08:56:56 -0800
 @@ -145,6 +145,9 @@
  	else if (toupper(s->type) == 'U' ||
  		 is_arm_mapping_symbol(str))
