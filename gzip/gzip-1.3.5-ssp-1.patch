@@ -1,0 +1,120 @@
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2004-11-21
+Initial Package Version: 1.3.5
+Upstream Status: Not Submitted - This is too far out of mainstream to be
+accepted.
+Origin: None
+Description: This adds --with-ssp to ./configure.
+
+Run:
+aclocal -I m4 &&
+autoconf &&
+autoheader &&
+automake -a
+
+See: http://www.trl.ibm.com/projects/security/ssp/
+Also see: http://www.linuxfromscratch.org/hlfs/
+
+diff -Naur gzip-1.3.5.orig/Makefile.am gzip-1.3.5/Makefile.am
+--- gzip-1.3.5.orig/Makefile.am	2002-09-29 18:18:50.000000000 +0000
++++ gzip-1.3.5/Makefile.am	2004-11-21 05:07:21.000000000 +0000
+@@ -47,6 +47,7 @@
+   bits.c crypt.c deflate.c getopt.c getopt1.c gzip.c inflate.c lzw.c \
+   trees.c unlzh.c unlzw.c unpack.c unzip.c util.c yesno.c zip.c
+ gzip_LDADD = @LIBOBJS@
++gzip_CFLAGS = @SSPCFLAGS@
+ 
+ AM_MAKEINFOFLAGS = --no-split
+ 
+diff -Naur gzip-1.3.5.orig/configure.in gzip-1.3.5/configure.in
+--- gzip-1.3.5.orig/configure.in	2002-09-30 09:28:09.000000000 +0000
++++ gzip-1.3.5/configure.in	2004-11-21 05:07:21.000000000 +0000
+@@ -32,6 +32,7 @@
+ AC_GNU_SOURCE
+ AC_MINIX
+ AC_SYS_LARGEFILE
++AC_CC_SSP
+ 
+ # cc -E produces incorrect asm files on SVR4, we must use /lib/cpp.
+ test -z "$ASCPP" && test -f /lib/cpp && ASCPP=/lib/cpp
+diff -Naur gzip-1.3.5.orig/m4/ssp.m4 gzip-1.3.5/m4/ssp.m4
+--- gzip-1.3.5.orig/m4/ssp.m4	1970-01-01 00:00:00.000000000 +0000
++++ gzip-1.3.5/m4/ssp.m4	2004-11-21 05:07:53.000000000 +0000
+@@ -0,0 +1,77 @@
++# Public Domain - 2004 - Robert Connolly
++# Smashing Stack Protector m4 macro.
++
++# Add --with-ssp and check whether CC accepts -fstack-protector-all.
++# This will only work with GCC and somewhat recent Smashing Stack
++# Protector.
++# See: http://www.trl.ibm.com/projects/security/ssp/
++# Also see: http://www.linuxfromscratch.org/hlfs/
++# Written by Robert Connolly <robert at linuxfromscratch dot org>.
++# Got idea from Tiago Sousa and Matthew Burgess.
++
++# I assume if you are using -fstack-protector with C++ you will also use it
++# with C, but not necessarily vise versa. So the C++ macro depends on the C
++# macro.
++
++AC_DEFUN([AC_CC_SSP],[
++AC_ARG_WITH(ssp,
++        [  --with-ssp              use -fstack-protector-all (default=no)],
++[         if test X$withval = Xyes || test X$withval = X ; then
++           AC_DEFINE(USE_SSP, 1, [Use Smashing Stack Protector])
++           use_ssp=yes
++          fi
++], [with_ssp=no])]
++[AC_REQUIRE([AC_PROG_CC])
++AC_LANG_C
++  if test X$use_ssp = Xyes ; then
++    AC_MSG_CHECKING([whether ${CC} accepts -fstack-protector-all])
++    ssp_old_cflags="$CFLAGS"
++    # We put -fstack after CFLAGS incase CFLAGS has -fno-stack.
++    CFLAGS="$CFLAGS -fstack-protector-all"
++AC_TRY_COMPILE([#include <stdio.h>], [
++#if __SSP_ALL__ != 2
++#error fstack-protector-all does not work or you have an old version.
++#endif
++], [
++     have_cc_ssp=yes
++     AC_DEFINE(HAVE_CC_SSP, 1, [Have Smashing Stack Protector in CC])
++     AC_MSG_RESULT(yes)
++     CFLAGS="$ssp_old_cflags"
++     SSPCFLAGS="-fstack-protector-all"
++     AC_SUBST(SSPCFLAGS)
++], [
++     have_cc_ssp=no
++     AC_MSG_RESULT(no)
++     CFLAGS="$ssp_old_cflags"
++])
++   fi
++])
++
++AC_DEFUN([AC_CXX_SSP],[
++AC_REQUIRE([AC_PROG_CXX])
++AC_REQUIRE([AC_CC_SSP])
++AC_LANG_CPLUSPLUS
++  if test X$use_ssp = Xyes ; then
++    AC_MSG_CHECKING([whether ${CXX} accepts -fstack-protector-all])
++    ssp_old_cxxflags="$CXXFLAGS"
++    # We put -fstack after CXXFLAGS incase CXXFLAGS has -fno-stack.
++    CXXFLAGS="$CXXFLAGS -fstack-protector-all"
++AC_TRY_COMPILE([#include <stdio.h>], [
++#if __SSP_ALL__ != 2
++#error fstack-protector-all does not work or you have an old version.
++#endif
++], [
++     have_cxx_ssp=yes
++     AC_DEFINE(HAVE_CXX_SSP, 1, [Have Smashing Stack Protector in C++])
++     AC_MSG_RESULT(yes)
++     CXXFLAGS="$ssp_old_cxxflags"
++     SSPCXXFLAGS="-fstack-protector-all"
++     AC_SUBST(SSPCXXFLAGS)
++], [
++     have_cxx_ssp=no
++     AC_MSG_RESULT(no)
++     CXXFLAGS="$ssp_old_cxxflags"
++])
++   fi
++])
++
