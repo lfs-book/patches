@@ -1,0 +1,57 @@
+Submitted by: Ronald Hummelink <ronald at hummelink dot xs4all dot nl>
+Date: 2003-08-25
+Initial Package Version: 4.0.3
+Origin: Myself
+Description: Prevent installation of the groups program and manpages which are provided by coreutils
+
+diff -Naur shadow-4.0.3.orig/src/Makefile.in shadow-4.0.3/src/Makefile.in
+--- shadow-4.0.3.orig/src/Makefile.in	2002-03-13 19:04:10.000000000 +0000
++++ shadow-4.0.3/src/Makefile.in	2003-08-25 12:08:03.000000000 +0000
+@@ -130,14 +130,14 @@
+ # also /lib/libshadow.so.x.xx (if any) could be moved to /usr/lib
+ # and installation would be much simpler (just two directories,
+ # $prefix/bin and $prefix/sbin, no install-data hacks...)
+-bin_PROGRAMS = groups login su
++bin_PROGRAMS = login su
+ ubin_PROGRAMS = faillog lastlog chage chfn chsh expiry gpasswd newgrp passwd
+ usbin_PROGRAMS = chpasswd dpasswd groupadd groupdel groupmod \
+ 	logoutd mkpasswd newusers useradd userdel usermod grpck \
+ 	pwck vipw grpconv grpunconv pwconv pwunconv
+ 
+ 
+-noinst_PROGRAMS = id sulogin
++noinst_PROGRAMS = id sulogin groups
+ 
+ 
+ # id and groups are from gnu, sulogin from sysvinit
+@@ -167,8 +167,8 @@
+ mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+ CONFIG_HEADER = $(top_builddir)/config.h
+ CONFIG_CLEAN_FILES =
+-bin_PROGRAMS = groups$(EXEEXT) login$(EXEEXT) su$(EXEEXT)
+-noinst_PROGRAMS = id$(EXEEXT) sulogin$(EXEEXT)
++bin_PROGRAMS = login$(EXEEXT) su$(EXEEXT)
++noinst_PROGRAMS = id$(EXEEXT) sulogin$(EXEEXT) groups$(EXEEXT)
+ ubin_PROGRAMS = faillog$(EXEEXT) lastlog$(EXEEXT) chage$(EXEEXT) \
+ 	chfn$(EXEEXT) chsh$(EXEEXT) expiry$(EXEEXT) gpasswd$(EXEEXT) \
+ 	newgrp$(EXEEXT) passwd$(EXEEXT)
+--- shadow-4.0.3.orig/man/Makefile.in	2002-03-13 19:04:01.000000000 +0000
++++ shadow-4.0.3/man/Makefile.in	2003-08-25 12:14:26.000000000 +0000
+@@ -157,7 +157,6 @@
+ EXTRA_DIST = $(man_MANS) \
+ 	dpasswd.8 \
+ 	getspnam.3 \
+-	groups.1 \
+ 	id.1 \
+ 	pw_auth.3 \
+ 	pwauth.8 \
+--- shadow-4.0.3.orig/man/it/Makefile.in	2002-03-13 19:04:05.000000000 +0000
++++ shadow-4.0.3/man/it/Makefile.in	2003-08-25 12:24:11.000000000 +0000
+@@ -116,7 +116,6 @@
+ 	groupadd.8 \
+ 	groupdel.8 \
+ 	groupmod.8 \
+-	groups.1 \
+ 	grpck.8 \
+ 	grpconv.8 \
+ 	grpunconv.8 \
