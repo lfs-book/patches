@@ -8,6 +8,9 @@ Description: This is a gcc-3.4 backport for pie/fpie/fPIE support.
 This is usefull mainly for Pax. http://pax.grsecurity.net/
 https://twocents.mooo.com/hints/downloads/files/winter.txt
 
+There is a workgroup using this patch. Comments and questions can be sent to
+hlfs-dev@linuxfromscratch.org
+
 2003-06-03  Jakub Jelinek  <jakub@redhat.com>
 
 	* configure.in (HAVE_LD_PIE): Check for ld -pie.
