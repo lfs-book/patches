@@ -1,7 +1,7 @@
 Submitted By: Robert Connolly <cendres at videotron dot ca> (ashes)
 Date: 2003-12-30
 Initial Package Version: 2.3.3
-ORIGIN: http://emu.gentoo.org/~pappy/gentoo-x86/sys-libs/glibc/ \
+Origin: http://emu.gentoo.org/~pappy/gentoo-x86/sys-libs/glibc/ \
 	glibc-2.3.2-propolice-guard-functions-v2.patch
 Description: ProPolice Stack Gaurd - Move functions to Glibc-cvs
 ftp://twocents.mooo.com/pub/
