@@ -1,7 +1,7 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-01-04
+Date: 2005-01-27
 Initial Package Version: 2.3.4
-Upstream Status: Not submitted - They will reject it.
+Upstream Status: Not submitted
 Origin: None
 Description: This patch adds -fstack-protector-all to selected utilities
 and libraries. libc.so and ld.so are skipped, and anything that doesn't
@@ -12,9 +12,9 @@ http://www.research.ibm.com/trl/projects/security/ssp/
 http://www.linuxfromscratch.org/hlfs/
 http://www.linuxfromscratch.org/hints/downloads/files/ssp.txt
 
-diff -Naur glibc-20041220.orig/catgets/Makefile glibc-20041220/catgets/Makefile
---- glibc-20041220.orig/catgets/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/catgets/Makefile	2005-01-04 05:43:44.000000000 +0000
+diff -Naur glibc-20050124.orig/catgets/Makefile glibc-20050124/catgets/Makefile
+--- glibc-20050124.orig/catgets/Makefile	2005-01-27 19:15:49.578231696 +0000
++++ glibc-20050124/catgets/Makefile	2005-01-27 19:16:03.305377805 +0000
 @@ -42,6 +42,10 @@
  
  $(objpfx)gencat: $(gencat-modules:%=$(objpfx)%.o)
@@ -26,9 +26,9 @@ diff -Naur glibc-20041220.orig/catgets/Makefile glibc-20041220/catgets/Makefile
  catgets-CPPFLAGS := -DNLSPATH='"$(msgcatdir)/%L/%N:$(msgcatdir)/%L/LC_MESSAGES/%N:$(msgcatdir)/%l/%N:$(msgcatdir)/%l/LC_MESSAGES/%N:"' \
  	    -DHAVE_CONFIG_H
  
-diff -Naur glibc-20041220.orig/crypt/Makefile glibc-20041220/crypt/Makefile
---- glibc-20041220.orig/crypt/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/crypt/Makefile	2005-01-03 17:03:22.000000000 +0000
+diff -Naur glibc-20050124.orig/crypt/Makefile glibc-20050124/crypt/Makefile
+--- glibc-20050124.orig/crypt/Makefile	2005-01-27 19:15:49.633216260 +0000
++++ glibc-20050124/crypt/Makefile	2005-01-27 19:16:03.307377244 +0000
 @@ -37,6 +37,12 @@
  
  include ../Makeconfig
@@ -42,9 +42,9 @@ diff -Naur glibc-20041220.orig/crypt/Makefile glibc-20041220/crypt/Makefile
  ifeq ($(crypt-in-libc),yes)
  routines += $(libcrypt-routines)
  endif
-diff -Naur glibc-20041220.orig/debug/Makefile glibc-20041220/debug/Makefile
---- glibc-20041220.orig/debug/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/debug/Makefile	2005-01-03 17:22:46.000000000 +0000
+diff -Naur glibc-20050124.orig/debug/Makefile glibc-20050124/debug/Makefile
+--- glibc-20050124.orig/debug/Makefile	2005-01-27 19:15:49.655210085 +0000
++++ glibc-20050124/debug/Makefile	2005-01-27 19:16:03.313375560 +0000
 @@ -31,20 +31,36 @@
  	    printf_chk fprintf_chk vprintf_chk vfprintf_chk \
  	    gets_chk chk_fail readonly-area
@@ -92,12 +92,12 @@ diff -Naur glibc-20041220.orig/debug/Makefile glibc-20041220/debug/Makefile
  extra-libs = libSegFault libpcprofile
  extra-libs-others = $(extra-libs)
  
-diff -Naur glibc-20041220.orig/elf/Makefile glibc-20041220/elf/Makefile
---- glibc-20041220.orig/elf/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/elf/Makefile	2005-01-02 06:20:10.000000000 +0000
-@@ -85,9 +85,37 @@
- 		   check-textrel.c dl-sysdep.h test-dlopenrpathmod.c \
- 		   tst-deep1mod1.c tst-deep1mod2.c tst-deep1mod3.c
+diff -Naur glibc-20050124.orig/elf/Makefile glibc-20050124/elf/Makefile
+--- glibc-20050124.orig/elf/Makefile	2005-01-27 19:15:49.694199139 +0000
++++ glibc-20050124/elf/Makefile	2005-01-27 19:16:03.322373034 +0000
+@@ -86,9 +86,37 @@
+ 		   tst-deep1mod1.c tst-deep1mod2.c tst-deep1mod3.c \
+ 		   tst-auditmod1.c
  
 -CFLAGS-dl-runtime.c = -fexceptions -fasynchronous-unwind-tables
 -CFLAGS-dl-lookup.c = -fexceptions -fasynchronous-unwind-tables
@@ -136,7 +136,7 @@ diff -Naur glibc-20041220.orig/elf/Makefile glibc-20041220/elf/Makefile
  
  include ../Makeconfig
  
-@@ -285,7 +313,7 @@
+@@ -288,7 +316,7 @@
  
  # interp.c exists just to get this string into the libraries.
  CFLAGS-interp.c = -D'RUNTIME_LINKER="$(slibdir)/$(rtld-installed-name)"' \
@@ -145,7 +145,7 @@ diff -Naur glibc-20041220.orig/elf/Makefile glibc-20041220/elf/Makefile
  $(objpfx)interp.os: $(common-objpfx)config.make
  
  ifneq (ld.so,$(rtld-installed-name))
-@@ -309,7 +337,7 @@
+@@ -312,7 +340,7 @@
  	echo '#define DL_DST_LIB "$(notdir $(slibdir))"' >> ${@:st=T}
  	$(move-if-change) ${@:st=T} ${@:st=h}
  	touch $@
@@ -154,7 +154,7 @@ diff -Naur glibc-20041220.orig/elf/Makefile glibc-20041220/elf/Makefile
  
  ifeq (yes,$(build-shared))
  $(inst_slibdir)/$(rtld-version-installed-name): $(objpfx)ld.so $(+force)
-@@ -359,10 +387,10 @@
+@@ -362,10 +390,10 @@
  
  $(objpfx)ldconfig: $(ldconfig-modules:%=$(objpfx)%.o)
  SYSCONF-FLAGS := -D'SYSCONFDIR="$(sysconfdir)"'
@@ -168,9 +168,9 @@ diff -Naur glibc-20041220.orig/elf/Makefile glibc-20041220/elf/Makefile
  
  CPPFLAGS-.os += $(if $(filter $(@F),$(patsubst %,%.os,$(all-rtld-routines))),-DNOT_IN_libc=1 -DIS_IN_rtld=1)
  
-diff -Naur glibc-20041220.orig/elf/rtld.c glibc-20041220/elf/rtld.c
---- glibc-20041220.orig/elf/rtld.c	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/elf/rtld.c	2005-01-02 06:20:10.000000000 +0000
+diff -Naur glibc-20050124.orig/elf/rtld.c glibc-20050124/elf/rtld.c
+--- glibc-20050124.orig/elf/rtld.c	2005-01-27 19:15:49.742185667 +0000
++++ glibc-20050124/elf/rtld.c	2005-01-27 19:16:03.329371069 +0000
 @@ -42,6 +42,13 @@
  
  #include <assert.h>
@@ -185,9 +185,9 @@ diff -Naur glibc-20041220.orig/elf/rtld.c glibc-20041220/elf/rtld.c
  /* Avoid PLT use for our local calls at startup.  */
  extern __typeof (__mempcpy) __mempcpy attribute_hidden;
  
-diff -Naur glibc-20041220.orig/iconv/Makefile glibc-20041220/iconv/Makefile
---- glibc-20041220.orig/iconv/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/iconv/Makefile	2005-01-03 17:08:13.000000000 +0000
+diff -Naur glibc-20050124.orig/iconv/Makefile glibc-20050124/iconv/Makefile
+--- glibc-20050124.orig/iconv/Makefile	2005-01-27 19:15:49.864151426 +0000
++++ glibc-20050124/iconv/Makefile	2005-01-27 19:16:03.332370227 +0000
 @@ -30,9 +30,9 @@
  ifeq ($(elf),yes)
  routines	+= gconv_dl
@@ -252,9 +252,9 @@ diff -Naur glibc-20041220.orig/iconv/Makefile glibc-20041220/iconv/Makefile
  
  CPPFLAGS-iconv_prog = -DNOT_IN_libc
  CPPFLAGS-iconv_charmap = -DNOT_IN_libc
-diff -Naur glibc-20041220.orig/intl/Makefile glibc-20041220/intl/Makefile
---- glibc-20041220.orig/intl/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/intl/Makefile	2005-01-03 17:04:29.000000000 +0000
+diff -Naur glibc-20050124.orig/intl/Makefile glibc-20050124/intl/Makefile
+--- glibc-20050124.orig/intl/Makefile	2005-01-27 19:15:50.800888445 +0000
++++ glibc-20050124/intl/Makefile	2005-01-27 19:16:03.334369666 +0000
 @@ -41,6 +41,19 @@
  
  include ../Makeconfig
@@ -284,9 +284,9 @@ diff -Naur glibc-20041220.orig/intl/Makefile glibc-20041220/intl/Makefile
 +# This ensures they will load libc.so for needed symbols if loaded by
 +# a statically-linked program that hasn't already loaded it.
 +$(objpfx)libutil.so: $(common-objpfx)libc.so $(common-objpfx)libc_nonshared.a
-diff -Naur glibc-20041220.orig/libidn/Makefile glibc-20041220/libidn/Makefile
---- glibc-20041220.orig/libidn/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/libidn/Makefile	2005-01-03 04:43:19.000000000 +0000
+diff -Naur glibc-20050124.orig/libidn/Makefile glibc-20050124/libidn/Makefile
+--- glibc-20050124.orig/libidn/Makefile	2005-01-27 19:15:50.964842416 +0000
++++ glibc-20050124/libidn/Makefile	2005-01-27 19:16:03.341367701 +0000
 @@ -29,6 +29,14 @@
  
  libcidn-routines := punycode toutf8 nfkc stringprep rfc3454 profiles idna
@@ -302,9 +302,9 @@ diff -Naur glibc-20041220.orig/libidn/Makefile glibc-20041220/libidn/Makefile
  
  include ../Makeconfig
  
-diff -Naur glibc-20041220.orig/locale/Makefile glibc-20041220/locale/Makefile
---- glibc-20041220.orig/locale/Makefile	2005-01-01 03:17:18.000000000 +0000
-+++ glibc-20041220/locale/Makefile	2005-01-03 08:16:58.000000000 +0000
+diff -Naur glibc-20050124.orig/locale/Makefile glibc-20050124/locale/Makefile
+--- glibc-20050124.orig/locale/Makefile	2005-01-27 19:15:51.427712468 +0000
++++ glibc-20050124/locale/Makefile	2005-01-27 19:16:03.343367139 +0000
 @@ -97,10 +97,24 @@
  		   -DLOCSRCDIR='"$(i18ndir)/locales"' -DHAVE_CONFIG_H \
  		   -Iprograms
@@ -334,9 +334,9 @@ diff -Naur glibc-20041220.orig/locale/Makefile glibc-20041220/locale/Makefile
  
  # This makes sure -DNOT_IN_libc is passed for all these modules.
  cpp-srcs-left := $(addsuffix .c,$(localedef-modules) $(localedef-aux) \
-diff -Naur glibc-20041220.orig/login/Makefile glibc-20041220/login/Makefile
---- glibc-20041220.orig/login/Makefile	2005-01-01 03:17:20.000000000 +0000
-+++ glibc-20041220/login/Makefile	2005-01-03 17:15:56.000000000 +0000
+diff -Naur glibc-20050124.orig/login/Makefile glibc-20050124/login/Makefile
+--- glibc-20050124.orig/login/Makefile	2005-01-27 19:15:53.588105948 +0000
++++ glibc-20050124/login/Makefile	2005-01-27 19:16:03.346366297 +0000
 @@ -27,7 +27,20 @@
  routines := getutent getutent_r getutid getutline getutid_r getutline_r \
  	    utmp_file utmpname updwtmp getpt grantpt unlockpt ptsname
@@ -377,9 +377,9 @@ diff -Naur glibc-20041220.orig/login/Makefile glibc-20041220/login/Makefile
  
  ifeq (yes,$(build-static-nss))
  otherlibs += $(nssobjdir)/libnss_files.a $(resolvobjdir)/libnss_dns.a \
-diff -Naur glibc-20041220.orig/math/Makefile glibc-20041220/math/Makefile
---- glibc-20041220.orig/math/Makefile	2005-01-01 03:17:20.000000000 +0000
-+++ glibc-20041220/math/Makefile	2005-01-04 08:01:43.000370808 +0000
+diff -Naur glibc-20050124.orig/math/Makefile glibc-20050124/math/Makefile
+--- glibc-20050124.orig/math/Makefile	2005-01-27 19:15:53.761057392 +0000
++++ glibc-20050124/math/Makefile	2005-01-27 19:16:03.349365455 +0000
 @@ -86,6 +86,168 @@
  long-c-yes = $(calls:=l)
  distribute += $(filter-out $(generated),$(long-m-yes:=.c) $(long-c-yes:=.c))
@@ -564,9 +564,9 @@ diff -Naur glibc-20041220.orig/math/Makefile glibc-20041220/math/Makefile
  
  distribute += libm-test.inc gen-libm-test.pl README.libm-test
  
-diff -Naur glibc-20041220.orig/nis/Makefile glibc-20041220/nis/Makefile
---- glibc-20041220.orig/nis/Makefile	2005-01-01 03:17:20.000000000 +0000
-+++ glibc-20041220/nis/Makefile	2005-01-03 17:36:27.000000000 +0000
+diff -Naur glibc-20050124.orig/nis/Makefile glibc-20050124/nis/Makefile
+--- glibc-20050124.orig/nis/Makefile	2005-01-27 19:15:53.837036061 +0000
++++ glibc-20050124/nis/Makefile	2005-01-27 19:16:03.352364613 +0000
 @@ -69,6 +69,44 @@
  
  include ../Rules
@@ -612,9 +612,9 @@ diff -Naur glibc-20041220.orig/nis/Makefile glibc-20041220/nis/Makefile
  
  $(objpfx)libnss_compat.so: $(objpfx)libnsl.so$(libnsl.so-version)
  $(objpfx)libnss_nis.so: $(objpfx)libnsl.so$(libnsl.so-version) \
-diff -Naur glibc-20041220.orig/nptl/Makefile glibc-20041220/nptl/Makefile
---- glibc-20041220.orig/nptl/Makefile	2005-01-01 03:17:20.000000000 +0000
-+++ glibc-20041220/nptl/Makefile	2005-01-04 02:29:47.000000000 +0000
+diff -Naur glibc-20050124.orig/nptl/Makefile glibc-20050124/nptl/Makefile
+--- glibc-20050124.orig/nptl/Makefile	2005-01-27 19:15:53.925011363 +0000
++++ glibc-20050124/nptl/Makefile	2005-01-27 19:16:03.356363491 +0000
 @@ -125,65 +125,251 @@
  libpthread-shared-only-routines = version pt-allocrtsig unwind-forcedunwind
  libpthread-static-only-routines = pthread_atfork
@@ -912,9 +912,9 @@ diff -Naur glibc-20041220.orig/nptl/Makefile glibc-20041220/nptl/Makefile
  
  link-libc-static := $(common-objpfx)libc.a $(static-gnulib) \
  		    $(common-objpfx)libc.a
-diff -Naur glibc-20041220.orig/nptl_db/Makefile glibc-20041220/nptl_db/Makefile
---- glibc-20041220.orig/nptl_db/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/nptl_db/Makefile	2005-01-03 16:34:17.000000000 +0000
+diff -Naur glibc-20050124.orig/nptl_db/Makefile glibc-20050124/nptl_db/Makefile
+--- glibc-20050124.orig/nptl_db/Makefile	2005-01-27 19:15:54.406876080 +0000
++++ glibc-20050124/nptl_db/Makefile	2005-01-27 19:16:03.359362649 +0000
 @@ -47,6 +47,48 @@
  
  libthread_db-inhibit-o = $(filter-out .os,$(object-suffixes))
@@ -964,10 +964,10 @@ diff -Naur glibc-20041220.orig/nptl_db/Makefile glibc-20041220/nptl_db/Makefile
  # The ps_* callback functions are not defined.
  libthread_db.so-no-z-defs = yes
  
-diff -Naur glibc-20041220.orig/nscd/Makefile glibc-20041220/nscd/Makefile
---- glibc-20041220.orig/nscd/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/nscd/Makefile	2005-01-03 17:33:00.000000000 +0000
-@@ -63,17 +63,18 @@
+diff -Naur glibc-20050124.orig/nscd/Makefile glibc-20050124/nscd/Makefile
+--- glibc-20050124.orig/nscd/Makefile	2005-01-27 19:15:54.433868502 +0000
++++ glibc-20050124/nscd/Makefile	2005-01-27 19:16:03.362361807 +0000
+@@ -65,17 +65,18 @@
  
  include ../Rules
  
@@ -991,9 +991,9 @@ diff -Naur glibc-20041220.orig/nscd/Makefile glibc-20041220/nscd/Makefile
  CFLAGS-nscd.c += $(nscd-cflags)
  CFLAGS-connections.c += $(nscd-cflags)
  CFLAGS-pwdcache.c += $(nscd-cflags)
-diff -Naur glibc-20041220.orig/nss/Makefile glibc-20041220/nss/Makefile
---- glibc-20041220.orig/nss/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/nss/Makefile	2005-01-03 17:08:28.000000000 +0000
+diff -Naur glibc-20050124.orig/nss/Makefile glibc-20050124/nss/Makefile
+--- glibc-20050124.orig/nss/Makefile	2005-01-27 19:15:54.458861486 +0000
++++ glibc-20050124/nss/Makefile	2005-01-27 19:16:03.364361245 +0000
 @@ -42,6 +42,24 @@
  tests			= test-netdb
  xtests			= bug-erange
@@ -1027,10 +1027,10 @@ diff -Naur glibc-20041220.orig/nss/Makefile glibc-20041220/nss/Makefile
  ifeq (yes,$(build-static-nss))
  $(objpfx)getent: $(objpfx)libnss_files.a
  endif
-diff -Naur glibc-20041220.orig/posix/Makefile glibc-20041220/posix/Makefile
---- glibc-20041220.orig/posix/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/posix/Makefile	2005-01-02 07:44:03.000000000 +0000
-@@ -127,28 +127,114 @@
+diff -Naur glibc-20050124.orig/posix/Makefile glibc-20050124/posix/Makefile
+--- glibc-20050124.orig/posix/Makefile	2005-01-27 19:15:54.607819666 +0000
++++ glibc-20050124/posix/Makefile	2005-01-27 19:29:15.519624694 +0000
+@@ -127,32 +127,118 @@
  endif
  endif
  
@@ -1046,17 +1046,6 @@ diff -Naur glibc-20041220.orig/posix/Makefile glibc-20041220/posix/Makefile
 -CFLAGS-waitpid.c = -fexceptions -fasynchronous-unwind-tables
 -CFLAGS-getopt.c = -fexceptions
 -CFLAGS-wordexp.c = -fexceptions
--CFLAGS-sysconf.c = -fexceptions -DGETCONF_DIR='"$(libexecdir)/getconf"'
--CFLAGS-pathconf.c = -fexceptions
--CFLAGS-fpathconf.c = -fexceptions
--CFLAGS-spawn.c = -fexceptions
--CFLAGS-spawnp.c = -fexceptions
--CFLAGS-spawni.c = -fexceptions
--CFLAGS-pause.c = -fexceptions
--CFLAGS-glob.c = $(uses-callbacks) -fexceptions
--CFLAGS-glob64.c = $(uses-callbacks) -fexceptions
--CFLAGS-getconf.c = -DGETCONF_DIR='"$(libexecdir)/getconf"'
-+
 +CFLAGS-uname.c = -fstack-protector-all
 +CFLAGS-times.c = -fstack-protector-all
 +CFLAGS-wait.c = -fexceptions -fasynchronous-unwind-tables \
@@ -1131,7 +1120,7 @@ diff -Naur glibc-20041220.orig/posix/Makefile glibc-20041220/posix/Makefile
 +CFLAGS-gai_strerror.c = -fstack-protector-all
 +CFLAGS-wordexp.c = -fexceptions -fstack-protector-all
 +CFLAGS-pread.c = -fexceptions -fasynchronous-unwind-tables \
-+		 -fstack-protector-all
++ 		 -fstack-protector-all
 +CFLAGS-pwrite.c = -fexceptions -fasynchronous-unwind-tables \
 +		  -fstack-protector-all
 +CFLAGS-pread64.c = -fexceptions -fasynchronous-unwind-tables \
@@ -1164,12 +1153,27 @@ diff -Naur glibc-20041220.orig/posix/Makefile glibc-20041220/posix/Makefile
 +CFLAGS-getconf.c = -DGETCONF_DIR='"$(libexecdir)/getconf"' \
 +		   -fstack-protector-all
 +getconf-CFLAGS = -fstack-protector-all
- 
- tstgetopt-ARGS = -a -b -cfoobar --required foobar --optional=bazbug \
- 		--none random --col --color --colour
-diff -Naur glibc-20041220.orig/resolv/Makefile glibc-20041220/resolv/Makefile
---- glibc-20041220.orig/resolv/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/resolv/Makefile	2005-01-03 17:05:03.000000000 +0000
++
+ CFLAGS-wordexp.os = -fomit-frame-pointer
+-CFLAGS-sysconf.c = -fexceptions -DGETCONF_DIR='"$(libexecdir)/getconf"'
+-CFLAGS-pathconf.c = -fexceptions
+-CFLAGS-fpathconf.c = -fexceptions
+-CFLAGS-spawn.c = -fexceptions
+ CFLAGS-spawn.os = -fomit-frame-pointer
+-CFLAGS-spawnp.c = -fexceptions
+ CFLAGS-spawnp.os = -fomit-frame-pointer
+-CFLAGS-spawni.c = -fexceptions
+ CFLAGS-spawni.os = -fomit-frame-pointer
+-CFLAGS-pause.c = -fexceptions
+-CFLAGS-glob.c = $(uses-callbacks) -fexceptions
+-CFLAGS-glob64.c = $(uses-callbacks) -fexceptions
+-CFLAGS-getconf.c = -DGETCONF_DIR='"$(libexecdir)/getconf"'
+ CFLAGS-execve.os = -fomit-frame-pointer
+ CFLAGS-fexecve.os = -fomit-frame-pointer
+ CFLAGS-execv.os = -fomit-frame-pointer
+diff -Naur glibc-20050124.orig/resolv/Makefile glibc-20050124/resolv/Makefile
+--- glibc-20050124.orig/resolv/Makefile	2005-01-27 19:15:54.716789073 +0000
++++ glibc-20050124/resolv/Makefile	2005-01-27 19:16:03.374358438 +0000
 @@ -51,9 +51,34 @@
  		      ns_parse ns_name ns_netint ns_ttl ns_print	\
  		      ns_samedomain
@@ -1232,9 +1236,9 @@ diff -Naur glibc-20041220.orig/resolv/Makefile glibc-20041220/resolv/Makefile
  
  # The BIND code elicits some harmless warnings.
  +cflags += -Wno-strict-prototypes -Wno-write-strings
-diff -Naur glibc-20041220.orig/rt/Makefile glibc-20041220/rt/Makefile
---- glibc-20041220.orig/rt/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/rt/Makefile	2005-01-03 17:05:46.000000000 +0000
+diff -Naur glibc-20050124.orig/rt/Makefile glibc-20050124/rt/Makefile
+--- glibc-20050124.orig/rt/Makefile	2005-01-27 19:15:54.777771952 +0000
++++ glibc-20050124/rt/Makefile	2005-01-27 19:16:03.376357877 +0000
 @@ -54,9 +54,46 @@
  
  include ../Rules
@@ -1285,9 +1289,9 @@ diff -Naur glibc-20041220.orig/rt/Makefile glibc-20041220/rt/Makefile
  
  LDFLAGS-rt.so = -Wl,--enable-new-dtags,-z,nodelete
  
-diff -Naur glibc-20041220.orig/sunrpc/Makefile glibc-20041220/sunrpc/Makefile
---- glibc-20041220.orig/sunrpc/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/sunrpc/Makefile	2005-01-03 17:17:03.000000000 +0000
+diff -Naur glibc-20050124.orig/sunrpc/Makefile glibc-20050124/sunrpc/Makefile
+--- glibc-20050124.orig/sunrpc/Makefile	2005-01-27 19:15:55.057693365 +0000
++++ glibc-20050124/sunrpc/Makefile	2005-01-27 19:16:03.379357035 +0000
 @@ -107,24 +107,77 @@
  omit-deps = $(librpcsvc-routines)
  endif
@@ -1384,9 +1388,9 @@ diff -Naur glibc-20041220.orig/sunrpc/Makefile glibc-20041220/sunrpc/Makefile
  
  ifeq (yes,$(have_doors))
  CPPFLAGS-key_call.c += -DHAVE_DOORS=1
-diff -Naur glibc-20041220.orig/sysdeps/ieee754/Makefile glibc-20041220/sysdeps/ieee754/Makefile
---- glibc-20041220.orig/sysdeps/ieee754/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/sysdeps/ieee754/Makefile	2005-01-03 00:20:50.000000000 +0000
+diff -Naur glibc-20050124.orig/sysdeps/ieee754/Makefile glibc-20050124/sysdeps/ieee754/Makefile
+--- glibc-20050124.orig/sysdeps/ieee754/Makefile	2005-01-27 19:15:56.141389119 +0000
++++ glibc-20050124/sysdeps/ieee754/Makefile	2005-01-27 19:16:03.385355351 +0000
 @@ -1,5 +1,5 @@
  ifeq ($(subdir),math)
  sysdep_headers += ieee754.h
@@ -1394,9 +1398,9 @@ diff -Naur glibc-20041220.orig/sysdeps/ieee754/Makefile glibc-20041220/sysdeps/i
 +CFLAGS-k_standard.c = -Wno-write-strings -fstack-protector-all
  endif
  
-diff -Naur glibc-20041220.orig/sysdeps/unix/sysv/linux/Makefile glibc-20041220/sysdeps/unix/sysv/linux/Makefile
---- glibc-20041220.orig/sysdeps/unix/sysv/linux/Makefile	2005-01-01 03:17:21.000000000 +0000
-+++ glibc-20041220/sysdeps/unix/sysv/linux/Makefile	2005-01-03 06:00:50.000000000 +0000
+diff -Naur glibc-20050124.orig/sysdeps/unix/sysv/linux/Makefile glibc-20050124/sysdeps/unix/sysv/linux/Makefile
+--- glibc-20050124.orig/sysdeps/unix/sysv/linux/Makefile	2005-01-27 19:15:57.997867912 +0000
++++ glibc-20050124/sysdeps/unix/sysv/linux/Makefile	2005-01-27 19:16:03.388354509 +0000
 @@ -3,19 +3,31 @@
  endif
  
@@ -1499,9 +1503,9 @@ diff -Naur glibc-20041220.orig/sysdeps/unix/sysv/linux/Makefile glibc-20041220/s
 +CFLAGS-connections.c += -DHAVE_EPOLL -fstack-protector-all
 +CFLAGS-gai.c += -DNEED_NETLINK -fstack-protector-all
  endif
-diff -Naur glibc-20041220.orig/sysdeps/unix/sysv/linux/i386/Makefile glibc-20041220/sysdeps/unix/sysv/linux/i386/Makefile
---- glibc-20041220.orig/sysdeps/unix/sysv/linux/i386/Makefile	2005-01-01 03:17:22.000000000 +0000
-+++ glibc-20041220/sysdeps/unix/sysv/linux/i386/Makefile	2005-01-02 06:20:10.000000000 +0000
+diff -Naur glibc-20050124.orig/sysdeps/unix/sysv/linux/i386/Makefile glibc-20050124/sysdeps/unix/sysv/linux/i386/Makefile
+--- glibc-20050124.orig/sysdeps/unix/sysv/linux/i386/Makefile	2005-01-27 19:15:58.214807006 +0000
++++ glibc-20050124/sysdeps/unix/sysv/linux/i386/Makefile	2005-01-27 19:16:03.391353667 +0000
 @@ -1,6 +1,10 @@
  ifeq ($(subdir),misc)
  sysdep_routines += ioperm iopl vm86
@@ -1519,9 +1523,9 @@ diff -Naur glibc-20041220.orig/sysdeps/unix/sysv/linux/i386/Makefile glibc-20041
  sysdep_routines += oldgetrlimit64
 +CFLAGS-oldgetrlimit64.c = -fstack-protector-all
  endif
-diff -Naur glibc-20041220.orig/timezone/Makefile glibc-20041220/timezone/Makefile
---- glibc-20041220.orig/timezone/Makefile	2005-01-01 03:17:22.000000000 +0000
-+++ glibc-20041220/timezone/Makefile	2005-01-02 06:20:10.000000000 +0000
+diff -Naur glibc-20050124.orig/timezone/Makefile glibc-20050124/timezone/Makefile
+--- glibc-20050124.orig/timezone/Makefile	2005-01-27 19:15:59.191532788 +0000
++++ glibc-20050124/timezone/Makefile	2005-01-27 19:16:03.393353105 +0000
 @@ -164,12 +164,12 @@
  tz-cflags = -DTZDIR='"$(zonedir)"' \
  	    -DTZDEFAULT='"$(localtime-file)"' \
