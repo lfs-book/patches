@@ -1,7 +1,7 @@
 Submitted By: Archaic (archaic -aT- linuxfromscratch -DoT- org)
 Date: 2005-04-27
 Initial Package Version: 2.3.4
-Origin: http://sources.redhat.com/ml/libc-alpha/2005-04/msg00033.html
+Origin: http://sources.redhat.com/ml/libc-alpha/2005-04/msg00056.html
 Upstream Status: Applied
 Description: Allows tst-cancel17 and tst-cancelx17 to pass with kernel-2.6.11.x
 
