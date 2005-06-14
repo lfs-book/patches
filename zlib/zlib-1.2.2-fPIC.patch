@@ -7,6 +7,12 @@ Description:
  1. Build shared and static lib in one pass
  2. Always add -fPIC when building shared lib, don't expect the user to set it.
 
+To build the shared and static library:
+	./configure --prefix=<prefix> --shared &&
+	make &&
+	make install
+Remove the --shared if you don't want the shared lib.
+
 diff -Naur zlib-1.2.2.orig/configure zlib-1.2.2/configure
 --- zlib-1.2.2.orig/configure	2004-09-07 00:50:06.000000000 -0500
 +++ zlib-1.2.2/configure	2005-02-05 01:34:08.553292416 -0600
