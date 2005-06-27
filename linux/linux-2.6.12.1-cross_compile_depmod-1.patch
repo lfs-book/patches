@@ -1,0 +1,25 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2005-06-27
+Initial Package Version: 2.6.12
+Origin: Ryan Oliver
+Upstream Status: N/A
+Description: Modifies the kernel Makefile to allow the use
+	     of depmod.pl, since depmod is architecture
+	     specific
+ 
+--- linux-2.6.12.1/Makefile.orig	2005-06-27 07:00:34.000000000 +0000
++++ linux-2.6.12.1/Makefile	2005-06-27 07:01:02.000000000 +0000
+@@ -895,11 +895,11 @@
+ ifeq "$(strip $(INSTALL_MOD_PATH))" ""
+ depmod_opts	:=
+ else
+-depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
++depmod_opts	:= -b $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
+ endif
+ .PHONY: _modinst_post
+ _modinst_post: _modinst_
+-	if [ -r System.map -a -x $(DEPMOD) ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
++	if [ -r System.map ]; then depmod.pl -F System.map $(depmod_opts) -k vmlinux; fi
+ 
+ else # CONFIG_MODULES
+ 
