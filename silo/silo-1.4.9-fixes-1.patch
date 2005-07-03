@@ -51,6 +51,18 @@ diff -Naur silo-1.4.9.orig/first/Makefile silo-1.4.9/first/Makefile
  
  .S.o:
  	$(CC) $(CFLAGS) -c $*.S
+diff -Naur silo-1.4.9.orig/first-isofs/Makefile silo-1.4.9/first-isofs/Makefile
+--- silo-1.4.9.orig/first-isofs/Makefile	2003-04-14 13:21:41.000000000 +0000
++++ silo-1.4.9/first-isofs/Makefile	2005-07-03 09:04:41.000000000 +0000
+@@ -4,7 +4,7 @@
+ 
+ include ../Rules.make
+ 
+-LDFLAGS = -N -Ttext 0x4000
++LDFLAGS = -N -Ttext 0x4000 -m elf32_sparc
+ 
+ NAME = isofs
+ 
 diff -Naur silo-1.4.9.orig/second/Makefile silo-1.4.9/second/Makefile
 --- silo-1.4.9.orig/second/Makefile	2004-06-20 17:16:32.000000000 +0000
 +++ silo-1.4.9/second/Makefile	2005-07-03 08:42:02.000000000 +0000
