@@ -1,0 +1,31 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2005-07-09
+Initial Package Version: 2.6.12.0
+Origin: Jbit and MDH
+Upstream Status: Sent
+Description: Remove unistd.h, conflicts with the silo builds
+ 
+diff -Naur linux-libc-headers-2.6.12.0/include/asm-sparc/page.h linux-libc-headers-2.6.12.0.orig/include/asm-sparc/page.h
+--- linux-libc-headers-2.6.12.0/include/asm-sparc/page.h	2005-07-09 22:28:38.000000000 -0700
++++ linux-libc-headers-2.6.12.0.orig/include/asm-sparc/page.h	2005-07-05 17:17:30.000000000 -0700
+@@ -8,6 +8,8 @@
+ #ifndef _SPARC_PAGE_H
+ #define _SPARC_PAGE_H
+ 
++#include <unistd.h>
++
+ #define PAGE_SIZE (getpagesize())
+ static __inline__ int getpageshift()
+ {
+diff -Naur linux-libc-headers-2.6.12.0/include/asm-sparc64/page.h linux-libc-headers-2.6.12.0.orig/include/asm-sparc64/page.h
+--- linux-libc-headers-2.6.12.0/include/asm-sparc64/page.h	2005-07-09 22:28:50.000000000 -0700
++++ linux-libc-headers-2.6.12.0.orig/include/asm-sparc64/page.h	2005-07-05 17:17:43.000000000 -0700
+@@ -1,6 +1,8 @@
+ #ifndef _SPARC64_PAGE_H
+ #define _SPARC64_PAGE_H
+ 
++#include <unistd.h>
++
+ #define PAGE_SIZE (getpagesize())
+ static __inline__ int getpageshift()
+ {
