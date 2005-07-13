@@ -1,13 +1,13 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-05-27
-Initial Package Version: 20050313
+Date: 2005-07-09
+Initial Package Version: 20050709
 Upstream Status: Not submitted.
 Origin: Based on blfs-bootscripts templates.
 Description: This patch adds bootscripts for frandom, openntpd, and rdate.
 
-diff -Naur blfs-bootscripts-20050313.orig/Makefile blfs-bootscripts-20050313/Makefile
---- blfs-bootscripts-20050313.orig/Makefile	2005-03-07 03:48:33.000000000 +0000
-+++ blfs-bootscripts-20050313/Makefile	2005-04-28 00:19:12.000000000 +0000
+diff -Naur blfs-bootscripts-20050709.orig/Makefile blfs-bootscripts-20050709/Makefile
+--- blfs-bootscripts-20050709.orig/Makefile	2005-06-26 07:57:36.000000000 +0000
++++ blfs-bootscripts-20050709/Makefile	2005-07-09 19:40:47.000000000 +0000
 @@ -280,6 +280,16 @@
  	ln -sf  ../init.d/openldap ${EXTDIR}/rc.d/rc5.d/S25openldap
  	ln -sf  ../init.d/openldap ${EXTDIR}/rc.d/rc6.d/K46openldap
@@ -38,9 +38,9 @@ diff -Naur blfs-bootscripts-20050313.orig/Makefile blfs-bootscripts-20050313/Mak
  install-rsyncd: create-dirs
  	install -m ${MODE} blfs/init.d/rsyncd     ${EXTDIR}/rc.d/init.d/
  	ln -sf  ../init.d/rsyncd ${EXTDIR}/rc.d/rc0.d/K30rsyncd
-diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/openntpd blfs-bootscripts-20050313/blfs/init.d/openntpd
---- blfs-bootscripts-20050313.orig/blfs/init.d/openntpd	1970-01-01 00:00:00.000000000 +0000
-+++ blfs-bootscripts-20050313/blfs/init.d/openntpd	2005-04-28 00:19:12.000000000 +0000
+diff -Naur blfs-bootscripts-20050709.orig/blfs/init.d/openntpd blfs-bootscripts-20050709/blfs/init.d/openntpd
+--- blfs-bootscripts-20050709.orig/blfs/init.d/openntpd	1970-01-01 00:00:00.000000000 +0000
++++ blfs-bootscripts-20050709/blfs/init.d/openntpd	2005-07-09 19:40:47.000000000 +0000
 @@ -0,0 +1,37 @@
 +#!/bin/sh
 +# Begin $rc_base/init.d/openntp
@@ -79,29 +79,31 @@ diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/openntpd blfs-bootscripts-
 +esac
 +
 +# End $rc_base/init.d/openntp
-diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/random blfs-bootscripts-20050313/blfs/init.d/random
---- blfs-bootscripts-20050313.orig/blfs/init.d/random	2004-10-02 17:57:32.000000000 +0000
-+++ blfs-bootscripts-20050313/blfs/init.d/random	2005-04-28 00:23:55.000000000 +0000
+diff -Naur blfs-bootscripts-20050709.orig/blfs/init.d/random blfs-bootscripts-20050709/blfs/init.d/random
+--- blfs-bootscripts-20050709.orig/blfs/init.d/random	2005-07-08 05:10:22.000000000 +0000
++++ blfs-bootscripts-20050709/blfs/init.d/random	2005-07-09 19:44:30.000000000 +0000
 @@ -5,8 +5,8 @@
  # Rewritten by Gerard Beekmans  - gerard@linuxfromscratch.org
  # Random script elements by Larry Lawrence
  
 -#$LastChangedBy: dj $
--#$Date: 2004-10-02 11:57:32 -0600 (Sat, 02 Oct 2004) $
+-#$Date: 2005-07-07 23:10:22 -0600 (Thu, 07 Jul 2005) $
 +#$LastChangedBy: robert $
-+#$Date: 2005-04-27 $
++#$Date: 2005-07-09 $
  
  . /etc/sysconfig/rc
  . $rc_functions
-@@ -14,18 +14,34 @@
+@@ -14,18 +14,33 @@
  case "$1" in
  	start)
- 		echo "Initializing kernel random number generator..."
+ 		boot_mesg "Initializing kernel random number generator..."
 -		if [ -f /var/tmp/random-seed ]; then
 -			/bin/cat /var/tmp/random-seed >/dev/urandom
 +		if [ -f /var/cache/random-seed ]; then
 +			/bin/cat /var/cache/random-seed >/dev/urandom
-+		fi
+ 		fi
+-		/bin/dd if=/dev/urandom of=/var/tmp/random-seed \
+-			count=1 &>/dev/null
 +		/bin/install -m0600 -o0 /dev/null /var/cache/random-seed
 +		if [ -r /proc/sys/kernel/random/poolsize ]; then
 +			dd if=/dev/urandom of=/var/cache/random-seed count=1 \
@@ -113,14 +115,11 @@ diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/random blfs-bootscripts-20
 +		if [ -c /dev/frandom ]; then
 +			/bin/dd if=/dev/frandom of=/dev/null \
 +				count=1 2>/dev/null
- 		fi
--		/bin/dd if=/dev/urandom of=/var/tmp/random-seed \
--			count=1 &>/dev/null
  		evaluate_retval
  		;;
-                 
+ 
  	stop)
- 		echo "Saving random seed..."
+ 		boot_mesg "Saving random seed..."
 -		/bin/dd if=/dev/urandom of=/var/tmp/random-seed \
 -			count=1 &>/dev/null
 +		/bin/install -m0600 -o0 /dev/null /etc/random-seed
@@ -134,9 +133,9 @@ diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/random blfs-bootscripts-20
  		evaluate_retval
  		;;
  
-diff -Naur blfs-bootscripts-20050313.orig/blfs/init.d/rdate blfs-bootscripts-20050313/blfs/init.d/rdate
---- blfs-bootscripts-20050313.orig/blfs/init.d/rdate	1970-01-01 00:00:00.000000000 +0000
-+++ blfs-bootscripts-20050313/blfs/init.d/rdate	2005-04-28 00:19:12.000000000 +0000
+diff -Naur blfs-bootscripts-20050709.orig/blfs/init.d/rdate blfs-bootscripts-20050709/blfs/init.d/rdate
+--- blfs-bootscripts-20050709.orig/blfs/init.d/rdate	1970-01-01 00:00:00.000000000 +0000
++++ blfs-bootscripts-20050709/blfs/init.d/rdate	2005-07-09 19:40:47.000000000 +0000
 @@ -0,0 +1,26 @@
 +#!/bin/sh
 +# Begin $rc_base/init.d/rdate
