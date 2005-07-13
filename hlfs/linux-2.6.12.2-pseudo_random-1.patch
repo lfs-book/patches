@@ -1,6 +1,6 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-06-19
-Initial Package Version: 2.6.12
+Date: 2005-07-06
+Initial Package Version: 2.6.12.2
 Upstream Status: Not submitted
 Origin: http://frandom.sourceforge.net/
 Description: This patch adds the he frandom, and erandom devices, and a
@@ -11,9 +11,9 @@ Also see:
 http://www.linuxfromscratch.org/hlfs/
 http://www.linuxfromscratch.org/hints/downloads/files/entropy.txt
 
-diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/Kconfig linux-2.6.12-rc6-mm1/drivers/char/Kconfig
---- linux-2.6.12-rc6-mm1.orig/drivers/char/Kconfig	2005-03-02 07:37:45.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/drivers/char/Kconfig	2005-06-19 22:19:33.000000000 +0000
+diff -Naur linux-2.6.12.2.orig/drivers/char/Kconfig linux-2.6.12.2/drivers/char/Kconfig
+--- linux-2.6.12.2.orig/drivers/char/Kconfig	2005-06-29 23:00:53.000000000 +0000
++++ linux-2.6.12.2/drivers/char/Kconfig	2005-07-06 23:47:22.000000000 +0000
 @@ -57,6 +57,19 @@
  
  	  If unsure, say Y.
@@ -33,10 +33,10 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/Kconfig linux-2.6.12-rc6-mm1/d
 +
  config HW_CONSOLE
  	bool
- 	depends on VT && !S390 && !USERMODE
-diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/Makefile linux-2.6.12-rc6-mm1/drivers/char/Makefile
---- linux-2.6.12-rc6-mm1.orig/drivers/char/Makefile	2005-03-02 07:38:26.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/drivers/char/Makefile	2005-06-19 22:19:33.000000000 +0000
+ 	depends on VT && !S390 && !UML
+diff -Naur linux-2.6.12.2.orig/drivers/char/Makefile linux-2.6.12.2/drivers/char/Makefile
+--- linux-2.6.12.2.orig/drivers/char/Makefile	2005-06-29 23:00:53.000000000 +0000
++++ linux-2.6.12.2/drivers/char/Makefile	2005-07-06 23:47:22.000000000 +0000
 @@ -9,6 +9,8 @@
  
  obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o
@@ -46,9 +46,9 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/Makefile linux-2.6.12-rc6-mm1/
  obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
  obj-$(CONFIG_UNIX98_PTYS)	+= pty.o
  obj-y				+= misc.o
-diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/frandom.c linux-2.6.12-rc6-mm1/drivers/char/frandom.c
---- linux-2.6.12-rc6-mm1.orig/drivers/char/frandom.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/drivers/char/frandom.c	2005-06-19 22:22:24.000000000 +0000
+diff -Naur linux-2.6.12.2.orig/drivers/char/frandom.c linux-2.6.12.2/drivers/char/frandom.c
+--- linux-2.6.12.2.orig/drivers/char/frandom.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.12.2/drivers/char/frandom.c	2005-07-06 23:47:22.000000000 +0000
 @@ -0,0 +1,387 @@
 +/*
 +** frandom.c
@@ -360,7 +360,7 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/frandom.c linux-2.6.12-rc6-mm1
 +	{12, "erandom", S_IRUGO | S_IWUSR,      &frandom_fops},
 +};
 +
-+static struct class *frandom_class;
++static struct class_simple *frandom_class;
 +
 +static void frandom_cleanup_module(void) {
 +	kfree(erandom_state->buf);
@@ -421,9 +421,9 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/frandom.c linux-2.6.12-rc6-mm1
 +	}
 +	if (frandom_major == 0) frandom_major = result; /* dynamic */
 +
-+	frandom_class = class_create(THIS_MODULE, "frandom");
++	frandom_class = class_simple_create(THIS_MODULE, "frandom");
 +	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
-+		class_device_create(frandom_class,
++		class_simple_device_add(frandom_class,
 +					MKDEV(FRANDOM_MAJOR, devlist[i].minor),
 +					NULL, devlist[i].name);
 +		devfs_mk_cdev(MKDEV(FRANDOM_MAJOR, devlist[i].minor),
@@ -437,10 +437,10 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/frandom.c linux-2.6.12-rc6-mm1
 +module_exit(frandom_cleanup_module);
 +
 +EXPORT_SYMBOL(erandom_get_random_bytes);
-diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/random.c linux-2.6.12-rc6-mm1/drivers/char/random.c
---- linux-2.6.12-rc6-mm1.orig/drivers/char/random.c	2005-03-02 07:37:48.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/drivers/char/random.c	2005-06-19 22:19:33.000000000 +0000
-@@ -1891,6 +1891,104 @@
+diff -Naur linux-2.6.12.2.orig/drivers/char/random.c linux-2.6.12.2/drivers/char/random.c
+--- linux-2.6.12.2.orig/drivers/char/random.c	2005-06-29 23:00:53.000000000 +0000
++++ linux-2.6.12.2/drivers/char/random.c	2005-07-06 23:51:36.000000000 +0000
+@@ -1227,6 +1227,105 @@
  	return 1;
  }
  
@@ -542,10 +542,11 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/random.c linux-2.6.12-rc6-mm1/
 +}
 +#endif
 +
- static int sysctl_poolsize = DEFAULT_POOL_SIZE;
++
+ static int sysctl_poolsize = INPUT_POOL_WORDS * 32;
  ctl_table random_table[] = {
  	{
-@@ -1947,6 +2045,26 @@
+@@ -1284,6 +1383,26 @@
  		.proc_handler	= &proc_do_uuid,
  		.strategy	= &uuid_strategy,
  	},
@@ -571,11 +572,11 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/drivers/char/random.c linux-2.6.12-rc6-mm1/
 +#endif
  	{ .ctl_name = 0 }
  };
- 
-diff -Naur linux-2.6.12-rc6-mm1.orig/include/linux/sysctl.h linux-2.6.12-rc6-mm1/include/linux/sysctl.h
---- linux-2.6.12-rc6-mm1.orig/include/linux/sysctl.h	2005-03-02 07:38:10.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/include/linux/sysctl.h	2005-06-19 22:19:33.000000000 +0000
-@@ -195,6 +195,8 @@
+ #endif 	/* CONFIG_SYSCTL */
+diff -Naur linux-2.6.12.2.orig/include/linux/sysctl.h linux-2.6.12.2/include/linux/sysctl.h
+--- linux-2.6.12.2.orig/include/linux/sysctl.h	2005-06-29 23:00:53.000000000 +0000
++++ linux-2.6.12.2/include/linux/sysctl.h	2005-07-06 23:47:22.000000000 +0000
+@@ -196,6 +196,8 @@
  };
  
  /* /proc/sys/kernel/random */
@@ -584,7 +585,7 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/include/linux/sysctl.h linux-2.6.12-rc6-mm1
  enum
  {
  	RANDOM_POOLSIZE=1,
-@@ -202,7 +204,9 @@
+@@ -203,7 +205,9 @@
  	RANDOM_READ_THRESH=3,
  	RANDOM_WRITE_THRESH=4,
  	RANDOM_BOOT_ID=5,
@@ -595,10 +596,10 @@ diff -Naur linux-2.6.12-rc6-mm1.orig/include/linux/sysctl.h linux-2.6.12-rc6-mm1
  };
  
  /* /proc/sys/kernel/pty */
-diff -Naur linux-2.6.12-rc6-mm1.orig/init/Kconfig linux-2.6.12-rc6-mm1/init/Kconfig
---- linux-2.6.12-rc6-mm1.orig/init/Kconfig	2005-03-02 07:38:19.000000000 +0000
-+++ linux-2.6.12-rc6-mm1/init/Kconfig	2005-06-19 22:19:33.000000000 +0000
-@@ -154,6 +154,16 @@
+diff -Naur linux-2.6.12.2.orig/init/Kconfig linux-2.6.12.2/init/Kconfig
+--- linux-2.6.12.2.orig/init/Kconfig	2005-06-29 23:00:53.000000000 +0000
++++ linux-2.6.12.2/init/Kconfig	2005-07-06 23:47:22.000000000 +0000
+@@ -162,6 +162,16 @@
  	  building a kernel for install/rescue disks or your system is very
  	  limited in memory.
  
