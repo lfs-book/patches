@@ -1,18 +1,15 @@
-Submitted By: Richard Downing <richard at linuxfromscratch dot org>
-Date: 2005-08-09
+Submitted By:            Richard Downing <richard at linuxfromscratch dot org>
+Date:                    2005-08-09
 Initial Package Version: 1.0.6
-Upstream Status: Not known
-Origin: http://cvs.fedora.redhat.com
-Description: This patch allows firefox-1.0.6 and thunderbird 1.0.6 compile
-with gcc-4.0.1.
+Upstream Status:         Not known
+Origin:                  http://cvs.fedora.redhat.com
+Description:             Allows firefox-1.0.6 and thunderbird 1.0.6 to compile
+                         with GCC-4.0.1.
 
-Index: gfx/src/freetype/nsFreeType.cpp
-===================================================================
-RCS file: /cvsroot/mozilla/gfx/src/freetype/nsFreeType.cpp,v
-retrieving revision 1.24
-diff -u -r1.24 nsFreeType.cpp
---- gfx/src/freetype/nsFreeType.cpp	7 Feb 2004 15:22:30 -0000	1.24
-+++ gfx/src/freetype/nsFreeType.cpp	4 Mar 2005 19:59:53 -0000
+
+diff -Naur mozilla-orig/gfx/src/freetype/nsFreeType.cpp mozilla/gfx/src/freetype/nsFreeType.cpp
+--- mozilla-orig/gfx/src/freetype/nsFreeType.cpp	2004-02-07 15:22:30.000000000 +0000
++++ mozilla/gfx/src/freetype/nsFreeType.cpp	2005-08-24 19:00:41.000000000 +0000
 @@ -96,7 +96,7 @@
  // Define the FreeType2 functions we resolve at run time.
  // see the comment near nsFreeType2::DoneFace() for more info
@@ -22,13 +19,9 @@ diff -u -r1.24 nsFreeType.cpp
  FtFuncList nsFreeType2::FtFuncs [] = {
    {"FT_Done_Face",            NS_FT2_OFFSET(nsFT_Done_Face),            PR_TRUE},
    {"FT_Done_FreeType",        NS_FT2_OFFSET(nsFT_Done_FreeType),        PR_TRUE},
-Index: netwerk/protocol/http/src/nsHttpConnectionMgr.cpp
-===================================================================
-RCS file: /cvsroot/mozilla/netwerk/protocol/http/src/nsHttpConnectionMgr.cpp,v
-retrieving revision 1.7.20.1
-diff -u -r1.7.20.1 nsHttpConnectionMgr.cpp
---- netwerk/protocol/http/src/nsHttpConnectionMgr.cpp	1 Sep 2004 23:31:03 -0000	1.7.20.1
-+++ netwerk/protocol/http/src/nsHttpConnectionMgr.cpp	4 Mar 2005 19:59:57 -0000
+diff -Naur mozilla-orig/netwerk/protocol/http/src/nsHttpConnectionMgr.cpp mozilla/netwerk/protocol/http/src/nsHttpConnectionMgr.cpp
+--- mozilla-orig/netwerk/protocol/http/src/nsHttpConnectionMgr.cpp	2004-09-01 23:31:03.000000000 +0000
++++ mozilla/netwerk/protocol/http/src/nsHttpConnectionMgr.cpp	2005-08-24 19:00:41.000000000 +0000
 @@ -834,8 +834,8 @@
  void
  nsHttpConnectionMgr::OnMsgUpdateParam(nsresult status, void *param)
@@ -40,13 +33,9 @@ diff -u -r1.7.20.1 nsHttpConnectionMgr.cpp
  
      switch (name) {
      case MAX_CONNECTIONS:
-Index: security/nss/lib/pki1/oiddata.h
-===================================================================
-RCS file: /cvsroot/mozilla/security/nss/lib/pki1/oiddata.h,v
-retrieving revision 1.1
-diff -u -r1.1 oiddata.h
---- security/nss/lib/pki1/oiddata.h	4 Jan 2002 05:22:07 -0000	1.1
-+++ security/nss/lib/pki1/oiddata.h	4 Mar 2005 19:59:58 -0000
+diff -Naur mozilla-orig/security/nss/lib/pki1/oiddata.h mozilla/security/nss/lib/pki1/oiddata.h
+--- mozilla-orig/security/nss/lib/pki1/oiddata.h	2002-01-04 05:22:07.000000000 +0000
++++ mozilla/security/nss/lib/pki1/oiddata.h	2005-08-24 19:00:41.000000000 +0000
 @@ -43,9 +43,6 @@
  #include "nsspki1t.h"
  #endif /* NSSPKI1T_H */
@@ -57,13 +46,9 @@ diff -u -r1.1 oiddata.h
  /*extern const nssAttributeTypeAliasTable nss_attribute_type_aliases[];*/
  /*extern const PRUint32 nss_attribute_type_alias_count;*/
  
-Index: security/nss/lib/pki1/pki1.h
-===================================================================
-RCS file: /cvsroot/mozilla/security/nss/lib/pki1/pki1.h,v
-retrieving revision 1.2
-diff -u -r1.2 pki1.h
---- security/nss/lib/pki1/pki1.h	19 Jul 2001 20:40:42 -0000	1.2
-+++ security/nss/lib/pki1/pki1.h	4 Mar 2005 19:59:59 -0000
+diff -Naur mozilla-orig/security/nss/lib/pki1/pki1.h mozilla/security/nss/lib/pki1/pki1.h
+--- mozilla-orig/security/nss/lib/pki1/pki1.h	2001-07-19 20:40:42.000000000 +0000
++++ mozilla/security/nss/lib/pki1/pki1.h	2005-08-24 19:00:41.000000000 +0000
 @@ -58,6 +58,8 @@
  /* fgmr 19990505 moved these here from oiddata.h */
  extern const nssAttributeTypeAliasTable nss_attribute_type_aliases[];
@@ -73,13 +58,9 @@ diff -u -r1.2 pki1.h
  
  /*
   * NSSOID
-Index: widget/src/gtk2/nsDragService.cpp
-===================================================================
-RCS file: /cvsroot/mozilla/widget/src/gtk2/nsDragService.cpp,v
-retrieving revision 1.5
-diff -u -r1.5 nsDragService.cpp
---- widget/src/gtk2/nsDragService.cpp	30 Oct 2003 01:48:41 -0000	1.5
-+++ widget/src/gtk2/nsDragService.cpp	4 Mar 2005 20:00:01 -0000
+diff -Naur mozilla-orig/widget/src/gtk2/nsDragService.cpp mozilla/widget/src/gtk2/nsDragService.cpp
+--- mozilla-orig/widget/src/gtk2/nsDragService.cpp	2005-03-16 00:20:25.000000000 +0000
++++ mozilla/widget/src/gtk2/nsDragService.cpp	2005-08-24 19:00:41.000000000 +0000
 @@ -838,7 +838,7 @@
              (GtkTargetEntry *)g_malloc(sizeof(GtkTargetEntry));
          listTarget->target = g_strdup(gMimeListType);
@@ -125,4 +106,3 @@ diff -u -r1.5 nsDragService.cpp
                              PR_LOG(sDragLm, PR_LOG_DEBUG,
                                     ("automatically adding target %s with \
                                     id %ld\n", urlTarget->target, urlAtom));
-
