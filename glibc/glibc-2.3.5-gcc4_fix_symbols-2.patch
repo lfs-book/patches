@@ -1,0 +1,131 @@
+Submitted By: Matthew Burgess <matthew@linuxfromscratch.org>
+Date: 2005-08-31
+Initial Package Version: 2.3.5
+Upstream Status: From Upstream (libc/include/libc-symbols.h -r1.71)
+Origin: Ryan Oliver, courtesy of Dan Kegel's crosstool
+        (http://kegel.com/crosstool/)
+	Joe Ciccone - Alpha build test issue 
+	(https://www.redhat.com/archives/fedora-cvs-commits/2005-March/msg00408.html)
+Description: Fixes a compilation problem with gcc-4.0.x that results in:
+             ../sysdeps/ieee754/dbl-64/s_isinf.c:29: error: 'isinf' aliased to
+             undefined symbol '__isinf'
+	     Fixes build issue under 64 bit architectures
+ 
+diff -Naur glibc-2.3.5.orig/include/libc-symbols.h glibc-2.3.5/include/libc-symbols.h
+--- glibc-2.3.5.orig/include/libc-symbols.h	2004-10-24 21:17:08.000000000 +0000
++++ glibc-2.3.5/include/libc-symbols.h	2005-09-01 04:47:08.000000000 +0000
+@@ -582,78 +582,23 @@
+ #  define hidden_proto(name, attrs...) \
+   __hidden_proto (name, __GI_##name, ##attrs)
+ #  define __hidden_proto(name, internal, attrs...) \
+-  extern __typeof (name) internal; \
+   extern __typeof (name) name __asm__ (__hidden_asmname (#internal)) \
+   __hidden_proto_hiddenattr (attrs);
+ #  define __hidden_asmname(name) \
+   __hidden_asmname1 (__USER_LABEL_PREFIX__, name)
+ #  define __hidden_asmname1(prefix, name) __hidden_asmname2(prefix, name)
+ #  define __hidden_asmname2(prefix, name) #prefix name
+-#  ifdef HAVE_ASM_SET_DIRECTIVE
+-#   define __hidden_def1(original, alias)			\
+-  ASM_GLOBAL_DIRECTIVE C_SYMBOL_NAME (alias) ASM_LINE_SEP	\
+-  .set C_SYMBOL_NAME (alias), C_SYMBOL_NAME (original)
+-#   ifdef HAVE_ASM_GLOBAL_DOT_NAME
+-#     define __hidden_dot_def1(original, alias)	 ASM_LINE_SEP	\
+-  ASM_GLOBAL_DIRECTIVE C_SYMBOL_DOT_NAME (alias) ASM_LINE_SEP	\
+-  .set C_SYMBOL_DOT_NAME (alias), C_SYMBOL_DOT_NAME (original)
+-#   else
+-#     define __hidden_dot_def1(original, alias)
+-#   endif
+-#  else
+-#   define __hidden_def1(original, alias)			\
+-  ASM_GLOBAL_DIRECTIVE C_SYMBOL_NAME (alias) ASM_LINE_SEP	\
+-  C_SYMBOL_NAME (alias) = C_SYMBOL_NAME (original)
+-#   ifdef HAVE_ASM_GLOBAL_DOT_NAME
+-#    define __hidden_dot_def1(original, alias)	ASM_LINE_SEP	\
+-  ASM_GLOBAL_DIRECTIVE C_SYMBOL_DOT_NAME (alias) ASM_LINE_SEP	\
+-  C_SYMBOL_DOT_NAME (alias) = C_SYMBOL_DOT_NAME (original)
+-#   else
+-#    define __hidden_dot_def1(original, alias)
+-#   endif
+-#  endif
+-#  define __hidden_def2(...) #__VA_ARGS__
+-#  define __hidden_def3(...) __hidden_def2 (__VA_ARGS__)
+-#  define hidden_def(name)					\
+-  __asm__ (__hidden_def3 (__hidden_def1 (__GI_##name, name) \
+-  __hidden_dot_def1 (__GI_##name, name)));
+-#  define hidden_data_def(name)					\
+-  __asm__ (__hidden_def3 (__hidden_def1 (__GI_##name, name)));
+-#  define hidden_ver(local, name)				\
+-  __asm__ (__hidden_def3 (__hidden_def1 (local, __GI_##name) \
+-  __hidden_dot_def1 (local, __GI_##name)));
+-#  define hidden_data_ver(local, name)				\
+-  __asm__ (__hidden_def3 (__hidden_def1 (local, __GI_##name)));
+-#  ifdef HAVE_WEAK_SYMBOLS
+-#   ifdef HAVE_ASM_WEAKEXT_DIRECTIVE
+-#    define __hidden_weak1(original, alias)			\
+-  .weakext C_SYMBOL_NAME (alias), C_SYMBOL_NAME (original)
+-#    ifdef HAVE_ASM_GLOBAL_DOT_NAME
+-#     define __hidden_dot_weak1(original, alias)	ASM_LINE_SEP	\
+-  .weakext C_SYMBOL_DOT_NAME (alias), C_SYMBOL_DOT_NAME (original)
+-#    else
+-#     define __hidden_dot_weak1(original, alias)
+-#    endif
+-#   else /* ! HAVE_ASM_WEAKEXT_DIRECTIVE */
+-#    define __hidden_weak1(original, alias)			\
+-  .weak C_SYMBOL_NAME (alias) ASM_LINE_SEP			\
+-  C_SYMBOL_NAME (alias) = C_SYMBOL_NAME (original)
+-#    ifdef HAVE_ASM_GLOBAL_DOT_NAME
+-#     define __hidden_dot_weak1(original, alias)	ASM_LINE_SEP	\
+-  .weak C_SYMBOL_DOT_NAME (alias) ASM_LINE_SEP	\
+-  C_SYMBOL_DOT_NAME (alias) = C_SYMBOL_DOT_NAME (original)
+-#    else
+-#     define __hidden_dot_weak1(original, alias)
+-#    endif
+-#   endif
+-#   define hidden_weak(name)					\
+-  __asm__ (__hidden_def3 (__hidden_weak1 (__GI_##name, name) \
+-  __hidden_dot_weak1 (__GI_##name, name)));
+-#   define hidden_data_weak(name)					\
+-  __asm__ (__hidden_def3 (__hidden_weak1 (__GI_##name, name)));
+-#  else
+-#   define hidden_weak(name) hidden_def (name)
+-#  endif
++#  define __hidden_ver1(local, internal, name) \
++  extern __typeof (name) __EI_##name __asm__(__hidden_asmname (#internal)); \
++  extern __typeof (name) __EI_##name \
++	__attribute__((alias (__hidden_asmname (#local))))
++#  define hidden_ver(local, name)	__hidden_ver1(local, __GI_##name, name);
++#  define hidden_data_ver(local, name)	hidden_ver(local, name)
++#  define hidden_def(name)		__hidden_ver1(__GI_##name, name, name);
++#  define hidden_data_def(name)		hidden_def(name)
++#  define hidden_weak(name) \
++	__hidden_ver1(__GI_##name, name, name) __attribute__((weak));
++#  define hidden_data_weak(name)	hidden_weak(name)
+ # else
+ /* For assembly, we need to do the opposite of what we do in C:
+    in assembly gcc __REDIRECT stuff is not in place, so functions
+diff -Naur glibc-2.3.5.orig/sysdeps/wordsize-64/strtol_l.c glibc-2.3.5/sysdeps/wordsize-64/strtol_l.c
+--- glibc-2.3.5.orig/sysdeps/wordsize-64/strtol_l.c	2003-03-03 09:45:12.000000000 +0000
++++ glibc-2.3.5/sysdeps/wordsize-64/strtol_l.c	2005-09-01 04:41:22.000000000 +0000
+@@ -8,7 +8,9 @@
+ #undef ____strtoll_l_internal
+ #undef __strtoll_l
+ #undef strtoll_l
++#if !UNSIGNED
+ strong_alias (____strtol_l_internal, ____strtoll_l_internal)
+ libc_hidden_ver (____strtol_l_internal, ____strtoll_l_internal)
+ weak_alias (__strtol_l, __strtoll_l)
+ weak_alias (__strtol_l, strtoll_l)
++#endif
+diff -Naur glibc-2.3.5.orig/sysdeps/wordsize-64/wcstol_l.c glibc-2.3.5/sysdeps/wordsize-64/wcstol_l.c
+--- glibc-2.3.5.orig/sysdeps/wordsize-64/wcstol_l.c	2002-08-08 11:44:51.000000000 +0000
++++ glibc-2.3.5/sysdeps/wordsize-64/wcstol_l.c	2005-09-01 04:41:22.000000000 +0000
+@@ -8,6 +8,8 @@
+ #undef ____wcstoll_l_internal
+ #undef __wcstoll_l
+ #undef wcstoll_l
++#if !UNSIGNED
+ strong_alias (____wcstol_l_internal, ____wcstoll_l_internal)
+ weak_alias (__wcstol_l, __wcstoll_l)
+ weak_alias (__wcstol_l, wcstoll_l)
++#endif
