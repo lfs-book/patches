@@ -1,0 +1,35 @@
+Submitted By:            Randy McMurchy <randy_at_linuxfromscratch_dot_org>
+Date:                    2005-09-09
+Initial Package Version: 6.8.2
+Upstream Status:         Unknown
+Origin:                  Gentoo Development
+Description:             Below are the notes from the original patch before
+                         the rediff by Randy McMurchy
+
+Patch from Gentoo bugzilla to fix a glitch in the Radeon driver that
+prevents compilation with gcc4:
+
+Red Hat bugzilla:
+       https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=150086
+
+Gentoo bugzilla:
+       http://bugs.gentoo.org/show_bug.cgi?id=80685
+
+Update: We should carefully review this before committing upstream, to
+make sure it is the most correct fix.  It was included in our build
+for now, to solve the pressing need to get things building with gcc 4.
+
+
+diff -Naur xc-orig/programs/Xserver/hw/xfree86/drivers/ati/radeon_probe.h xc/programs/Xserver/hw/xfree86/drivers/ati/radeon_probe.h
+--- xc-orig/programs/Xserver/hw/xfree86/drivers/ati/radeon_probe.h	2004-08-03 09:38:03.000000000 +0000
++++ xc/programs/Xserver/hw/xfree86/drivers/ati/radeon_probe.h	2005-09-10 05:07:01.000000000 +0000
+@@ -146,9 +146,6 @@
+ extern Bool                 RADEONProbe
+ 			    FunctionPrototype((DriverPtr, int));
+ 
+-extern SymTabRec            RADEONChipsets[];
+-extern PciChipsets          RADEONPciChipsets[];
+-
+ /* radeon_driver.c */
+ extern void                 RADEONLoaderRefSymLists
+ 			    FunctionPrototype((void));
