@@ -1,9 +1,9 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
 Date: 2005-09-12
-Initial Package Version: 
-Origin: 
-Upstream Status: 
-Description: 
+Initial Package Version: 4.0.1
+Origin: Daniel Jacobowitz
+Upstream Status: GCC Dev Mailling lists
+Description: Adds support for TLS on MIPS
  
 diff -Naur gcc-4.0.1.orig/gcc/config/mips/mips-protos.h gcc-4.0.1/gcc/config/mips/mips-protos.h
 --- gcc-4.0.1.orig/gcc/config/mips/mips-protos.h	2004-12-30 03:07:56.000000000 +0000
