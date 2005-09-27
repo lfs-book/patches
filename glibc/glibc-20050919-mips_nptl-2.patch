@@ -1,13 +1,13 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 2005-09-22
+Date: 2005-09-27
 Initial Package Version: 20050919 Snapshot
 Origin: Daniel Jacobwitz
 Upstream Status: Submitted by Origin
-Description: Adds NPTL support for MIPS64
+Description: Adds NPTL support for MIPS
  
 diff -Naur glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h
 --- glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-03-28 09:21:52.000000000 +0000
-+++ glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-09-27 16:15:20.000000000 +0000
 @@ -30,6 +30,8 @@
  #define FUTEX_WAKE		1
  #define FUTEX_REQUEUE		3
@@ -71,7 +71,7 @@ diff -Naur glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h 
  __lll_mutex_trylock(int *futex)
 diff -Naur glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h
 --- glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	1970-01-01 00:00:00.000000000 +0000
-+++ glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	2005-09-27 16:15:20.000000000 +0000
 @@ -0,0 +1,183 @@
 +/* Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -258,7 +258,7 @@ diff -Naur glibc-20050919.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-c
 +#endif
 diff -Naur glibc-20050919.orig/sysdeps/mips/dl-machine.h glibc-20050919/sysdeps/mips/dl-machine.h
 --- glibc-20050919.orig/sysdeps/mips/dl-machine.h	2005-03-28 09:32:04.000000000 +0000
-+++ glibc-20050919/sysdeps/mips/dl-machine.h	2005-09-22 22:07:18.000000000 +0000
++++ glibc-20050919/sysdeps/mips/dl-machine.h	2005-09-27 16:15:20.000000000 +0000
 @@ -266,13 +266,13 @@
  	" STRINGXP(PTR_ADDU) " $7, $7, " STRINGXP (PTRSIZE) " \n\
  	# Make sure the stack pointer is aligned for _dl_init_internal.\n\
@@ -309,7 +309,7 @@ diff -Naur glibc-20050919.orig/sysdeps/mips/dl-machine.h glibc-20050919/sysdeps/
  
 diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/bits/socket.h glibc-20050919/sysdeps/unix/sysv/linux/mips/bits/socket.h
 --- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/bits/socket.h	2004-12-15 01:00:55.000000000 +0000
-+++ glibc-20050919/sysdeps/unix/sysv/linux/mips/bits/socket.h	2005-09-22 22:07:11.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/bits/socket.h	2005-09-27 16:15:20.000000000 +0000
 @@ -219,10 +219,10 @@
      socklen_t msg_namelen;	/* Length of address data.  */
  
@@ -352,7 +352,7 @@ diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/bits/socket.h glibc-
  /* User visible structure for SCM_CREDENTIALS message */
 diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/Makefile
 --- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/Makefile	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/Makefile	2005-09-27 16:15:20.000000000 +0000
 @@ -0,0 +1,9 @@
 +ifeq ($(subdir),socket)
 +CFLAGS-recv.c += -fexceptions
@@ -365,7 +365,7 @@ diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile glib
 +endif
 diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h
 --- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2005-02-25 15:18:12.000000000 +0000
-+++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2005-09-27 16:15:20.000000000 +0000
 @@ -66,22 +66,28 @@
  #define INTERNAL_SYSCALL_ERRNO(val, err)     (val)
  
@@ -573,7 +573,7 @@ diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h 
  	_sys_result = __v0;						\
 diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h
 --- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2005-02-25 15:18:13.000000000 +0000
-+++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2005-09-27 16:15:20.000000000 +0000
 @@ -66,22 +66,28 @@
  #define INTERNAL_SYSCALL_ERRNO(val, err)     (val)
  
@@ -781,7 +781,7 @@ diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h 
  	_sys_result = __v0;						\
 diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list
 --- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2004-07-21 06:13:15.000000000 +0000
-+++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2005-09-22 22:07:00.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2005-09-27 16:15:20.000000000 +0000
 @@ -1,16 +1,12 @@
  # File name	Caller	Syscall name	Args	Strong name	Weak names
  
@@ -917,3 +917,143 @@ diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/ptrace.c glibc-20050
 -
 -  return res;
 -}
+diff -Naur glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h glibc-20050919/sysdeps/unix/sysv/linux/mips/sys/ptrace.h
+--- glibc-20050919.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	2004-11-24 04:37:35.000000000 +0000
++++ glibc-20050919/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	1970-01-01 00:00:00.000000000 +0000
+@@ -1,136 +0,0 @@
+-/* `ptrace' debugger support interface.  Linux version.
+-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004
+-	Free Software Foundation, Inc.
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library; if not, write to the Free
+-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+-   02111-1307 USA.  */
+-
+-#ifndef _SYS_PTRACE_H
+-#define _SYS_PTRACE_H	1
+-
+-#include <features.h>
+-#include <sgidefs.h>
+-
+-__BEGIN_DECLS
+-
+-/* Type of the REQUEST argument to `ptrace.'  */
+-enum __ptrace_request
+-{
+-  /* Indicate that the process making this request should be traced.
+-     All signals received by this process can be intercepted by its
+-     parent, and its parent can use the other `ptrace' requests.  */
+-  PTRACE_TRACEME = 0,
+-#define PT_TRACE_ME PTRACE_TRACEME
+-
+-  /* Return the word in the process's text space at address ADDR.  */
+-  PTRACE_PEEKTEXT = 1,
+-#define PT_READ_I PTRACE_PEEKTEXT
+-
+-  /* Return the word in the process's data space at address ADDR.  */
+-  PTRACE_PEEKDATA = 2,
+-#define PT_READ_D PTRACE_PEEKDATA
+-
+-  /* Return the word in the process's user area at offset ADDR.  */
+-  PTRACE_PEEKUSER = 3,
+-#define PT_READ_U PTRACE_PEEKUSER
+-
+-  /* Write the word DATA into the process's text space at address ADDR.  */
+-  PTRACE_POKETEXT = 4,
+-#define PT_WRITE_I PTRACE_POKETEXT
+-
+-  /* Write the word DATA into the process's data space at address ADDR.  */
+-  PTRACE_POKEDATA = 5,
+-#define PT_WRITE_D PTRACE_POKEDATA
+-
+-  /* Write the word DATA into the process's user area at offset ADDR.  */
+-  PTRACE_POKEUSER = 6,
+-#define PT_WRITE_U PTRACE_POKEUSER
+-
+-  /* Continue the process.  */
+-  PTRACE_CONT = 7,
+-#define PT_CONTINUE PTRACE_CONT
+-
+-  /* Kill the process.  */
+-  PTRACE_KILL = 8,
+-#define PT_KILL PTRACE_KILL
+-
+-  /* Single step the process.
+-     This is not supported on all machines.  */
+-  PTRACE_SINGLESTEP = 9,
+-#define PT_STEP PTRACE_SINGLESTEP
+-
+-  /* Get all general purpose registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_GETREGS = 12,
+-#define PT_GETREGS PTRACE_GETREGS
+-
+-  /* Set all general purpose registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_SETREGS = 13,
+-#define PT_SETREGS PTRACE_SETREGS
+-
+-  /* Get all floating point registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_GETFPREGS = 14,
+-#define PT_GETFPREGS PTRACE_GETFPREGS
+-
+-  /* Set all floating point registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_SETFPREGS = 15,
+-#define PT_SETFPREGS PTRACE_SETFPREGS
+-
+-  /* Attach to a process that is already running. */
+-  PTRACE_ATTACH = 16,
+-#define PT_ATTACH PTRACE_ATTACH
+-
+-  /* Detach from a process attached to with PTRACE_ATTACH.  */
+-  PTRACE_DETACH = 17,
+-#define PT_DETACH PTRACE_DETACH
+-
+-  /* Get all extended floating point registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_GETFPXREGS = 18,
+-#define PT_GETFPXREGS PTRACE_GETFPXREGS
+-
+-  /* Set all extended floating point registers used by a processes.
+-     This is not supported on all machines.  */
+-   PTRACE_SETFPXREGS = 19,
+-#define PT_SETFPXREGS PTRACE_SETFPXREGS
+-
+-  /* Continue and stop at the next (return from) syscall.  */
+-  PTRACE_SYSCALL = 24
+-#define PT_SYSCALL PTRACE_SYSCALL
+-};
+-
+-/* Perform process tracing functions.  REQUEST is one of the values
+-   above, and determines the action to be taken.
+-   For all requests except PTRACE_TRACEME, PID specifies the process to be
+-   traced.
+-
+-   PID and the other arguments described above for the various requests should
+-   appear (those that are used for the particular request) as:
+-     pid_t PID, void *ADDR, int DATA, void *ADDR2
+-   after REQUEST.  */
+-#if _MIPS_SIM == _ABIN32
+-__extension__ extern long long int ptrace
+-  (enum __ptrace_request __request, ...) __THROW;
+-#else
+-extern long int ptrace (enum __ptrace_request __request, ...) __THROW;
+-#endif
+-
+-__END_DECLS
+-
+-#endif /* _SYS_PTRACE_H */
