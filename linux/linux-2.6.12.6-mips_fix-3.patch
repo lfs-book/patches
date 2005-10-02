@@ -14,7 +14,7 @@ diff -Naur linux-2.6.12.6.orig/Makefile linux-2.6.12.6/Makefile
  				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 -				  -e s/s390x/s390/ -e s/parisc64/parisc/ )
 +				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
-+				  -e /mips64/mips/ )
++				  -e s/mips64/mips/ )
  
  # Cross compiling and selecting different set of gcc/bin-utils
  # ---------------------------------------------------------------------------
