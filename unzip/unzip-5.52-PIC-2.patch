@@ -35,7 +35,7 @@ diff -Naur unzip-5.52.orig/unix/Makefile unzip-5.52/unix/Makefile
 -	$(MAKE) unzips CC=gcc LD=gcc AS=gcc\
 -	 CF="-O3 -Wall -I. -DASM_CRC $(LOC)"\
 +	$(MAKE) unzips CC=gcc LD="gcc -pie" AS=gcc\
-+	 CF="-O3 -Wall -I. -DASM_CRC -fPIC $(LOC)"\
++	 CF="-O3 -Wall -I. -DASM_CRC -fPIE $(LOC)"\
  	 AF="-Di386 $(AF)" CRC32=crc_gcc
  # GRR:  this echo is pointless; if user gets this far, no difference to install
  #	@echo 'Be sure to use the install_asm target rather than the install target'
