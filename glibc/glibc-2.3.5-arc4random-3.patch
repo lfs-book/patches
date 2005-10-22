@@ -1,5 +1,5 @@
 Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
-Date: 2005-10-18
+Date: 2005-10-22
 Initial Package Version: 2.3.5
 Upstream Status: Not submitted
 Origin: http://www.openbsd.org/cgi-bin/cvsweb/src/lib/libc/crypt/arc4random.c
@@ -536,7 +536,7 @@ diff -Naur glibc-2.3.5.orig/sysdeps/posix/tempname.c glibc-2.3.5/sysdeps/posix/t
    XXXXXX = &tmpl[len - 6];
  
 +/* Get real random data. */
-+#if defined(HAVE_ARC4RANDOM)
++#if defined(LIBC_HAS_ARC4RANDOM)
 +  random_time_bits = arc4randomII();
 +#else
    /* Get some more or less random data.  */
@@ -547,7 +547,7 @@ diff -Naur glibc-2.3.5.orig/sysdeps/posix/tempname.c glibc-2.3.5/sysdeps/posix/t
  # endif
  #endif
 +#endif
-+#if defined(HAVE_ARC4RANDOM)
++#if defined(LIBC_HAS_ARC4RANDOM)
 +  value += random_time_bits ^ arc4randomII();
 +#else
    value += random_time_bits ^ __getpid ();
