@@ -5,10 +5,6 @@ Origin: JDK-6.0 (Mustang) snapshot
 Upstream Status: Fixed in 6.0
 Description: Fixes syntax for use with nptl.
 
-$LastChangedBy: dj $
-$Date: 2005-10-06 00:08:13 -0500 (Thu, 06 Oct 2005) $
-
-
 diff -Naur jdk-1.5.0_04-orig/deploy/src/javaws/solaris/native/system_md.c jdk-1.5.0_04/deploy/src/javaws/solaris/native/system_md.c
 --- jdk-1.5.0_04-orig/deploy/src/javaws/solaris/native/system_md.c      2005-10-02 17:48:50.000000000 -0500
 +++ jdk-1.5.0_04/deploy/src/javaws/solaris/native/system_md.c   2005-10-02 17:57:00.000000000 -0500

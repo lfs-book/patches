@@ -5,10 +5,6 @@ Origin: Previous gcc-3.4 patch, upstream 6.0 sources, and self.
 Upstream Status: Not Submitted - Upstream targets gcc-3.2.
 Description: Fixes syntax for use with gcc-4.0.x
 
-$LastChangedBy: dj $
-$Date: 2005-10-06 00:08:13 -0500 (Thu, 06 Oct 2005) $
-
-
 diff -Naur jdk-build-orig/deploy/src/javaws/share/native/xmlparser.c jdk-build/deploy/src/javaws/share/native/xmlparser.c
 --- jdk-build-orig/deploy/src/javaws/share/native/xmlparser.c	2004-10-19 14:04:17.000000000 -0500
 +++ jdk-build/deploy/src/javaws/share/native/xmlparser.c	2005-09-21 23:18:55.000000000 -0500
