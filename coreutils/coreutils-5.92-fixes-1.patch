@@ -4,8 +4,13 @@ Initial Package Version: 5.9.2
 Origin: Coreutils CVS
 Upstream Status: Already Applied
 Description: Various Fixes
+	http://lists.gnu.org/archive/html/bug-coreutils/2005-10/msg00275.html
 	fixes installation of locales into /locale
+
+	http://lists.gnu.org/archive/html/bug-coreutils/2005-10/msg00301.html	
 	fixes md5sum adds backwards compatibility
+
+	http://lists.gnu.org/archive/html/bug-coreutils/2005-10/msg00268.html
 	fixes dircolors adds missing ,	
  
 diff -Naur coreutils-5.92.orig/po/Makefile.in.in coreutils-5.92/po/Makefile.in.in
