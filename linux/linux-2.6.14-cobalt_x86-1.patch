@@ -367,59 +367,63 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/ke
  /*
   * Power off function, if any
   */
-@@ -271,6 +276,29 @@
- 				:
- 				: "i" ((void *) (0x1000 - sizeof (real_mode_switch) - 100)));
- }
-+
-+/* kill some time at halt/reboot to allow drives with large cache to sync */
-+void wait_for_flush(void)
-+{
-+      int i;
-+      static int flushed;
-+
-+      if (flushed)
-+              return;
-+      flushed = 1;
-+
-+      printk("waiting for devices to flush");
-+      for (i = 0 ; i < 10; i++) {
-+              printk(".");
-+              mdelay(500);
-+#ifdef CONFIG_COBALT_LCD
-+              if (i == 8)
-+                      cobalt_lcd_off();
-+#endif
-+      }
-+      printk("done\n");
-+}
-+
- #ifdef CONFIG_APM_MODULE
- EXPORT_SYMBOL(machine_real_restart);
- #endif
-@@ -304,6 +332,11 @@
- 	smp_send_stop();
- #endif /* CONFIG_SMP */
+@@ -277,6 +282,11 @@ EXPORT_SYMBOL(machine_real_restart);
  
+ void machine_shutdown(void)
+ {
 +#ifdef CONFIG_COBALT_RAQ
-+     wait_for_flush();
-+     cobalt_halt();
++	wait_for_flush();
++	cobalt_halt();
 +#endif
 +
- 	lapic_shutdown();
+ #ifdef CONFIG_SMP
+ 	int reboot_cpu_id;
  
- #ifdef CONFIG_X86_IO_APIC
-@@ -313,6 +346,10 @@
+@@ -313,6 +323,9 @@ void machine_shutdown(void)
  
  void machine_emergency_restart(void)
  {
-+	#ifdef CONFIG_COBALT_RAQ
-+		wait_for_flush();
-+		cobalt_restart();
-+	#endif
++#ifdef CONFIG_COBALT_RAQ
++	cobalt_restart();
++#endif
  	if (!reboot_thru_bios) {
  		if (efi_enabled) {
  			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, NULL);
+@@ -335,8 +348,34 @@ void machine_emergency_restart(void)
+ 	machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
+ }
+ 
++/* kill some time at halt/reboot to allow drives with large cache to sync */
++void wait_for_flush(void)
++{
++	int i;
++	static int flushed;
++
++	if (flushed)
++		return;
++	flushed = 1;
++
++	printk("waiting for devices to flush");
++	for (i = 0 ; i < 10; i++) {
++		printk(".");
++		mdelay(500);
++#ifdef CONFIG_COBALT_LCD
++		if (i == 8)
++			cobalt_lcd_off();
++#endif
++	}
++	printk("done\n");
++}
++
+ void machine_restart(char * __unused)
+ {
++#ifdef CONFIG_COBALT_RAQ
++	wait_for_flush();
++	cobalt_restart();
++#endif
+ 	machine_shutdown();
+ 	machine_emergency_restart();
+ }
 diff -Naur linux-2.6.14.orig/arch/i386/kernel/traps.c linux-2.6.14/arch/i386/kernel/traps.c
 --- linux-2.6.14.orig/arch/i386/kernel/traps.c	2005-10-28 00:02:08.000000000 +0000
 +++ linux-2.6.14/arch/i386/kernel/traps.c	2005-10-28 15:27:23.000000000 +0000
