@@ -3,7 +3,8 @@ Date: 2005-11-20
 Initial Package Version: 1.0.1
 Origin: Gentoo and Debian
 Upstream Status: Applied
-Description: Fixes issues with Dvhtool
+Description: Fixes Build issues with Dvhtool
+             Adds support for LVM and Linux Partitions
  
 diff -Naur dvhtool-1.0.1.orig/Makefile.in dvhtool-1.0.1/Makefile.in
 --- dvhtool-1.0.1.orig/Makefile.in	2001-04-17 18:07:24.000000000 +0000
