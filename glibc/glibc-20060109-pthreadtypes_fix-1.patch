@@ -64,8 +64,8 @@ diff -Naur glibc-20060109.orig/nptl/sysdeps/unix/sysv/linux/mips/bits/pthreadtyp
 -#if _MIPS_SIM != _ABI64
 +#if _MIPS_SIM == _ABI64
 +    int __spins;
-+    struct __pthread_mutex_u *__next;
-+    struct __pthread_mutex_u *__prev;
++    struct __pthread_mutex_s *__next;
++    struct __pthread_mutex_s *__prev;
 +# define __PTHREAD_MUTEX_HAVE_PREV      1
 +#else
      unsigned int __nusers;
@@ -124,8 +124,8 @@ diff -Naur glibc-20060109.orig/nptl/sysdeps/unix/sysv/linux/sparc/bits/pthreadty
      int __spins;
 -    union __pthread_mutex_u *__next;
 -    union __pthread_mutex_u *__prev;
-+    struct __pthread_mutex_u *__next;
-+    struct __pthread_mutex_u *__prev;
++    struct __pthread_mutex_s *__next;
++    struct __pthread_mutex_s *__prev;
  # define __PTHREAD_MUTEX_HAVE_PREV	1
  #else
      unsigned int __nusers;
