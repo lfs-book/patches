@@ -72,7 +72,7 @@ diff -Naur glibc-20060109.orig/nptl/sysdeps/unix/sysv/linux/mips/bits/pthreadtyp
 +    union
 +    {
 +      int __spins;
-+      struct __pthread_mutex_u *__next;
++      struct __pthread_mutex_s *__next;
 +    };
  #endif
 -    int __spins;
@@ -133,7 +133,7 @@ diff -Naur glibc-20060109.orig/nptl/sysdeps/unix/sysv/linux/sparc/bits/pthreadty
      {
        int __spins;
 -      union __pthread_mutex_u *__next;
-+      struct __pthread_mutex_u *__next;
++      struct __pthread_mutex_s *__next;
      };
  #endif
    } __data;
