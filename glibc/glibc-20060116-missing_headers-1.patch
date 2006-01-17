@@ -1,0 +1,18 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2006-01-16
+Initial Package Version: 20060116
+Origin: Jim Gifford
+Upstream Status: Sent
+Description: Adds missing headers needed for gcc build
+ 
+--- glibc-20060116/stdlib/Makefile.orig	2006-01-17 03:38:18.000000000 +0000
++++ glibc-20060116/stdlib/Makefile	2006-01-17 03:39:31.000000000 +0000
+@@ -22,6 +22,8 @@
+ subdir	:= stdlib
+ 
+ headers	:= stdlib.h bits/stdlib.h bits/stdlib-ldbl.h			      \
++	   alloca.h fmtmsg.h ucontext.h                                       \
++	   ucontext.h sys/ucontext.h                                          \
+ 	   monetary.h bits/monetary-ldbl.h				      \
+ 	   inttypes.h stdint.h bits/wordsize.h				      \
+ 	   errno.h sys/errno.h bits/errno.h
