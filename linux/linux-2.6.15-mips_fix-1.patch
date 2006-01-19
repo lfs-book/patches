@@ -5,9 +5,9 @@ Origin: Jim Gifford
 Upstream Status: Not Accepted
 Description: Various Fixes for MIPS architectures
 
-diff -Naur linux-2.6.15.orig/arch/mips/lib/Makefile linux-2.6.15/arch/mips/lib/Makefile
---- linux-2.6.15.orig/arch/mips/lib/Makefile	2006-01-09 21:32:16.000000000 +0000
-+++ linux-2.6.15/arch/mips/lib/Makefile	2006-01-09 21:37:56.000000000 +0000
+diff -Naur linux-2.6.15.1.orig/arch/mips/lib/Makefile linux-2.6.15.1/arch/mips/lib/Makefile
+--- linux-2.6.15.1.orig/arch/mips/lib/Makefile	2006-01-19 18:06:11.000000000 +0000
++++ linux-2.6.15.1/arch/mips/lib/Makefile	2006-01-19 18:05:07.000000000 +0000
 @@ -5,4 +5,6 @@
  lib-y	+= csum_partial_copy.o memcpy.o promlib.o strlen_user.o strncpy_user.o \
  	   strnlen_user.o uncached.o
@@ -15,9 +15,9 @@ diff -Naur linux-2.6.15.orig/arch/mips/lib/Makefile linux-2.6.15/arch/mips/lib/M
 +obj-y	+= iomap.o
 +
  EXTRA_AFLAGS := $(CFLAGS)
-diff -Naur linux-2.6.15.orig/arch/mips/lib/iomap.c linux-2.6.15/arch/mips/lib/iomap.c
---- linux-2.6.15.orig/arch/mips/lib/iomap.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.15/arch/mips/lib/iomap.c	2006-01-09 21:37:56.000000000 +0000
+diff -Naur linux-2.6.15.1.orig/arch/mips/lib/iomap.c linux-2.6.15.1/arch/mips/lib/iomap.c
+--- linux-2.6.15.1.orig/arch/mips/lib/iomap.c	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.15.1/arch/mips/lib/iomap.c	2006-01-19 18:05:07.000000000 +0000
 @@ -0,0 +1,78 @@
 +/*
 + *  iomap.c, Memory Mapped I/O routines for MIPS architecture.
@@ -97,9 +97,9 @@ diff -Naur linux-2.6.15.orig/arch/mips/lib/iomap.c linux-2.6.15/arch/mips/lib/io
 +}
 +EXPORT_SYMBOL(pci_iomap);
 +EXPORT_SYMBOL(pci_iounmap);
-diff -Naur linux-2.6.15.orig/include/asm-mips/addrspace.h linux-2.6.15/include/asm-mips/addrspace.h
---- linux-2.6.15.orig/include/asm-mips/addrspace.h	2006-01-03 03:21:10.000000000 +0000
-+++ linux-2.6.15/include/asm-mips/addrspace.h	2006-01-09 20:47:10.000000000 +0000
+diff -Naur linux-2.6.15.1.orig/include/asm-mips/addrspace.h linux-2.6.15.1/include/asm-mips/addrspace.h
+--- linux-2.6.15.1.orig/include/asm-mips/addrspace.h	2006-01-15 06:16:02.000000000 +0000
++++ linux-2.6.15.1/include/asm-mips/addrspace.h	2006-01-19 18:05:07.000000000 +0000
 @@ -124,7 +124,7 @@
  #define PHYS_TO_XKSEG_CACHED(p)		PHYS_TO_XKPHYS(K_CALG_COH_SHAREABLE,(p))
  #define XKPHYS_TO_PHYS(p)		((p) & TO_PHYS_MASK)
@@ -109,9 +109,9 @@ diff -Naur linux-2.6.15.orig/include/asm-mips/addrspace.h linux-2.6.15/include/a
  
  #if defined (CONFIG_CPU_R4300)						\
      || defined (CONFIG_CPU_R4X00)					\
-diff -Naur linux-2.6.15.orig/include/asm-mips/cobalt/cpu-feature-overrides.h linux-2.6.15/include/asm-mips/cobalt/cpu-feature-overrides.h
---- linux-2.6.15.orig/include/asm-mips/cobalt/cpu-feature-overrides.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.15/include/asm-mips/cobalt/cpu-feature-overrides.h	2006-01-09 20:52:18.000000000 +0000
+diff -Naur linux-2.6.15.1.orig/include/asm-mips/cobalt/cpu-feature-overrides.h linux-2.6.15.1/include/asm-mips/cobalt/cpu-feature-overrides.h
+--- linux-2.6.15.1.orig/include/asm-mips/cobalt/cpu-feature-overrides.h	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.15.1/include/asm-mips/cobalt/cpu-feature-overrides.h	2006-01-19 18:05:07.000000000 +0000
 @@ -0,0 +1,17 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General Public
@@ -130,9 +130,9 @@ diff -Naur linux-2.6.15.orig/include/asm-mips/cobalt/cpu-feature-overrides.h lin
 +#endif
 +
 +#endif /* __ASM_COBALT_CPU_FEATURE_OVERRIDES_H */
-diff -Naur linux-2.6.15.orig/include/asm-mips/cobalt/ide.h linux-2.6.15/include/asm-mips/cobalt/ide.h
---- linux-2.6.15.orig/include/asm-mips/cobalt/ide.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.15/include/asm-mips/cobalt/ide.h	2006-01-09 20:47:10.000000000 +0000
+diff -Naur linux-2.6.15.1.orig/include/asm-mips/cobalt/ide.h linux-2.6.15.1/include/asm-mips/cobalt/ide.h
+--- linux-2.6.15.1.orig/include/asm-mips/cobalt/ide.h	1970-01-01 00:00:00.000000000 +0000
++++ linux-2.6.15.1/include/asm-mips/cobalt/ide.h	2006-01-19 18:05:07.000000000 +0000
 @@ -0,0 +1,83 @@
 +
 +/*
@@ -217,41 +217,13 @@ diff -Naur linux-2.6.15.orig/include/asm-mips/cobalt/ide.h linux-2.6.15/include/
 +
 +#define __ide_mm_outsw		writesw
 +#define __ide_mm_outsl		writesl
-diff -Naur linux-2.6.15.orig/include/asm-mips/io.h linux-2.6.15/include/asm-mips/io.h
---- linux-2.6.15.orig/include/asm-mips/io.h	2006-01-09 21:32:18.000000000 +0000
-+++ linux-2.6.15/include/asm-mips/io.h	2006-01-09 20:47:10.000000000 +0000
-@@ -535,6 +535,62 @@
+diff -Naur linux-2.6.15.1.orig/include/asm-mips/io.h linux-2.6.15.1/include/asm-mips/io.h
+--- linux-2.6.15.1.orig/include/asm-mips/io.h	2006-01-19 18:06:12.000000000 +0000
++++ linux-2.6.15.1/include/asm-mips/io.h	2006-01-19 18:05:38.000000000 +0000
+@@ -535,6 +535,34 @@
  }
  
  /*
-+ * Memory Mapped I/O
-+ */
-+#define ioread8(addr)		readb(addr)
-+#define ioread16(addr)		readw(addr)
-+#define ioread32(addr)		readl(addr)
-+
-+#define iowrite8(b,addr)	writeb(b,addr)
-+#define iowrite16(w,addr)	writew(w,addr)
-+#define iowrite32(l,addr)	writel(l,addr)
-+
-+#define ioread8_rep(a,b,c)	readsb(a,b,c)
-+#define ioread16_rep(a,b,c)	readsw(a,b,c)
-+#define ioread32_rep(a,b,c)	readsl(a,b,c)
-+
-+#define iowrite8_rep(a,b,c)	writesb(a,b,c)
-+#define iowrite16_rep(a,b,c)	writesw(a,b,c)
-+#define iowrite32_rep(a,b,c)	writesl(a,b,c)
-+
-+/* Create a virtual mapping cookie for an IO port range */
-+extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
-+extern void ioport_unmap(void __iomem *);
-+
-+/* Create a virtual mapping cookie for a PCI BAR (memory or IO) */
-+struct pci_dev;
-+extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
-+extern void pci_iounmap(struct pci_dev *dev, void __iomem *);
-+
-+/*
 + * Memory Mapped I/O
 + */
 +#define ioread8(addr)		readb(addr)
