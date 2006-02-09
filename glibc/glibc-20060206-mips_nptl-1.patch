@@ -1,13 +1,13 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 2005-01-30
-Initial Package Version: 20060130 Snapshot
+Date: 2006-02-06
+Initial Package Version: 20060206 Snapshot
 Origin: Daniel Jacobwitz and Lior Balkohen
 Upstream Status: Submitted by Origin
-Description: Adds NPTL support for MIPS 
-
-diff -Naur glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h glibc-20060130/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h
---- glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-03-28 09:21:52.000000000 +0000
-+++ glibc-20060130/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2006-01-30 14:30:35.000000000 +0000
+Description: Adds NPTL support for MIPS
+ 
+diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h
+--- glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-03-28 09:21:52.000000000 +0000
++++ glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2006-02-09 19:43:11.000000000 +0000
 @@ -1,4 +1,4 @@
 -/* Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
 +/* Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -75,9 +75,9 @@ diff -Naur glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h 
  
  static inline int __attribute__((always_inline))
  __lll_mutex_trylock(int *futex)
-diff -Naur glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h glibc-20060130/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h
---- glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	1970-01-01 00:00:00.000000000 +0000
-+++ glibc-20060130/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	2006-01-30 14:27:18.000000000 +0000
+diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h
+--- glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	1970-01-01 00:00:00.000000000 +0000
++++ glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	2006-02-09 19:43:11.000000000 +0000
 @@ -0,0 +1,183 @@
 +/* Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -262,9 +262,51 @@ diff -Naur glibc-20060130.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-c
 +# define NO_CANCELLATION 1
 +
 +#endif
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/Makefile
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/Makefile	2006-01-30 14:27:18.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/mips/dl-machine.h glibc-20060206/sysdeps/mips/dl-machine.h
+--- glibc-20060206.orig/sysdeps/mips/dl-machine.h	2006-01-31 01:25:58.000000000 +0000
++++ glibc-20060206/sysdeps/mips/dl-machine.h	2006-02-09 19:43:11.000000000 +0000
+@@ -1,5 +1,5 @@
+ /* Machine-dependent ELF dynamic relocation inline functions.  MIPS version.
+-   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005
++   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005, 2006
+    Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+    Contributed by Kazumoto Kojima <kkojima@info.kanagawa-u.ac.jp>.
+@@ -336,28 +336,24 @@
+ # endif
+       {
+ 	struct link_map *sym_map = RESOLVE_MAP (&sym, version, r_type);
+-	Elf32_Addr value = sym == NULL ? 0 : sym_map->l_addr + sym->st_value;
+-
+-	if (sym)
+-	  value += sym->st_value;
+ 
+ 	switch (r_type)
+ 	  {
+ 	  case R_MIPS_TLS_DTPMOD64:
+ 	  case R_MIPS_TLS_DTPMOD32:
+ 	    if (sym_map)
+-	      *(ElfW(Word) *)reloc_addr = sym_map->l_tls_modid;
++	      *(ElfW(Addr) *)reloc_addr = sym_map->l_tls_modid;
+ 	    break;
+ 
+ 	  case R_MIPS_TLS_DTPREL64:
+ 	  case R_MIPS_TLS_DTPREL32:
+-	    *(ElfW(Word) *)reloc_addr += TLS_DTPREL_VALUE (sym);
++	    *(ElfW(Addr) *)reloc_addr += TLS_DTPREL_VALUE (sym);
+ 	    break;
+ 
+ 	  case R_MIPS_TLS_TPREL32:
+ 	  case R_MIPS_TLS_TPREL64:
+ 	    CHECK_STATIC_TLS (map, sym_map);
+-	    *(ElfW(Word) *)reloc_addr += TLS_TPREL_VALUE (sym_map, sym);
++	    *(ElfW(Addr) *)reloc_addr += TLS_TPREL_VALUE (sym_map, sym);
+ 	    break;
+ 	  }
+ 
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/Makefile
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/Makefile	2006-02-09 19:43:11.000000000 +0000
 @@ -0,0 +1,9 @@
 +ifeq ($(subdir),socket)
 +CFLAGS-recv.c += -fexceptions
@@ -275,9 +317,9 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/Makefile glib
 +CFLAGS-recv.c += -fexceptions
 +CFLAGS-send.c += -fexceptions
 +endif
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2005-02-25 15:18:12.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2006-01-30 14:27:18.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2005-02-25 15:18:12.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h	2006-02-09 19:43:11.000000000 +0000
 @@ -1,4 +1,5 @@
 -/* Copyright (C) 2000, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
 +/* Copyright (C) 2000, 2002, 2003, 2004, 2005, 2006
@@ -490,9 +532,9 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n32/sysdep.h 
  	: __SYSCALL_CLOBBERS); 						\
  	err = __a3;							\
  	_sys_result = __v0;						\
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2005-02-25 15:18:13.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2006-01-30 14:27:18.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2005-02-25 15:18:13.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h	2006-02-09 19:43:11.000000000 +0000
 @@ -1,4 +1,5 @@
 -/* Copyright (C) 2000, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
 +/* Copyright (C) 2000, 2002, 2003, 2004, 2005, 2006
@@ -705,9 +747,9 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/n64/sysdep.h 
  	: __SYSCALL_CLOBBERS); 						\
  	err = __a3;							\
  	_sys_result = __v0;						\
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2004-07-21 06:13:15.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2006-01-30 14:27:18.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2004-07-21 06:13:15.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list	2006-02-09 19:43:11.000000000 +0000
 @@ -1,16 +1,12 @@
  # File name	Caller	Syscall name	Args	Strong name	Weak names
  
@@ -728,9 +770,9 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/mips64/syscalls.list
  shmat		-	shmat		i:ipi	__shmat		shmat
  shmctl		-	shmctl		i:iip	__shmctl	shmctl
  shmdt		-	shmdt		i:s	__shmdt		shmdt
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/ptrace.c glibc-20060130/sysdeps/unix/sysv/linux/mips/ptrace.c
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/ptrace.c	2004-11-24 04:36:11.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/ptrace.c	1970-01-01 00:00:00.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/ptrace.c glibc-20060206/sysdeps/unix/sysv/linux/mips/ptrace.c
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/ptrace.c	2004-11-24 04:36:11.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/ptrace.c	1970-01-01 00:00:00.000000000 +0000
 @@ -1,111 +0,0 @@
 -/* Copyright (C) 1995, 1996, 1997, 1998, 2000, 2002, 2003, 2004
 -	Free Software Foundation, Inc.
@@ -843,9 +885,9 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/ptrace.c glibc-20060
 -
 -  return res;
 -}
-diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h glibc-20060130/sysdeps/unix/sysv/linux/mips/sys/ptrace.h
---- glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	2004-11-24 04:37:35.000000000 +0000
-+++ glibc-20060130/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	1970-01-01 00:00:00.000000000 +0000
+diff -Naur glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h glibc-20060206/sysdeps/unix/sysv/linux/mips/sys/ptrace.h
+--- glibc-20060206.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	2004-11-24 04:37:35.000000000 +0000
++++ glibc-20060206/sysdeps/unix/sysv/linux/mips/sys/ptrace.h	1970-01-01 00:00:00.000000000 +0000
 @@ -1,136 +0,0 @@
 -/* `ptrace' debugger support interface.  Linux version.
 -   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004
@@ -983,3 +1025,4 @@ diff -Naur glibc-20060130.orig/sysdeps/unix/sysv/linux/mips/sys/ptrace.h glibc-2
 -__END_DECLS
 -
 -#endif /* _SYS_PTRACE_H */
+
