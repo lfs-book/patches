@@ -1,3 +1,14 @@
+Submitted by: Alexander E. Patrakov
+Date: 2006-02-15
+Initial Package Version: 2.6.15.4
+Upstream Status: Rejected: they say it modifies the meaning of an existing ioctl
+Origin: http://chris.heathens.co.nz/linux/downloads/patches-2.6.4-cdh1.tar.gz
+	Porting to linux-2.6.12.5 by Alexander E. Patrakov
+Description: This patch fixes dead keys and copy/paste of non-ASCII characters
+in UTF-8 mode on Linux console.
+See more details about the original patch at:
+http://chris.heathens.co.nz/linux/utf8.html
+
 diff -Naur linux-2.6.15.4.orig/drivers/char/consolemap.c linux-2.6.15.4/drivers/char/consolemap.c
 --- linux-2.6.15.4.orig/drivers/char/consolemap.c	2006-02-10 07:22:48.000000000 +0000
 +++ linux-2.6.15.4/drivers/char/consolemap.c	2006-02-14 21:22:15.000000000 +0000
