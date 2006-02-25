@@ -1,13 +1,12 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
 Date: 2006-02-06
 Initial Package Version: 20060206 Snapshot
-Origin: Daniel Jacobwitz and Lior Balkohen
+Origin: Daniel Jacobwitz,Lior Balkohen, and Jim Gifford
 Upstream Status: Submitted by Origin
 Description: Adds NPTL support for MIPS
  
-diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h
---- glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-03-28 09:21:52.000000000 +0000
-+++ glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2006-02-09 19:43:11.000000000 +0000
+--- glibc-20060220.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2005-03-28 01:21:52.000000000 -0800
++++ glibc-20060220/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h	2006-02-24 16:43:17.000000000 -0800
 @@ -1,4 +1,4 @@
 -/* Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
 +/* Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
@@ -41,7 +40,7 @@ diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h 
      INTERNAL_SYSCALL_ERROR_P (__ret, __err) ? -__ret : __ret;		      \
    })
  
-@@ -57,7 +59,7 @@
+@@ -57,21 +59,42 @@
      INTERNAL_SYSCALL_DECL (__err);					      \
      long int __ret;							      \
      __ret = INTERNAL_SYSCALL (futex, __err, 4,				      \
@@ -50,7 +49,18 @@ diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h 
      INTERNAL_SYSCALL_ERROR_P (__ret, __err) ? -__ret : __ret;		      \
    })
  
-@@ -67,11 +69,23 @@
++#define lll_robust_mutex_dead(futexv) \
++  do									      \
++    {									      \
++      int *__futexp = &(futexv);					      \
++      atomic_or (__futexp, FUTEX_OWNER_DIED);				      \
++      lll_futex_wake (__futexp, 1);					      \
++    }									      \
++  while (0)
++
+ /* Returns non-zero if error happened, zero if success.  */
+ #define lll_futex_requeue(futexp, nr_wake, nr_move, mutex, val) \
+   ({									      \
      INTERNAL_SYSCALL_DECL (__err);					      \
      long int __ret;							      \
      __ret = INTERNAL_SYSCALL (futex, __err, 6,				      \
@@ -75,6 +85,83 @@ diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/lowlevellock.h 
  
  static inline int __attribute__((always_inline))
  __lll_mutex_trylock(int *futex)
+@@ -88,8 +111,16 @@
+ }
+ #define lll_mutex_cond_trylock(lock)	__lll_mutex_cond_trylock (&(lock))
+ 
++static inline int __attribute__((always_inline))
++__lll_robust_mutex_trylock(int *futex, int id)
++{
++  return atomic_compare_and_exchange_val_acq (futex, id, 0) != 0;
++}
++#define lll_robust_mutex_trylock(lock, id) \
++  __lll_robust_mutex_trylock (&(lock), id)
+ 
+ extern void __lll_lock_wait (int *futex) attribute_hidden;
++extern int __lll_robust_lock_wait (int *futex) attribute_hidden;
+ 
+ static inline void __attribute__((always_inline))
+ __lll_mutex_lock(int *futex)
+@@ -99,6 +130,16 @@
+ }
+ #define lll_mutex_lock(futex) __lll_mutex_lock (&(futex))
+ 
++static inline int __attribute__ ((always_inline))
++__lll_robust_mutex_lock (int *futex, int id)
++{
++  int result = 0;
++  if (atomic_compare_and_exchange_bool_acq (futex, id, 0) != 0)
++    result = __lll_robust_lock_wait (futex);
++  return result;
++}
++#define lll_robust_mutex_lock(futex, id) \
++  __lll_robust_mutex_lock (&(futex), id)
+ 
+ static inline void __attribute__ ((always_inline))
+ __lll_mutex_cond_lock (int *futex)
+@@ -108,9 +149,13 @@
+ }
+ #define lll_mutex_cond_lock(futex) __lll_mutex_cond_lock (&(futex))
+ 
++#define lll_robust_mutex_cond_lock(futex, id) \
++  __lll_robust_mutex_lock (&(futex), (id) | FUTEX_WAITERS)
+ 
+ extern int __lll_timedlock_wait (int *futex, const struct timespec *)
+ 	attribute_hidden;
++extern int __lll_robust_timedlock_wait (int *futex, const struct timespec *)
++	attribute_hidden;
+ 
+ static inline int __attribute__ ((always_inline))
+ __lll_mutex_timedlock (int *futex, const struct timespec *abstime)
+@@ -123,6 +168,27 @@
+ #define lll_mutex_timedlock(futex, abstime) \
+   __lll_mutex_timedlock (&(futex), abstime)
+ 
++static inline int __attribute__ ((always_inline))
++__lll_robust_mutex_timedlock (int *futex, const struct timespec *abstime,
++			      int id)
++{
++  int result = 0;
++  if (atomic_compare_and_exchange_bool_acq (futex, id, 0) != 0)
++    result = __lll_robust_timedlock_wait (futex, abstime);
++  return result;
++}
++#define lll_robust_mutex_timedlock(futex, abstime, id) \
++  __lll_robust_mutex_timedlock (&(futex), abstime, id)
++
++static inline void __attribute__ ((always_inline))
++__lll_robust_mutex_unlock (int *futex, int mask)
++{
++  int val = atomic_exchange_rel (futex, 0);
++  if (__builtin_expect (val & mask, 0))
++    lll_futex_wake (futex, 1);
++}
++#define lll_robust_mutex_unlock(futex) \
++  __lll_robust_mutex_unlock(&(futex), FUTEX_WAITERS)
+ 
+ static inline void __attribute__ ((always_inline))
+ __lll_mutex_unlock (int *futex)
+
 diff -Naur glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h
 --- glibc-20060206.orig/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	1970-01-01 00:00:00.000000000 +0000
 +++ glibc-20060206/nptl/sysdeps/unix/sysv/linux/mips/mips64/sysdep-cancel.h	2006-02-09 19:43:11.000000000 +0000
