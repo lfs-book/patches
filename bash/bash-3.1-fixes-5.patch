@@ -3,11 +3,12 @@ Date: 2006-02-27
 Initial Package Version: 3.1
 Upstream Status: From Upstream
 Origin: http://ftp.gnu.org/gnu/bash/bash-3.1-patches/
-Description: Contains patches 001-011 from upstream
+Description: Contains patches 001-011 from upstream (including the fixed 010
+             patch)
 
 diff -Naur bash-3.1.orig/doc/bash.1 bash-3.1/doc/bash.1
 --- bash-3.1.orig/doc/bash.1	2005-10-12 15:40:52.000000000 +0000
-+++ bash-3.1/doc/bash.1	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/doc/bash.1	2006-02-28 03:35:06.000000000 +0000
 @@ -6,12 +6,12 @@
  .\"	Case Western Reserve University
  .\"	chet@po.cwru.edu
@@ -88,7 +89,7 @@ diff -Naur bash-3.1.orig/doc/bash.1 bash-3.1/doc/bash.1
  If
 diff -Naur bash-3.1.orig/doc/bashref.texi bash-3.1/doc/bashref.texi
 --- bash-3.1.orig/doc/bashref.texi	2005-10-03 19:07:21.000000000 +0000
-+++ bash-3.1/doc/bashref.texi	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/doc/bashref.texi	2006-02-28 03:35:06.000000000 +0000
 @@ -961,8 +961,8 @@
  (see the description of @code{shopt} in @ref{Bash Builtins})
  is enabled, the match is performed without regard to the case
@@ -161,7 +162,7 @@ diff -Naur bash-3.1.orig/doc/bashref.texi bash-3.1/doc/bashref.texi
  variable is expanded and the resultant value is printed before
 diff -Naur bash-3.1.orig/doc/version.texi bash-3.1/doc/version.texi
 --- bash-3.1.orig/doc/version.texi	2005-09-20 18:52:56.000000000 +0000
-+++ bash-3.1/doc/version.texi	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/doc/version.texi	2006-02-28 03:35:06.000000000 +0000
 @@ -2,9 +2,9 @@
  Copyright (C) 1988-2005 Free Software Foundation, Inc.
  @end ignore
@@ -179,7 +180,7 @@ diff -Naur bash-3.1.orig/doc/version.texi bash-3.1/doc/version.texi
 +@set UPDATED-MONTH December 2005
 diff -Naur bash-3.1.orig/jobs.c bash-3.1/jobs.c
 --- bash-3.1.orig/jobs.c	2005-11-12 04:13:27.000000000 +0000
-+++ bash-3.1/jobs.c	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/jobs.c	2006-02-28 03:35:30.000000000 +0000
 @@ -619,8 +619,11 @@
  	   * once in the parent and once in each child.  This is where
  	   * the parent gives it away.
@@ -286,7 +287,7 @@ diff -Naur bash-3.1.orig/jobs.c bash-3.1/jobs.c
  
 diff -Naur bash-3.1.orig/lib/readline/terminal.c bash-3.1/lib/readline/terminal.c
 --- bash-3.1.orig/lib/readline/terminal.c	2005-11-13 01:46:54.000000000 +0000
-+++ bash-3.1/lib/readline/terminal.c	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/lib/readline/terminal.c	2006-02-28 03:35:13.000000000 +0000
 @@ -122,7 +122,7 @@
  static char *_rl_visible_bell;
  
@@ -308,21 +309,85 @@ diff -Naur bash-3.1.orig/lib/readline/terminal.c bash-3.1/lib/readline/terminal.
    if (cols > 0)
 diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
 --- bash-3.1.orig/parse.y	2005-11-12 04:14:18.000000000 +0000
-+++ bash-3.1/parse.y	2006-02-28 01:14:00.000000000 +0000
-@@ -2898,7 +2898,11 @@
++++ bash-3.1/parse.y	2006-02-28 03:35:40.000000000 +0000
+@@ -2716,6 +2716,7 @@
+ #define P_ALLOWESC	0x02
+ #define P_DQUOTE	0x04
+ #define P_COMMAND	0x08	/* parsing a command, so look for comments */
++#define P_BACKQUOTE	0x10	/* parsing a backquoted command substitution */
+ 
+ static char matched_pair_error;
+ static char *
+@@ -2725,12 +2726,12 @@
+      int *lenp, flags;
+ {
+   int count, ch, was_dollar, in_comment, check_comment;
+-  int pass_next_character, nestlen, ttranslen, start_lineno;
++  int pass_next_character, backq_backslash, nestlen, ttranslen, start_lineno;
+   char *ret, *nestret, *ttrans;
+   int retind, retsize, rflags;
+ 
+   count = 1;
+-  pass_next_character = was_dollar = in_comment = 0;
++  pass_next_character = backq_backslash = was_dollar = in_comment = 0;
+   check_comment = (flags & P_COMMAND) && qc != '\'' && qc != '"' && (flags & P_DQUOTE) == 0;
+ 
+   /* RFLAGS is the set of flags we want to pass to recursive calls. */
+@@ -2742,11 +2743,8 @@
+   start_lineno = line_number;
+   while (count)
+     {
+-#if 0
+-      ch = shell_getc ((qc != '\'' || (flags & P_ALLOWESC)) && pass_next_character == 0);
+-#else
+-      ch = shell_getc (qc != '\'' && pass_next_character == 0);
+-#endif
++      ch = shell_getc (qc != '\'' && pass_next_character == 0 && backq_backslash == 0);
++
+       if (ch == EOF)
+ 	{
+ 	  free (ret);
+@@ -2771,9 +2769,16 @@
+ 	  continue;
+ 	}
+       /* Not exactly right yet */
+-      else if (check_comment && in_comment == 0 && ch == '#' && (retind == 0 || ret[retind-1] == '\n' || whitespace (ret[retind -1])))
++      else if MBTEST(check_comment && in_comment == 0 && ch == '#' && (retind == 0 || ret[retind-1] == '\n' || whitespace (ret[retind - 1])))
+ 	in_comment = 1;
+ 
++      /* last char was backslash inside backquoted command substitution */
++      if (backq_backslash)
++	{
++	  backq_backslash = 0;
++	  /* Placeholder for adding special characters */
++	}
++
+       if (pass_next_character)		/* last char was backslash */
+ 	{
+ 	  pass_next_character = 0;
+@@ -2814,6 +2819,8 @@
+ 	{
+ 	  if MBTEST((flags & P_ALLOWESC) && ch == '\\')
+ 	    pass_next_character++;
++	  else if MBTEST((flags & P_BACKQUOTE) && ch == '\\')
++	    backq_backslash++;
+ 	  continue;
+ 	}
+ 
+@@ -2898,7 +2905,11 @@
  	}
        else if MBTEST(qc == '`' && (ch == '"' || ch == '\'') && in_comment == 0)
  	{
 -	  nestret = parse_matched_pair (0, ch, ch, &nestlen, rflags);
-+	  /* Add P_ALLOWESC so backslash quotes the next character and
++	  /* Add P_BACKQUOTE so backslash quotes the next character and
 +	     shell_getc does the right thing with \<newline>.  We do this for
 +	     a measure  of backwards compatibility -- it's not strictly the
 +	     right POSIX thing. */
-+	  nestret = parse_matched_pair (0, ch, ch, &nestlen, rflags|P_ALLOWESC);
++	  nestret = parse_matched_pair (0, ch, ch, &nestlen, rflags|P_BACKQUOTE);
  	  goto add_nestret;
  	}
        else if MBTEST(was_dollar && (ch == '(' || ch == '{' || ch == '['))	/* ) } ] */
-@@ -2907,7 +2911,7 @@
+@@ -2907,7 +2918,7 @@
  	  if (open == ch)	/* undo previous increment */
  	    count--;
  	  if (ch == '(')		/* ) */
@@ -331,7 +396,7 @@ diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
  	  else if (ch == '{')		/* } */
  	    nestret = parse_matched_pair (0, '{', '}', &nestlen, P_FIRSTCLOSE|rflags);
  	  else if (ch == '[')		/* ] */
-@@ -3695,7 +3699,9 @@
+@@ -3695,7 +3706,9 @@
        struct builtin *b;
        b = builtin_address_internal (token, 0);
        if (b && (b->flags & ASSIGNMENT_BUILTIN))
@@ -342,7 +407,7 @@ diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
      }
  
    yylval.word = the_word;
-@@ -4686,18 +4692,21 @@
+@@ -4686,18 +4699,21 @@
       int *retlenp;
  {
    WORD_LIST *wl, *rl;
@@ -365,7 +430,7 @@ diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
    wl = (WORD_LIST *)NULL;	/* ( */
    parser_state |= PST_COMPASSIGN;
  
-@@ -4740,7 +4749,7 @@
+@@ -4740,7 +4756,7 @@
  	jump_to_top_level (DISCARD);
      }
  
@@ -374,7 +439,7 @@ diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
    if (wl)
      {
        rl = REVERSE_LIST (wl, WORD_LIST *);
-@@ -4752,6 +4761,10 @@
+@@ -4752,6 +4768,10 @@
  
    if (retlenp)
      *retlenp = (ret && *ret) ? strlen (ret) : 0;
@@ -387,7 +452,7 @@ diff -Naur bash-3.1.orig/parse.y bash-3.1/parse.y
  
 diff -Naur bash-3.1.orig/patchlevel.h bash-3.1/patchlevel.h
 --- bash-3.1.orig/patchlevel.h	2005-07-20 17:58:20.000000000 +0000
-+++ bash-3.1/patchlevel.h	2006-02-28 01:14:00.000000000 +0000
++++ bash-3.1/patchlevel.h	2006-02-28 03:35:40.000000000 +0000
 @@ -25,6 +25,6 @@
     regexp `^#define[ 	]*PATCHLEVEL', since that's what support/mkversion.sh
     looks for to find the patch level (for the sccs version string). */
@@ -398,7 +463,7 @@ diff -Naur bash-3.1.orig/patchlevel.h bash-3.1/patchlevel.h
  #endif /* _PATCHLEVEL_H_ */
 diff -Naur bash-3.1.orig/subst.c bash-3.1/subst.c
 --- bash-3.1.orig/subst.c	2005-10-24 13:51:13.000000000 +0000
-+++ bash-3.1/subst.c	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/subst.c	2006-02-28 03:35:11.000000000 +0000
 @@ -2187,7 +2187,7 @@
    if (mklocal && variable_context)
      {
@@ -423,7 +488,7 @@ diff -Naur bash-3.1.orig/subst.c bash-3.1/subst.c
  	      sindex += t_index;
 diff -Naur bash-3.1.orig/variables.c bash-3.1/variables.c
 --- bash-3.1.orig/variables.c	2005-11-13 02:22:37.000000000 +0000
-+++ bash-3.1/variables.c	2006-02-28 01:13:54.000000000 +0000
++++ bash-3.1/variables.c	2006-02-28 03:35:08.000000000 +0000
 @@ -860,9 +860,11 @@
  {
    char val[INT_STRLEN_BOUND(int) + 1], *v;
