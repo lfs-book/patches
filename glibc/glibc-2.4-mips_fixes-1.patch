@@ -5,9 +5,9 @@ Origin: Daniel Jacobwitz
 Upstream Status: Applied
 Description: Fixes for MIPS architecture
 
-diff -Naur glibc-2.4.orig/glibc-ports-2.4/sysdeps/unix/sysv/linux/mips/nptl/fork.c glibc-2.4/glibc-ports-2.4/sysdeps/unix/sysv/linux/mips/nptl/fork.c
---- glibc-2.4.orig/glibc-ports-2.4/sysdeps/unix/sysv/linux/mips/nptl/fork.c	2005-03-28 01:21:52.000000000 -0800
-+++ glibc-2.4/glibc-ports-2.4/sysdeps/unix/sysv/linux/mips/nptl/fork.c	2006-03-15 14:35:34.000000000 -0800
+diff -Naur glibc-2.4.orig/ports/sysdeps/unix/sysv/linux/mips/nptl/fork.c glibc-2.4/ports/sysdeps/unix/sysv/linux/mips/nptl/fork.c
+--- glibc-2.4.orig/ports/sysdeps/unix/sysv/linux/mips/nptl/fork.c	2005-03-28 01:21:52.000000000 -0800
++++ glibc-2.4/ports/sysdeps/unix/sysv/linux/mips/nptl/fork.c	2006-03-15 14:35:34.000000000 -0800
 @@ -1 +1 @@
 -#include "../i386/fork.c"
 +#include <sysdeps/unix/sysv/linux/i386/fork.c>
