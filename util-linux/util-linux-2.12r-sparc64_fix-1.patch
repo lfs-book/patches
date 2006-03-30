@@ -1,0 +1,40 @@
+Submitted By: Jim Gifford (patches at jg555 dot com)
+Date: 2006-03-29
+Initial Package Version: 2.12r
+Origin: Jim Gifford
+Upstream Status: Sent
+Description: Fixes fdisk under Sparc 64
+ 
+diff -Naur util-linux-2.12r.orig/fdisk/fdisksunlabel.h util-linux-2.12r/fdisk/fdisksunlabel.h
+--- util-linux-2.12r.orig/fdisk/fdisksunlabel.h	2004-12-13 15:39:18.000000000 -0800
++++ util-linux-2.12r/fdisk/fdisksunlabel.h	2006-03-29 22:02:09.000000000 -0800
+@@ -1,4 +1,4 @@
+-#include <linux/types.h>   /* for __u16, __u32 */
++#include <stdint.h>	/* for uint32_t, uint16_t, uint8_t, int16_t */
+ 
+ typedef struct {
+ 	unsigned char info[128];   /* Informative text string */
+@@ -21,8 +21,8 @@
+ 	unsigned short nsect;      /* Sectors per track */
+ 	unsigned char spare3[4];   /* Even more magic... */
+ 	struct sun_partition {
+-		__u32 start_cylinder;
+-		__u32 num_sectors;
++		uint32_t start_cylinder;
++		uint32_t num_sectors;
+ 	} partitions[8];
+ 	unsigned short magic;      /* Magic number */
+ 	unsigned short csum;       /* Label xor'd checksum */
+@@ -32,9 +32,9 @@
+ #define SUN_LABEL_MAGIC_SWAPPED  0xBEDA
+ #define sunlabel ((sun_partition *)MBRbuffer)
+ #define SSWAP16(x) (other_endian ? __swap16(x) \
+-				 : (__u16)(x))
++				 : (uint16_t)(x))
+ #define SSWAP32(x) (other_endian ? __swap32(x) \
+-				 : (__u32)(x))
++				 : (uint32_t)(x))
+ 				 
+ /* fdisk.c */
+ extern char MBRbuffer[MAX_SECTOR_SIZE];
+
