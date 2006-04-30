@@ -1,0 +1,19 @@
+Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
+Date: 2006-04-30
+Initial Package Version: 1.1.2.1
+Origin: Jim Gifford
+Description: Fixes for Linux Headers
+
+diff -Naur libnet.orig/src/libnet_link_linux.c libnet/src/libnet_link_linux.c
+--- libnet.orig/src/libnet_link_linux.c	2004-01-03 12:31:02.000000000 -0800
++++ libnet/src/libnet_link_linux.c	2006-04-30 00:18:53.196650996 -0700
+@@ -42,7 +42,7 @@
+ #ifndef SOL_PACKET
+ #define SOL_PACKET 263
+ #endif  /* SOL_PACKET */
+-#if __GLIBC__ >= 2 && __GLIBC_MINOR >= 1
++#if (__GLIBC__)
+ #include <netpacket/packet.h>
+ #include <net/ethernet.h>     /* the L2 protocols */
+ #else
+
