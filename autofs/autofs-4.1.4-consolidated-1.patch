@@ -1,3 +1,11 @@
+Submitted By: Bruce Dubbs (bdubbs at linuxfromscratch dot org)
+Date: 2006-05-12
+Initial Package Version: autofs-4.1.4
+Origin: http://ftp.kernel.org/pub/linux/daemons/autofs/v4/
+Upstream Status: In place
+Description: A consolidation of nine upstram packages.
+
+=========
 This patch provides a configure option to disable the use of a lock
 file when calling mount from autofs. It also adds a patch to the
 "patches" directory that needs to be used for mount to (hopefuully)
