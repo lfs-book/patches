@@ -2,10 +2,22 @@ Submitted By: Alexander E. Patrakov
 Date: 2006-05-27
 Initial Package Version: 7.0
 Upstream status: LFS specific
-Description: Adjusts installation of manual pages to meet Man-DB expectations
+Description: Adjusts installation of manual pages to meet Man-DB expectations.
 
---- vim70/src/Makefile.orig	2006-05-07 19:25:27.000000000 +0600
-+++ vim70/src/Makefile	2006-05-27 14:29:31.000000000 +0600
+             Additional change to explicitly install the man pages into
+	     /usr/share/man instead of /usr/man by Ag Hatzim.
+
+--- vim70/src/Makefile.orig	2006-05-27 12:49:31.767959808 +0300
++++ vim70/src/Makefile	2006-05-27 12:49:55.778309680 +0300
+@@ -867,7 +867,7 @@
+ # Uncomment the next line to install Vim in "/usr/bin"
+ #BINDIR   = /usr/bin
+ # Uncomment the next line to install Vim manuals in "/usr/share/man/man1"
+-#MANDIR   = /usr/share/man
++MANDIR   = /usr/share/man
+ # Uncomment the next line to install Vim help files in "/usr/share/vim"
+ #DATADIR  = /usr/share
+ 
 @@ -1325,7 +1325,7 @@
  DEST_MAN_PL = $(DEST_MAN_TOP)/pl$(MAN1DIR)
  DEST_MAN_PL_I = $(DEST_MAN_TOP)/pl.ISO8859-2$(MAN1DIR)
