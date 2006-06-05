@@ -29,10 +29,6 @@ diff -urN cdrtools-2.01.orig/cdrecord/cdrecord.c cdrtools-2.01/cdrecord/cdrecord
  	 *
  	 * If you modify cdrecord you need to include additional version
  	 * printing code that:
-
-I think I am not violating GPL by the next hunks. A copyright notice that
-cannot be properly displayed is invalid anyway -- AP
-
 @@ -349,7 +349,7 @@
  #	define	CLONE_TITLE	""
  #endif
