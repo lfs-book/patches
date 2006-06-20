@@ -1,47 +1,13 @@
 Submitted By: Jim Gifford (patches at jg555 dot com)
-Date: 2005-10-28
-Initial Package Version: 2.6.14
-Origin: Gentoo
-Upstream Status: Unknown
+Date: 2006-06-19
+Initial Package Version: 2.6.17
+Origin: Gentoo - Jeff Waters
+Upstream Status: N/A
 Description: Adds Support for the x86 Cobalt Series
- 
-diff -Naur linux-2.6.14.orig/Makefile linux-2.6.14/Makefile
---- linux-2.6.14.orig/Makefile	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/Makefile	2005-10-28 15:27:22.000000000 +0000
-@@ -211,6 +211,7 @@
- KBUILD_MODULES :=
- KBUILD_BUILTIN := 1
- 
-+DRIVERS-$(CONFIG_COBALT_RAQ) += drivers/cobalt/cobalt.o
- #	If we have only "make modules", don't compile built-in objects.
- #	When we're building modules with modversions, we need to consider
- #	the built-in objects during the descend as well, in order to
-@@ -732,6 +733,11 @@
-       cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) \
-                      $(if $(CONFIG_KALLSYMS_ALL),--all-symbols) > $@
- 
-+
-+cobalt: vmlinux
-+	strip vmlinux
-+	bzip2 vmlinux
-+
- .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
- 	$(call if_changed_dep,as_o_S)
- 
-diff -Naur linux-2.6.14.orig/arch/i386/kernel/Makefile linux-2.6.14/arch/i386/kernel/Makefile
---- linux-2.6.14.orig/arch/i386/kernel/Makefile	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/arch/i386/kernel/Makefile	2005-10-28 15:27:22.000000000 +0000
-@@ -47,6 +47,7 @@
- targets += vsyscall-note.o vsyscall.lds
- 
- # The DSO images are built using a special linker script.
-+obj-$(CONFIG_COBALT_RAQ)	+= cobalt.o
- quiet_cmd_syscall = SYSCALL $@
-       cmd_syscall = $(CC) -m elf_i386 -nostdlib $(SYSCFLAGS_$(@F)) \
- 		          -Wl,-T,$(filter-out FORCE,$^) -o $@
-diff -Naur linux-2.6.14.orig/arch/i386/kernel/cobalt.c linux-2.6.14/arch/i386/kernel/cobalt.c
---- linux-2.6.14.orig/arch/i386/kernel/cobalt.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/arch/i386/kernel/cobalt.c	2005-10-28 15:27:23.000000000 +0000
+
+diff -Naur linux-2.6.17.orig/arch/i386/kernel/cobalt.c linux-2.6.17/arch/i386/kernel/cobalt.c
+--- linux-2.6.17.orig/arch/i386/kernel/cobalt.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/arch/i386/kernel/cobalt.c	2006-06-19 22:14:46.000000000 -0700
 @@ -0,0 +1,281 @@
 +/* $Id: cobalt.c,v 1.34 2002/11/04 17:54:14 thockin Exp $ */
 +#include <linux/config.h>
@@ -324,9 +290,20 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/cobalt.c linux-2.6.14/arch/i386/ke
 +	return 0;
 +}
 +module_init(cobalt_arch_init);
-diff -Naur linux-2.6.14.orig/arch/i386/kernel/process.c linux-2.6.14/arch/i386/kernel/process.c
---- linux-2.6.14.orig/arch/i386/kernel/process.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/arch/i386/kernel/process.c	2005-10-28 15:28:21.000000000 +0000
+diff -Naur linux-2.6.17.orig/arch/i386/kernel/Makefile linux-2.6.17/arch/i386/kernel/Makefile
+--- linux-2.6.17.orig/arch/i386/kernel/Makefile	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/arch/i386/kernel/Makefile	2006-06-19 22:14:46.000000000 -0700
+@@ -50,6 +50,7 @@
+ targets += vsyscall-note.o vsyscall.lds
+ 
+ # The DSO images are built using a special linker script.
++obj-$(CONFIG_COBALT_RAQ)	+= cobalt.o
+ quiet_cmd_syscall = SYSCALL $@
+       cmd_syscall = $(CC) -m elf_i386 -nostdlib $(SYSCFLAGS_$(@F)) \
+ 		          -Wl,-T,$(filter-out FORCE,$^) -o $@
+diff -Naur linux-2.6.17.orig/arch/i386/kernel/process.c linux-2.6.17/arch/i386/kernel/process.c
+--- linux-2.6.17.orig/arch/i386/kernel/process.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/arch/i386/kernel/process.c	2006-06-19 22:14:46.000000000 -0700
 @@ -52,6 +52,11 @@
  #include <asm/math_emu.h>
  #endif
@@ -339,7 +316,7 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/process.c linux-2.6.14/arch/i386/k
  #include <linux/err.h>
  
  #include <asm/tlbflush.h>
-@@ -522,6 +527,12 @@
+@@ -481,6 +486,12 @@
  void dump_thread(struct pt_regs * regs, struct user * dump)
  {
  	int i;
@@ -352,10 +329,10 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/process.c linux-2.6.14/arch/i386/k
  
  /* changed the size calculations - should hopefully work better. lbt */
  	dump->magic = CMAGIC;
-diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/kernel/reboot.c
---- linux-2.6.14.orig/arch/i386/kernel/reboot.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/arch/i386/kernel/reboot.c	2005-10-28 18:03:09.000000000 +0000
-@@ -18,6 +18,11 @@
+diff -Naur linux-2.6.17.orig/arch/i386/kernel/reboot.c linux-2.6.17/arch/i386/kernel/reboot.c
+--- linux-2.6.17.orig/arch/i386/kernel/reboot.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/arch/i386/kernel/reboot.c	2006-06-19 22:14:46.000000000 -0700
+@@ -19,6 +19,11 @@
  #include "mach_reboot.h"
  #include <linux/reboot_fixups.h>
  
@@ -367,7 +344,7 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/ke
  /*
   * Power off function, if any
   */
-@@ -277,6 +282,11 @@ EXPORT_SYMBOL(machine_real_restart);
+@@ -286,6 +291,11 @@
  
  void machine_shutdown(void)
  {
@@ -379,7 +356,7 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/ke
  #ifdef CONFIG_SMP
  	int reboot_cpu_id;
  
-@@ -313,6 +323,9 @@ void machine_shutdown(void)
+@@ -322,6 +332,9 @@
  
  void machine_emergency_restart(void)
  {
@@ -389,7 +366,7 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/ke
  	if (!reboot_thru_bios) {
  		if (efi_enabled) {
  			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, NULL);
-@@ -335,8 +348,34 @@ void machine_emergency_restart(void)
+@@ -344,8 +357,34 @@
  	machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
  }
  
@@ -424,9 +401,9 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/reboot.c linux-2.6.14/arch/i386/ke
  	machine_shutdown();
  	machine_emergency_restart();
  }
-diff -Naur linux-2.6.14.orig/arch/i386/kernel/traps.c linux-2.6.14/arch/i386/kernel/traps.c
---- linux-2.6.14.orig/arch/i386/kernel/traps.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/arch/i386/kernel/traps.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/arch/i386/kernel/traps.c linux-2.6.17/arch/i386/kernel/traps.c
+--- linux-2.6.17.orig/arch/i386/kernel/traps.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/arch/i386/kernel/traps.c	2006-06-19 22:14:46.000000000 -0700
 @@ -56,6 +56,10 @@
  
  #include "mach_traps.h"
@@ -438,69 +415,49 @@ diff -Naur linux-2.6.14.orig/arch/i386/kernel/traps.c linux-2.6.14/arch/i386/ker
  asmlinkage int system_call(void);
  
  struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
-@@ -523,9 +527,12 @@
+@@ -596,11 +600,14 @@
  
  static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
  {
 +#ifdef CONFIG_COBALT_RAQ
-+    	cobalt_nmi(reason, regs);
++	cobalt_nmi(reason, regs);
 +#else
- 	printk("Uhhuh. NMI received. Dazed and confused, but trying to continue\n");
- 	printk("You probably have a hardware problem with your RAM chips\n");
+ 	printk(KERN_EMERG "Uhhuh. NMI received. Dazed and confused, but trying "
+ 			"to continue\n");
+ 	printk(KERN_EMERG "You probably have a hardware problem with your RAM "
+ 			"chips\n");
 -
 +#endif
  	/* Clear and disable the memory parity error line. */
  	clear_mem_error(reason);
  }
-diff -Naur linux-2.6.14.orig/drivers/Kconfig linux-2.6.14/drivers/Kconfig
---- linux-2.6.14.orig/drivers/Kconfig	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/Kconfig	2005-10-28 15:27:23.000000000 +0000
-@@ -66,4 +66,6 @@
- 
- source "drivers/sn/Kconfig"
- 
-+source "drivers/cobalt/Kconfig"
-+
- endmenu
-diff -Naur linux-2.6.14.orig/drivers/Makefile linux-2.6.14/drivers/Makefile
---- linux-2.6.14.orig/drivers/Makefile	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/Makefile	2005-10-28 15:27:23.000000000 +0000
-@@ -61,6 +61,8 @@
- obj-$(CONFIG_ISDN)		+= isdn/
- obj-$(CONFIG_MCA)		+= mca/
- obj-$(CONFIG_EISA)		+= eisa/
-+obj-$(CONFIG_COBALT_RAQ)	+= cobalt/
-+
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
- obj-$(CONFIG_MMC)		+= mmc/
- obj-$(CONFIG_INFINIBAND)	+= infiniband/
-diff -Naur linux-2.6.14.orig/drivers/char/Kconfig linux-2.6.14/drivers/char/Kconfig
---- linux-2.6.14.orig/drivers/char/Kconfig	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/char/Kconfig	2005-10-28 15:27:23.000000000 +0000
-@@ -783,7 +783,7 @@
- 	tristate "NEC VR4100 series Real Time Clock Support"
- 	depends on CPU_VR41XX
+diff -Naur linux-2.6.17.orig/drivers/char/Kconfig linux-2.6.17/drivers/char/Kconfig
+--- linux-2.6.17.orig/drivers/char/Kconfig	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/char/Kconfig	2006-06-19 22:14:47.000000000 -0700
+@@ -805,7 +805,7 @@
+ 	  Samsung S3C2410. This can provide periodic interrupt rates
+ 	  from 1Hz to 64Hz for user programs, and wakeup from Alarm.
  
 -config COBALT_LCD
 +config COBALT_MIPS_LCD
  	bool "Support for Cobalt LCD"
  	depends on MIPS_COBALT
  	help
-diff -Naur linux-2.6.14.orig/drivers/char/Makefile linux-2.6.14/drivers/char/Makefile
---- linux-2.6.14.orig/drivers/char/Makefile	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/char/Makefile	2005-10-28 15:27:23.000000000 +0000
-@@ -75,7 +75,7 @@
- obj-$(CONFIG_DS1620) += ds1620.o
- obj-$(CONFIG_HW_RANDOM) += hw_random.o
- obj-$(CONFIG_FTAPE) += ftape/
--obj-$(CONFIG_COBALT_LCD) += lcd.o
-+obj-$(CONFIG_COBALT_MIPS_LCD) += lcd.o
- obj-$(CONFIG_PPDEV) += ppdev.o
- obj-$(CONFIG_NWBUTTON) += nwbutton.o
- obj-$(CONFIG_NWFLASH) += nwflash.o
-diff -Naur linux-2.6.14.orig/drivers/char/misc.c linux-2.6.14/drivers/char/misc.c
---- linux-2.6.14.orig/drivers/char/misc.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/char/misc.c	2005-10-28 17:23:16.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/char/Makefile linux-2.6.17/drivers/char/Makefile
+--- linux-2.6.17.orig/drivers/char/Makefile	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/char/Makefile	2006-06-19 22:16:05.000000000 -0700
+@@ -77,7 +77,7 @@
+ obj-$(CONFIG_DS1620)		+= ds1620.o
+ obj-$(CONFIG_HW_RANDOM)		+= hw_random.o
+ obj-$(CONFIG_FTAPE)		+= ftape/
+-obj-$(CONFIG_COBALT_LCD)	+= lcd.o
++obj-$(CONFIG_COBALT_MIPS_LCD)	+= lcd.o
+ obj-$(CONFIG_PPDEV)		+= ppdev.o
+ obj-$(CONFIG_NWBUTTON)		+= nwbutton.o
+ obj-$(CONFIG_NWFLASH)		+= nwflash.o
+diff -Naur linux-2.6.17.orig/drivers/char/misc.c linux-2.6.17/drivers/char/misc.c
+--- linux-2.6.17.orig/drivers/char/misc.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/char/misc.c	2006-06-19 22:14:47.000000000 -0700
 @@ -51,6 +51,17 @@
  #include <linux/tty.h>
  #include <linux/kmod.h>
@@ -533,9 +490,9 @@ diff -Naur linux-2.6.14.orig/drivers/char/misc.c linux-2.6.14/drivers/char/misc.
  #ifdef CONFIG_PROC_FS
  static void *misc_seq_start(struct seq_file *seq, loff_t *pos)
  {
-diff -Naur linux-2.6.14.orig/drivers/char/nvram.c linux-2.6.14/drivers/char/nvram.c
---- linux-2.6.14.orig/drivers/char/nvram.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/char/nvram.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/char/nvram.c linux-2.6.17/drivers/char/nvram.c
+--- linux-2.6.17.orig/drivers/char/nvram.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/char/nvram.c	2006-06-19 22:14:47.000000000 -0700
 @@ -50,8 +50,7 @@
  #if defined(CONFIG_ATARI)
  #  define MACH ATARI
@@ -546,201 +503,9 @@ diff -Naur linux-2.6.14.orig/drivers/char/nvram.c linux-2.6.14/drivers/char/nvra
  #    include <linux/cobalt-nvram.h>
  #    define MACH COBALT
  #  else
-diff -Naur linux-2.6.14.orig/drivers/cobalt/Kconfig linux-2.6.14/drivers/cobalt/Kconfig
---- linux-2.6.14.orig/drivers/cobalt/Kconfig	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/Kconfig	2005-10-28 15:27:23.000000000 +0000
-@@ -0,0 +1,143 @@
-+#
-+# Cobalt Drivers
-+#
-+
-+menu "Cobalt RaQ/Qube Hardware"
-+
-+config COBALT_RAQ
-+	bool "Cobalt RaQ/Qube Hardware Support"
-+	select INPUT
-+	default n
-+	---help---
-+	  NOTE: This support is for x86 Cobalts, not MIPS versions
-+	  
-+	  If you have a Gen III or Gen V Cobalt RaQ/Qube machine, it's probably
-+	  a good idea to say Y here and choose from the options below.
-+
-+config COBALT_GEN_III
-+	bool "Gen III (3000 series) system support"
-+	depends on COBALT_RAQ
-+	default y
-+	---help---
-+	  If you have one of the following Gen III Cobalt systems, say Y here.
-+	  Otherwise, it's best to say N.
-+	  
-+	   - RaQ 3
-+	   - RaQ 4
-+	   - Qube3
-+
-+config COBALT_GEN_V
-+	bool "Gen V (5000 series) system support"
-+	depends on COBALT_RAQ
-+	default n
-+	---help---
-+	  If you have one of the following Gen V Cobalt systems, say Y here.
-+	  Otherwise, it's best to say N.
-+	  
-+	   - RaQ XTR
-+	   - RaQ550
-+
-+config COBALT_OLDPROC
-+	bool "Create legacy /proc files"
-+	depends on COBALT_RAQ
-+	default y
-+	---help---
-+	  Creates entries in /proc/cobalt which provide useful information about
-+	  your RaQ/Qube.  Best to say Y here.
-+
-+config COBALT_BOOTLOADER
-+	bool "Cobalt Bootloader Support"
-+	depends on COBALT_RAQ
-+	default n
-+	---help---
-+	  If you are going to being burning this kernel to the RaQ/Qube's ROM to
-+	  act as a loader kernel, this is required to load the system kernel and
-+	  hand off control to it.  It is recommended you say N here unless you
-+	  know what you're getting yourself into.
-+
-+menu "Cobalt Hardware Options"
-+	depends on COBALT_RAQ
-+	
-+	config COBALT_LCD
-+			bool "Front panel LCD support"
-+			default y
-+			---help---
-+			  Handles support for the front panel LCD screen and buttons.
-+	
-+	config COBALT_LCD_TWIDDLE
-+			bool "Twiddle LCD on boot"
-+			depends on COBALT_LCD
-+			default y
-+			---help---
-+			  Gives you a nice little twiddle on the LCD while booting.
-+	
-+	config COBALT_LED
-+			bool "Software controlled LED support"
-+			default y
-+			---help---
-+			  Allows software to play with the LEDs on the front of the
-+			  system.
-+	
-+	config COBALT_SERNUM
-+			tristate "Serial number support"
-+			depends on COBALT_OLDPROC
-+			default y
-+			---help---
-+			  Allows you to retrieve the system's serial number via a /proc
-+			  entry.
-+	
-+	config COBALT_WDT
-+			bool "Watchdog timer support"
-+			depends on WATCHDOG
-+			default y
-+			---help---
-+			  w00f?
-+	
-+	config COBALT_SENSORS
-+			bool "System sensors support"
-+			depends on COBALT_OLDPROC
-+			default y
-+			---help---
-+			  Allows you to retrieve system temperatures via /proc entries.
-+	
-+	config COBALT_FANS
-+			tristate "Fan tachometer support"
-+			depends on COBALT_OLDPROC
-+			depends on COBALT_GEN_V
-+			default y
-+			---help---
-+			  Allows you to retrieve fan speeds via /proc entries.
-+	
-+	config COBALT_RAMINFO
-+			tristate "Memory information support"
-+			depends on COBALT_OLDPROC
-+			default y
-+			---help---
-+			  Got DIMMs?  This will tell you how much and in which slot via a
-+			  /proc entry.
-+	
-+	config COBALT_RULER
-+			bool "Disk drive ruler support"
-+			depends on COBALT_OLDPROC
-+			depends on COBALT_GEN_V
-+			default y
-+			---help---
-+			  Not sure what this does... A purple tape measure maybe?
-+	
-+	config COBALT_ACPI
-+			bool "Cobalt ACPI support"
-+			depends on COBALT_GEN_V
-+			default y
-+			---help---
-+			  ACPI support for the Generation V Cobalts.
-+	
-+	config COBALT_EMU_ACPI
-+			bool "/proc/acpi emulation"
-+			depends on COBALT_ACPI
-+			default y
-+			---help---
-+			  Emulates the /proc/acpi interface.
-+
-+endmenu
-+
-+endmenu
-diff -Naur linux-2.6.14.orig/drivers/cobalt/Makefile linux-2.6.14/drivers/cobalt/Makefile
---- linux-2.6.14.orig/drivers/cobalt/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/Makefile	2005-10-28 15:27:23.000000000 +0000
-@@ -0,0 +1,18 @@
-+#
-+# Makefile for the Sun/Cobalt device drivers
-+#
-+
-+#O_TARGET := cobalt.o
-+
-+#export-objs := init.o systype.o wdt.o i2c.o
-+
-+obj-$(CONFIG_COBALT_RAQ)	+= init.o systype.o i2c.o wdt.o 
-+obj-$(CONFIG_COBALT_ACPI)	+= acpi.o
-+obj-$(CONFIG_COBALT_SERNUM)	+= serialnum.o
-+obj-$(CONFIG_COBALT_LCD)	+= lcd.o
-+obj-$(CONFIG_COBALT_LED)	+= net.o led.o
-+obj-$(CONFIG_COBALT_SENSORS)	+= sensors.o
-+obj-$(CONFIG_COBALT_FANS)	+= fans.o
-+obj-$(CONFIG_COBALT_RAMINFO)	+= raminfo.o
-+obj-$(CONFIG_COBALT_RULER)	+= ruler.o
-+
-diff -Naur linux-2.6.14.orig/drivers/cobalt/README linux-2.6.14/drivers/cobalt/README
---- linux-2.6.14.orig/drivers/cobalt/README	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/README	2005-10-28 15:27:23.000000000 +0000
-@@ -0,0 +1,19 @@
-+Notes on Cobalt's drivers:
-+
-+You will notice in several places constructs such as this:
-+
-+	if (cobt_is_3k()) {
-+		foo();
-+	} else if (cobt_is_5k()) {
-+		bar();
-+	}
-+
-+The goal here is to only compile in code that is needed, but to allow one to
-+define support for both 3k and 5k (and more?) style systems.  The systype
-+check macros are very simple and clean.  They check whether config-time
-+support for the generation has been enabled, and (if so) whether the current
-+systype matches the spcified generation.  This leaves the code free from 
-+#ifdef cruft, but lets the compiler throw out unsupported generation-specific 
-+code with if (0) detection.
-+
-+--
-diff -Naur linux-2.6.14.orig/drivers/cobalt/acpi.c linux-2.6.14/drivers/cobalt/acpi.c
---- linux-2.6.14.orig/drivers/cobalt/acpi.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/acpi.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/acpi.c linux-2.6.17/drivers/cobalt/acpi.c
+--- linux-2.6.17.orig/drivers/cobalt/acpi.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/acpi.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,1994 @@
 + /* 
 + * cobalt acpi driver 
@@ -2736,9 +2501,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/acpi.c linux-2.6.14/drivers/cobalt/a
 +}
 +
 +#endif /* CONFIG_COBALT_EMU_ACPI */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/fans.c linux-2.6.14/drivers/cobalt/fans.c
---- linux-2.6.14.orig/drivers/cobalt/fans.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/fans.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/fans.c linux-2.6.17/drivers/cobalt/fans.c
+--- linux-2.6.17.orig/drivers/cobalt/fans.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/fans.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,419 @@
 +/* $Id: fans.c,v 1.18 2002/03/16 21:33:02 duncan Exp $
 + * Copyright (c) 2000-2001 Sun Microsystems, Inc 
@@ -3159,9 +2924,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/fans.c linux-2.6.14/drivers/cobalt/f
 +#endif
 +
 +#endif /* CONFIG_COBALT_FANS || CONFIG_COBALT_FANS_MODULE */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/i2c.c linux-2.6.14/drivers/cobalt/i2c.c
---- linux-2.6.14.orig/drivers/cobalt/i2c.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/i2c.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/i2c.c linux-2.6.17/drivers/cobalt/i2c.c
+--- linux-2.6.17.orig/drivers/cobalt/i2c.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/i2c.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,519 @@
 +/*
 + * $Id: i2c.c,v 1.19 2002/09/17 23:41:29 sparker Exp $
@@ -3682,9 +3447,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/i2c.c linux-2.6.14/drivers/cobalt/i2
 +EXPORT_SYMBOL(cobalt_i2c_write_byte);
 +EXPORT_SYMBOL(cobalt_i2c_write_word);
 +EXPORT_SYMBOL(cobalt_i2c_write_block);
-diff -Naur linux-2.6.14.orig/drivers/cobalt/init.c linux-2.6.14/drivers/cobalt/init.c
---- linux-2.6.14.orig/drivers/cobalt/init.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/init.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/init.c linux-2.6.17/drivers/cobalt/init.c
+--- linux-2.6.17.orig/drivers/cobalt/init.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/init.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,114 @@
 +/* $Id: init.c,v 1.22 2002/11/04 17:54:15 thockin Exp $ */
 +/*
@@ -3800,9 +3565,146 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/init.c linux-2.6.14/drivers/cobalt/i
 +	return (len > plen) ? plen : len;
 +}
 +EXPORT_SYMBOL(cobalt_gen_proc_read);
-diff -Naur linux-2.6.14.orig/drivers/cobalt/lcd.c linux-2.6.14/drivers/cobalt/lcd.c
---- linux-2.6.14.orig/drivers/cobalt/lcd.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/lcd.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/Kconfig linux-2.6.17/drivers/cobalt/Kconfig
+--- linux-2.6.17.orig/drivers/cobalt/Kconfig	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/Kconfig	2006-06-19 22:18:48.000000000 -0700
+@@ -0,0 +1,133 @@
++#
++# Cobalt Drivers
++#
++
++menu "Cobalt RaQ/Qube Hardware"
++
++config COBALT_RAQ
++	bool "Cobalt RaQ/Qube Hardware Support"
++	select INPUT
++	default n
++	---help---
++	  NOTE: This support is for x86 Cobalts, not MIPS versions
++	  
++	  If you have a Gen III or Gen V Cobalt RaQ/Qube machine, it's probably
++	  a good idea to say Y here and choose from the options below.
++
++config COBALT_GEN_III
++	bool "Gen III (3000 series) system support"
++	depends on COBALT_RAQ
++	default y
++	---help---
++	  If you have one of the following Gen III Cobalt systems, say Y here.
++	  Otherwise, it's best to say N.
++	  
++	   - RaQ 3
++	   - RaQ 4
++	   - Qube3
++
++config COBALT_GEN_V
++	bool "Gen V (5000 series) system support"
++	depends on COBALT_RAQ
++	default n
++	---help---
++	  If you have one of the following Gen V Cobalt systems, say Y here.
++	  Otherwise, it's best to say N.
++	  
++	   - RaQ XTR
++	   - RaQ550
++
++config COBALT_OLDPROC
++	bool "Create legacy /proc files"
++	depends on COBALT_RAQ
++	default y
++	---help---
++	  Creates entries in /proc/cobalt which provide useful information about
++	  your RaQ/Qube.  Best to say Y here.
++
++menu "Cobalt Hardware Options"
++	depends on COBALT_RAQ
++	
++	config COBALT_LCD
++			bool "Front panel LCD support"
++			default y
++			---help---
++			  Handles support for the front panel LCD screen and buttons.
++	
++	config COBALT_LCD_TWIDDLE
++			bool "Twiddle LCD on boot"
++			depends on COBALT_LCD
++			default y
++			---help---
++			  Gives you a nice little twiddle on the LCD while booting.
++	
++	config COBALT_LED
++			bool "Software controlled LED support"
++			default y
++			---help---
++			  Allows software to play with the LEDs on the front of the
++			  system.
++	
++	config COBALT_SERNUM
++			tristate "Serial number support"
++			depends on COBALT_OLDPROC
++			default y
++			---help---
++			  Allows you to retrieve the system's serial number via a /proc
++			  entry.
++	
++	config COBALT_WDT
++			bool "Watchdog timer support"
++			depends on WATCHDOG
++			default y
++			---help---
++			  w00f?
++	
++	config COBALT_SENSORS
++			bool "System sensors support"
++			depends on COBALT_OLDPROC
++			default y
++			---help---
++			  Allows you to retrieve system temperatures via /proc entries.
++	
++	config COBALT_FANS
++			tristate "Fan tachometer support"
++			depends on COBALT_OLDPROC
++			depends on COBALT_GEN_V
++			default y
++			---help---
++			  Allows you to retrieve fan speeds via /proc entries.
++	
++	config COBALT_RAMINFO
++			tristate "Memory information support"
++			depends on COBALT_OLDPROC
++			default y
++			---help---
++			  Got DIMMs?  This will tell you how much and in which slot via a
++			  /proc entry.
++	
++	config COBALT_RULER
++			bool "Disk drive ruler support"
++			depends on COBALT_OLDPROC
++			depends on COBALT_GEN_V
++			default y
++			---help---
++			  Not sure what this does... A purple tape measure maybe?
++	
++	config COBALT_ACPI
++			bool "Cobalt ACPI support"
++			depends on COBALT_GEN_V
++			default y
++			---help---
++			  ACPI support for the Generation V Cobalts.
++	
++	config COBALT_EMU_ACPI
++			bool "/proc/acpi emulation"
++			depends on COBALT_ACPI
++			default y
++			---help---
++			  Emulates the /proc/acpi interface.
++
++endmenu
++
++endmenu
+diff -Naur linux-2.6.17.orig/drivers/cobalt/lcd.c linux-2.6.17/drivers/cobalt/lcd.c
+--- linux-2.6.17.orig/drivers/cobalt/lcd.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/lcd.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,835 @@
 +/*
 + * $Id: lcd.c,v 1.44 2002/05/10 18:44:45 duncan Exp $
@@ -4639,9 +4541,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/lcd.c linux-2.6.14/drivers/cobalt/lc
 +}
 +
 +#endif /* CONFIG_COBALT_LCD */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/led.c linux-2.6.14/drivers/cobalt/led.c
---- linux-2.6.14.orig/drivers/cobalt/led.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/led.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/led.c linux-2.6.17/drivers/cobalt/led.c
+--- linux-2.6.17.orig/drivers/cobalt/led.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/led.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,504 @@
 + /*
 + * $Id: led.c,v 1.36 2002/05/10 18:44:45 duncan Exp $
@@ -5147,9 +5049,31 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/led.c linux-2.6.14/drivers/cobalt/le
 +}
 +
 +#endif /* CONFIG_COBALT_LED */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/net.c linux-2.6.14/drivers/cobalt/net.c
---- linux-2.6.14.orig/drivers/cobalt/net.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/net.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/Makefile linux-2.6.17/drivers/cobalt/Makefile
+--- linux-2.6.17.orig/drivers/cobalt/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/Makefile	2006-06-19 22:14:47.000000000 -0700
+@@ -0,0 +1,18 @@
++#
++# Makefile for the Sun/Cobalt device drivers
++#
++
++#O_TARGET := cobalt.o
++
++#export-objs := init.o systype.o wdt.o i2c.o
++
++obj-$(CONFIG_COBALT_RAQ)	+= init.o systype.o i2c.o wdt.o 
++obj-$(CONFIG_COBALT_ACPI)	+= acpi.o
++obj-$(CONFIG_COBALT_SERNUM)	+= serialnum.o
++obj-$(CONFIG_COBALT_LCD)	+= lcd.o
++obj-$(CONFIG_COBALT_LED)	+= net.o led.o
++obj-$(CONFIG_COBALT_SENSORS)	+= sensors.o
++obj-$(CONFIG_COBALT_FANS)	+= fans.o
++obj-$(CONFIG_COBALT_RAMINFO)	+= raminfo.o
++obj-$(CONFIG_COBALT_RULER)	+= ruler.o
++
+diff -Naur linux-2.6.17.orig/drivers/cobalt/net.c linux-2.6.17/drivers/cobalt/net.c
+--- linux-2.6.17.orig/drivers/cobalt/net.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/net.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,133 @@
 +/* 
 + * cobalt net wrappers
@@ -5284,9 +5208,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/net.c linux-2.6.14/drivers/cobalt/ne
 +
 +	return 0;
 +}
-diff -Naur linux-2.6.14.orig/drivers/cobalt/raminfo.c linux-2.6.14/drivers/cobalt/raminfo.c
---- linux-2.6.14.orig/drivers/cobalt/raminfo.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/raminfo.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/raminfo.c linux-2.6.17/drivers/cobalt/raminfo.c
+--- linux-2.6.17.orig/drivers/cobalt/raminfo.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/raminfo.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,320 @@
 +/* $Id: raminfo.c,v 1.7 2001/10/29 22:21:36 thockin Exp $
 + *
@@ -5608,9 +5532,32 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/raminfo.c linux-2.6.14/drivers/cobal
 +MODULE_LICENSE("GPL");
 +
 +#endif /* CONFIG_COBALT_RAMINFO || CONFIG_COBALT_RAMINFO_MODULE */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/ruler.c linux-2.6.14/drivers/cobalt/ruler.c
---- linux-2.6.14.orig/drivers/cobalt/ruler.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/ruler.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/README linux-2.6.17/drivers/cobalt/README
+--- linux-2.6.17.orig/drivers/cobalt/README	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/README	2006-06-19 22:14:47.000000000 -0700
+@@ -0,0 +1,19 @@
++Notes on Cobalt's drivers:
++
++You will notice in several places constructs such as this:
++
++	if (cobt_is_3k()) {
++		foo();
++	} else if (cobt_is_5k()) {
++		bar();
++	}
++
++The goal here is to only compile in code that is needed, but to allow one to
++define support for both 3k and 5k (and more?) style systems.  The systype
++check macros are very simple and clean.  They check whether config-time
++support for the generation has been enabled, and (if so) whether the current
++systype matches the spcified generation.  This leaves the code free from 
++#ifdef cruft, but lets the compiler throw out unsupported generation-specific 
++code with if (0) detection.
++
++--
+diff -Naur linux-2.6.17.orig/drivers/cobalt/ruler.c linux-2.6.17/drivers/cobalt/ruler.c
+--- linux-2.6.17.orig/drivers/cobalt/ruler.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/ruler.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,419 @@
 +/* 
 + * cobalt ruler driver 
@@ -6031,9 +5978,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/ruler.c linux-2.6.14/drivers/cobalt/
 +
 +	return 0;
 +}
-diff -Naur linux-2.6.14.orig/drivers/cobalt/sensors.c linux-2.6.14/drivers/cobalt/sensors.c
---- linux-2.6.14.orig/drivers/cobalt/sensors.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/sensors.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/sensors.c linux-2.6.17/drivers/cobalt/sensors.c
+--- linux-2.6.17.orig/drivers/cobalt/sensors.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/sensors.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,525 @@
 +/* $Id: sensors.c,v 1.31 2002/08/29 00:33:01 uzi Exp $
 + * Copyright (c) 2000-2001 Sun Microsystems, Inc 
@@ -6560,9 +6507,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/sensors.c linux-2.6.14/drivers/cobal
 +#endif /* CONFIG_PROC_FS */
 +
 +#endif /* CONFIG_COBALT_SENSORS */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/serialnum.c linux-2.6.14/drivers/cobalt/serialnum.c
---- linux-2.6.14.orig/drivers/cobalt/serialnum.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/serialnum.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/serialnum.c linux-2.6.17/drivers/cobalt/serialnum.c
+--- linux-2.6.17.orig/drivers/cobalt/serialnum.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/serialnum.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,453 @@
 +/* $Id: serialnum.c,v 1.15 2001/10/23 20:15:27 thockin Exp $ */
 +/*
@@ -7017,9 +6964,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/serialnum.c linux-2.6.14/drivers/cob
 +#endif /* MODULE */
 +
 +#endif /* CONFIG_COBALT_SERNUM */
-diff -Naur linux-2.6.14.orig/drivers/cobalt/systype.c linux-2.6.14/drivers/cobalt/systype.c
---- linux-2.6.14.orig/drivers/cobalt/systype.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/systype.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/systype.c linux-2.6.17/drivers/cobalt/systype.c
+--- linux-2.6.17.orig/drivers/cobalt/systype.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/systype.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,280 @@
 +/*
 + * $Id: systype.c,v 1.33 2002/11/04 17:54:15 thockin Exp $
@@ -7301,9 +7248,9 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/systype.c linux-2.6.14/drivers/cobal
 +	}
 +	return 0;
 +}
-diff -Naur linux-2.6.14.orig/drivers/cobalt/wdt.c linux-2.6.14/drivers/cobalt/wdt.c
---- linux-2.6.14.orig/drivers/cobalt/wdt.c	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/drivers/cobalt/wdt.c	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/drivers/cobalt/wdt.c linux-2.6.17/drivers/cobalt/wdt.c
+--- linux-2.6.17.orig/drivers/cobalt/wdt.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/drivers/cobalt/wdt.c	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,424 @@
 +/* $Id: wdt.c,v 1.21 2002/07/02 00:38:17 asun Exp $ */
 +/* 
@@ -7729,10 +7676,68 @@ diff -Naur linux-2.6.14.orig/drivers/cobalt/wdt.c linux-2.6.14/drivers/cobalt/wd
 +	spin_unlock_irqrestore(&wdt_lock, flags);
 +#endif
 +}
-diff -Naur linux-2.6.14.orig/drivers/net/Kconfig linux-2.6.14/drivers/net/Kconfig
---- linux-2.6.14.orig/drivers/net/Kconfig	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/net/Kconfig	2005-10-28 15:27:23.000000000 +0000
-@@ -1402,6 +1402,16 @@
+diff -Naur linux-2.6.17.orig/drivers/Kconfig linux-2.6.17/drivers/Kconfig
+--- linux-2.6.17.orig/drivers/Kconfig	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/Kconfig	2006-06-19 22:14:46.000000000 -0700
+@@ -72,4 +72,6 @@
+ 
+ source "drivers/rtc/Kconfig"
+ 
++source "drivers/cobalt/Kconfig"
++
+ endmenu
+diff -Naur linux-2.6.17.orig/drivers/Makefile linux-2.6.17/drivers/Makefile
+--- linux-2.6.17.orig/drivers/Makefile	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/Makefile	2006-06-19 22:14:46.000000000 -0700
+@@ -65,6 +65,8 @@
+ obj-$(CONFIG_EDAC)		+= edac/
+ obj-$(CONFIG_MCA)		+= mca/
+ obj-$(CONFIG_EISA)		+= eisa/
++obj-$(CONFIG_COBALT_RAQ)	+= cobalt/
++
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
+ obj-$(CONFIG_MMC)		+= mmc/
+ obj-$(CONFIG_NEW_LEDS)		+= leds/
+diff -Naur linux-2.6.17.orig/drivers/net/e100.c linux-2.6.17/drivers/net/e100.c
+--- linux-2.6.17.orig/drivers/net/e100.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/net/e100.c	2006-06-19 22:14:47.000000000 -0700
+@@ -163,6 +163,7 @@
+ #define DRV_VERSION		"3.5.10-k2"DRV_EXT
+ #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
+ #define DRV_COPYRIGHT		"Copyright(c) 1999-2005 Intel Corporation"
++#define DRV_MODIFIED		"Modified by <jeff@404ster.com> to ignore bad EEPROM checksums"
+ #define PFX			DRV_NAME ": "
+ 
+ #define E100_WATCHDOG_PERIOD	(2 * HZ)
+@@ -756,8 +757,14 @@
+ 	 * the sum of words should be 0xBABA */
+ 	checksum = le16_to_cpu(0xBABA - checksum);
+ 	if(checksum != nic->eeprom[nic->eeprom_wc - 1]) {
++#if defined(CONFIG_E100_IGNORE_CSUM)
++		DPRINTK(PROBE, ERR, "EEPROM corrupted, ignoring and moving on\n");
++		DPRINTK(PROBE, ERR, "    Caclulated Checksum: %X\n",checksum);
++		DPRINTK(PROBE, ERR, "    EEPROM Checksum:     %X\n",nic->eeprom[nic->eeprom_wc - 1]);
++#else
+ 		DPRINTK(PROBE, ERR, "EEPROM corrupted\n");
+ 		return -EAGAIN;
++#endif
+ 	}
+ 
+ 	return 0;
+@@ -2798,6 +2805,9 @@
+ 	if(((1 << debug) - 1) & NETIF_MSG_DRV) {
+ 		printk(KERN_INFO PFX "%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
+ 		printk(KERN_INFO PFX "%s\n", DRV_COPYRIGHT);
++#if defined(CONFIG_E100_IGNORE_CSUM)
++		printk(KERN_INFO PFX "%s\n", DRV_MODIFIED);
++#endif
+ 	}
+ 	return pci_module_init(&e100_driver);
+ }
+diff -Naur linux-2.6.17.orig/drivers/net/Kconfig linux-2.6.17/drivers/net/Kconfig
+--- linux-2.6.17.orig/drivers/net/Kconfig	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/drivers/net/Kconfig	2006-06-19 22:14:47.000000000 -0700
+@@ -1458,6 +1458,16 @@
  	  <file:Documentation/networking/net-modules.txt>.  The module
  	  will be called e100.
  
@@ -7749,45 +7754,9 @@ diff -Naur linux-2.6.14.orig/drivers/net/Kconfig linux-2.6.14/drivers/net/Kconfi
  config LNE390
  	tristate "Mylex EISA LNE390A/B support (EXPERIMENTAL)"
  	depends on NET_PCI && EISA && EXPERIMENTAL
-diff -Naur linux-2.6.14.orig/drivers/net/e100.c linux-2.6.14/drivers/net/e100.c
---- linux-2.6.14.orig/drivers/net/e100.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/drivers/net/e100.c	2005-10-28 15:27:23.000000000 +0000
-@@ -159,6 +159,7 @@
- #define DRV_VERSION		"3.4.14-k2"DRV_EXT
- #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
- #define DRV_COPYRIGHT		"Copyright(c) 1999-2005 Intel Corporation"
-+#define DRV_MODIFIED		"Modified by <jeff@404ster.com> to ignore bad EEPROM checksums"
- #define PFX			DRV_NAME ": "
- 
- #define E100_WATCHDOG_PERIOD	(2 * HZ)
-@@ -751,8 +752,14 @@
- 	 * the sum of words should be 0xBABA */
- 	checksum = le16_to_cpu(0xBABA - checksum);
- 	if(checksum != nic->eeprom[nic->eeprom_wc - 1]) {
-+#if defined(CONFIG_E100_IGNORE_CSUM)
-+		DPRINTK(PROBE, ERR, "EEPROM corrupted, ignoring and moving on\n");
-+		DPRINTK(PROBE, ERR, "    Caclulated Checksum: %X\n",checksum);
-+		DPRINTK(PROBE, ERR, "    EEPROM Checksum:     %X\n",nic->eeprom[nic->eeprom_wc - 1]);
-+#else
- 		DPRINTK(PROBE, ERR, "EEPROM corrupted\n");
- 		return -EAGAIN;
-+#endif
- 	}
- 
- 	return 0;
-@@ -2480,6 +2487,9 @@
- 	if(((1 << debug) - 1) & NETIF_MSG_DRV) {
- 		printk(KERN_INFO PFX "%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
- 		printk(KERN_INFO PFX "%s\n", DRV_COPYRIGHT);
-+#if defined(CONFIG_E100_IGNORE_CSUM)
-+		printk(KERN_INFO PFX "%s\n", DRV_MODIFIED);
-+#endif
- 	}
- 	return pci_module_init(&e100_driver);
- }
-diff -Naur linux-2.6.14.orig/include/cobalt/acpi.h linux-2.6.14/include/cobalt/acpi.h
---- linux-2.6.14.orig/include/cobalt/acpi.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/acpi.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/acpi.h linux-2.6.17/include/cobalt/acpi.h
+--- linux-2.6.17.orig/include/cobalt/acpi.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/acpi.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,82 @@
 +/*
 + * $Id: cobalt-acpi.h,v 1.7 2001/10/27 07:03:31 erik Exp $
@@ -7871,9 +7840,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/acpi.h linux-2.6.14/include/cobalt/a
 +
 +
 +#endif /* COBALT_ACPI_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/cobalt.h linux-2.6.14/include/cobalt/cobalt.h
---- linux-2.6.14.orig/include/cobalt/cobalt.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/cobalt.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/cobalt.h linux-2.6.17/include/cobalt/cobalt.h
+--- linux-2.6.17.orig/include/cobalt/cobalt.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/cobalt.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,58 @@
 +/* $Id: cobalt.h,v 1.16 2002/11/04 17:54:15 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -7933,9 +7902,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/cobalt.h linux-2.6.14/include/cobalt
 +//#endif /* CONFIG_COBALT_RAQ */
 +
 +#endif /* !defined(COBALT_H) && defined(CONFIG_COBALT_RAQ) */
-diff -Naur linux-2.6.14.orig/include/cobalt/i2c.h linux-2.6.14/include/cobalt/i2c.h
---- linux-2.6.14.orig/include/cobalt/i2c.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/i2c.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/i2c.h linux-2.6.17/include/cobalt/i2c.h
+--- linux-2.6.17.orig/include/cobalt/i2c.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/i2c.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,40 @@
 +/*
 + * $Id: cobalt-i2c.h,v 1.3 2001/08/22 05:48:04 asun Exp $
@@ -7977,9 +7946,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/i2c.h linux-2.6.14/include/cobalt/i2
 +				  unsigned char *data, int count);
 +
 +#endif /* COBALT_I2C_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/lcd.h linux-2.6.14/include/cobalt/lcd.h
---- linux-2.6.14.orig/include/cobalt/lcd.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/lcd.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/lcd.h linux-2.6.17/include/cobalt/lcd.h
+--- linux-2.6.17.orig/include/cobalt/lcd.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/lcd.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,95 @@
 +/*
 + * $Id: cobalt-lcd.h,v 1.12 2001/11/30 05:38:46 asun Exp $
@@ -8076,9 +8045,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/lcd.h linux-2.6.14/include/cobalt/lc
 +void cobalt_lcd_off(void);
 +
 +#endif /* COBALT_LCD_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/led.h linux-2.6.14/include/cobalt/led.h
---- linux-2.6.14.orig/include/cobalt/led.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/led.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/led.h linux-2.6.17/include/cobalt/led.h
+--- linux-2.6.17.orig/include/cobalt/led.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/led.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,59 @@
 +/*
 + * $Id: cobalt-led.h,v 1.7 2001/11/08 01:15:33 thockin Exp $
@@ -8139,9 +8108,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/led.h linux-2.6.14/include/cobalt/le
 +
 +#endif /* COBALT_LED_H */
 +
-diff -Naur linux-2.6.14.orig/include/cobalt/misc.h linux-2.6.14/include/cobalt/misc.h
---- linux-2.6.14.orig/include/cobalt/misc.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/misc.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/misc.h linux-2.6.17/include/cobalt/misc.h
+--- linux-2.6.17.orig/include/cobalt/misc.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/misc.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,11 @@
 +/* $Id: cobalt-misc.h,v 1.1 2001/04/04 03:36:43 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -8154,9 +8123,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/misc.h linux-2.6.14/include/cobalt/m
 +void cobalt_power_off(void);
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/cobalt/net.h linux-2.6.14/include/cobalt/net.h
---- linux-2.6.14.orig/include/cobalt/net.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/net.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/net.h linux-2.6.17/include/cobalt/net.h
+--- linux-2.6.17.orig/include/cobalt/net.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/net.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,12 @@
 +/* $Id: cobalt-net.h,v 1.3 2002/10/25 01:02:42 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -8170,9 +8139,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/net.h linux-2.6.14/include/cobalt/ne
 +void cobalt_net_unregister(struct net_device *ndev);
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/cobalt/nvram.h linux-2.6.14/include/cobalt/nvram.h
---- linux-2.6.14.orig/include/cobalt/nvram.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/nvram.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/nvram.h linux-2.6.17/include/cobalt/nvram.h
+--- linux-2.6.17.orig/include/cobalt/nvram.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/nvram.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,125 @@
 +/*
 + * $Id: cobalt-nvram.h,v 1.21 2002/11/02 00:57:06 thockin Exp $
@@ -8299,9 +8268,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/nvram.h linux-2.6.14/include/cobalt/
 +#define COBT_CMOS_HA_MODE		NVRAM_OFFSET(0x62)
 +
 +#endif /* COBALT_NVRAM_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/ruler.h linux-2.6.14/include/cobalt/ruler.h
---- linux-2.6.14.orig/include/cobalt/ruler.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/ruler.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/ruler.h linux-2.6.17/include/cobalt/ruler.h
+--- linux-2.6.17.orig/include/cobalt/ruler.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/ruler.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,15 @@
 +/* $Id: cobalt-ruler.h,v 1.4 2001/06/08 20:46:44 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -8318,9 +8287,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/ruler.h linux-2.6.14/include/cobalt/
 +//int *cob_busproc_t (ide_drive_t *, int);
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/cobalt/sensors.h linux-2.6.14/include/cobalt/sensors.h
---- linux-2.6.14.orig/include/cobalt/sensors.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/sensors.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/sensors.h linux-2.6.17/include/cobalt/sensors.h
+--- linux-2.6.17.orig/include/cobalt/sensors.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/sensors.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,29 @@
 +/* $Id: cobalt-sensors.h,v 1.2 2001/09/25 18:10:29 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -8351,9 +8320,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/sensors.h linux-2.6.14/include/cobal
 +}
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/cobalt/serialnum.h linux-2.6.14/include/cobalt/serialnum.h
---- linux-2.6.14.orig/include/cobalt/serialnum.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/serialnum.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/serialnum.h linux-2.6.17/include/cobalt/serialnum.h
+--- linux-2.6.17.orig/include/cobalt/serialnum.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/serialnum.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,16 @@
 +/*
 + * $Id: cobalt-serialnum.h,v 1.1 2001/03/07 01:58:24 thockin Exp $
@@ -8371,9 +8340,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/serialnum.h linux-2.6.14/include/cob
 +unsigned long cobalt_hostid_get(void);
 +
 +#endif /* COBALT_SERIALNUM_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/superio.h linux-2.6.14/include/cobalt/superio.h
---- linux-2.6.14.orig/include/cobalt/superio.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/superio.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/superio.h linux-2.6.17/include/cobalt/superio.h
+--- linux-2.6.17.orig/include/cobalt/superio.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/superio.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,225 @@
 +/*
 + * $Id: cobalt-superio.h,v 1.11 2001/11/02 12:00:03 duncan Exp $
@@ -8600,9 +8569,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/superio.h linux-2.6.14/include/cobal
 +}
 +
 +#endif /* COBALT_SUPERIO_H */
-diff -Naur linux-2.6.14.orig/include/cobalt/systype.h linux-2.6.14/include/cobalt/systype.h
---- linux-2.6.14.orig/include/cobalt/systype.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/systype.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/systype.h linux-2.6.17/include/cobalt/systype.h
+--- linux-2.6.17.orig/include/cobalt/systype.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/systype.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,99 @@
 +/*
 + * $Id: cobalt-systype.h,v 1.8 2002/08/08 22:46:50 carls Exp $
@@ -8703,9 +8672,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/systype.h linux-2.6.14/include/cobal
 +#define cobt_is_5k()	 (cobt_is_monterey() || cobt_is_alpine() || cobt_is_bigbear())
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/cobalt/wdt.h linux-2.6.14/include/cobalt/wdt.h
---- linux-2.6.14.orig/include/cobalt/wdt.h	1970-01-01 00:00:00.000000000 +0000
-+++ linux-2.6.14/include/cobalt/wdt.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/cobalt/wdt.h linux-2.6.17/include/cobalt/wdt.h
+--- linux-2.6.17.orig/include/cobalt/wdt.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.17/include/cobalt/wdt.h	2006-06-19 22:14:47.000000000 -0700
 @@ -0,0 +1,16 @@
 +/* $Id: cobalt-wdt.h,v 1.1 2001/03/07 01:58:24 thockin Exp $ */
 +/* Copyright 2001 Sun Microsystems, Inc. */
@@ -8723,9 +8692,9 @@ diff -Naur linux-2.6.14.orig/include/cobalt/wdt.h linux-2.6.14/include/cobalt/wd
 +void cobalt_wdt_cleardog(void);
 +
 +#endif
-diff -Naur linux-2.6.14.orig/include/linux/reboot.h linux-2.6.14/include/linux/reboot.h
---- linux-2.6.14.orig/include/linux/reboot.h	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/include/linux/reboot.h	2005-10-28 15:27:23.000000000 +0000
+diff -Naur linux-2.6.17.orig/include/linux/reboot.h linux-2.6.17/include/linux/reboot.h
+--- linux-2.6.17.orig/include/linux/reboot.h	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/include/linux/reboot.h	2006-06-19 22:14:47.000000000 -0700
 @@ -50,6 +50,7 @@
  extern void machine_restart(char *cmd);
  extern void machine_halt(void);
@@ -8734,10 +8703,10 @@ diff -Naur linux-2.6.14.orig/include/linux/reboot.h linux-2.6.14/include/linux/r
  
  extern void machine_shutdown(void);
  struct pt_regs;
-diff -Naur linux-2.6.14.orig/init/main.c linux-2.6.14/init/main.c
---- linux-2.6.14.orig/init/main.c	2005-10-28 00:02:08.000000000 +0000
-+++ linux-2.6.14/init/main.c	2005-10-28 15:27:23.000000000 +0000
-@@ -601,6 +601,10 @@
+diff -Naur linux-2.6.17.orig/init/main.c linux-2.6.17/init/main.c
+--- linux-2.6.17.orig/init/main.c	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/init/main.c	2006-06-19 22:14:47.000000000 -0700
+@@ -613,6 +613,10 @@
   *
   * Now we can finally start doing some real work..
   */
@@ -8748,8 +8717,8 @@ diff -Naur linux-2.6.14.orig/init/main.c linux-2.6.14/init/main.c
  static void __init do_basic_setup(void)
  {
  	/* drivers will send hotplug events */
-@@ -616,6 +620,10 @@
- 	sock_init();
+@@ -625,6 +629,10 @@
+ #endif
  
  	do_initcalls();
 +	
@@ -8759,3 +8728,26 @@ diff -Naur linux-2.6.14.orig/init/main.c linux-2.6.14/init/main.c
  }
  
  static void do_pre_smp_initcalls(void)
+diff -Naur linux-2.6.17.orig/Makefile linux-2.6.17/Makefile
+--- linux-2.6.17.orig/Makefile	2006-06-17 18:49:35.000000000 -0700
++++ linux-2.6.17/Makefile	2006-06-19 22:14:46.000000000 -0700
+@@ -194,6 +194,7 @@
+ KBUILD_MODULES :=
+ KBUILD_BUILTIN := 1
+ 
++DRIVERS-$(CONFIG_COBALT_RAQ) += drivers/cobalt/cobalt.o
+ #	If we have only "make modules", don't compile built-in objects.
+ #	When we're building modules with modversions, we need to consider
+ #	the built-in objects during the descend as well, in order to
+@@ -668,6 +669,11 @@
+       cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) \
+                      $(if $(CONFIG_KALLSYMS_ALL),--all-symbols) > $@
+ 
++
++cobalt: vmlinux
++	strip vmlinux
++	bzip2 vmlinux
++
+ .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
+ 	$(call if_changed_dep,as_o_S)
+ 
