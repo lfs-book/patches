@@ -1,0 +1,39 @@
+Submitted By: Jim Gifford (jim at linuxfromscratch dot org)
+Date: 2006-07-06
+Initial Package Version: 1.2.10
+Origin: Gentoo
+Upstream Status: Unknown
+Description: Various Fixes
+
+diff -Naur gtk+-1.2.10.orig/gtk/gtkrc.c gtk+-1.2.10/gtk/gtkrc.c
+--- gtk+-1.2.10.orig/gtk/gtkrc.c	2001-03-15 10:41:40.000000000 -0800
++++ gtk+-1.2.10/gtk/gtkrc.c	2006-07-06 18:36:29.899294709 -0700
+@@ -451,7 +451,7 @@
+     {
+       gint length;
+       
+-      char *locale = setlocale (LC_CTYPE, NULL);
++      char *locale = g_strdup (setlocale (LC_CTYPE, NULL))
+       char *p;
+       
+       initted = TRUE;
+@@ -585,6 +585,7 @@
+ 	  rc_file->canonical_name = str->str;
+ 	  g_string_free (str, FALSE);
+ 	}
++      g_free (locale);
+     }
+ 
+   if (!lstat (rc_file->canonical_name, &statbuf))
+diff -Naur gtk+-1.2.10.orig/gtk.m4 gtk+-1.2.10/gtk.m4
+--- gtk+-1.2.10.orig/gtk.m4	1999-02-18 08:43:35.000000000 -0800
++++ gtk+-1.2.10/gtk.m4	2006-07-06 18:37:08.134294021 -0700
+@@ -4,7 +4,7 @@
+ dnl AM_PATH_GTK([MINIMUM-VERSION, [ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND [, MODULES]]]])
+ dnl Test for GTK, and define GTK_CFLAGS and GTK_LIBS
+ dnl
+-AC_DEFUN(AM_PATH_GTK,
++AC_DEFUN([AM_PATH_GTK],
+ [dnl 
+ dnl Get the cflags and libraries from the gtk-config script
+ dnl
