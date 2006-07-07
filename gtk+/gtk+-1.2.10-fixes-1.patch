@@ -13,7 +13,7 @@ diff -Naur gtk+-1.2.10.orig/gtk/gtkrc.c gtk+-1.2.10/gtk/gtkrc.c
        gint length;
        
 -      char *locale = setlocale (LC_CTYPE, NULL);
-+      char *locale = g_strdup (setlocale (LC_CTYPE, NULL))
++      char *locale = g_strdup (setlocale (LC_CTYPE, NULL));
        char *p;
        
        initted = TRUE;
