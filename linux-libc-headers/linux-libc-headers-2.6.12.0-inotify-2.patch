@@ -113,3 +113,38 @@ diff -urN linux-libc-headers-2.6.12.0.orig/include/linux/inotify.h linux-libc-he
 +
 +
 +#endif	/* _LINUX_INOTIFY_H */
+diff -urN linux-libc-headers-2.6.12.0.orig/include/sys/inotify.h linux-libc-headers-2.6.12.0/include/sys/inotify.h
+--- linux-libc-headers-2.6.12.0.orig/include/sys/inotify.h	1970-01-01 05:00:00.000000000 +0500
++++ linux-libc-headers-2.6.12.0/include/sys/inotify.h	2006-07-30 13:44:34.000000000 +0600
+@@ -0,0 +1,31 @@
++/*
++ * Inode based directory notification for Linux
++ *
++ * Copyright (C) 2005 John McCutchan
++ */
++
++#ifndef _SYS_INOTIFY_H
++#define _SYS_INOTIFY_H
++
++#include <stdint.h>
++#include <linux/inotify.h>
++#include <asm/unistd.h>
++
++extern long int syscall (long int __sysno, ...) __THROW;
++
++static inline int inotify_init(void)
++{
++	return syscall(__NR_inotify_init);
++}
++	
++static inline int inotify_add_watch(int fd, const char *name, uint32_t mask)
++{
++	return syscall(__NR_inotify_add_watch, fd, name, mask);
++}
++
++static inline int inotify_rm_watch (int fd, uint32_t wd)
++{
++	return syscall(__NR_inotify_rm_watch, fd, wd);
++}
++		
++#endif	/* _SYS_INOTIFY_H */
