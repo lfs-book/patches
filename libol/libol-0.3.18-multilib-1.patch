@@ -4,16 +4,17 @@ Initial Package Version: 0.3.18
 Origin: Various
 Description: Make libol-config Multilib Friendly
 
-diff -Naur libol-0.3.18/libol-config.in libol-0.3.18.orig/libol-config.in
---- libol-0.3.18/libol-config.in	2006-07-04 12:52:26.832221125 -0700
-+++ libol-0.3.18.orig/libol-config.in	1999-07-10 06:23:07.000000000 -0700
-@@ -47,7 +47,8 @@
+diff -Naur libol-0.3.18.orig/libol-config.in libol-0.3.18/libol-config.in
+--- libol-0.3.18.orig/libol-config.in   1999-07-10 06:23:07.000000000 -0700
++++ libol-0.3.18/libol-config.in        2006-08-17 22:03:38.523363309 -0700
+@@ -47,8 +47,7 @@
        echo $includes
        ;;
      --libs)
--      echo -lol @LIBS@
-+      libdirs=-L@libdir@
-+      echo $libdirs -lol @LIBS@
+-      libdirs=-L@libdir@
+-      echo $libdirs -lol @LIBS@
++      echo -lol @LIBS@
        ;;
      --static-libs)
        echo @libdir@/libol.a @LIBS@
+
