@@ -78,7 +78,7 @@ diff -Naur gcc-4.1.1.orig/gcc/config/s390/t-linux64 gcc-4.1.1/gcc/config/s390/t-
  INSTALL_LIBGCC = install-multilib
 diff -Naur gcc-4.1.1.orig/gcc/config/sparc/t-linux64 gcc-4.1.1/gcc/config/sparc/t-linux64
 --- gcc-4.1.1.orig/gcc/config/sparc/t-linux64	2004-04-01 08:05:22.000000000 -0800
-+++ gcc-4.1.1/gcc/config/sparc/t-linux64	2006-08-21 23:23:44.607986455 -0700
++++ gcc-4.1.1/gcc/config/sparc/t-linux64	2006-08-26 22:02:56.222291480 -0700
 @@ -1,6 +1,6 @@
 -MULTILIB_OPTIONS = m64/m32
 -MULTILIB_DIRNAMES = 64 32
@@ -89,9 +89,10 @@ diff -Naur gcc-4.1.1.orig/gcc/config/sparc/t-linux64 gcc-4.1.1/gcc/config/sparc/
  
  LIBGCC = stmp-multilib
  INSTALL_LIBGCC = install-multilib
-@@ -16,4 +16,4 @@
+@@ -14,6 +14,3 @@
+ SHLIB_MAPFILES = $(srcdir)/libgcc-std.ver \
+ 		 $(srcdir)/config/sparc/libgcc-sparc-glibc.ver
  
- CRTSTUFF_T_CFLAGS = `if test x$$($(GCC_FOR_TARGET) $(MULTILIB_CFLAGS) \
- 				 -print-multi-os-directory) \
+-CRTSTUFF_T_CFLAGS = `if test x$$($(GCC_FOR_TARGET) $(MULTILIB_CFLAGS) \
+-				 -print-multi-os-directory) \
 -			= x../lib64; then echo -mcmodel=medany; fi`
-+			= x../lib; then echo -mcmodel=medany; fi`
