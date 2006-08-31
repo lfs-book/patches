@@ -96,3 +96,21 @@ diff -Naur gcc-4.1.1.orig/gcc/config/sparc/t-linux64 gcc-4.1.1/gcc/config/sparc/
 -CRTSTUFF_T_CFLAGS = `if test x$$($(GCC_FOR_TARGET) $(MULTILIB_CFLAGS) \
 -				 -print-multi-os-directory) \
 -			= x../lib64; then echo -mcmodel=medany; fi`
+
+--- gcc-4.1.1.orig/gcc/config/sparc/linux64.h   2006-02-11 00:38:51.000000000 -0800
++++ gcc-4.1.1/gcc/config/sparc/linux64.h        2006-08-30 23:52:50.288518761 -0700
+@@ -50,11 +50,13 @@
+ /* A 64 bit v9 compiler with stack-bias,
+    in a Medium/Low code model environment.  */
+
++#ifdef SPARC64_USERSPACE_FORCED_TO_32
+ #undef TARGET_DEFAULT
+ #define TARGET_DEFAULT \
+   (MASK_V9 + MASK_PTR64 + MASK_64BIT /* + MASK_HARD_QUAD */ \
+    + MASK_STACK_BIAS + MASK_APP_REGS + MASK_FPU + MASK_LONG_DOUBLE_128)
+ #endif
++#endif
+
+ #undef ASM_CPU_DEFAULT_SPEC
+ #define ASM_CPU_DEFAULT_SPEC "-Av9a"
+
