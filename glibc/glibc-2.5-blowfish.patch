@@ -1,9 +1,10 @@
-Robert Connolly
-This is crypt_blowfish from:
-http://www.openwall.com/crypt/
-ported to glibc-2.4.
-Thanks to:
-http://www.mail-archive.com/owl-users%40lists.openwall.com/msg00150.html
+Submitted By: Robert Connolly <robert at linuxfromscratch dot org> (ashes)
+Date: 2006-10-11
+Initial Package Version: 2.5
+Upstream Status: Submitted - http://sourceware.org/bugzilla/show_bug.cgi?id=2100
+Origin: http://www.openwall.com/crypt/
+Description: This patch adds blowfish crypto to libcrypt.
+Thanks to http://www.mail-archive.com/owl-users%40lists.openwall.com/msg00150.html
 for help.
 
 diff -Naur glibc-2.4.orig/crypt/Makefile glibc-2.4/crypt/Makefile
