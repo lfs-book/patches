@@ -178,8 +178,8 @@ diff -Naur vim70.orig/src/os_unix.c vim70/src/os_unix.c
 +    /* This write(3) function often doesn't return 0. That's fine.
 +       But to make FORTIFY_SOURCE happy we'll check it. */
 +    if (write(1, (char *)s, len) == 0) {
-+	return 0;
 +    }
++
      if (p_wd)		/* Unix is too fast, slow down a bit more */
  	RealWaitForChar(read_cmd_fd, p_wd, NULL);
  }
