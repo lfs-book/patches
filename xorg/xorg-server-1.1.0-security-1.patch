@@ -3,7 +3,6 @@ Date: 2007-07-18
 Initial Package Version: 1.1.0
 Origin: http://xorg.freedesktop.org/releases/X11R7.1/patches/ and
     http://gitweb.freedesktop.org/?p=xorg/xserver.git;a=commit;h=50a3e1ad18c815a5adafee22beccdf970bae62d6
-    http://gitweb.freedesktop.org/?p=xorg/xserver.git;a=commit;h=e3aa6ad201eb20862c11c000e76206e317a96dc9
 Upstream Status: Applied
 Description: Fixes multiple security vulnerabilities in the X server.
     See the following advisories:
