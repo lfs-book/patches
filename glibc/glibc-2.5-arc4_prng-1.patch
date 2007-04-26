@@ -73,7 +73,7 @@ diff -Naur glibc-2.5.orig/configure glibc-2.5/configure
 +else
 +  prng_device=/dev/urandom
 +fi;
-+cat >>confdefs.h <<\_ACEOF
++cat >>confdefs.h <<_ACEOF
 +#define PRNG_DEV "$prng_device"
 +_ACEOF
 +
@@ -135,7 +135,7 @@ diff -Naur glibc-2.5.orig/configure.in glibc-2.5/configure.in
 +			    @<:@default=/dev/urandom@:>@]),
 +	    [prng_device=$withval],
 +	    [prng_device=/dev/urandom])
-+AC_DEFINE(PRNG_DEV, "$prng_device")
++AC_DEFINE_UNQUOTED(PRNG_DEV, "$prng_device")
 +
  AC_ARG_ENABLE([sanity-checks],
                AC_HELP_STRING([--disable-sanity-checks],
