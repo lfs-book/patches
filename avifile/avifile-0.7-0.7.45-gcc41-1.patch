@@ -13,25 +13,25 @@ $Id$
  template <class Key, class Value, class Compare = less<Key>, class equal = equal<Key> > class avm_map
  {
  protected:
--    template <class KeyP, class ValueP> struct pair
-+    template <class Key1, class Value1> struct pair
+-    template <class Key1, class Value1> struct pair
++    template <class KeyP, class ValueP> struct pair
      {
--	KeyP key;
--	ValueP value;
-+	Key1 key;
-+	Value1 value;
+-	Key1 key;
+-	Value1 value;
++	KeyP key;
++	ValueP value;
  	pair() : key(Key()), value(Value()) {}
--	pair(KeyP k, ValueP v) : key(k), value(v) {}
--	pair(const pair<KeyP, ValueP>& p) : key(p.key), value(p.value) {}
-+	pair(Key1 k, Value1 v) : key(k), value(v) {}
-+	pair(const pair<Key1, Value1>& p) : key(p.key), value(p.value) {}
+-	pair(Key1 k, Value1 v) : key(k), value(v) {}
+-	pair(const pair<Key1, Value1>& p) : key(p.key), value(p.value) {}
++	pair(KeyP k, ValueP v) : key(k), value(v) {}
++	pair(const pair<KeyP, ValueP>& p) : key(p.key), value(p.value) {}
      };
      typedef pair<Key, Value> _Tpair;
  
      template <class Key1, class Value1> struct binary_tree_node
      {
--	_Tpair* entry;
-+	avm_map::pair<Key1, Value1>* entry;
+-	avm_map::pair<Key1, Value1>* entry;
++	_Tpair* entry;
  	binary_tree_node<Key1, Value1>* left;
  	Key1 minval;
  	binary_tree_node<Key1, Value1>* right;
@@ -41,8 +41,8 @@ $Id$
  	short  nCodecDelay;
      };
  public:
--    MP3Encoder(const CodecInfo& info, const WAVEFORMATEX* format)
-+    MP3Encoder::MP3Encoder(const CodecInfo& info, const WAVEFORMATEX* format)
+-    MP3Encoder::MP3Encoder(const CodecInfo& info, const WAVEFORMATEX* format)
++    MP3Encoder(const CodecInfo& info, const WAVEFORMATEX* format)
  	:IAudioEncoder(info)
      {
  	in_fmt=*format;
