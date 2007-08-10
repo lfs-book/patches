@@ -5,7 +5,7 @@ Upstream Status:         In upstream CVS
 Origin:                  Upstream CVS: http://svn.mplayerhq.hu/mplayer/trunk/
 Description:             Adds upstream code to allow linking with a system
                          installed version of a recent FFmpeg (date sensitive-
-                         must be before 20070520 - BLFS book version is fine).
+                         must be before 20070620 - BLFS book version is fine).
 Note:                    You must pass CPPFLAGS=-I/usr/include/ffmpeg on the
                          configure script command so the build can pick up
                          the system-installed FFMpeg interface headers
