@@ -1,13 +1,16 @@
 Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
-Date: 2008-10-15
+Date: 2009-01-07
 Initial Package Version: 0.10.21
-Upstream Status: Not yet known, just raised as gnome bug 556348.
-Origin: Self
-Description: Allows 'make install' to succeed if gtkdoc-rebase is not present.
+Upstream Status: unknown
+Origin: (1.) self (2.) unknown, found in fedora and gentoo
+Description: Consolidated build fixes.
+1. allows 'make install' to succeed if gtkdoc-rebase is not present.
+2. stop configure barfing with bison-2.4.1
+Run autoreconf and libtoolize -f after applying this (very noisy).
 
 diff -Naur gstreamer-0.10.21.orig/common/gtk-doc.mak gstreamer-0.10.21/common/gtk-doc.mak
 --- gstreamer-0.10.21.orig/common/gtk-doc.mak	2008-09-10 10:13:16.000000000 +0100
-+++ gstreamer-0.10.21/common/gtk-doc.mak	2008-10-15 18:12:18.000000000 +0100
++++ gstreamer-0.10.21/common/gtk-doc.mak	2009-01-07 20:02:47.000000000 +0000
 @@ -201,7 +201,7 @@
  	           $(DESTDIR)$(TARGET_DIR)/$(DOC_MODULE)-@GST_MAJORMINOR@.devhelp2; \
  	  fi; \
@@ -17,9 +20,24 @@ diff -Naur gstreamer-0.10.21.orig/common/gtk-doc.mak gstreamer-0.10.21/common/gt
  	fi) 
  uninstall-local:
  	(installfiles=`echo ./html/*.html`; \
+diff -Naur gstreamer-0.10.21.orig/common/m4/gst-parser.m4 gstreamer-0.10.21/common/m4/gst-parser.m4
+--- gstreamer-0.10.21.orig/common/m4/gst-parser.m4	2008-09-10 10:16:47.000000000 +0100
++++ gstreamer-0.10.21/common/m4/gst-parser.m4	2009-01-07 20:02:56.000000000 +0000
+@@ -15,10 +15,7 @@
+   bison_version=`$BISON_PATH --version | head -n 1 |  sed 's/^[[^0-9]]*//' | sed 's/[[^0-9]]*$//' | cut -d' ' -f1`
+   AC_MSG_CHECKING([bison version $bison_version >= $bison_min_version])
+ 
+-  if perl -w <<EOF
+-    exit ($bison_version < $bison_min_version) ? 0 : 1;
+-EOF 
+-  then 
++  if perl -we "exit ((v$bison_version ge v$bison_min_version) ? 0 : 1)"; then 
+     AC_MSG_RESULT([yes])
+   else 
+     AC_MSG_ERROR([no])
 diff -Naur gstreamer-0.10.21.orig/docs/gst/Makefile.in gstreamer-0.10.21/docs/gst/Makefile.in
 --- gstreamer-0.10.21.orig/docs/gst/Makefile.in	2008-10-02 22:54:18.000000000 +0100
-+++ gstreamer-0.10.21/docs/gst/Makefile.in	2008-10-15 18:12:45.000000000 +0100
++++ gstreamer-0.10.21/docs/gst/Makefile.in	2009-01-07 20:02:47.000000000 +0000
 @@ -809,7 +809,7 @@
  	           $(DESTDIR)$(TARGET_DIR)/$(DOC_MODULE)-@GST_MAJORMINOR@.devhelp2; \
  	  fi; \
@@ -31,7 +49,7 @@ diff -Naur gstreamer-0.10.21.orig/docs/gst/Makefile.in gstreamer-0.10.21/docs/gs
  	(installfiles=`echo ./html/*.html`; \
 diff -Naur gstreamer-0.10.21.orig/docs/libs/Makefile.in gstreamer-0.10.21/docs/libs/Makefile.in
 --- gstreamer-0.10.21.orig/docs/libs/Makefile.in	2008-10-02 22:54:18.000000000 +0100
-+++ gstreamer-0.10.21/docs/libs/Makefile.in	2008-10-15 18:12:18.000000000 +0100
++++ gstreamer-0.10.21/docs/libs/Makefile.in	2009-01-07 20:02:47.000000000 +0000
 @@ -811,7 +811,7 @@
  	           $(DESTDIR)$(TARGET_DIR)/$(DOC_MODULE)-@GST_MAJORMINOR@.devhelp2; \
  	  fi; \
