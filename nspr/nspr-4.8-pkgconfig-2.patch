@@ -7,7 +7,7 @@ Description: Adds pkg-config file for nspr.
 
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/config.mk nspr-4.8/mozilla/nsprpub/config/config.mk
 --- nspr-4.8-orig/mozilla/nsprpub/config/config.mk	2005-04-29 16:02:53.000000000 -0500
-+++ nspr-4.8/mozilla/nsprpub/config/config.mk	2009-08-28 10:05:39.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/config/config.mk	2009-08-28 15:42:46.000000000 -0500
 @@ -162,3 +162,4 @@
  RELEASE_INCLUDE_DIR = $(RELEASE_DIR)/$(BUILD_NUMBER)/$(OBJDIR_NAME)/include
  RELEASE_BIN_DIR = $(RELEASE_DIR)/$(BUILD_NUMBER)/$(OBJDIR_NAME)/bin
@@ -15,7 +15,7 @@ diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/config.mk nspr-4.8/mozilla/nsprp
 +RELEASE_PC_DIR = $(RELEASE_LIB_DIR)/pkgconfig
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/Makefile.in nspr-4.8/mozilla/nsprpub/config/Makefile.in
 --- nspr-4.8-orig/mozilla/nsprpub/config/Makefile.in	2009-03-03 16:04:23.000000000 -0600
-+++ nspr-4.8/mozilla/nsprpub/config/Makefile.in	2009-08-28 10:04:36.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/config/Makefile.in	2009-08-28 15:42:46.000000000 -0500
 @@ -52,9 +52,10 @@
  
  # autoconf.mk must be deleted last (from the top-level directory)
@@ -30,7 +30,7 @@ diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/Makefile.in nspr-4.8/mozilla/nsp
  
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/nspr.pc.in nspr-4.8/mozilla/nsprpub/config/nspr.pc.in
 --- nspr-4.8-orig/mozilla/nsprpub/config/nspr.pc.in	1969-12-31 18:00:00.000000000 -0600
-+++ nspr-4.8/mozilla/nsprpub/config/nspr.pc.in	2009-08-28 10:04:36.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/config/nspr.pc.in	2009-08-28 15:43:13.000000000 -0500
 @@ -0,0 +1,11 @@
 +prefix=@prefix@
 +exec_prefix=@exec_prefix@
@@ -40,12 +40,12 @@ diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/nspr.pc.in nspr-4.8/mozilla/nspr
 +Name: NSPR
 +Description: The Netscape Portable Runtime
 +Version: @MOD_MAJOR_VERSION@.@MOD_MINOR_VERSION@.@MOD_PATCH_VERSION@
-+Libs: -L${libdir} -lplds4 -lplc4 -lnspr4 -lpthread 
++Libs: -L${libdir} -lplds@MOD_MAJOR_VERSION@ -lplc@MOD_MAJOR_VERSION@ -lnspr@MOD_MAJOR_VERSION@ -lpthread 
 +Cflags: -I${includedir}
 +
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/rules.mk nspr-4.8/mozilla/nsprpub/config/rules.mk
 --- nspr-4.8-orig/mozilla/nsprpub/config/rules.mk	2009-05-01 18:08:01.000000000 -0500
-+++ nspr-4.8/mozilla/nsprpub/config/rules.mk	2009-08-28 10:06:22.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/config/rules.mk	2009-08-28 15:42:46.000000000 -0500
 @@ -211,7 +211,7 @@
  	rm -rf $(wildcard *.OBJ *.OBJD) dist $(ALL_TRASH) $(DIST_GARBAGE)
  	+$(LOOP_OVER_DIRS)
@@ -91,7 +91,7 @@ diff -Naur nspr-4.8-orig/mozilla/nsprpub/config/rules.mk nspr-4.8/mozilla/nsprpu
  alltags:
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/configure nspr-4.8/mozilla/nsprpub/configure
 --- nspr-4.8-orig/mozilla/nsprpub/configure	2009-05-08 08:12:31.000000000 -0500
-+++ nspr-4.8/mozilla/nsprpub/configure	2009-08-28 10:04:36.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/configure	2009-08-28 15:42:46.000000000 -0500
 @@ -6037,6 +6037,7 @@
  config/nsprincl.mk
  config/nsprincl.sh
@@ -102,7 +102,7 @@ diff -Naur nspr-4.8-orig/mozilla/nsprpub/configure nspr-4.8/mozilla/nsprpub/conf
  lib/libc/Makefile 
 diff -Naur nspr-4.8-orig/mozilla/nsprpub/configure.in nspr-4.8/mozilla/nsprpub/configure.in
 --- nspr-4.8-orig/mozilla/nsprpub/configure.in	2009-05-01 18:08:00.000000000 -0500
-+++ nspr-4.8/mozilla/nsprpub/configure.in	2009-08-28 10:04:36.000000000 -0500
++++ nspr-4.8/mozilla/nsprpub/configure.in	2009-08-28 15:42:46.000000000 -0500
 @@ -2871,6 +2871,7 @@
  config/nsprincl.mk
  config/nsprincl.sh
