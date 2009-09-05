@@ -212,7 +212,7 @@ diff -Naur mozilla-1.9.1-orig/xulrunner/installer/nspr-config.in mozilla-1.9.1/x
 +fi
 +
 +if test "$echo_cflags" = "yes"; then
-+    echo -I$includedir
++    echo -I$includedir/stable
 +fi
 +
 +if test "$echo_libs" = "yes"; then
@@ -388,7 +388,7 @@ diff -Naur mozilla-1.9.1-orig/xulrunner/installer/nss-config.in mozilla-1.9.1/xu
 +fi
 +
 +if test "$echo_cflags" = "yes"; then
-+    echo -I$includedir
++    echo -I$includedir/stable
 +fi
 +
 +if test "$echo_libs" = "yes"; then
