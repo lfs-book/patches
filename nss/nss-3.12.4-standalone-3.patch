@@ -1,5 +1,5 @@
 Submitted By: DJ Lucas <dj at linuxfromscratch dot org>
-Date: 2009-09-01
+Date: 2009-09-05
 Initial Package Version: 3.12.4
 Upstream Status: not applicable
 Origin: self
@@ -220,7 +220,7 @@ diff -Naur nss-3.12.4-orig/mozilla/security/nss/config/nss.pc.in nss-3.12.4/mozi
 +Description: Network Security Services
 +Version: @NSS_MAJOR_VERSION@.@NSS_MINOR_VERSION@.@NSS_PATCH_VERSION@
 +Requires: nspr >= 4.8
-+Libs: -L@libdir@ -lnss3@NSS_MAJOR_VERSION@ -lnssutil@NSS_MAJOR_VERSION@ -lsmime@NSS_MAJOR_VERSION@ -lssl@NSS_MAJOR_VERSION@ -lsoftokn@NSS_MAJOR_VERSION@
++Libs: -L@libdir@ -lnss@NSS_MAJOR_VERSION@ -lnssutil@NSS_MAJOR_VERSION@ -lsmime@NSS_MAJOR_VERSION@ -lssl@NSS_MAJOR_VERSION@ -lsoftokn@NSS_MAJOR_VERSION@
 +Cflags: -I${includedir}
 +
 diff -Naur nss-3.12.4-orig/mozilla/security/nss/Makefile nss-3.12.4/mozilla/security/nss/Makefile
