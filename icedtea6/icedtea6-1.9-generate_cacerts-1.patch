@@ -1,8 +1,8 @@
 Submitted By: DJ Lucas <dj AT linuxfromscratch DOT org>
 Date: 2010-09-08
 Initial Package Version: 1.9
-Upstream Status: pending review
-Origin: http://icedtea.classpath.org/hg/icedtea6/
+Upstream Status: submitted
+Origin: self 
 Description: Allows the build to generate a valid JDK cacerts file using the 
              system installed CA certificates.
 
