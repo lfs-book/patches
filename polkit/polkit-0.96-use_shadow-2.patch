@@ -4,8 +4,8 @@ Initial Package Version: 0.96
 Upstream Status: Probably not submitted.
 Origin: Believed to come from Andrew Psaltis, for Slackware.  Rediffed
  by Andrew Benton to no longer require autoreconf (which requires gtk-doc).
-Description: Add shadow support, to avoid needing PAM.  Add --authfw=shadow
-to configure.
+Description: Add shadow support, to avoid needing PAM.  Add
+ --with-authfw=shadow to configure.
 
 diff -Naur polkit-0.96-orig/configure polkit-0.96/configure
 --- polkit-0.96-orig/configure	2010-01-15 18:51:15.000000000 +0000
