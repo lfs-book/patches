@@ -13,9 +13,10 @@ diff -Naur perl-5.10.1.orig/hints/linux.sh perl-5.10.1/hints/linux.sh
  # are insufficiently precise to distinguish things like
  # libc-2.0.6 and libc-2.0.7.
 -if test -L /lib/libc.so.6; then
-+if test -L ${prefix}/lib/libc.so.6; then
-     libc=`ls -l /lib/libc.so.6 | awk '{print $NF}'`
+-    libc=`ls -l /lib/libc.so.6 | awk '{print $NF}'`
 -    libc=/lib/$libc
++if test -L ${prefix}/lib/libc.so.6; then
++    libc=`ls -l ${prefix}/lib/libc.so.6 | awk '{print $NF}'`
 +    libc=${prefix}/lib/$libc
  fi
  
