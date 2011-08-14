@@ -35,7 +35,7 @@ diff -Naur binutils-2.21.1.orig//bfd/elf.c binutils-2.21.1/bfd/elf.c
        return _bfd_elf_make_section_from_phdr (abfd, hdr, hdr_index, "relro");
  
 +    case PT_PAX_FLAGS:
-+      return _bfd_elf_make_section_from_phdr (abfd, hdr, index, "pax_flags");
++      return _bfd_elf_make_section_from_phdr (abfd, hdr, hdr_index, "pax_flags");
 +
      default:
        /* Check for any processor-specific program segment types.  */
