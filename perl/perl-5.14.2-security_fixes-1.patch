@@ -1,3 +1,10 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2011-11-16
+Initial Package Version: 5.14.2 (applies to earleir as well)
+Upstream Status: Applied
+Origin: Fedora
+Description: Fixes CVE-2011-3597
+
 From dbcab24bb98b4a243c8330bc7017c2080832b3f9 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
 Date: Tue, 4 Oct 2011 13:46:39 +0200
