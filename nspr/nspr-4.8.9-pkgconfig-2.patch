@@ -2,7 +2,7 @@ Submitted By: A Benton <andy at linuxfromscratch dot org>
 Date: 2011-11-28
 Initial Package Version: 4.8.9
 Upstream Status: not applicable
-Origin: Rediffed DJs patch against 4.8.9
+Origin: Rediffed DJs patch against nspr-4.8.9
 Description: Adds pkg-config file for nspr.
 
 
