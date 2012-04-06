@@ -1,15 +1,13 @@
-Submitted By: Wayne Blaszczyk <wblaszcz at bigpond dot net dot au>
-Date: 2012-01-10
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2012-04-05
 Initial Package Version: 0.8.998
-Upstream Status: Not submitted
-Origin: Wayne Blaszczyk
-Description: Modified the NetworkManagerLFS.c file. Altered the
-nm_system_update_dns function to be more appropriate
-(we probably don't run nscd, but we might).
+Upstream Status:         Not submitted
+Origin:                  Wayne Blaszcz
+Description:             Based on Wayne's work to make NetworkManager work
+                         on BLFS, but ported to work with 0.9.4.0
 
-diff -Naur c/config.h.in d/config.h.in
---- c/config.h.in	2012-03-24 07:11:38.000000000 +1100
-+++ d/config.h.in	2012-04-02 21:14:32.000000000 +1000
+--- NetworkManager.orig/config.h.in	2012-04-06 22:38:21.418543910 +0200
++++ NetworkManager/config.h.in	2012-04-06 22:40:22.042157953 +0200
 @@ -180,6 +180,9 @@
  /* Define if you have Gentoo */
  #undef TARGET_GENTOO
@@ -20,9 +18,8 @@ diff -Naur c/config.h.in d/config.h.in
  /* Define if you have linexa */
  #undef TARGET_LINEXA
  
-diff -Naur c/configure d/configure
---- c/configure	2012-03-24 07:11:23.000000000 +1100
-+++ d/configure	2012-04-02 21:24:18.000000000 +1000
+--- NetworkManager.orig/configure	2012-04-06 22:38:19.300497994 +0200
++++ NetworkManager/configure	2012-04-06 22:40:19.996113628 +0200
 @@ -728,6 +728,8 @@
  LIBM
  WITH_WEXT_FALSE
@@ -32,7 +29,7 @@ diff -Naur c/configure d/configure
  TARGET_EXHERBO_FALSE
  TARGET_EXHERBO_TRUE
  TARGET_LINEXA_FALSE
-@@ -1687,7 +1689,7 @@
+@@ -1690,7 +1692,7 @@
    --with-docs             Build NetworkManager documentation
    --with-distro=DISTRO    Specify the Linux distribution to target: One of
                            redhat, suse, gentoo, debian, arch, slackware,
@@ -41,13 +38,13 @@ diff -Naur c/configure d/configure
    --with-dist-version=<NM-distribution-version>
                            Define the NM's distribution version string
    --with-wext=yes         Enable or disable Linux Wireless Extensions
-@@ -19602,6 +19604,25 @@
+@@ -19680,6 +19682,25 @@
    with_distro="exherbo"
  fi
  
 +	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for /etc/lfs-release" >&5
 +$as_echo_n "checking for /etc/lfs-release... " >&6; }
-+if test "${ac_cv_file__etc_lfs_release+set}" = set; then :
++if ${ac_cv_file__etc_lfs_release+:} false; then :
 +  $as_echo_n "(cached) " >&6
 +else
 +  test "$cross_compiling" = yes &&
@@ -60,14 +57,14 @@ diff -Naur c/configure d/configure
 +fi
 +{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_file__etc_lfs_release" >&5
 +$as_echo "$ac_cv_file__etc_lfs_release" >&6; }
-+if test "x$ac_cv_file__etc_lfs_release" = x""yes; then :
++if test "x$ac_cv_file__etc_lfs_release" = xyes; then :
 +  with_distro="lfs"
 +fi
 +
  	if test "z$with_distro" = "z"; then
  		with_distro=`lsb_release -is`
  	fi
-@@ -19613,7 +19634,7 @@
+@@ -19691,7 +19712,7 @@
  	exit 1
  else
  	case $with_distro in
@@ -76,7 +73,7 @@ diff -Naur c/configure d/configure
  		*)
  			echo "Your distribution (${with_distro}) is not yet supported!  (patches welcome)"
  			exit 1
-@@ -19803,6 +19824,20 @@
+@@ -19881,6 +19902,20 @@
  
  fi
  
@@ -97,7 +94,7 @@ diff -Naur c/configure d/configure
  
  # Check whether --with-dist-version was given.
  if test "${with_dist_version+set}" = set; then :
-@@ -23295,6 +23330,10 @@
+@@ -23353,6 +23388,10 @@
    as_fn_error $? "conditional \"TARGET_EXHERBO\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
  fi
@@ -108,9 +105,8 @@ diff -Naur c/configure d/configure
  if test -z "${WITH_WEXT_TRUE}" && test -z "${WITH_WEXT_FALSE}"; then
    as_fn_error $? "conditional \"WITH_WEXT\" was never defined.
  Usually this means the macro was only invoked conditionally." "$LINENO" 5
-diff -Naur c/configure.ac d/configure.ac
---- c/configure.ac	2012-03-24 07:11:15.000000000 +1100
-+++ d/configure.ac	2012-04-02 21:28:21.000000000 +1000
+--- NetworkManager.orig/configure.ac	2012-03-23 21:11:15.000000000 +0100
++++ NetworkManager/configure.ac	2012-04-06 22:37:12.047039779 +0200
 @@ -107,7 +107,7 @@
  dnl
  AC_C_BIGENDIAN
@@ -149,9 +145,8 @@ diff -Naur c/configure.ac d/configure.ac
  dnl
  dnl Distribution version string
  dnl
-diff -Naur c/src/backends/Makefile.am d/src/backends/Makefile.am
---- c/src/backends/Makefile.am	2012-02-28 02:57:16.000000000 +1100
-+++ d/src/backends/Makefile.am	2012-04-02 21:01:46.000000000 +1000
+--- NetworkManager.orig/src/backends/Makefile.am	2012-02-27 16:57:16.000000000 +0100
++++ NetworkManager/src/backends/Makefile.am	2012-04-06 22:37:12.048039800 +0200
 @@ -64,6 +64,10 @@
  libnmbackend_la_SOURCES += NetworkManagerExherbo.c
  endif
@@ -163,9 +158,8 @@ diff -Naur c/src/backends/Makefile.am d/src/backends/Makefile.am
  libnmbackend_la_LIBADD += \
  	$(top_builddir)/src/logging/libnm-logging.la \
  	$(LIBNL_LIBS) \
-diff -Naur c/src/backends/Makefile.in d/src/backends/Makefile.in
---- c/src/backends/Makefile.in	2012-03-24 07:11:29.000000000 +1100
-+++ d/src/backends/Makefile.in	2012-04-02 21:13:10.000000000 +1000
+--- NetworkManager.orig/src/backends/Makefile.in	2012-04-06 22:38:33.881814082 +0200
++++ NetworkManager/src/backends/Makefile.in	2012-04-06 22:40:31.979373228 +0200
 @@ -47,6 +47,7 @@
  @TARGET_PARDUS_TRUE@am__append_11 = NetworkManagerPardus.c
  @TARGET_LINEXA_TRUE@am__append_12 = NetworkManagerLinexa.c
@@ -197,8 +191,8 @@ diff -Naur c/src/backends/Makefile.in d/src/backends/Makefile.in
 +	$(am__objects_10) $(am__objects_11) $(am__objects_12) \
 +	$(am__objects_13)
  libnmbackend_la_OBJECTS = $(am_libnmbackend_la_OBJECTS)
- AM_V_lt = $(am__v_lt_$(V))
- am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
+ AM_V_lt = $(am__v_lt_@AM_V@)
+ am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 @@ -381,7 +385,7 @@
  	$(am__append_2) $(am__append_3) $(am__append_4) \
  	$(am__append_5) $(am__append_6) $(am__append_7) \
@@ -216,33 +210,30 @@ diff -Naur c/src/backends/Makefile.in d/src/backends/Makefile.in
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnmbackend_la-NetworkManagerLinexa.Plo@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnmbackend_la-NetworkManagerMandriva.Plo@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnmbackend_la-NetworkManagerPaldo.Plo@am__quote@
-@@ -591,6 +596,14 @@
+@@ -575,6 +580,13 @@
  @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
- @am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnmbackend_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnmbackend_la-NetworkManagerExherbo.lo `test -f 'NetworkManagerExherbo.c' || echo '$(srcdir)/'`NetworkManagerExherbo.c
+ @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnmbackend_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnmbackend_la-NetworkManagerExherbo.lo `test -f 'NetworkManagerExherbo.c' || echo '$(srcdir)/'`NetworkManagerExherbo.c
  
 +libnmbackend_la-NetworkManagerLFS.lo: NetworkManagerLFS.c
 +@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnmbackend_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libnmbackend_la-NetworkManagerLFS.lo -MD -MP -MF $(DEPDIR)/libnmbackend_la-NetworkManagerLFS.Tpo -c -o libnmbackend_la-NetworkManagerLFS.lo `test -f 'NetworkManagerLFS.c' || echo '$(srcdir)/'`NetworkManagerLFS.c
 +@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libnmbackend_la-NetworkManagerLFS.Tpo $(DEPDIR)/libnmbackend_la-NetworkManagerLFS.Plo
-+@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
-+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='NetworkManagerLFS.c' object='libnmbackend_la-NetworkManagerLFS.lo' libtool=yes @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='NetworkManagerLFS.c' object='libnmbackend_la-NetworkManagerLFS.lo' libtool=yes @AMDEPBACKSLASH@
 +@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-+@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnmbackend_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnmbackend_la-NetworkManagerLFS.lo `test -f 'NetworkManagerLFS.c' || echo '$(srcdir)/'`NetworkManagerLFS.c
++@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnmbackend_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnmbackend_la-NetworkManagerLFS.lo `test -f 'NetworkManagerLFS.c' || echo '$(srcdir)/'`NetworkManagerLFS.c
 +
  mostlyclean-libtool:
  	-rm -f *.lo
  
-diff -Naur c/src/backends/NetworkManagerLFS.c d/src/backends/NetworkManagerLFS.c
---- c/src/backends/NetworkManagerLFS.c	1970-01-01 10:00:00.000000000 +1000
-+++ d/src/backends/NetworkManagerLFS.c	2012-04-02 22:09:39.000000000 +1000
-@@ -0,0 +1,55 @@
+--- NetworkManager.orig/src/backends/NetworkManagerLFS.c	1970-01-01 01:00:00.000000000 +0100
++++ NetworkManager/src/backends/NetworkManagerLFS.c	2012-04-06 22:37:12.049039821 +0200
+@@ -0,0 +1,70 @@
 +/* NetworkManager -- Network link manager
 + *
 + * Backend implementation for Beyond Linux From Scratch
 + * http://www.linuxfromscratch.org/blfs/
 + *
 + * Wayne Blaszczyk <wblaszcz@bigpond.net.au>
-+ *
-+ * Heavily based on NetworkManagerPaldo.c by Jürg Billeter <juerg@paldo.org>
++ * Armin K. <krejzi@email.com>
 + *
 + * Heavily based on NetworkManagerRedhat.c by Dan Williams <dcbw@redhat.com>
 + *
@@ -260,7 +251,7 @@ diff -Naur c/src/backends/NetworkManagerLFS.c d/src/backends/NetworkManagerLFS.c
 + * with this program; if not, write to the Free Software Foundation, Inc.,
 + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + *
-+ * (C) Copyright 2004 - 2012 Red Hat, Inc.
++ * (C) Copyright 2004 Red Hat, Inc.
 + * (C) Copyright 2006 Jürg Billeter
 + */
 +
@@ -268,25 +259,41 @@ diff -Naur c/src/backends/NetworkManagerLFS.c d/src/backends/NetworkManagerLFS.c
 +#include <config.h>
 +#endif
 +
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++
 +#include "NetworkManagerGeneric.h"
++#include "nm-system.h"
 +#include "NetworkManagerUtils.h"
 +#include "nm-logging.h"
 +
++/*
++ * nm_backend_enable_loopback
++ *
++ * Bring up the loopback interface
++ *
++ */
 +void nm_backend_enable_loopback (void)
 +{
-+       nm_spawn_process ("/etc/rc.d/init.d/localnet restart");
++        nm_generic_enable_loopback ();
 +}
 +
++/*
++ * nm_backend_update_dns
++ *
++ * Invalidate the nscd host cache, if it exists, since
++ * we changed resolv.conf.
++ *
++ */
 +void nm_backend_update_dns (void)
 +{
-+        if (g_file_test("/var/run/nscd/nscd.pid", G_FILE_TEST_EXISTS)) {
++        if (g_file_test("/var/run/nscd/nscd.pid", G_FILE_TEST_EXISTS))
 +               nm_log_info (LOGD_DNS, "Clearing nscd hosts cache.");
 +               nm_spawn_process ("/usr/sbin/nscd -i hosts");
-+    }
 +}
 +
 +int nm_backend_ipv6_use_tempaddr (void)
 +{
-+	return nm_generic_ipv6_use_tempaddr ();
++        return nm_generic_ipv6_use_tempaddr ();
 +}
-+
