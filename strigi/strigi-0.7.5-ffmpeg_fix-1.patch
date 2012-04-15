@@ -1,3 +1,8 @@
+Submitted By: Ragnar Thomsen (rthomsen at linuxfromscratch dot org)
+Date: 2012-04-15
+Initial Package Version: 0.7.5
+Description: Fixes compiling with FFmpeg.
+
 diff -ruN strigi-0.7.5.orig/libstreamanalyzer/plugins/endplugins/ffmpegendanalyzer.cpp strigi-0.7.5/libstreamanalyzer/plugins/endplugins/ffmpegendanalyzer.cpp
 --- strigi-0.7.5.orig/libstreamanalyzer/plugins/endplugins/ffmpegendanalyzer.cpp	2011-06-02 11:29:26.000000000 +0200
 +++ strigi-0.7.5/libstreamanalyzer/plugins/endplugins/ffmpegendanalyzer.cpp	2011-08-02 23:25:04.936181179 +0200
