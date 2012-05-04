@@ -1,6 +1,6 @@
 Submitted By:            Bruce Dubbs <bdubbs@linuxfromscratch.org>
 Date:                    2012-05-04
-Initial Package Version: 1.0.9
+Initial Package Version: 2.0.2
 Upstream Status:         In version control
 Origin:                  https://projects.kde.org/projects/extragear/multimedia/k3b/repository/revisions/2f845b34badb614882b7e38ac38b00041ac2832d/diff/plugins/decoder/ffmpeg/k3bffmpegwrapper.cpp
 Description:             Fixes k3b for newer ffmpeg releases
