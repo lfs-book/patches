@@ -12,7 +12,7 @@ diff -Naur icedtea-2.2-orig/Makefile.am icedtea-2.2/Makefile.am
  
  ICEDTEA_PATCHES =
  
-+DISTRIBUTION_PATCHES += patches/lfs-fixed-paths.patch
++DISTRIBUTION_PATCHES = patches/lfs-fixed-paths.patch
 +
  # Conditional patches
  
