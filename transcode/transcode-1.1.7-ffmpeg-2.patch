@@ -1,12 +1,12 @@
 Submitted By:            Armin K. <krejzi at email dot com>
-Date:                    2012-12-31
+Date:                    2013-01-05
 Initial Package Version: 1.1.7
 Upstream Status:         Unknown
-Origin:                  Archlinux
+Origin:                  Archlinux and Debian
 Description:             Fixes building against FFMpeg 1.0
 
 --- transcode.orig/encode/encode_lavc.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/encode/encode_lavc.c	2012-12-31 22:44:11.141652409 +0100
++++ transcode/encode/encode_lavc.c	2013-01-05 21:28:41.336682489 +0100
 @@ -1387,7 +1387,7 @@
                      pd->confdata.thread_count,
                      (pd->confdata.thread_count > 1) ?"s" :"");
@@ -17,7 +17,7 @@ Description:             Fixes building against FFMpeg 1.0
      pd->ff_vcodec = avcodec_find_encoder(FF_VCODEC_ID(pd));
      if (pd->ff_vcodec == NULL) {
 --- transcode.orig/export/export_ffmpeg.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/export/export_ffmpeg.c	2012-12-31 22:43:27.901967236 +0100
++++ transcode/export/export_ffmpeg.c	2013-01-05 21:28:41.338682520 +0100
 @@ -180,7 +180,7 @@
  
  
@@ -70,7 +70,16 @@ Description:             Fixes building against FFMpeg 1.0
                "(lavc_venc_context->codec->encode == NULL)");
        return TC_EXPORT_ERROR;
 --- transcode.orig/export/ffmpeg_cfg.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/export/ffmpeg_cfg.c	2012-12-31 22:37:31.197314927 +0100
++++ transcode/export/ffmpeg_cfg.c	2013-01-05 21:28:53.639872618 +0100
+@@ -126,7 +126,7 @@
+ //int lavc_param_atag = 0;
+ //int lavc_param_abitrate = 224;
+ 
+-char *lavc_param_video_preset = "medium";
++char *lavc_param_video_preset = NULL;
+ char *lavc_param_ffmpeg_datadir = "/usr/share/ffmpeg";
+ 
+ TCConfigEntry lavcopts_conf[]={
 @@ -160,9 +160,7 @@
      {"vcelim", &lavc_param_chroma_elim_threshold, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, -99, 99},
      {"vpsize", &lavc_param_packet_size, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, 0, 100000000},
@@ -99,8 +108,16 @@ Description:             Fixes building against FFMpeg 1.0
      {"ilme", &lavc_param_ilme, TCCONF_TYPE_FLAG, 0, 0, CODEC_FLAG_INTERLACED_ME},
      {"inter_threshold", &lavc_param_inter_threshold, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, -1000000, 1000000},
      {"sc_threshold", &lavc_param_sc_threshold, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, -1000000, 1000000},
+@@ -237,7 +231,6 @@
+     {"skip_top", &lavc_param_skip_top, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, 0, 1000},
+     {"skip_bottom", &lavc_param_skip_bottom, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, 0, 1000},
+     {"fps_code", &lavc_param_fps_code, TCCONF_TYPE_INT, TCCONF_FLAG_RANGE, 0, 9},
+-    {"vpre", &lavc_param_video_preset, TCCONF_TYPE_STRING, 0, 0, 0},
+     {"ffmpeg_datadir", &lavc_param_ffmpeg_datadir, TCCONF_TYPE_STRING, 0, 0, 0},
+     {NULL, NULL, 0, 0, 0, 0}
+ };
 --- transcode.orig/filter/filter_pp.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/filter/filter_pp.c	2012-12-31 22:37:31.197314927 +0100
++++ transcode/filter/filter_pp.c	2013-01-05 21:28:41.339682535 +0100
 @@ -38,8 +38,8 @@
  
  /* FIXME: these use the filter ID as an index--the ID can grow
@@ -113,7 +130,7 @@ Description:             Fixes building against FFMpeg 1.0
  static int pre[100];
  
 --- transcode.orig/import/decode_lavc.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/import/decode_lavc.c	2012-12-31 22:37:31.198314943 +0100
++++ transcode/import/decode_lavc.c	2013-01-05 21:28:41.340682551 +0100
 @@ -181,7 +181,7 @@
  #if LIBAVCODEC_VERSION_INT < ((52<<16)+(0<<8)+0)
    lavc_dec_context->error_resilience  = 2;
@@ -124,7 +141,7 @@ Description:             Fixes building against FFMpeg 1.0
    lavc_dec_context->error_concealment = 3;
    lavc_dec_context->workaround_bugs = FF_BUG_AUTODETECT;
 --- transcode.orig/import/import_ffmpeg.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/import/import_ffmpeg.c	2012-12-31 22:37:31.199314958 +0100
++++ transcode/import/import_ffmpeg.c	2013-01-05 21:28:41.340682551 +0100
 @@ -314,7 +314,7 @@
  #if LIBAVCODEC_VERSION_INT < ((52<<16)+(0<<8)+0)
      lavc_dec_context->error_resilience  = 2;
@@ -135,7 +152,7 @@ Description:             Fixes building against FFMpeg 1.0
      lavc_dec_context->error_concealment = 3;
      lavc_dec_context->workaround_bugs = FF_BUG_AUTODETECT;
 --- transcode.orig/import/probe_ffmpeg.c	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/import/probe_ffmpeg.c	2012-12-31 22:37:31.199314958 +0100
++++ transcode/import/probe_ffmpeg.c	2013-01-05 21:28:41.341682566 +0100
 @@ -99,8 +99,8 @@
  
      TC_INIT_LIBAVCODEC;
@@ -148,7 +165,7 @@ Description:             Fixes building against FFMpeg 1.0
          tc_log_error(__FILE__, "unable to open '%s'"
                                 " (libavformat failure)",
 --- transcode.orig/libtc/tcavcodec.h	2011-11-19 17:50:27.000000000 +0100
-+++ transcode/libtc/tcavcodec.h	2012-12-31 22:37:31.200314974 +0100
++++ transcode/libtc/tcavcodec.h	2013-01-05 21:28:41.341682566 +0100
 @@ -53,7 +53,6 @@
  
  #define TC_INIT_LIBAVCODEC do { \
