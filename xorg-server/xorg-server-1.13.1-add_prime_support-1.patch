@@ -3,7 +3,7 @@ Date:                    2012-12-30
 Initial Package Version: 1.13.1
 Upstream Status:         Not submitted.
 Origin:                  Upstream mailing list.
-Description:             Adds PRIME support to Xorg Server to make GPU switching work.
+Description:             Adds PRIME support to Xorg Server to make GPU offloading work.
 
 --- xorg-server.orig/hw/xfree86/common/xf86Init.c	2012-10-14 01:38:50.000000000 +0200
 +++ xorg-server/hw/xfree86/common/xf86Init.c	2012-12-01 19:51:53.249922134 +0100
