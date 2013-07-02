@@ -1,8 +1,8 @@
 Submitted By:            Armin K. <krejzi at email dot com>
-Date:                    2013-06-02
+Date:                    2013-07-02
 Initial Package Version: 3.15
 Upstream Status:         Not applicable
-Origin:                  Based on dj's original patch, rediffed for 3.15
+Origin:                  Based on dj's original patch, rediffed and modified for 3.15
 Description:             Adds auto-generated nss.pc and nss-config script, and allows
                          building without nspr in the source tree.
 
