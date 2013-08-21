@@ -1,0 +1,108 @@
+Submitted By:            Matt Burgess <matthew_at_linuxfromscratch_dot_org>
+Date:                    2013-08-20
+Initial Package Version: 5.1
+Upstream Status:         From Upstream
+Origin:                  http://lists.gnu.org/archive/html/texinfo-commits/2013-
+08/msg00021.html, http://lists.gnu.org/archive/html/texinfo-commits/2013-08/msg0
+0022.html, and http://lists.gnu.org/archive/html/texinfo-commits/2013-08/msg00027.html
+Description:             Fixes test failures triggered by Perl-5.18.x.  
+
+diff -Naur texinfo-5.1.orig/Pod-Simple-Texinfo/pod2texi.pl texinfo-5.1/Pod-Simple-Texinfo/pod2texi.pl
+--- texinfo-5.1.orig/Pod-Simple-Texinfo/pod2texi.pl	2013-02-23 00:11:25.000000000 +0000
++++ texinfo-5.1/Pod-Simple-Texinfo/pod2texi.pl	2013-08-20 21:27:24.061501192 +0000
+@@ -25,6 +25,7 @@
+ use File::Spec;
+ 
+ Getopt::Long::Configure("gnu_getopt");
++#use Pod::Simple::Debug (4);
+ 
+ BEGIN
+ {
+diff -Naur texinfo-5.1.orig/Pod-Simple-Texinfo/t/Pod-Simple-Texinfo.t texinfo-5.1/Pod-Simple-Texinfo/t/Pod-Simple-Texinfo.t
+--- texinfo-5.1.orig/Pod-Simple-Texinfo/t/Pod-Simple-Texinfo.t	2013-02-19 22:25:28.000000000 +0000
++++ texinfo-5.1/Pod-Simple-Texinfo/t/Pod-Simple-Texinfo.t	2013-08-20 21:20:57.471931735 +0000
+@@ -50,6 +50,10 @@
+ 
+ ', 'index in head');
+ 
++TODO: {
++
++local $TODO = 'Pod::Simple not ignoring correctly X<>';
++
+ run_test ('=head1 NAME
+ X<aaa>
+ ',
+@@ -59,6 +63,8 @@
+ 
+ ', 'index in head node', 1, 2);
+ 
++}
++
+ run_test ('=head1 NAME
+ 
+ T@c
+@@ -138,6 +144,8 @@
+ run_test('=over
+ 
+ =item L</somewhere>
++
++=back
+ ', '@table @asis
+ @item @ref{somewhere}
+ @anchor{somewhere}
+@@ -176,6 +184,7 @@
+ 
+ =item a L<pod2latex|pod2latex>
+ 
++=back
+ ', '@table @asis
+ @item a @ref{, pod2text,, pod2text}
+ @anchor{a pod2text}
+@@ -301,4 +310,3 @@
+ ','cpp lines in formats');
+ 
+ 1;
+-
+diff -Naur texinfo-5.1.orig/tp/Texinfo/Convert/HTML.pm texinfo-5.1/tp/Texinfo/Convert/HTML.pm
+--- texinfo-5.1.orig/tp/Texinfo/Convert/HTML.pm	2013-02-19 22:25:46.000000000 +0000
++++ texinfo-5.1/tp/Texinfo/Convert/HTML.pm	2013-08-20 20:46:38.578190966 +0000
+@@ -7069,7 +7069,7 @@
+       $parser_for_renamed_nodes = $self->{'parser'}->parser();
+     }
+     my %warned_new_node;
+-    foreach my $old_node_name (keys(%{$self->{'renamed_nodes'}})) {
++    foreach my $old_node_name (sort(keys(%{$self->{'renamed_nodes'}}))) {
+       my $parsed_old_node = $self->_parse_node_and_warn_external(
+          $old_node_name, $parser_for_renamed_nodes,
+          $self->{'renamed_nodes_lines'}->{$old_node_name},
+diff -Naur texinfo-5.1.orig/tp/tests/formatting/res_parser/unknown_nodes_renamed/unknown_nodes_renamed.2 texinfo-5.1/tp/tests/formatting/res_parser/unknown_nodes_renamed/unknown_nodes_renamed.2
+--- texinfo-5.1.orig/tp/tests/formatting/res_parser/unknown_nodes_renamed/unknown_nodes_renamed.2	2013-02-19 22:25:45.000000000 +0000
++++ texinfo-5.1/tp/tests/formatting/res_parser/unknown_nodes_renamed/unknown_nodes_renamed.2	2013-08-20 20:47:41.874513472 +0000
+@@ -1,2 +1,2 @@
+ unknown_nodes_renamed.texi: warning: must specify a title with a title command or @top
+-unknown_nodes_renamed-noderename.cnf:3: warning: target node (new name for `unknown node 2') not in document: renamed as unknow too
++unknown_nodes_renamed-noderename.cnf:3: warning: target node (new name for `Unknown node 1') not in document: renamed as unknow too
+diff -Naur texinfo-5.1.orig/tp/tests/sectioning/res_parser/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2 texinfo-5.1/tp/tests/sectioning/res_parser/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2
+--- texinfo-5.1.orig/tp/tests/sectioning/res_parser/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2	2013-02-19 22:25:44.000000000 +0000
++++ texinfo-5.1/tp/tests/sectioning/res_parser/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2	2013-08-20 20:49:52.357178253 +0000
+@@ -7,7 +7,7 @@
+ equivalent_nodes-noderename.cnf:8: warning: no node to be renamed
+ equivalent_nodes-noderename.cnf:10: warning: nodes without a new name at the end of file
+ equivalent_nodes.texi: warning: must specify a title with a title command or @top
++equivalent_nodes-noderename.cnf: file empty for renamed node `@strong{}'
+ equivalent_nodes-noderename.cnf: old name for `ToP' is a node of the document
+ equivalent_nodes-noderename.cnf: old name for `Top' is a node of the document
+-equivalent_nodes-noderename.cnf: file empty for renamed node `@strong{}'
+ equivalent_nodes-noderename.cnf: warning: target node (new name for `old non existing') not in document: non existing file
+diff -Naur texinfo-5.1.orig/tp/tests/sectioning/res_parser_html/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2 texinfo-5.1/tp/tests/sectioning/res_parser_html/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2
+--- texinfo-5.1.orig/tp/tests/sectioning/res_parser_html/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2	2013-02-19 22:25:44.000000000 +0000
++++ texinfo-5.1/tp/tests/sectioning/res_parser_html/equivalent_nodes_test_renamed_nodes/equivalent_nodes.2	2013-08-20 20:51:04.571546141 +0000
+@@ -7,7 +7,7 @@
+ equivalent_nodes-noderename.cnf:8: warning: no node to be renamed
+ equivalent_nodes-noderename.cnf:10: warning: nodes without a new name at the end of file
+ equivalent_nodes.texi: warning: must specify a title with a title command or @top
++equivalent_nodes-noderename.cnf: file empty for renamed node `@strong{}'
+ equivalent_nodes-noderename.cnf: old name for `ToP' is a node of the document
+ equivalent_nodes-noderename.cnf: old name for `Top' is a node of the document
+-equivalent_nodes-noderename.cnf: file empty for renamed node `@strong{}'
+ equivalent_nodes-noderename.cnf: warning: target node (new name for `old non existing') not in document: non existing file
