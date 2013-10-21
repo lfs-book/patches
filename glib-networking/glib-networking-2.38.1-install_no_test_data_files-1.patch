@@ -1,0 +1,31 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2013-10-21
+Initial Package Version: 2.38.1
+Upstream Status: Committed
+Origin: upstream
+URL: http://osdir.com/ml/commits.gnome/2013-10/msg04725.html
+Description: Avoid creating /files and installing there some test data files
+
+diff -Naur glib-networking-2.38.1.orig/tls/tests/Makefile.am glib-networking-2.38.1/tls/tests/Makefile.am
+--- glib-networking-2.38.1.orig/tls/tests/Makefile.am	2013-10-15 10:25:27.000000000 -0300
++++ glib-networking-2.38.1/tls/tests/Makefile.am	2013-10-21 15:23:14.432404307 -0300
+@@ -36,7 +36,7 @@
+ endif
+ 
+ testfilesdir = $(installed_testdir)/files
+-testfiles_DATA =				\
++testfiles_data = \
+ 	files/ca.pem				\
+ 	files/ca-roots.pem			\
+ 	files/ca-verisign-sha1.pem		\
+@@ -54,4 +54,9 @@
+ 	files/server-self.pem			\
+ 	$(NULL)
+ 
+-EXTRA_DIST += $(testfiles_DATA)
++if ENABLE_INSTALLED_TESTS
++testfilesdir = $(installed_testdir)/files
++testfiles_DATA = $(testfiles_data)
++endif
++
++EXTRA_DIST += $(testfiles_data)
