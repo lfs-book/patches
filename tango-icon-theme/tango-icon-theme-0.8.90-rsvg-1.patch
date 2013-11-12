@@ -1,0 +1,39 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2013-11-12
+Initial Package Version: 0.8.90
+Upstream Status:         Unknown
+Origin:                  PhantomX SlackBuilds
+Description:             Fixes building with newer librsvg.
+
+diff -Naur tango-icon-theme-0.8.90.orig/configure.ac tango-icon-theme-0.8.90/configure.ac
+--- tango-icon-theme-0.8.90.orig/configure.ac	2009-02-26 04:06:20.000000000 +0100
++++ tango-icon-theme-0.8.90/configure.ac	2013-11-12 21:55:27.530985379 +0100
+@@ -82,7 +82,7 @@
+    PKG_CHECK_EXISTS([librsvg-2.0 >= 2.12.3],
+                     [enable_large_bitmaps=yes], [enable_large_bitmaps=no])
+    if test "x$enable_large_bitmaps" = "xyes"; then
+-      svgconvert_prog="rsvg"
++      svgconvert_prog="rsvg-convert"
+    else
+       svgconvert_prog="ksvgtopng"
+    fi
+diff -Naur tango-icon-theme-0.8.90.orig/svg2png.sh.in tango-icon-theme-0.8.90/svg2png.sh.in
+--- tango-icon-theme-0.8.90.orig/svg2png.sh.in	2007-02-16 21:04:29.000000000 +0100
++++ tango-icon-theme-0.8.90/svg2png.sh.in	2013-11-12 21:55:27.531985366 +0100
+@@ -9,12 +9,14 @@
+ 
+ ICONFILE=`basename ${3}`
+ ICONNAME=`echo ${ICONFILE} | sed -e "s/.svg//"`
+-if test `basename $SVGCONVERT` = "rsvg"; then
++if test `basename $SVGCONVERT` = "rsvg-convert"; then
+     OPTIONS="-w ${1} -h ${1}"
++    OUTPUT="-o"
+ else
+     OPTIONS="${1} ${1}"
++    OUTPUT=""
+ fi
+ 
+ echo "${SVGCONVERT} ${OPTIONS} ${3} ${2}/${ICONNAME}.png"
+-${SVGCONVERT} ${OPTIONS} ${3} ${2}/${ICONNAME}.png
++${SVGCONVERT} ${OPTIONS} ${3} ${OUTPUT} ${2}/${ICONNAME}.png
+ 
