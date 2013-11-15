@@ -1,0 +1,36 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2013-11-15
+Initial Package Version: 1.6.5
+Upstream Status:         Reported
+Origin:                  Me
+Description:             Fixes building with libcdio media detection method.
+
+diff -Naur simpleburn-1.6.5.orig/src/common-detection.c simpleburn-1.6.5/src/common-detection.c
+--- simpleburn-1.6.5.orig/src/common-detection.c	2012-08-05 13:46:15.000000000 +0200
++++ simpleburn-1.6.5/src/common-detection.c	2013-11-15 15:47:52.793036164 +0100
+@@ -1,3 +1,9 @@
++#ifdef LIBCDIO_DETECTION
++#include <cdio/cdio.h>
++#include <cdio/cd_types.h>
++#include <cdio/mmc.h>
++#endif
++
+ #include "t_cdinfos.h"
+ #include "config.h"
+ 
+diff -Naur simpleburn-1.6.5.orig/src/simpleburn.c simpleburn-1.6.5/src/simpleburn.c
+--- simpleburn-1.6.5.orig/src/simpleburn.c	2012-08-05 13:47:32.000000000 +0200
++++ simpleburn-1.6.5/src/simpleburn.c	2013-11-15 15:49:43.281036964 +0100
+@@ -10,12 +10,6 @@
+ #include <glob.h>
+ #include <signal.h>
+ 
+-#ifdef LIBCDIO_DETECTION
+-#include <cdio/cdio.h>
+-#include <cdio/cd_types.h>
+-#include <cdio/mmc.h>
+-#endif
+-
+ #include "config.h"
+ 
+ GtkBuilder *xml;
