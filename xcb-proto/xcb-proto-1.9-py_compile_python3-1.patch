@@ -1,0 +1,60 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2013-11-23
+Initial Package Version: 1.9
+Upstream Status: Not Submitted
+Origin: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Description: Fixes make install with Python3
+
+--- xcb-proto-1.9/py-compile.orig	2013-01-10 20:14:12.000000000 -0300
++++ xcb-proto-1.9/py-compile	2012-10-05 09:43:56.000000000 -0300
+@@ -99,38 +117,38 @@
+ fi
+ 
+ $PYTHON -c "
+-import sys, os, string, py_compile
++import sys, os, py_compile
+ 
+ files = '''$files'''
+ 
+-print 'Byte-compiling python modules...'
+-for file in string.split(files):
++sys.stdout.write('Byte-compiling python modules...\n')
++for file in files.split():
+     $pathtrans
+     $filetrans
+     if not os.path.exists(filepath) or not (len(filepath) >= 3
+                                             and filepath[-3:] == '.py'):
+-	continue
+-    print file,
++	    continue
++    sys.stdout.write(file)
+     sys.stdout.flush()
+     py_compile.compile(filepath, filepath + 'c', path)
+-print" || exit $?
++sys.stdout.write('\n')" || exit $?
+ 
+ # this will fail for python < 1.5, but that doesn't matter ...
+ $PYTHON -O -c "
+-import sys, os, string, py_compile
++import sys, os, py_compile
+ 
+ files = '''$files'''
+-print 'Byte-compiling python modules (optimized versions) ...'
+-for file in string.split(files):
++sys.stdout.write('Byte-compiling python modules (optimized versions) ...\n')
++for file in files.split():
+     $pathtrans
+     $filetrans
+     if not os.path.exists(filepath) or not (len(filepath) >= 3
+                                             and filepath[-3:] == '.py'):
+-	continue
+-    print file,
++	    continue
++    sys.stdout.write(file)
+     sys.stdout.flush()
+     py_compile.compile(filepath, filepath + 'o', path)
+-print" 2>/dev/null || :
++sys.stdout.write('\n')" 2>/dev/null || :
+ 
+ # Local Variables:
+ # mode: shell-script
