@@ -1,0 +1,24 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2013-12-01
+Initial Package Version: 2.2.2
+Upstream Status: Unknown
+Origin: Fernando de Oliveira
+URL: 
+Description: Fixes build with FreeType-2.5.1
+
+diff -Naur webkitgtk-2.2.2/Source/WebCore/platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp.orig webkitgtk-2.2.2/Source/WebCore/platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp
+--- webkitgtk-2.2.2/Source/WebCore/platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp.orig	2013-11-11 05:32:35.000000000 -0300
++++ webkitgtk-2.2.2/Source/WebCore/platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp	2013-12-01 09:46:15.091576910 -0300
+@@ -39,8 +39,9 @@
+ #include "TextEncoding.h"
+ #include <cairo-ft.h>
+ #include <cairo.h>
+-#include <freetype/freetype.h>
+-#include <freetype/tttables.h>
++#include <ft2build.h>
++#include FT_FREETYPE_H
++#include FT_TRUETYPE_TABLES_H
+ #include <hb.h>
+ #include <wtf/text/CString.h>
+ 
+
