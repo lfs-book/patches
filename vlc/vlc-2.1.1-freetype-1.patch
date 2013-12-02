@@ -1,0 +1,21 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2013-12-02
+Initial Package Version: 2.1.1
+Upstream Status: Unknown
+Origin: Fernando de Oliveira
+URL: 
+Description: Fixes build with FreeType-2.5.1
+
+diff -Naur vlc-2.1.1.orig/modules/text_renderer/freetype.c vlc-2.1.1/modules/text_renderer/freetype.c
+--- vlc-2.1.1.orig/modules/text_renderer/freetype.c	2013-09-12 12:18:34.000000000 -0300
++++ vlc-2.1.1/modules/text_renderer/freetype.c	2013-12-02 13:14:22.312976917 -0300
+@@ -90,7 +90,8 @@
+ #endif
+ 
+ /* Freetype */
+-#include <freetype/ftsynth.h>
++#include <ft2build.h>
++#include FT_SYNTHESIS_H
+ #include FT_FREETYPE_H
+ #include FT_GLYPH_H
+ #include FT_STROKER_H
