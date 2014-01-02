@@ -1,0 +1,31 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-01-01
+Initial Package Version: 2.1.1
+Upstream Status:         Committed (we are using a version modified by Armin K.)
+Origin:                  videolan
+URL:                     http://git.videolan.org/?p=ffmpeg.git;a=patch;h=8c79730a8e2c526367aaf760a53a75e4d9c42106
+Description:             Fixes build with FreeType-2.5.x
+
+diff -Naur a/configure b/configure
+--- a/configure	2013-11-20 03:29:07.000000000 +0100
++++ b/configure	2014-01-01 18:45:08.985974286 +0100
+@@ -4242,7 +4242,7 @@
+ enabled libfdk_aac        && require libfdk_aac fdk-aac/aacenc_lib.h aacEncOpen -lfdk-aac
+ flite_libs="-lflite_cmu_time_awb -lflite_cmu_us_awb -lflite_cmu_us_kal -lflite_cmu_us_kal16 -lflite_cmu_us_rms -lflite_cmu_us_slt -lflite_usenglish -lflite_cmulex -lflite"
+ enabled libflite          && require2 libflite "flite/flite.h" flite_init $flite_libs
+-enabled libfreetype       && require_pkg_config freetype2 "ft2build.h freetype/freetype.h" FT_Init_FreeType
++enabled libfreetype       && require_pkg_config freetype2 "freetype2/ft2build.h freetype2/freetype.h" FT_Init_FreeType
+ enabled libgme            && require  libgme gme/gme.h gme_new_emu -lgme -lstdc++
+ enabled libgsm            && { for gsm_hdr in "gsm.h" "gsm/gsm.h"; do
+                                    check_lib "${gsm_hdr}" gsm_create -lgsm && break;
+diff -Naur a/libavfilter/vf_drawtext.c b/libavfilter/vf_drawtext.c
+--- a/libavfilter/vf_drawtext.c	2013-11-20 03:28:56.000000000 +0100
++++ b/libavfilter/vf_drawtext.c	2014-01-01 18:46:32.657393182 +0100
+@@ -48,7 +48,6 @@
+ #include "video.h"
+ 
+ #include <ft2build.h>
+-#include <freetype/config/ftheader.h>
+ #include FT_FREETYPE_H
+ #include FT_GLYPH_H
+ #if CONFIG_FONTCONFIG
