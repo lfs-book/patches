@@ -1,0 +1,46 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2014-01-15
+Initial Package Version: 3.0
+Upstream Status:         Fixed
+Origin:                  Upstream
+Description:             Fixes building the lexers with bison versions at and after 2.6.
+
+diff -Naur netsurf-full-3.0.orig/src/nsgenbind-0.0.1/src/nsgenbind-lexer.l netsurf-full-3.0/src/nsgenbind-0.0.1/src/nsgenbind-lexer.l
+--- netsurf-full-3.0.orig/src/nsgenbind-0.0.1/src/nsgenbind-lexer.l	2013-04-18 23:59:18.000000000 +0200
++++ netsurf-full-3.0/src/nsgenbind-0.0.1/src/nsgenbind-lexer.l	2014-01-15 17:01:48.671826076 +0100
+@@ -19,6 +19,16 @@
+     yylloc->first_column = yylloc->last_column + 1; \
+     yylloc->last_column += yyleng;
+ 
++
++/* Ensure compatability with bison 2.6 and later */
++#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED && defined NSGENBIND_STYPE_IS_DECLARED
++#define YYSTYPE NSGENBIND_STYPE
++#endif
++
++#if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED && defined NSGENBIND_LTYPE_IS_DECLARED
++#define YYLTYPE NSGENBIND_LTYPE
++#endif
++
+ %}
+ 
+ /* lexer options */
+diff -Naur netsurf-full-3.0.orig/src/nsgenbind-0.0.1/src/webidl-lexer.l netsurf-full-3.0/src/nsgenbind-0.0.1/src/webidl-lexer.l
+--- netsurf-full-3.0.orig/src/nsgenbind-0.0.1/src/webidl-lexer.l	2013-04-18 23:59:18.000000000 +0200
++++ netsurf-full-3.0/src/nsgenbind-0.0.1/src/webidl-lexer.l	2014-01-15 17:01:48.671826076 +0100
+@@ -27,6 +27,15 @@
+     yylloc->first_column = yylloc->last_column + 1; \
+     yylloc->last_column += yyleng;
+ 
++/* Ensure compatability with bison 2.6 and later */
++#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED && defined WEBIDL_STYPE_IS_DECLARED
++#define YYSTYPE WEBIDL_STYPE
++#endif
++
++#if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED && defined WEBIDL_LTYPE_IS_DECLARED
++#define YYLTYPE WEBIDL_LTYPE
++#endif
++
+ %}
+ 
+ 
