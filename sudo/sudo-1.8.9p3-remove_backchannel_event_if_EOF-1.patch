@@ -1,0 +1,30 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2014-01-15
+Initial Package Version: 1.8.9p3
+Upstream Status: Fixed
+Origin: Upstream
+URL:http://www.sudo.ws/bugs/show_bug.cgi?id=631
+Description: Sudo consumes full CPU while waiting on child process 
+
+--- a/src/exec.c	Tue Jan 14 09:26:14 2014 -0700
++++ b/src/exec.c	Tue Jan 14 10:54:56 2014 -0700
+@@ -230,11 +230,14 @@
+ 	    /* Short read or EOF. */
+ 	    sudo_debug_printf(SUDO_DEBUG_ERROR,
+ 		"failed to read child status: %s", n ? "short read" : "EOF");
+-	    /*
+-	     * If not logging I/O we may get EOF when the command is
+-	     * executed and sv is closed.  It is safe to ignore this.
+-	     */
+-	    if (ec->log_io || n != 0) {
++	    if (!ec->log_io && n == 0) {
++		/*
++		 * If not logging I/O we may get EOF when the command is
++		 * executed and the other end of the backchannel is closed.
++		 * Just remove the event in this case.
++		 */
++		(void)sudo_ev_del(ec->evbase, backchannel_event);
++	    } else {
+ 		/* XXX - need new CMD_ type for monitor errors. */
+ 		errno = n ? EIO : ECONNRESET;
+ 		ec->cstat->type = CMD_ERRNO;
