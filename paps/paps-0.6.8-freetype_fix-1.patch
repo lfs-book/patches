@@ -1,0 +1,20 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2014-02-13
+Initial Package Version: 0.6.8
+Upstream Status: Unknown
+Origin: Found at debian
+Description: Fixes build with freetype-2.5.1
+
+diff -Naur paps-0.6.8.orig/src/libpaps.c paps-0.6.8/src/libpaps.c
+--- paps-0.6.8.orig/src/libpaps.c	2007-01-19 11:17:11.000000000 +0000
++++ paps-0.6.8/src/libpaps.c	2014-02-13 16:16:04.478205343 +0000
+@@ -25,8 +25,7 @@
+ 
+ #include <pango/pango.h>
+ #include <pango/pangoft2.h>
+-#include <freetype/ftglyph.h>
+-#include <freetype/ftoutln.h>
++#include <ftglyph.h>
+ #include <errno.h>
+ #include <stdlib.h>
+ #include <stdio.h>
