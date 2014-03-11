@@ -1,6 +1,12 @@
-diff -Naur a/cmulocal/sasl2.m4 b/cmulocal/sasl2.m4
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-03-11
+Initial Package Version: 2.1.26
+Upstream Status:         Unknown
+Origin:                  Debian and Gentoo
+Description:             Various package fixes, including autotools fixes, plugin fixes, security fixes, parallel build fixes, etc.
+
 --- a/cmulocal/sasl2.m4	2012-11-06 20:14:29.000000000 +0100
-+++ b/cmulocal/sasl2.m4	2014-03-11 20:07:57.604918434 +0100
++++ b/cmulocal/sasl2.m4	2014-03-11 20:15:44.921995241 +0100
 @@ -112,9 +112,6 @@
    fi
  
@@ -19,9 +25,8 @@ diff -Naur a/cmulocal/sasl2.m4 b/cmulocal/sasl2.m4
    AC_CHECK_FUNCS(gss_decapsulate_token)
    AC_CHECK_FUNCS(gss_encapsulate_token)
    AC_CHECK_FUNCS(gss_oid_equal)
-diff -Naur a/config/kerberos_v4.m4 b/config/kerberos_v4.m4
 --- a/config/kerberos_v4.m4	2012-01-28 00:31:36.000000000 +0100
-+++ b/config/kerberos_v4.m4	2014-03-11 20:07:57.604918434 +0100
++++ b/config/kerberos_v4.m4	2014-03-11 20:15:44.922995258 +0100
 @@ -89,18 +89,18 @@
      dnl if we were ambitious, we would look more aggressively for the
      dnl krb4 install
@@ -45,9 +50,8 @@ diff -Naur a/config/kerberos_v4.m4 b/config/kerberos_v4.m4
         fi
         LDFLAGS="$LDFLAGS -L$krb4/lib"
      fi
-diff -Naur a/config.h.in b/config.h.in
 --- a/config.h.in	2012-11-06 20:20:59.000000000 +0100
-+++ b/config.h.in	2014-03-11 20:07:57.604918434 +0100
++++ b/config.h.in	2014-03-11 20:15:44.922995258 +0100
 @@ -126,6 +126,10 @@
     */
  #undef HAVE_GSSKRB5_REGISTER_ACCEPTOR_IDENTITY
@@ -59,9 +63,8 @@ diff -Naur a/config.h.in b/config.h.in
  /* Define if your GSSAPI implementation defines GSS_C_NT_HOSTBASED_SERVICE */
  #undef HAVE_GSS_C_NT_HOSTBASED_SERVICE
  
-diff -Naur a/configure.in b/configure.in
 --- a/configure.in	2012-10-12 16:05:48.000000000 +0200
-+++ b/configure.in	2014-03-11 20:07:57.605918451 +0100
++++ b/configure.in	2014-03-11 20:15:44.922995258 +0100
 @@ -44,6 +44,8 @@
  AC_INIT(lib/saslint.h)
  AC_PREREQ([2.54])
@@ -114,9 +117,8 @@ diff -Naur a/configure.in b/configure.in
  
  AC_OUTPUT(Makefile
  libsasl2.pc
-diff -Naur a/include/sasl.h b/include/sasl.h
 --- a/include/sasl.h	2012-10-12 16:05:48.000000000 +0200
-+++ b/include/sasl.h	2014-03-11 20:07:57.605918451 +0100
++++ b/include/sasl.h	2014-03-11 20:15:44.923995276 +0100
 @@ -223,6 +223,8 @@
   * they must be called before all other SASL functions:
   */
@@ -126,9 +128,8 @@ diff -Naur a/include/sasl.h b/include/sasl.h
  /* memory allocation functions which may optionally be replaced:
   */
  typedef void *sasl_malloc_t(size_t);
-diff -Naur a/java/CyrusSasl/Makefile.am b/java/CyrusSasl/Makefile.am
 --- a/java/CyrusSasl/Makefile.am	2012-01-28 00:31:36.000000000 +0100
-+++ b/java/CyrusSasl/Makefile.am	2014-03-11 20:07:57.606918468 +0100
++++ b/java/CyrusSasl/Makefile.am	2014-03-11 20:15:44.923995276 +0100
 @@ -28,7 +28,7 @@
  javasasldir = $(prefix)/lib/java/classes/sasl/CyrusSasl
  javahtmldir = $(prefix)/html/sasl
@@ -138,9 +139,8 @@ diff -Naur a/java/CyrusSasl/Makefile.am b/java/CyrusSasl/Makefile.am
  
  javasasl_JAVA = Sasl.java GenericClient.java \
  		ClientFactory.java \
-diff -Naur a/lib/auxprop.c b/lib/auxprop.c
 --- a/lib/auxprop.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/lib/auxprop.c	2014-03-11 20:07:57.606918468 +0100
++++ b/lib/auxprop.c	2014-03-11 20:15:44.923995276 +0100
 @@ -43,6 +43,7 @@
   */
  
@@ -160,9 +160,8 @@ diff -Naur a/lib/auxprop.c b/lib/auxprop.c
  	_sasl_log(sparams->utils->conn, SASL_LOG_DEBUG,
  		  "could not find auxprop plugin, was searching for '%s'",
  		  plist ? plist : "[all]");
-diff -Naur a/lib/dlopen.c b/lib/dlopen.c
 --- a/lib/dlopen.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/lib/dlopen.c	2014-03-11 20:07:57.606918468 +0100
++++ b/lib/dlopen.c	2014-03-11 20:15:44.924995293 +0100
 @@ -247,105 +247,6 @@
      return result;
  }
@@ -295,9 +294,8 @@ diff -Naur a/lib/dlopen.c b/lib/dlopen.c
  		/* skip "lib" and cut off suffix --
  		   this only need be approximate */
  		strcpy(plugname, name + 3);
-diff -Naur a/lib/Makefile.am b/lib/Makefile.am
 --- a/lib/Makefile.am	2012-10-12 16:05:48.000000000 +0200
-+++ b/lib/Makefile.am	2014-03-11 20:07:57.607918485 +0100
++++ b/lib/Makefile.am	2014-03-11 20:15:44.924995293 +0100
 @@ -45,7 +45,7 @@
  # CURRENT:REVISION:AGE
  sasl_version = 3:0:0
@@ -327,9 +325,8 @@ diff -Naur a/lib/Makefile.am b/lib/Makefile.am
  	@for i in ./libsasl2.la ../sasldb/libsasldb.la ../plugins/lib*.la; do \
  	if test ! -f $$i; then continue; fi; . $$i; \
  	for j in $$dependency_libs foo; do \
-diff -Naur a/Makefile.am b/Makefile.am
 --- a/Makefile.am	2012-10-12 16:05:48.000000000 +0200
-+++ b/Makefile.am	2014-03-11 20:07:57.607918485 +0100
++++ b/Makefile.am	2014-03-11 20:15:44.924995293 +0100
 @@ -43,6 +43,8 @@
  #
  ################################################################
@@ -339,9 +336,8 @@ diff -Naur a/Makefile.am b/Makefile.am
  if SASLAUTHD
  SAD = saslauthd
  else
-diff -Naur a/plugins/gssapi.c b/plugins/gssapi.c
 --- a/plugins/gssapi.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/plugins/gssapi.c	2014-03-11 20:07:57.607918485 +0100
++++ b/plugins/gssapi.c	2014-03-11 20:15:44.925995310 +0100
 @@ -50,6 +50,9 @@
  #else
  #include <gssapi/gssapi.h>
@@ -392,10 +388,18 @@ diff -Naur a/plugins/gssapi.c b/plugins/gssapi.c
      }
  #endif
      
-diff -Naur a/plugins/ldapdb.c b/plugins/ldapdb.c
 --- a/plugins/ldapdb.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/plugins/ldapdb.c	2014-03-11 20:07:57.612918572 +0100
-@@ -404,6 +404,7 @@
++++ b/plugins/ldapdb.c	2014-03-11 20:15:59.655250391 +0100
+@@ -251,6 +251,8 @@
+ 
+ #if defined(LDAP_PROXY_AUTHZ_FAILURE)
+ 	case LDAP_PROXY_AUTHZ_FAILURE:
++#elif defined(LDAP_X_PROXY_AUTHZ_FAILURE)
++	case LDAP_X_PROXY_AUTHZ_FAILURE:
+ #endif
+ 	case LDAP_INAPPROPRIATE_AUTH:
+ 	case LDAP_INVALID_CREDENTIALS:
+@@ -404,6 +406,7 @@
  	if ( len > out_max )
  	    len = out_max;
  	memcpy(out, bvals[0]->bv_val, len);
@@ -403,9 +407,8 @@ diff -Naur a/plugins/ldapdb.c b/plugins/ldapdb.c
  	*out_ulen = len;
  	ber_bvecfree(bvals);
      }
-diff -Naur a/plugins/Makefile.am b/plugins/Makefile.am
 --- a/plugins/Makefile.am	2012-10-12 16:05:48.000000000 +0200
-+++ b/plugins/Makefile.am	2014-03-11 20:07:57.612918572 +0100
++++ b/plugins/Makefile.am	2014-03-11 20:15:44.925995310 +0100
 @@ -49,7 +49,7 @@
  # CURRENT:REVISION:AGE
  plugin_version = 3:0:0
@@ -415,9 +418,8 @@ diff -Naur a/plugins/Makefile.am b/plugins/Makefile.am
  AM_LDFLAGS = -module -export-dynamic -rpath $(plugindir) -version-info $(plugin_version)
  
  COMPAT_OBJS = @LTGETADDRINFOOBJS@ @LTGETNAMEINFOOBJS@ @LTSNPRINTFOBJS@
-diff -Naur a/pwcheck/Makefile.am b/pwcheck/Makefile.am
 --- a/pwcheck/Makefile.am	2012-01-28 00:31:36.000000000 +0100
-+++ b/pwcheck/Makefile.am	2014-03-11 20:07:57.612918572 +0100
++++ b/pwcheck/Makefile.am	2014-03-11 20:15:44.925995310 +0100
 @@ -24,7 +24,7 @@
  
  sbin_PROGRAMS = pwcheck
@@ -427,9 +429,8 @@ diff -Naur a/pwcheck/Makefile.am b/pwcheck/Makefile.am
  
  pwcheck_SOURCES = pwcheck.c
  EXTRA_pwcheck_SOURCES = pwcheck_getpwnam.c pwcheck_getspnam.c
-diff -Naur a/pwcheck/pwcheck_getpwnam.c b/pwcheck/pwcheck_getpwnam.c
 --- a/pwcheck/pwcheck_getpwnam.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/pwcheck/pwcheck_getpwnam.c	2014-03-11 20:07:57.612918572 +0100
++++ b/pwcheck/pwcheck_getpwnam.c	2014-03-11 20:15:44.925995310 +0100
 @@ -32,6 +32,7 @@
  char *password;
  {
@@ -447,9 +448,8 @@ diff -Naur a/pwcheck/pwcheck_getpwnam.c b/pwcheck/pwcheck_getpwnam.c
  	r = "Incorrect password";
      }
      else {
-diff -Naur a/pwcheck/pwcheck_getspnam.c b/pwcheck/pwcheck_getspnam.c
 --- a/pwcheck/pwcheck_getspnam.c	2012-01-28 00:31:36.000000000 +0100
-+++ b/pwcheck/pwcheck_getspnam.c	2014-03-11 20:07:57.613918589 +0100
++++ b/pwcheck/pwcheck_getspnam.c	2014-03-11 20:15:44.926995328 +0100
 @@ -24,6 +24,7 @@
  ******************************************************************/
  
@@ -475,9 +475,8 @@ diff -Naur a/pwcheck/pwcheck_getspnam.c b/pwcheck/pwcheck_getspnam.c
  	return "Incorrect password";
      }
      else {
-diff -Naur a/sample/Makefile.am b/sample/Makefile.am
 --- a/sample/Makefile.am	2012-10-16 15:07:55.000000000 +0200
-+++ b/sample/Makefile.am	2014-03-11 20:07:57.613918589 +0100
++++ b/sample/Makefile.am	2014-03-11 20:15:44.926995328 +0100
 @@ -42,7 +42,7 @@
  #
  ################################################################
@@ -487,9 +486,8 @@ diff -Naur a/sample/Makefile.am b/sample/Makefile.am
  
  noinst_PROGRAMS = client server
  EXTRA_PROGRAMS = sample-client sample-server
-diff -Naur a/saslauthd/auth_getpwent.c b/saslauthd/auth_getpwent.c
 --- a/saslauthd/auth_getpwent.c	2012-10-12 16:05:48.000000000 +0200
-+++ b/saslauthd/auth_getpwent.c	2014-03-11 20:07:57.613918589 +0100
++++ b/saslauthd/auth_getpwent.c	2014-03-11 20:15:44.926995328 +0100
 @@ -77,6 +77,7 @@
  {
      /* VARIABLES */
@@ -508,9 +506,8 @@ diff -Naur a/saslauthd/auth_getpwent.c b/saslauthd/auth_getpwent.c
  	if (flags & VERBOSE) {
  	    syslog(LOG_DEBUG, "DEBUG: auth_getpwent: %s: invalid password", login);
  	}
-diff -Naur a/saslauthd/auth_rimap.c b/saslauthd/auth_rimap.c
 --- a/saslauthd/auth_rimap.c	2012-10-12 16:05:48.000000000 +0200
-+++ b/saslauthd/auth_rimap.c	2014-03-11 20:07:57.613918589 +0100
++++ b/saslauthd/auth_rimap.c	2014-03-11 20:15:44.926995328 +0100
 @@ -90,6 +90,7 @@
  					   service we connect to.	 */
  #define TAG "saslauthd"			/* IMAP command tag */
@@ -557,9 +554,8 @@ diff -Naur a/saslauthd/auth_rimap.c b/saslauthd/auth_rimap.c
      (void) close(s);			/* we're done with the remote */
      if (rc == -1) {
  	syslog(LOG_WARNING, "auth_rimap: read (response): %m");
-diff -Naur a/saslauthd/auth_shadow.c b/saslauthd/auth_shadow.c
 --- a/saslauthd/auth_shadow.c	2012-10-12 16:05:48.000000000 +0200
-+++ b/saslauthd/auth_shadow.c	2014-03-11 20:07:57.614918606 +0100
++++ b/saslauthd/auth_shadow.c	2014-03-11 20:15:44.927995345 +0100
 @@ -210,8 +210,8 @@
  	RETURN("NO Insufficient permission to access NIS authentication database (saslauthd)");
      }
@@ -591,9 +587,8 @@ diff -Naur a/saslauthd/auth_shadow.c b/saslauthd/auth_shadow.c
  	if (flags & VERBOSE) {
  	    syslog(LOG_DEBUG, "auth_shadow: pw mismatch: %s != %s",
  		   password, upw->upw_passwd);
-diff -Naur a/saslauthd/configure b/saslauthd/configure
 --- a/saslauthd/configure	2012-11-06 20:21:44.000000000 +0100
-+++ b/saslauthd/configure	2014-03-11 20:07:57.617918658 +0100
++++ b/saslauthd/configure	2014-03-11 20:15:44.930995397 +0100
 @@ -9116,7 +9116,7 @@
    cmu_save_LIBS="$LIBS"
    LIBS="$LIBS $GSSAPIBASE_LIBS"
@@ -603,9 +598,8 @@ diff -Naur a/saslauthd/configure b/saslauthd/configure
  do
  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
  { $as_echo "$as_me:$LINENO: checking for $ac_func" >&5
-diff -Naur a/saslauthd/configure.in b/saslauthd/configure.in
 --- a/saslauthd/configure.in	2012-10-12 16:05:48.000000000 +0200
-+++ b/saslauthd/configure.in	2014-03-11 20:07:57.622918744 +0100
++++ b/saslauthd/configure.in	2014-03-11 20:15:44.930995397 +0100
 @@ -1,7 +1,8 @@
  AC_INIT(mechanisms.h)
  AC_PREREQ([2.54])
@@ -679,9 +673,8 @@ diff -Naur a/saslauthd/configure.in b/saslauthd/configure.in
                         AC_DEFINE(HAVE_FUNCTION,[],[Does compiler understand __FUNCTION__])
                 fi
         fi
-diff -Naur a/saslauthd/Makefile.am b/saslauthd/Makefile.am
 --- a/saslauthd/Makefile.am	2012-01-28 00:31:36.000000000 +0100
-+++ b/saslauthd/Makefile.am	2014-03-11 20:07:57.622918744 +0100
++++ b/saslauthd/Makefile.am	2014-03-11 20:15:44.931995414 +0100
 @@ -1,4 +1,6 @@
  AUTOMAKE_OPTIONS = 1.7
 +ACLOCAL_AMFLAGS = -I ../cmulocal -I ../config
@@ -707,9 +700,8 @@ diff -Naur a/saslauthd/Makefile.am b/saslauthd/Makefile.am
  DEFS            = @DEFS@ -DSASLAUTHD_CONF_FILE_DEFAULT=\"@sysconfdir@/saslauthd.conf\" -I. -I$(srcdir) -I..
  
  
-diff -Naur a/saslauthd/saslauthd.h.in b/saslauthd/saslauthd.h.in
 --- a/saslauthd/saslauthd.h.in	2012-11-06 20:21:43.000000000 +0100
-+++ b/saslauthd/saslauthd.h.in	2014-03-11 20:07:57.622918744 +0100
++++ b/saslauthd/saslauthd.h.in	2014-03-11 20:15:44.931995414 +0100
 @@ -62,6 +62,10 @@
     */
  #undef HAVE_GSSKRB5_REGISTER_ACCEPTOR_IDENTITY
@@ -721,9 +713,8 @@ diff -Naur a/saslauthd/saslauthd.h.in b/saslauthd/saslauthd.h.in
  /* Define if your GSSAPI implementation defines GSS_C_NT_HOSTBASED_SERVICE */
  #undef HAVE_GSS_C_NT_HOSTBASED_SERVICE
  
-diff -Naur a/sasldb/Makefile.am b/sasldb/Makefile.am
 --- a/sasldb/Makefile.am	2012-01-28 00:31:36.000000000 +0100
-+++ b/sasldb/Makefile.am	2014-03-11 20:07:57.622918744 +0100
++++ b/sasldb/Makefile.am	2014-03-11 20:15:44.932995432 +0100
 @@ -44,7 +44,7 @@
  # Note that this doesn't necessaraly follow the libsasl2 verison info
  sasl_version = 1:25:0
@@ -751,9 +742,8 @@ diff -Naur a/sasldb/Makefile.am b/sasldb/Makefile.am
 +	$(AR) cru $@ $(SASL_DB_BACKEND_STATIC)
  
  
-diff -Naur a/utils/Makefile.am b/utils/Makefile.am
 --- a/utils/Makefile.am	2012-01-28 00:31:36.000000000 +0100
-+++ b/utils/Makefile.am	2014-03-11 20:07:57.623918761 +0100
++++ b/utils/Makefile.am	2014-03-11 20:15:44.932995432 +0100
 @@ -89,7 +89,7 @@
  libsfsasl2_la_LIBADD = sfsasl.lo
  libsfsasl2_la_LDFLAGS = -version-info 1:0:0 -export-dynamic -rpath $(libdir)
@@ -763,9 +753,8 @@ diff -Naur a/utils/Makefile.am b/utils/Makefile.am
  EXTRA_DIST = saslpasswd2.8 sasldblistusers2.8 pluginviewer.8 sfsasl.h sfsasl.c smtptest.c testsuite.c pluginviewer.c NTMakefile
  
  sfsasl.lo: sfsasl.c
-diff -Naur a/Versions b/Versions
 --- a/Versions	1970-01-01 01:00:00.000000000 +0100
-+++ b/Versions	2014-03-11 20:07:57.623918761 +0100
++++ b/Versions	2014-03-11 20:15:44.932995432 +0100
 @@ -0,0 +1,7 @@
 +SASL2 {
 +    global:
