@@ -1,0 +1,29 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2013-04-03
+Initial Package Version: 0.99.8, also applies to 0.99.7.
+Upstream Status: Applied
+Origin: Upstream
+Description: Fixes compilation with readline-6.3.
+
+http://anonscm.debian.org/hg/xine-lib/xine-ui/raw-rev/8c0acbb8fcbb
+
+# HG changeset patch
+# User Darren Salt <devspam@moreofthesa.me.uk>
+# Date 1394989178 0
+# Node ID 8c0acbb8fcbb765120eb31ca637ecf82a1f213e4
+# Parent  c498f0ddba33bae8e8ca99600d469d2e448b74bd
+Fix FTBFS with libreadline 6.3.
+
+diff -r c498f0ddba33 -r 8c0acbb8fcbb src/xitk/network.c
+--- a/src/xitk/network.c	Sun Mar 16 16:58:33 2014 +0000
++++ b/src/xitk/network.c	Sun Mar 16 16:59:38 2014 +0000
+@@ -1255,7 +1255,7 @@
+   rl_readline_name = PROGNAME;
+   rl_set_prompt(session.prompt);
+   rl_initialize();
+-  rl_attempted_completion_function = (CPPFunction *)completion_function;
++  rl_attempted_completion_function = completion_function;
+   
+   signal(SIGPIPE, SIG_IGN);
+   
+
