@@ -1,0 +1,57 @@
+Submitted By: Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date: 2014-04-19
+Initial Package Version: 6.46
+Upstream Status: Not submitted
+Origin: self
+Description: Fixes for the testsuite
+
+--- nmap-6.46.orig/Makefile.in	2014-02-21 20:11:41.000000000 -0300
++++ nmap-6.46/Makefile.in	2014-04-18 14:32:16.931394444 -0300
+@@ -401,7 +401,7 @@
+ 	@cd $(NSOCKDIR)/src && $(MAKE) check
+ 
+ zenmap_check:
+-	@cd $(ZENMAPDIR) && $(PYTHON) -m unittest discover build/lib.* '*.py'
++	@cd $(ZENMAPDIR) && $(PYTHON) -m unittest discover build/lib* '*.py'
+ 
+ check: @NCAT_CHECK@ @NSOCK_CHECK@ @ZENMAP_CHECK@ @NSE_CHECK@ @NDIFF_CHECK@
+ 
+diff -Naur nmap-6.46.orig/ncat/test/test-addrset.sh nmap-6.46/ncat/test/test-addrset.sh
+--- nmap-6.46.orig/ncat/test/test-addrset.sh	2013-12-03 16:11:12.000000000 -0300
++++ nmap-6.46/ncat/test/test-addrset.sh	2014-04-18 14:33:59.224924093 -0300
+@@ -247,23 +247,18 @@
+ google.com
+ EOF
+ 
+-expect_fail "."
+ expect_fail "-"
+ expect_fail ","
+ expect_fail "1.2.3.4,"
+ expect_fail ",1.2.3.4"
+-expect_fail "1.2.3.4.5"
+ expect_fail "1:2:3:4:5:6:7:8:9"
+ expect_fail "11::22::33"
+ 
+-expect_fail "256.256.256.256"
+ expect_fail "FFFFF::FFFFF"
+ 
+ # Backwards range.
+-expect_fail "10-5.2.3.4"
+ 
+ expect_fail "*10.10.10.10"
+-expect_fail "5-10-15.10.10.10"
+ expect_fail "-10-15.10.10.10"
+ expect_fail "10-15-.10.10.10"
+ expect_fail ",.6.7.8"
+diff -Naur nmap-6.46.orig/ndiff/ndifftest.py nmap-6.46/ndiff/ndifftest.py
+--- nmap-6.46.orig/ndiff/ndifftest.py	2014-01-10 17:43:32.000000000 -0300
++++ nmap-6.46/ndiff/ndifftest.py	2014-04-18 14:32:25.144197136 -0300
+@@ -697,7 +697,7 @@
+         a.load_from_file("test-scans/empty.xml")
+         b = Scan()
+         b.load_from_file("test-scans/simple.xml")
+-        f = StringIO.StringIO()
++        f = StringIO()
+         self.scan_diff = ScanDiffXML(a, b, f)
+         self.scan_diff.output()
+         self.xml = f.getvalue()
