@@ -1,6 +1,6 @@
 Submitted By:            Armin K. <krejzi at email dot com>
 Date:                    2014-05-10
-Initial Package Version: 4,9,9
+Initial Package Version: 4.9.0
 Upstream Status:         Fixed Upstream
 Origin:                  Upstream VCS
 Description:             Prevents compiler from generating broken code that would cause
