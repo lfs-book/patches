@@ -1,0 +1,23 @@
+Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date: 2014-0604
+Initial Package Version: 1.42.10
+Origin: Upstream
+Description: Disable test for quota_options when quotas are not enabled.
+
+diff --git a/tests/f_quota/script b/tests/f_quota/script
+index bf25e07..d1c4b9e 100644
+--- a/tests/f_quota/script
++++ b/tests/f_quota/script
+@@ -1,4 +1,11 @@
+ AFTER_CMD='$DEBUGFS -f $test_dir/debugfs-cmds $TMPFILE 2>&1 | sed -f $cmd_dir/filter.sed > $test_name.0.log'
+ PASS_ZERO=true
+ 
++$TUNE2FS -h 2>&1 | grep -q quota_options
++if [ $? != 0 ] ; then
++        rm -f $TMPFILE
++        echo "$test_name: $test_description: skipped (quota not enabled)"
++        return 0
++fi
++
+ . $cmd_dir/run_e2fsck
+
