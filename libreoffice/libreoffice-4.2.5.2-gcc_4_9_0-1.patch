@@ -1,0 +1,48 @@
+Submitted By:            Ken Moffat <ken at linuxfromscratch dot org>
+Date:                    2014-06-22
+Initial Package Version: 4.2.5.2
+Upstream Status:         Unknown
+Origin:                  paldo, patch originally from Jürg Billeter
+Description:             Let libreoffice compile with gcc-4.9.0
+Comment:                 Original patch at http://www.paldo.org/paldo/sources/libreoffice/libreoffice-4.2.3.3-gcc-4.9-1.patch.bz2
+
+diff --git a/dbaccess/source/ui/uno/ColumnControl.cxx b/dbaccess/source/ui/uno/ColumnControl.cxx
+index 9f1da55..dfd31d7 100644
+--- a/dbaccess/source/ui/uno/ColumnControl.cxx
++++ b/dbaccess/source/ui/uno/ColumnControl.cxx
+@@ -106,6 +106,7 @@ void SAL_CALL OColumnControl::createPeer(const Reference< XToolkit >& /*rToolkit
+         if (!aComponentInfos.bEnable)
+             xW->setEnable(sal_False);
+ 
++#ifndef __i386__
+         if (maWindowListeners.getLength())
+             xW->addWindowListener( &maWindowListeners );
+ 
+@@ -123,6 +124,7 @@ void SAL_CALL OColumnControl::createPeer(const Reference< XToolkit >& /*rToolkit
+ 
+         if (maPaintListeners.getLength())
+             xW->addPaintListener( &maPaintListeners );
++#endif
+ 
+         Reference< ::com::sun::star::awt::XView >  xPeerView(getPeer(), UNO_QUERY);
+         xPeerView->setZoom( maComponentInfos.nZoomX, maComponentInfos.nZoomY );
+diff --git a/svx/source/fmcomp/fmgridif.cxx b/svx/source/fmcomp/fmgridif.cxx
+index cd399ce..e5d5825 100644
+--- a/svx/source/fmcomp/fmgridif.cxx
++++ b/svx/source/fmcomp/fmgridif.cxx
+@@ -551,6 +551,7 @@ void SAL_CALL FmXGridControl::createPeer(const Reference< ::com::sun::star::awt:
+             if (!maComponentInfos.bEnable)
+                 pPeer->setEnable(sal_False);
+ 
++#ifndef __i386__
+             if (maWindowListeners.getLength())
+                 pPeer->addWindowListener( &maWindowListeners );
+ 
+@@ -568,6 +569,7 @@ void SAL_CALL FmXGridControl::createPeer(const Reference< ::com::sun::star::awt:
+ 
+             if (maPaintListeners.getLength())
+                 pPeer->addPaintListener( &maPaintListeners );
++#endif
+ 
+             if (m_aModifyListeners.getLength())
+                 pPeer->addModifyListener( &m_aModifyListeners );
