@@ -346,8 +346,8 @@ diff -Naur icedtea-2.5.0/Makefile.am icedtea-2.5.0.new/Makefile.am
  add-zero-debug: stamps/add-zero-debug.stamp
 diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacerts.sh
 --- icedtea-2.5.0/scripts/mkcacerts.sh	1970-01-01 01:00:00.000000000 +0100
-+++ icedtea-2.5.0.new/scripts/mkcacerts.sh	2014-06-25 08:01:16.031893645 +0200
-@@ -0,0 +1,207 @@
++++ icedtea-2.5.0.new/scripts/mkcacerts.sh	2014-06-25 22:26:52.656188615 +0200
+@@ -0,0 +1,208 @@
 +#!/bin/sh
 +# Simple script to extract x509 certificates and create a JRE cacerts file.
 +
@@ -364,35 +364,35 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +                    check_arg $1 $2
 +                    CAFILE="${2}"
 +                    shift 2
-+                    ;;
++                ;;
 +                -d | --cadir)
 +                    check_arg $1 $2
 +                    CADIR="${2}"
 +                    shift 2
-+                    ;;
++                ;;
 +                -o | --outfile)
 +                    check_arg $1 $2
 +                    OUTFILE="${2}"
 +                    shift 2
-+                    ;;
++                ;;
 +                -k | --keytool)
 +                    check_arg $1 $2
 +                    KEYTOOL="${2}"
 +                    shift 2
-+                    ;;
++                ;;
 +                -s | --openssl)
 +                    check_arg $1 $2
 +                    OPENSSL="${2}"
 +                    shift 2
-+                    ;;
++                ;;
 +                -h | --help)
-+                    showhelp
-+                    exit 0
-+                    ;;
++                     showhelp
++                     exit 0
++                ;;
 +                *)
-+                    showhelp
-+                    exit 1
-+                    ;;
++                   showhelp
++                   exit 1
++                ;;
 +            esac
 +        done
 +    }
@@ -436,7 +436,7 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +
 +function showhelp()
 +    {
-+        echo "\`basename ${0}\` creates a valid cacerts file for use with IcedTea."
++        echo "`basename ${0}` creates a valid cacerts file for use with IcedTea."
 +        echo ""
 +        echo "        -f  --cafile        The path to a file containing PEM formated CA"
 +        echo "                            certificates.  May not be used with -d/--cadir."
@@ -453,7 +453,7 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +        echo ""
 +    }
 +
-+# Initialize empty variables so that the shell does not pollute the script
++# Initialize empty variables so that the shell does not polute the script
 +CAFILE=""
 +CADIR=""
 +OUTFILE=""
@@ -469,35 +469,35 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +# Handle common errors
 +if test "${CAFILE}x" == "x" -a "${CADIR}x" == "x" ; then
 +    echo "ERROR!  You must provide an x509 certificate store!"
-+    echo "\\'$(basename ${0}) --help\\' for more info."
++    echo "\'$(basename ${0}) --help\' for more info."
 +    echo ""
 +    exit 1
 +fi
 +
 +if test "${CAFILE}x" != "x" -a "${CADIR}x" != "x" ; then
 +    echo "ERROR!  You cannot provide two x509 certificate stores!"
-+    echo "\\'$(basename ${0}) --help\\' for more info."
++    echo "\'$(basename ${0}) --help\' for more info."
 +    echo ""
 +    exit 1
 +fi
 +
 +if test "${KEYTOOL}x" == "x" ; then
 +    echo "ERROR!  You must provide a valid keytool program!"
-+    echo "\\'$(basename ${0}) --help\\' for more info."
++    echo "\'$(basename ${0}) --help\' for more info."
 +    echo ""
 +    exit 1
 +fi
 +
 +if test "${OPENSSL}x" == "x" ; then
 +    echo "ERROR!  You must provide a valid path to openssl!"
-+    echo "\\'$(basename ${0}) --help\\' for more info."
++    echo "\'$(basename ${0}) --help\' for more info."
 +    echo ""
 +    exit 1
 +fi
 +
 +if test "${OUTFILE}x" == "x" ; then
 +    echo "ERROR!  You must provide a valid output file!"
-+    echo "\\'$(basename ${0}) --help\\' for more info."
++    echo "\'$(basename ${0}) --help\' for more info."
 +    echo ""
 +    exit 1
 +fi
@@ -506,30 +506,30 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +
 +# If using a CAFILE, split it into individual files in a temp directory
 +if test "${CAFILE}x" != "x" ; then
-+    TEMPDIR=\`mktemp -d\`
++    TEMPDIR=`mktemp -d`
 +    CADIR="${TEMPDIR}"
 +
 +    # Get a list of staring lines for each cert
-+    CERTLIST=\`grep -n "^-----BEGIN" "${CAFILE}" | cut -d ":" -f 1\`
++    CERTLIST=`grep -n "^-----BEGIN" "${CAFILE}" | cut -d ":" -f 1`
 +
 +    # Get a list of ending lines for each cert
-+    ENDCERTLIST=\`grep -n "^-----END" "${CAFILE}" | cut -d ":" -f 1\`
++    ENDCERTLIST=`grep -n "^-----END" "${CAFILE}" | cut -d ":" -f 1`
 +
 +    # Start a loop
-+    for certbegin in \`echo "${CERTLIST}"\` ; do
-+        for certend in \`echo "${ENDCERTLIST}"\` ; do
++    for certbegin in `echo "${CERTLIST}"` ; do
++        for certend in `echo "${ENDCERTLIST}"` ; do
 +            if test "${certend}" -gt "${certbegin}"; then
 +                break
 +            fi
 +        done
 +        sed -n "${certbegin},${certend}p" "${CAFILE}" > "${CADIR}/${certbegin}.pem"
-+        keyhash=\`${OPENSSL} x509 -noout -in "${CADIR}/${certbegin}.pem" -hash\`
++        keyhash=`${OPENSSL} x509 -noout -in "${CADIR}/${certbegin}.pem" -hash`
 +        echo "Generated PEM file with hash:  ${keyhash}."
 +    done
 +fi
 +
 +# Write the output file
-+for cert in \`find "${CADIR}" -type f -name "*.pem" -o -name "*.crt"\`
++for cert in `find "${CADIR}" -type f -name "*.pem" -o -name "*.crt"`
 +do
 +
 +    # Make sure the certificate date is valid...
@@ -542,11 +542,11 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +    fi
 +    unset date certdate
 +    ls "${cert}"
-+    tempfile=\`mktemp\`
-+    certbegin=\`grep -n "^-----BEGIN" "${cert}" | cut -d ":" -f 1\`
-+    certend=\`grep -n "^-----END" "${cert}" | cut -d ":" -f 1\`
++    tempfile=`mktemp`
++    certbegin=`grep -n "^-----BEGIN" "${cert}" | cut -d ":" -f 1`
++    certend=`grep -n "^-----END" "${cert}" | cut -d ":" -f 1`
 +    sed -n "${certbegin},${certend}p" "${cert}" > "${tempfile}"
-+    echo yes | env LC_ALL=C "${KEYTOOL}" -import -alias \`basename "${cert}"\` -keystore \\
++    echo yes | env LC_ALL=C "${KEYTOOL}" -import -alias `basename "${cert}"` -keystore \
 +                   "${OUTFILE}" -storepass 'changeit' -file "${tempfile}"
 +    rm "${tempfile}"
 +done
@@ -555,3 +555,4 @@ diff -Naur icedtea-2.5.0/scripts/mkcacerts.sh icedtea-2.5.0.new/scripts/mkcacert
 +    rm -rf "${TEMPDIR}"
 +fi
 +exit 0
++
