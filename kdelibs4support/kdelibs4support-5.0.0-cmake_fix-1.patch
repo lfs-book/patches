@@ -1,0 +1,28 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-07-09
+Initial Package Version: 5.0.0
+Upstream Status:         Fixed Upstream
+Origin:                  Upstream
+Description:             Fixes an incompatibility with FindGettext from ECM which causes
+                         several KDE Plasma packages to fail to build.
+
+--- a/cmake/modules/FindGettext.cmake	2014-07-01 17:10:41.000000000 +0200
++++ b/cmake/modules/FindGettext.cmake	2014-07-09 21:26:24.196787721 +0200
+@@ -212,7 +212,16 @@
+       LIST(REMOVE_AT _args 0 1)
+    ENDIF("${_tmp}" STREQUAL "INSTALL_DESTINATION")
+    
+-#    message(STATUS "2 all ${_addToAll} dest ${_installDest} args: ${_args}")
++   LIST(GET _args 0 _tmp)
++   IF("${_tmp}" STREQUAL "PO_FILES")
++      LIST(REMOVE_AT _args 0)
++   ELSE()
++      SET(_deprecation_arg DEPRECATION)
++      IF(CMAKE_VERSION VERSION_LESS 3.0.0)
++         SET(_deprecation_arg AUTHOR_WARNING)
++      ENDIF()
++      MESSAGE(${_deprecation_arg} "GETTEXT_PROCESS_PO_FILES without a PO_FILES argument is deprecated")
++   ENDIF()
+    
+    FOREACH(_current_PO_FILE ${_args})
+       GET_FILENAME_COMPONENT(_name ${_current_PO_FILE} NAME)
