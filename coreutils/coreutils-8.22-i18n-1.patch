@@ -1,6 +1,6 @@
 Submitted by:            Matt Burgess (matthew_at_linuxfromscratch_dot_org)
 Date:                    2013-12-16
-Initial Package Version: 8.22
+Initial Package Version: 8.22 (Rebased for version 8.23 by bdubbs@linuxfromscratch.org))
 Upstream Status:         Rejected
 Origin:                  Based on Fedora's i18n patch at
   http://pkgs.fedoraproject.org/cgit/coreutils.git/plain/coreutils-i18n.patch
