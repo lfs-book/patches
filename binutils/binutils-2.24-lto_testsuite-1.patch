@@ -3,7 +3,7 @@ Date:                    2014-07-19
 Initial Package Version: 2.24
 Upstream Status:         Unknown
 Origin:                  Arch Linux
-Description:             Fix coreutils LTO tests
+Description:             Fix binutils LTO tests
 
 index c5249f0..69946de 100644
 --- a/ld/testsuite/ld-plugin/lto.exp
