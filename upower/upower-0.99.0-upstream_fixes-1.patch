@@ -1,0 +1,50 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-07-23
+Initial Package Version: 0.99.0
+Upstream Status:         Fixed
+Origin:                  Upstream
+Description:             Fix segfault getting property when daemon is not running,
+                         Create the history directory at runtime.
+                         Fix typo in g-i annotation.
+
+--- a/libupower-glib/up-client.c	2013-10-29 11:37:08.000000000 +0100
++++ b/libupower-glib/up-client.c	2014-07-23 16:15:06.059322561 +0200
+@@ -131,7 +131,7 @@
+  * @client: a #UpClient instance.
+  *
+  * Get the composite display device.
+- * Return value: (transfer full) a #UpClient object, or %NULL on error.
++ * Return value: (transfer full): a #UpClient object, or %NULL on error.
+  *
+  * Since: 1.0
+  **/
+@@ -322,6 +322,9 @@
+ 	UpClient *client;
+ 	client = UP_CLIENT (object);
+ 
++	if (client->priv->proxy == NULL)
++                return;
++
+ 	switch (prop_id) {
+ 	case PROP_DAEMON_VERSION:
+ 		g_value_set_string (value, up_client_glue_get_daemon_version (client->priv->proxy));
+--- a/src/up-history.c	2013-10-29 11:37:08.000000000 +0100
++++ b/src/up-history.c	2014-07-23 16:14:53.769085729 +0200
+@@ -414,6 +414,7 @@
+ {
+ 	g_free (history->priv->dir);
+ 	history->priv->dir = g_strdup (dir);
++	g_mkdir_with_parents (dir, 0755);
+ }
+ 
+ /**
+@@ -887,7 +888,8 @@
+ 	history->priv->data_time_full = g_ptr_array_new_with_free_func ((GDestroyNotify) g_object_unref);
+ 	history->priv->data_time_empty = g_ptr_array_new_with_free_func ((GDestroyNotify) g_object_unref);
+ 	history->priv->max_data_age = UP_HISTORY_DEFAULT_MAX_DATA_AGE;
+-	history->priv->dir = g_build_filename (HISTORY_DIR, NULL);
++
++	up_history_set_directory (history, HISTORY_DIR);
+ }
+ 
+ /**
