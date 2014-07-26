@@ -1,0 +1,935 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-07-26
+Initial Package Version: 0.24.0
+Upstream Status:         Fixed
+Origin:                  Upstream
+Description:             Late post release fixes to fix some issues with packages that use Vala
+                         Hide internal methods in ABI
+                         gtk+-3.0: Update to 3.12.0
+                         geocode-glib-1.0: Update to 3.12.0
+                         clutter-1.0: Update to 1.18.0
+                         atk: Update and fix metadata
+
+--- a/ccode/valaccodedeclaration.vala	2010-08-15 13:49:03.000000000 +0200
++++ b/ccode/valaccodedeclaration.vala	2014-07-26 12:27:23.619143110 +0200
+@@ -52,7 +52,7 @@
+ 	}
+ 	
+ 	public override void write (CCodeWriter writer) {
+-		if ((modifiers & (CCodeModifiers.STATIC | CCodeModifiers.EXTERN)) == 0) {
++		if ((modifiers & (CCodeModifiers.STATIC | CCodeModifiers.INTERNAL | CCodeModifiers.EXTERN)) == 0) {
+ 			foreach (CCodeDeclarator decl in declarators) {
+ 				decl.write_initialization (writer);
+ 			}
+@@ -70,9 +70,12 @@
+ 	}
+ 
+ 	public override void write_declaration (CCodeWriter writer) {
+-		if ((modifiers & (CCodeModifiers.STATIC | CCodeModifiers.EXTERN)) != 0) {
++		if ((modifiers & (CCodeModifiers.STATIC | CCodeModifiers.INTERNAL | CCodeModifiers.EXTERN)) != 0) {
+ 			// combined declaration and initialization for static and extern variables
+ 			writer.write_indent (line);
++			if ((modifiers & CCodeModifiers.INTERNAL) != 0) {
++				writer.write_string ("G_GNUC_INTERNAL ");
++			}
+ 			if ((modifiers & CCodeModifiers.STATIC) != 0) {
+ 				writer.write_string ("static ");
+ 			}
+--- a/ccode/valaccodefunction.vala	2012-08-02 10:26:30.000000000 +0200
++++ b/ccode/valaccodefunction.vala	2014-07-26 12:27:23.620143144 +0200
+@@ -112,6 +112,9 @@
+ 	
+ 	public override void write (CCodeWriter writer) {
+ 		writer.write_indent (line);
++		if (CCodeModifiers.INTERNAL in modifiers) {
++			writer.write_string ("G_GNUC_INTERNAL ");
++		}
+ 		if (CCodeModifiers.STATIC in modifiers) {
+ 			writer.write_string ("static ");
+ 		}
+--- a/ccode/valaccodemodifiers.vala	2010-08-15 13:49:03.000000000 +0200
++++ b/ccode/valaccodemodifiers.vala	2014-07-26 12:27:23.620143144 +0200
+@@ -33,5 +33,6 @@
+ 	INLINE = 1 << 3,
+ 	VOLATILE = 1 << 4,
+ 	DEPRECATED = 1 << 5,
+-	THREAD_LOCAL = 1 << 6
++	THREAD_LOCAL = 1 << 6,
++	INTERNAL = 1 << 7
+ }
+--- a/codegen/valaccodebasemodule.vala	2014-02-03 20:35:53.000000000 +0100
++++ b/codegen/valaccodebasemodule.vala	2014-07-26 12:27:23.621143180 +0200
+@@ -820,10 +820,12 @@
+ 		var regfun = new CCodeFunction (fun_name, "GType");
+ 		regfun.attributes = "G_GNUC_CONST";
+ 
+-		if (en.access == SymbolAccessibility.PRIVATE) {
++		if (en.is_private_symbol ()) {
+ 			regfun.modifiers = CCodeModifiers.STATIC;
+ 			// avoid C warning as this function is not always used
+-			regfun.attributes = "G_GNUC_UNUSED";
++			regfun.attributes += " G_GNUC_UNUSED";
++		} else if (context.hide_internal && en.is_internal_symbol ()) {
++			regfun.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		decl_space.add_function_declaration (regfun);
+@@ -1011,6 +1013,8 @@
+ 
+ 			if (f.is_private_symbol ()) {
+ 				flock.modifiers = CCodeModifiers.STATIC;
++			} else if (context.hide_internal && f.is_internal_symbol ()) {
++				flock.modifiers = CCodeModifiers.INTERNAL;
+ 			} else {
+ 				flock.modifiers = CCodeModifiers.EXTERN;
+ 			}
+@@ -1028,6 +1032,8 @@
+ 					cdecl.add_declarator (new CCodeVariableDeclarator (get_array_length_cname (get_ccode_name (f), dim)));
+ 					if (f.is_private_symbol ()) {
+ 						cdecl.modifiers = CCodeModifiers.STATIC;
++					} else if (context.hide_internal && f.is_internal_symbol ()) {
++						cdecl.modifiers = CCodeModifiers.INTERNAL;
+ 					} else {
+ 						cdecl.modifiers = CCodeModifiers.EXTERN;
+ 					}
+@@ -1043,6 +1049,8 @@
+ 				cdecl.add_declarator (new CCodeVariableDeclarator (get_ccode_delegate_target_name (f)));
+ 				if (f.is_private_symbol ()) {
+ 					cdecl.modifiers = CCodeModifiers.STATIC;
++				} else if (context.hide_internal && f.is_internal_symbol ()) {
++					cdecl.modifiers = CCodeModifiers.INTERNAL;
+ 				} else {
+ 					cdecl.modifiers = CCodeModifiers.EXTERN;
+ 				}
+@@ -1053,6 +1061,8 @@
+ 					cdecl.add_declarator (new CCodeVariableDeclarator (get_delegate_target_destroy_notify_cname  (get_ccode_name (f))));
+ 					if (f.is_private_symbol ()) {
+ 						cdecl.modifiers = CCodeModifiers.STATIC;
++					} else if (context.hide_internal && f.is_internal_symbol ()) {
++						cdecl.modifiers = CCodeModifiers.INTERNAL;
+ 					} else {
+ 						cdecl.modifiers = CCodeModifiers.EXTERN;
+ 					}
+@@ -1503,6 +1513,8 @@
+ 
+ 		if (prop.is_private_symbol () || (!acc.readable && !acc.writable) || acc.access == SymbolAccessibility.PRIVATE) {
+ 			function.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && (prop.is_internal_symbol () || acc.access == SymbolAccessibility.INTERNAL)) {
++			function.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 		decl_space.add_function_declaration (function);
+ 	}
+@@ -1605,6 +1617,8 @@
+ 			if (prop.is_private_symbol () || !(acc.readable || acc.writable) || acc.access == SymbolAccessibility.PRIVATE) {
+ 				// accessor function should be private if the property is an internal symbol or it's a construct-only setter
+ 				function.modifiers |= CCodeModifiers.STATIC;
++			} else if (context.hide_internal && (prop.is_internal_symbol () || acc.access == SymbolAccessibility.INTERNAL)) {
++				function.modifiers |= CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			push_function (function);
+@@ -1728,6 +1742,8 @@
+ 				if (prop.is_private_symbol () || !(acc.readable || acc.writable) || acc.access == SymbolAccessibility.PRIVATE) {
+ 					// accessor function should be private if the property is an internal symbol or it's a construct-only setter
+ 					function.modifiers |= CCodeModifiers.STATIC;
++				} else if (context.hide_internal && (prop.is_internal_symbol () || acc.access == SymbolAccessibility.INTERNAL)) {
++					function.modifiers |= CCodeModifiers.INTERNAL;
+ 				}
+ 			}
+ 
+--- a/codegen/valaccodemethodmodule.vala	2013-12-22 19:40:23.000000000 +0100
++++ b/codegen/valaccodemethodmodule.vala	2014-07-26 12:27:23.621143180 +0200
+@@ -165,6 +165,8 @@
+ 			if (m.is_inline) {
+ 				function.modifiers |= CCodeModifiers.INLINE;
+ 			}
++		} else if (context.hide_internal && m.is_internal_symbol () && !m.external) {
++			function.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		if (m.deprecated) {
+@@ -192,6 +194,8 @@
+ 
+ 			if (m.is_private_symbol ()) {
+ 				function.modifiers |= CCodeModifiers.STATIC;
++			} else if (context.hide_internal && m.is_internal_symbol ()) {
++				function.modifiers |= CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			cparam_map = new HashMap<int,CCodeParameter> (direct_hash, direct_equal);
+@@ -426,6 +430,8 @@
+ 					cfile.add_function_declaration (function);
+ 				} else if (m.is_private_symbol ()) {
+ 					function.modifiers |= CCodeModifiers.STATIC;
++				} else if (context.hide_internal && m.is_internal_symbol ()) {
++					function.modifiers |= CCodeModifiers.INTERNAL;
+ 				}
+ 			} else {
+ 				if (m.body != null) {
+@@ -1178,6 +1184,8 @@
+ 		var vfunc = new CCodeFunction (func_name);
+ 		if (m.is_private_symbol ()) {
+ 			vfunc.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && m.is_internal_symbol ()) {
++			vfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		var cparam_map = new HashMap<int,CCodeParameter> (direct_hash, direct_equal);
+--- a/codegen/valaccodestructmodule.vala	2013-08-02 10:23:32.000000000 +0200
++++ b/codegen/valaccodestructmodule.vala	2014-07-26 12:27:23.621143180 +0200
+@@ -121,6 +121,8 @@
+ 		var function = new CCodeFunction (get_ccode_dup_function (st), get_ccode_name (st) + "*");
+ 		if (st.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && st.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 		function.add_parameter (new CCodeParameter ("self", "const " + get_ccode_name (st) + "*"));
+ 		decl_space.add_function_declaration (function);
+@@ -128,6 +130,8 @@
+ 		function = new CCodeFunction (get_ccode_free_function (st), "void");
+ 		if (st.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && st.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 		function.add_parameter (new CCodeParameter ("self", get_ccode_name (st) + "*"));
+ 		decl_space.add_function_declaration (function);
+@@ -136,6 +140,8 @@
+ 			function = new CCodeFunction (get_ccode_copy_function (st), "void");
+ 			if (st.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
++			} else if (context.hide_internal && st.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 			function.add_parameter (new CCodeParameter ("self", "const " + get_ccode_name (st) + "*"));
+ 			function.add_parameter (new CCodeParameter ("dest", get_ccode_name (st) + "*"));
+@@ -144,6 +150,8 @@
+ 			function = new CCodeFunction (get_ccode_destroy_function (st), "void");
+ 			if (st.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
++			} else if (context.hide_internal && st.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 			function.add_parameter (new CCodeParameter ("self", get_ccode_name (st) + "*"));
+ 			decl_space.add_function_declaration (function);
+@@ -234,8 +242,10 @@
+ 
+ 	void add_struct_free_function (Struct st) {
+ 		var function = new CCodeFunction (get_ccode_free_function (st), "void");
+-		if (st.access == SymbolAccessibility.PRIVATE) {
++		if (st.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && st.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		function.add_parameter (new CCodeParameter ("self", get_ccode_name (st) + "*"));
+@@ -259,8 +269,10 @@
+ 
+ 	void add_struct_copy_function (Struct st) {
+ 		var function = new CCodeFunction (get_ccode_copy_function (st), "void");
+-		if (st.access == SymbolAccessibility.PRIVATE) {
++		if (st.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && st.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		function.add_parameter (new CCodeParameter ("self", "const " + get_ccode_name (st) + "*"));
+@@ -292,8 +304,10 @@
+ 		push_context (instance_finalize_context);
+ 
+ 		var function = new CCodeFunction (get_ccode_destroy_function (st), "void");
+-		if (st.access == SymbolAccessibility.PRIVATE) {
++		if (st.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && st.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		function.add_parameter (new CCodeParameter ("self", get_ccode_name (st) + "*"));
+--- a/codegen/valagasyncmodule.vala	2013-06-13 09:15:22.000000000 +0200
++++ b/codegen/valagasyncmodule.vala	2014-07-26 12:27:23.622143215 +0200
+@@ -186,6 +186,8 @@
+ 			cfile.add_function_declaration (asyncfunc);
+ 		} else if (m.is_private_symbol ()) {
+ 			asyncfunc.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && m.is_internal_symbol ()) {
++			asyncfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		push_function (asyncfunc);
+@@ -337,6 +339,8 @@
+ 
+ 			if (m.is_private_symbol ()) {
+ 				asyncfunc.modifiers |= CCodeModifiers.STATIC;
++			} else if (context.hide_internal && m.is_internal_symbol ()) {
++				asyncfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			// do not generate _new functions for creation methods of abstract classes
+@@ -352,6 +356,8 @@
+ 
+ 			if (m.is_private_symbol ()) {
+ 				finishfunc.modifiers |= CCodeModifiers.STATIC;
++			} else if (context.hide_internal && m.is_internal_symbol ()) {
++				finishfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			// do not generate _new functions for creation methods of abstract classes
+@@ -367,6 +373,8 @@
+ 
+ 				if (m.is_private_symbol ()) {
+ 					function.modifiers |= CCodeModifiers.STATIC;
++				} else if (context.hide_internal && m.is_internal_symbol ()) {
++					function.modifiers |= CCodeModifiers.INTERNAL;
+ 				}
+ 
+ 				cparam_map = new HashMap<int,CCodeParameter> (direct_hash, direct_equal);
+@@ -378,6 +386,8 @@
+ 
+ 				if (m.is_private_symbol ()) {
+ 					function.modifiers |= CCodeModifiers.STATIC;
++				} else if (context.hide_internal && m.is_internal_symbol ()) {
++					function.modifiers |= CCodeModifiers.INTERNAL;
+ 				}
+ 
+ 				cparam_map = new HashMap<int,CCodeParameter> (direct_hash, direct_equal);
+@@ -517,6 +527,8 @@
+ 
+ 		if (m.is_private_symbol () || m.base_method != null || m.base_interface_method != null) {
+ 			finishfunc.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && m.is_internal_symbol ()) {
++			finishfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		push_function (finishfunc);
+--- a/codegen/valagdbusservermodule.vala	2014-03-12 20:38:04.000000000 +0100
++++ b/codegen/valagdbusservermodule.vala	2014-07-26 12:27:23.622143215 +0200
+@@ -1198,6 +1198,8 @@
+ 		cfunc.add_parameter (new CCodeParameter ("error", "GError**"));
+ 		if (sym.is_private_symbol ()) {
+ 			cfunc.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && sym.is_internal_symbol ()) {
++			cfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 		decl_space.add_function_declaration (cfunc);
+ 	}
+@@ -1219,6 +1221,8 @@
+ 		cfunc.add_parameter (new CCodeParameter ("error", "GError**"));
+ 		if (sym.is_private_symbol ()) {
+ 			cfunc.modifiers |= CCodeModifiers.STATIC;
++		} else if (context.hide_internal && sym.is_internal_symbol ()) {
++			cfunc.modifiers |= CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		push_function (cfunc);
+--- a/codegen/valagtypemodule.vala	2014-02-03 20:35:53.000000000 +0100
++++ b/codegen/valagtypemodule.vala	2014-07-26 12:27:23.622143215 +0200
+@@ -93,9 +93,12 @@
+ 		if (is_fundamental) {
+ 			var ref_fun = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "ref", "gpointer");
+ 			var unref_fun = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "unref", "void");
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				ref_fun.modifiers = CCodeModifiers.STATIC;
+ 				unref_fun.modifiers = CCodeModifiers.STATIC;
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				ref_fun.modifiers = CCodeModifiers.INTERNAL;
++				unref_fun.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			ref_fun.add_parameter (new CCodeParameter ("instance", "gpointer"));
+@@ -114,10 +117,12 @@
+ 			function.add_parameter (new CCodeParameter ("object_type", "GType"));
+ 			function.add_parameter (new CCodeParameter ("flags", "GParamFlags"));
+ 
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
+ 				// avoid C warning as this function is not always used
+ 				function.attributes = "G_GNUC_UNUSED";
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			decl_space.add_function_declaration (function);
+@@ -126,10 +131,14 @@
+ 			function.add_parameter (new CCodeParameter ("value", "GValue*"));
+ 			function.add_parameter (new CCodeParameter ("v_object", "gpointer"));
+ 
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
+ 				// avoid C warning as this function is not always used
+ 				function.attributes = "G_GNUC_UNUSED";
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
++				// avoid C warning as this function is not always used
++				function.attributes = "G_GNUC_UNUSED";
+ 			}
+ 
+ 			decl_space.add_function_declaration (function);
+@@ -138,10 +147,12 @@
+ 			function.add_parameter (new CCodeParameter ("value", "GValue*"));
+ 			function.add_parameter (new CCodeParameter ("v_object", "gpointer"));
+ 
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
+ 				// avoid C warning as this function is not always used
+ 				function.attributes = "G_GNUC_UNUSED";
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			decl_space.add_function_declaration (function);
+@@ -149,18 +160,24 @@
+ 			function = new CCodeFunction (get_ccode_get_value_function (cl), "gpointer");
+ 			function.add_parameter (new CCodeParameter ("value", "const GValue*"));
+ 
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
+ 				// avoid C warning as this function is not always used
+ 				function.attributes = "G_GNUC_UNUSED";
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
++				// avoid C warning as this function is not always used
++				function.attributes = "G_GNUC_UNUSED";
+ 			}
+ 
+ 			decl_space.add_function_declaration (function);
+ 		} else if (!is_gtypeinstance && !is_gsource) {
+ 			if (cl.base_class == null) {
+ 				var function = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "free", "void");
+-				if (cl.access == SymbolAccessibility.PRIVATE) {
++				if (cl.is_private_symbol ()) {
+ 					function.modifiers = CCodeModifiers.STATIC;
++				} else if (context.hide_internal && cl.is_internal_symbol ()) {
++					function.modifiers = CCodeModifiers.INTERNAL;
+ 				}
+ 
+ 				function.add_parameter (new CCodeParameter ("self", get_ccode_name (cl) + "*"));
+@@ -653,8 +670,10 @@
+ 				// ref function
+ 				var ref_fun = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "ref", "gpointer");
+ 				ref_fun.add_parameter (new CCodeParameter ("instance", "gpointer"));
+-				if (cl.access == SymbolAccessibility.PRIVATE) {
++				if (cl.is_private_symbol ()) {
+ 					ref_fun.modifiers = CCodeModifiers.STATIC;
++				} else if (context.hide_internal && cl.is_internal_symbol ()) {
++					ref_fun.modifiers = CCodeModifiers.INTERNAL;
+ 				}
+ 				push_function (ref_fun);
+ 
+@@ -670,8 +689,10 @@
+ 				// unref function
+ 				var unref_fun = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "unref", "void");
+ 				unref_fun.add_parameter (new CCodeParameter ("instance", "gpointer"));
+-				if (cl.access == SymbolAccessibility.PRIVATE) {
++				if (cl.is_private_symbol ()) {
+ 					unref_fun.modifiers = CCodeModifiers.STATIC;
++				} else if (context.hide_internal && cl.is_internal_symbol ()) {
++					unref_fun.modifiers = CCodeModifiers.INTERNAL;
+ 				}
+ 				push_function (unref_fun);
+ 
+@@ -909,8 +930,10 @@
+ 		function.add_parameter (new CCodeParameter ("object_type", "GType"));
+ 		function.add_parameter (new CCodeParameter ("flags", "GParamFlags"));
+ 
+-		if (cl.access == SymbolAccessibility.PRIVATE) {
++		if (cl.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && cl.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		push_function (function);
+@@ -950,8 +973,10 @@
+ 		function.add_parameter (new CCodeParameter ("value", "GValue*"));
+ 		function.add_parameter (new CCodeParameter ("v_object", "gpointer"));
+ 
+-		if (cl.access == SymbolAccessibility.PRIVATE) {
++		if (cl.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && cl.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		var vpointer = new CCodeMemberAccess (new CCodeMemberAccess.pointer (new CCodeIdentifier ("value"), "data[0]"), "v_pointer");
+@@ -1018,8 +1043,10 @@
+ 		function.add_parameter (new CCodeParameter ("value", "GValue*"));
+ 		function.add_parameter (new CCodeParameter ("v_object", "gpointer"));
+ 
+-		if (cl.access == SymbolAccessibility.PRIVATE) {
++		if (cl.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && cl.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		var vpointer = new CCodeMemberAccess(new CCodeMemberAccess.pointer (new CCodeIdentifier ("value"), "data[0]"),"v_pointer");
+@@ -1082,8 +1109,10 @@
+ 		var function = new CCodeFunction (get_ccode_get_value_function (cl), "gpointer");
+ 		function.add_parameter (new CCodeParameter ("value", "const GValue*"));
+ 
+-		if (cl.access == SymbolAccessibility.PRIVATE) {
++		if (cl.is_private_symbol ()) {
+ 			function.modifiers = CCodeModifiers.STATIC;
++		} else if (context.hide_internal && cl.is_internal_symbol ()) {
++			function.modifiers = CCodeModifiers.INTERNAL;
+ 		}
+ 
+ 		var vpointer = new CCodeMemberAccess(new CCodeMemberAccess.pointer (new CCodeIdentifier ("value"), "data[0]"),"v_pointer");
+@@ -1683,8 +1712,10 @@
+ 			ccode.add_assignment (new CCodeIdentifier ("self"), ccast);
+ 		} else {
+ 			var function = new CCodeFunction (get_ccode_lower_case_prefix (cl) + "free", "void");
+-			if (cl.access == SymbolAccessibility.PRIVATE) {
++			if (cl.is_private_symbol ()) {
+ 				function.modifiers = CCodeModifiers.STATIC;
++			} else if (context.hide_internal && cl.is_internal_symbol ()) {
++				function.modifiers = CCodeModifiers.INTERNAL;
+ 			}
+ 
+ 			function.add_parameter (new CCodeParameter ("self", get_ccode_name (cl) + "*"));
+--- a/codegen/valatyperegisterfunction.vala	2011-08-13 20:25:00.000000000 +0200
++++ b/codegen/valatyperegisterfunction.vala	2014-07-26 12:27:23.623143242 +0200
+@@ -75,6 +75,10 @@
+ 				fun.modifiers = CCodeModifiers.STATIC;
+ 				// avoid C warning as this function is not always used
+ 				fun.attributes += " G_GNUC_UNUSED";
++			} else if (context.hide_internal && get_accessibility () == SymbolAccessibility.INTERNAL) {
++				fun.modifiers = CCodeModifiers.INTERNAL;
++				// avoid C warning as this function is not always used
++				fun.attributes += " G_GNUC_UNUSED";
+ 			}
+ 		} else {
+ 			fun = new CCodeFunction ("%s_register_type".printf (CCodeBaseModule.get_ccode_lower_case_name (get_type_declaration ())), "GType");
+--- a/compiler/valacompiler.vala	2014-01-09 15:47:03.000000000 +0100
++++ b/compiler/valacompiler.vala	2014-07-26 12:27:23.623143242 +0200
+@@ -63,6 +63,7 @@
+ 	static bool disable_assert;
+ 	static bool enable_checking;
+ 	static bool deprecated;
++	static bool hide_internal;
+ 	static bool experimental;
+ 	static bool experimental_non_null;
+ 	static bool gobject_tracing;
+@@ -122,6 +123,7 @@
+ 		{ "disable-assert", 0, 0, OptionArg.NONE, ref disable_assert, "Disable assertions", null },
+ 		{ "enable-checking", 0, 0, OptionArg.NONE, ref enable_checking, "Enable additional run-time checks", null },
+ 		{ "enable-deprecated", 0, 0, OptionArg.NONE, ref deprecated, "Enable deprecated features", null },
++		{ "hide-internal", 0, 0, OptionArg.NONE, ref hide_internal, "Hide symbols marked as internal", null },
+ 		{ "enable-experimental", 0, 0, OptionArg.NONE, ref experimental, "Enable experimental features", null },
+ 		{ "disable-warnings", 0, 0, OptionArg.NONE, ref disable_warnings, "Disable warnings", null },
+ 		{ "fatal-warnings", 0, 0, OptionArg.NONE, ref fatal_warnings, "Treat warnings as fatal", null },
+@@ -176,6 +178,7 @@
+ 		context.assert = !disable_assert;
+ 		context.checking = enable_checking;
+ 		context.deprecated = deprecated;
++		context.hide_internal = hide_internal;
+ 		context.experimental = experimental;
+ 		context.experimental_non_null = experimental_non_null;
+ 		context.gobject_tracing = gobject_tracing;
+--- a/vala/valacodecontext.vala	2013-06-13 09:15:22.000000000 +0200
++++ b/vala/valacodecontext.vala	2014-07-26 12:27:23.623143242 +0200
+@@ -42,6 +42,11 @@
+ 	public bool deprecated { get; set; }
+ 
+ 	/**
++	 * Hide the symbols marked as internal
++	 */
++	public bool hide_internal { get; set; }
++
++	/**
+ 	 * Do not warn when using experimental features.
+ 	 */
+ 	public bool experimental { get; set; }
+--- a/vapi/atk.vapi	2013-12-22 19:40:23.000000000 +0100
++++ b/vapi/atk.vapi	2014-07-26 12:27:30.594274444 +0200
+@@ -41,12 +41,15 @@
+ 	public class Misc : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+ 		protected Misc ();
++		[Deprecated]
+ 		public static unowned Atk.Misc get_instance ();
++		[Deprecated]
+ 		public virtual void threads_enter ();
++		[Deprecated]
+ 		public virtual void threads_leave ();
+ 	}
+ 	[CCode (cheader_filename = "atk/atk.h", type_id = "atk_no_op_object_get_type ()")]
+-	public class NoOpObject : Atk.Object, Atk.Action, Atk.Component, Atk.Document, Atk.EditableText, Atk.Hypertext, Atk.Image, Atk.Selection, Atk.Table, Atk.Text, Atk.Value, Atk.Window {
++	public class NoOpObject : Atk.Object, Atk.Action, Atk.Component, Atk.Document, Atk.EditableText, Atk.Hypertext, Atk.Image, Atk.Selection, Atk.Table, Atk.TableCell, Atk.Text, Atk.Value, Atk.Window {
+ 		[CCode (has_construct_function = false, type = "AtkObject*")]
+ 		public NoOpObject (GLib.Object obj);
+ 	}
+@@ -65,6 +68,7 @@
+ 		[CCode (has_construct_function = false)]
+ 		protected Object ();
+ 		public bool add_relationship (Atk.RelationType relationship, Atk.Object target);
++		[Deprecated]
+ 		public virtual uint connect_property_change_handler (Atk.PropertyChangeHandler handler);
+ 		public virtual Atk.AttributeSet get_attributes ();
+ 		public virtual unowned string get_description ();
+@@ -82,9 +86,11 @@
+ 		public virtual Atk.Role get_role ();
+ 		public virtual void initialize (void* data);
+ 		public void notify_state_change (Atk.State state, bool value);
++		public unowned Atk.Object peek_parent ();
+ 		public Atk.Object ref_accessible_child (int i);
+ 		public virtual Atk.RelationSet ref_relation_set ();
+ 		public virtual Atk.StateSet ref_state_set ();
++		[Deprecated]
+ 		public virtual void remove_property_change_handler (uint handler_id);
+ 		public bool remove_relationship (Atk.RelationType relationship, Atk.Object target);
+ 		public virtual void set_description (string description);
+@@ -105,27 +111,33 @@
+ 		public Atk.Object accessible_parent { owned get; set; }
+ 		[NoAccessorMethod]
+ 		public int accessible_role { get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public string accessible_table_caption { owned get; set; }
+ 		[NoAccessorMethod]
+ 		public Atk.Object accessible_table_caption_object { owned get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public string accessible_table_column_description { owned get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public Atk.Object accessible_table_column_header { owned get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public string accessible_table_row_description { owned get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public Atk.Object accessible_table_row_header { owned get; set; }
+ 		[NoAccessorMethod]
+ 		public Atk.Object accessible_table_summary { owned get; set; }
++		[Deprecated]
+ 		[NoAccessorMethod]
+ 		public double accessible_value { get; set; }
+ 		public virtual signal void active_descendant_changed (void* child);
+ 		public virtual signal void children_changed (uint change_index, void* changed_child);
+ 		[Deprecated]
+ 		public virtual signal void focus_event (bool focus_in);
+-		public signal void property_change (void* arg1);
++		public virtual signal void property_change (void* values);
+ 		public virtual signal void state_change (string name, bool state_set);
+ 		public virtual signal void visible_data_changed ();
+ 	}
+@@ -145,6 +157,17 @@
+ 		[NoWrapper]
+ 		public virtual string get_object_id ();
+ 	}
++	[CCode (cheader_filename = "atk/atk.h", copy_function = "g_boxed_copy", free_function = "g_boxed_free", type_id = "atk_range_get_type ()")]
++	[Compact]
++	public class Range {
++		[CCode (has_construct_function = false)]
++		public Range (double lower_limit, double upper_limit, string description);
++		public Atk.Range copy ();
++		public void free ();
++		public unowned string get_description ();
++		public double get_lower_limit ();
++		public double get_upper_limit ();
++	}
+ 	[CCode (cheader_filename = "atk/atk.h")]
+ 	public class Registry : GLib.Object {
+ 		[Deprecated]
+@@ -280,7 +303,9 @@
+ 		public abstract void get_extents (int x, int y, int width, int height, Atk.CoordType coord_type);
+ 		public abstract Atk.Layer get_layer ();
+ 		public abstract int get_mdi_zorder ();
++		[Deprecated]
+ 		public abstract void get_position (int x, int y, Atk.CoordType coord_type);
++		[Deprecated]
+ 		public abstract void get_size (int width, int height);
+ 		public abstract bool grab_focus ();
+ 		public abstract Atk.Object ref_accessible_at_point (int x, int y, Atk.CoordType coord_type);
+@@ -371,13 +396,16 @@
+ 		public abstract bool add_column_selection (int column);
+ 		public abstract bool add_row_selection (int row);
+ 		public abstract unowned Atk.Object get_caption ();
++		[Deprecated]
+ 		public abstract int get_column_at_index (int index_);
+ 		public abstract unowned string get_column_description (int column);
+ 		public abstract int get_column_extent_at (int row, int column);
+ 		public abstract unowned Atk.Object get_column_header (int column);
++		[Deprecated]
+ 		public abstract int get_index_at (int row, int column);
+ 		public abstract int get_n_columns ();
+ 		public abstract int get_n_rows ();
++		[Deprecated]
+ 		public abstract int get_row_at_index (int index_);
+ 		public abstract unowned string get_row_description (int row);
+ 		public abstract int get_row_extent_at (int row, int column);
+@@ -405,6 +433,16 @@
+ 		public virtual signal void row_inserted (int row, int num_inserted);
+ 		public virtual signal void row_reordered ();
+ 	}
++	[CCode (cheader_filename = "atk/atk.h", type_id = "atk_table_cell_get_type ()")]
++	public interface TableCell : Atk.Object {
++		public abstract GLib.GenericArray<Atk.Object> get_column_header_cells ();
++		public abstract int get_column_span ();
++		public abstract bool get_position (out int row, out int column);
++		public abstract bool get_row_column_span (out int row, out int column, out int row_span, out int column_span);
++		public abstract GLib.GenericArray<Atk.Object> get_row_header_cells ();
++		public abstract int get_row_span ();
++		public abstract Atk.Object get_table ();
++	}
+ 	[CCode (cheader_filename = "atk/atk.h")]
+ 	public interface Text : GLib.Object {
+ 		public abstract bool add_selection (int start_offset, int end_offset);
+@@ -418,6 +456,7 @@
+ 		public static Atk.TextAttribute attribute_register (string name);
+ 		public static void free_ranges ([CCode (array_length = false)] Atk.TextRange[] ranges);
+ 		[CCode (array_length = false, array_null_terminated = true)]
++		[NoWrapper]
+ 		public virtual Atk.TextRange[] get_bounded_ranges (Atk.TextRectangle rect, Atk.CoordType coord_type, Atk.TextClipType x_clip_type, Atk.TextClipType y_clip_type);
+ 		public abstract int get_caret_offset ();
+ 		public abstract unichar get_character_at_offset (int offset);
+@@ -450,11 +489,22 @@
+ 	}
+ 	[CCode (cheader_filename = "atk/atk.h", type_id = "atk_value_get_type ()")]
+ 	public interface Value : GLib.Object {
++		[Deprecated]
+ 		public abstract void get_current_value (GLib.Value value);
++		public abstract double get_increment ();
++		[Deprecated]
+ 		public abstract void get_maximum_value (GLib.Value value);
++		[Deprecated]
+ 		public abstract void get_minimum_increment (GLib.Value value);
++		[Deprecated]
+ 		public abstract void get_minimum_value (GLib.Value value);
++		public abstract Atk.Range get_range ();
++		public abstract GLib.SList<Atk.Range> get_sub_ranges ();
++		public abstract void get_value_and_text (out double value, out string text);
++		[Deprecated]
+ 		public abstract bool set_current_value (GLib.Value value);
++		public abstract void set_value (double new_value);
++		public signal void value_changed (double value, string text);
+ 	}
+ 	[CCode (cheader_filename = "atk/atk.h", type_id = "atk_window_get_type ()")]
+ 	public interface Window : Atk.Object {
+@@ -484,8 +534,7 @@
+ 		public uint16 keycode;
+ 		public uint32 timestamp;
+ 	}
+-	[CCode (cheader_filename = "atk/atk.h", cname = "_AtkPropertyValues", has_type_id = false)]
+-	[GIR (name = "_PropertyValues")]
++	[CCode (cheader_filename = "atk/atk.h", has_type_id = false)]
+ 	public struct PropertyValues {
+ 		public weak string property_name;
+ 		public GLib.Value old_value;
+@@ -688,6 +737,9 @@
+ 		MATH,
+ 		RATING,
+ 		TIMER,
++		DESCRIPTION_LIST,
++		DESCRIPTION_TERM,
++		DESCRIPTION_VALUE,
+ 		LAST_DEFINED;
+ 		[CCode (cheader_filename = "atk/atk.h")]
+ 		public static Atk.Role for_name (string name);
+@@ -696,6 +748,7 @@
+ 		[CCode (cheader_filename = "atk/atk.h")]
+ 		public static unowned string get_name (Atk.Role role);
+ 		[CCode (cheader_filename = "atk/atk.h")]
++		[Deprecated]
+ 		public static Atk.Role register (string name);
+ 	}
+ 	[CCode (cheader_filename = "atk/atk.h", cprefix = "ATK_STATE_", type_id = "atk_state_type_get_type ()")]
+@@ -814,6 +867,29 @@
+ 		LINE,
+ 		PARAGRAPH
+ 	}
++	[CCode (cheader_filename = "atk/atk.h", cprefix = "ATK_VALUE_", type_id = "atk_value_type_get_type ()")]
++	public enum ValueType {
++		VERY_WEAK,
++		WEAK,
++		ACCEPTABLE,
++		STRONG,
++		VERY_STRONG,
++		VERY_LOW,
++		LOW,
++		MEDIUM,
++		HIGH,
++		VERY_HIGH,
++		VERY_BAD,
++		BAD,
++		GOOD,
++		VERY_GOOD,
++		BEST,
++		LAST_DEFINED;
++		[CCode (cheader_filename = "atk/atk.h")]
++		public static unowned string get_localized_name (Atk.ValueType value_type);
++		[CCode (cheader_filename = "atk/atk.h")]
++		public static unowned string get_name (Atk.ValueType value_type);
++	}
+ 	[CCode (cheader_filename = "atk/atk.h", has_target = false)]
+ 	public delegate void EventListener (Atk.Object obj);
+ 	[CCode (cheader_filename = "atk/atk.h", has_target = false)]
+@@ -826,6 +902,7 @@
+ 	[CCode (cheader_filename = "atk/atk.h", instance_pos = 1.9)]
+ 	public delegate int KeySnoopFunc (Atk.KeyEventStruct event);
+ 	[CCode (cheader_filename = "atk/atk.h", has_target = false)]
++	[Deprecated]
+ 	public delegate void PropertyChangeHandler (Atk.Object obj, Atk.PropertyValues vals);
+ 	[CCode (cheader_filename = "atk/atk.h", cname = "GSignalEmissionHook", has_target = false)]
+ 	public delegate bool SignalEmissionHook (GLib.SignalInvocationHint ihint, [CCode (array_length_pos = 1.9)] Atk.Value[] param_values, void* data);
+--- a/vapi/clutter-1.0.vapi	2014-02-03 23:11:21.000000000 +0100
++++ b/vapi/clutter-1.0.vapi	2014-07-26 12:27:23.625143306 +0200
+@@ -5989,12 +5989,18 @@
+ 		public void get_press_coords (uint point, out float press_x, out float press_y);
+ 		public void get_release_coords (uint point, out float release_x, out float release_y);
+ 		public unowned Clutter.EventSequence get_sequence (uint point);
++		public void get_threshold_trigger_distance (out float x, out float y);
+ 		public Clutter.GestureTriggerEdge get_threshold_trigger_egde ();
+ 		public float get_velocity (uint point, out float velocity_x, out float velocity_y);
+ 		public void set_n_touch_points (int nb_points);
++		public void set_threshold_trigger_distance (float x, float y);
+ 		public void set_threshold_trigger_edge (Clutter.GestureTriggerEdge edge);
+ 		public int n_touch_points { get; set; }
+ 		[NoAccessorMethod]
++		public float threshold_trigger_distance_x { get; construct; }
++		[NoAccessorMethod]
++		public float threshold_trigger_distance_y { get; construct; }
++		[NoAccessorMethod]
+ 		public Clutter.GestureTriggerEdge threshold_trigger_edge { get; construct; }
+ 		public virtual signal bool gesture_begin (Clutter.Actor actor);
+ 		public virtual signal void gesture_cancel (Clutter.Actor actor);
+--- a/vapi/geocode-glib-1.0.vapi	2013-09-13 08:43:42.000000000 +0200
++++ b/vapi/geocode-glib-1.0.vapi	2014-07-26 12:27:23.625143306 +0200
+@@ -16,6 +16,19 @@
+ 		[CCode (cheader_filename = "geocode-glib/geocode-glib.h", cname = "GEOCODE_LOCATION_ACCURACY_UNKNOWN")]
+ 		public const int UNKNOWN;
+ 	}
++	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", type_id = "geocode_bounding_box_get_type ()")]
++	public class BoundingBox : GLib.Object {
++		[CCode (has_construct_function = false)]
++		public BoundingBox (double top, double bottom, double left, double right);
++		public double get_bottom ();
++		public double get_left ();
++		public double get_right ();
++		public double get_top ();
++		public double bottom { get; construct; }
++		public double left { get; construct; }
++		public double right { get; construct; }
++		public double top { get; construct; }
++	}
+ 	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", type_id = "geocode_forward_get_type ()")]
+ 	public class Forward : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+@@ -24,27 +37,45 @@
+ 		public Forward.for_params (GLib.HashTable<string,GLib.Value?> @params);
+ 		[CCode (has_construct_function = false)]
+ 		public Forward.for_string (string str);
++		public uint get_answer_count ();
++		public bool get_bounded ();
+ 		public GLib.List<weak Geocode.Place> search () throws GLib.Error;
+ 		public async GLib.List<weak Geocode.Place> search_async (GLib.Cancellable? cancellable = null) throws GLib.Error;
+ 		public void set_answer_count (uint count);
++		public void set_bounded (bool bounded);
++		public void set_search_area (Geocode.BoundingBox box);
++		public uint answer_count { get; set; }
++		public bool bounded { get; set; }
++		[NoAccessorMethod]
++		public Geocode.BoundingBox search_area { owned get; set; }
+ 	}
+ 	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", type_id = "geocode_location_get_type ()")]
+ 	public class Location : GLib.Object {
+ 		[CCode (has_construct_function = false)]
+ 		public Location (double latitude, double longitude, double accuracy = LocationAccuracy.UNKNOWN);
+ 		public double get_accuracy ();
++		public double get_altitude ();
++		public Geocode.LocationCRS get_crs ();
+ 		public unowned string get_description ();
+ 		public double get_distance_from (Geocode.Location locb);
+ 		public double get_latitude ();
+ 		public double get_longitude ();
+ 		public uint64 get_timestamp ();
+ 		public void set_description (string description);
++		public bool set_from_uri (string uri) throws GLib.Error;
++		public string to_uri (Geocode.LocationURIScheme scheme);
+ 		[CCode (has_construct_function = false)]
+ 		public Location.with_description (double latitude, double longitude, double accuracy, string description);
+-		public double accuracy { get; construct; }
++		[NoAccessorMethod]
++		public double accuracy { get; set; }
++		[NoAccessorMethod]
++		public double altitude { get; set; }
++		public Geocode.LocationCRS crs { get; construct; }
+ 		public string description { get; set; }
+-		public double latitude { get; construct; }
+-		public double longitude { get; construct; }
++		[NoAccessorMethod]
++		public double latitude { get; set; }
++		[NoAccessorMethod]
++		public double longitude { get; set; }
+ 		public uint64 timestamp { get; }
+ 	}
+ 	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", type_id = "geocode_place_get_type ()")]
+@@ -53,6 +84,7 @@
+ 		public Place (string name, Geocode.PlaceType place_type);
+ 		public unowned string get_administrative_area ();
+ 		public unowned string get_area ();
++		public unowned Geocode.BoundingBox get_bounding_box ();
+ 		public unowned string get_building ();
+ 		public unowned string get_continent ();
+ 		public unowned string get_country ();
+@@ -61,6 +93,7 @@
+ 		public unowned GLib.Icon get_icon ();
+ 		public unowned Geocode.Location get_location ();
+ 		public unowned string get_name ();
++		public unowned string get_osm_id ();
+ 		public Geocode.PlaceType get_place_type ();
+ 		public unowned string get_postal_code ();
+ 		public unowned string get_state ();
+@@ -69,6 +102,7 @@
+ 		public unowned string get_town ();
+ 		public void set_administrative_area (string admin_area);
+ 		public void set_area (string area);
++		public void set_bounding_box (Geocode.BoundingBox bbox);
+ 		public void set_building (string building);
+ 		public void set_continent (string continent);
+ 		public void set_country (string country);
+@@ -85,15 +119,17 @@
+ 		public Place.with_location (string name, Geocode.PlaceType place_type, Geocode.Location location);
+ 		public string administrative_area { get; set; }
+ 		public string area { get; set; }
++		public Geocode.BoundingBox bounding_box { get; set; }
+ 		public string building { get; set; }
+ 		public string continent { get; set; }
+ 		public string country { get; set; }
+ 		public string country_code { get; set; }
+ 		public string county { get; set; }
+-		[NoAccessorMethod]
+-		public GLib.Icon icon { owned get; set; }
++		public GLib.Icon icon { get; }
+ 		public Geocode.Location location { get; set; }
+ 		public string name { get; set; }
++		[NoAccessorMethod]
++		public string osm_id { owned get; set; }
+ 		public Geocode.PlaceType place_type { get; construct; }
+ 		public string postal_code { get; set; }
+ 		public string state { get; set; }
+@@ -110,6 +146,14 @@
+ 		public Geocode.Place resolve () throws GLib.Error;
+ 		public async Geocode.Place resolve_async (GLib.Cancellable? cancellable = null) throws GLib.Error;
+ 	}
++	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", cprefix = "GEOCODE_LOCATION_CRS_", type_id = "geocode_location_crs_get_type ()")]
++	public enum LocationCRS {
++		WGS84
++	}
++	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", cprefix = "GEOCODE_LOCATION_URI_SCHEME_", type_id = "geocode_location_uri_scheme_get_type ()")]
++	public enum LocationURIScheme {
++		GEO
++	}
+ 	[CCode (cheader_filename = "geocode-glib/geocode-glib.h", cprefix = "GEOCODE_PLACE_TYPE_", type_id = "geocode_place_type_get_type ()")]
+ 	public enum PlaceType {
+ 		UNKNOWN,
