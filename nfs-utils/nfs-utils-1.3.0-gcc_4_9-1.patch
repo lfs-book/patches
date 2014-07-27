@@ -1,7 +1,7 @@
 Submitted By: Christopher Gregory <cjg at linuxfromscratch dot org>
 Date: 2010-09-03
 Initial Package Version: 1.3.0
-Upstream Status: unknown
+Upstream Status: applied
 Origin:  found on gentoo portage message board.
 Description: Fix add_name segfault with gcc 4.9.x
 Comment:
