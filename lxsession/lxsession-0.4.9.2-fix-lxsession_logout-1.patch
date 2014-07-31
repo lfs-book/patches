@@ -1,12 +1,12 @@
 Submitted By:            Christopher Gregory <cjg at higgs dot linuxfromscratch dot org>
 Date:                    2014-07-31
 Initial Package Version: 0.4.9.2
-Upstream Status:         Not Submitted
+Upstream Status:         From Upstream
 Origin:                  Self
-Description:             Backport lxsession-0.4.9.3 git dbus logind changes to lxsession-0.4.9.2 stable
+Description:             Backport Upstream logind fixes to current stable. 
 
---- lxsession-0.4.9.2/lxsession-logout/dbus-interface.c	2013-04-12 21:02:19.000000000 +0000
-+++ lxsession-0.4.9.2/lxsession-logout/dbus-interface.c	2014-07-31 10:52:27.472736388 +0000
+--- lxsession-logout/dbus-interface.c	2013-04-12 21:02:19.000000000 +0000
++++ lxsession-logout/dbus-interface.c	2014-07-31 14:47:55.986279232 +0000
 @@ -1,21 +1,17 @@
 -/**
 - * Copyright (c) 2010 LxDE Developers, see the file AUTHORS for details.
@@ -842,3 +842,357 @@ Description:             Backport lxsession-0.4.9.3 git dbus logind changes to l
 -    return dbus_Lightdm_command("SwitchToGreeter");
 +    return lxde_call_function ("Restart", TRUE, error);
  }
+
+--- lxsession-logout/dbus-interface.h	2013-03-10 11:48:25.000000000 +0000
++++ lxsession-logout/dbus-interface.h	2014-07-31 14:47:56.057279211 +0000
+@@ -21,41 +21,32 @@
+ 
+ #include <glib.h>
+ 
+-/* Interface to logind for shutdown, reboot, suspend and hibernate. */
+-extern gboolean dbus_logind_CanPowerOff(void);
+-extern gboolean dbus_logind_CanReboot(void);
+-extern gboolean dbus_logind_CanSuspend(void);
+-extern gboolean dbus_logind_CanHibernate(void);
+-extern char * dbus_logind_PowerOff(void);
+-extern char * dbus_logind_Reboot(void);
+-extern char * dbus_logind_Suspend(void);
+-extern char * dbus_logind_Hibernate(void);
+-
+ /* Interface to ConsoleKit for shutdown and reboot. */
+ extern gboolean dbus_ConsoleKit_CanStop(void);
+ extern gboolean dbus_ConsoleKit_CanRestart(void);
+-extern char * dbus_ConsoleKit_Stop(void);
+-extern char * dbus_ConsoleKit_Restart(void);
++extern gboolean dbus_ConsoleKit_Stop(GError **);
++extern gboolean dbus_ConsoleKit_Restart(GError **);
+ 
+ /* Interface to UPower for suspend and hibernate. */
+ extern gboolean dbus_UPower_CanSuspend(void);
+ extern gboolean dbus_UPower_CanHibernate(void);
+-extern char * dbus_UPower_Suspend(void);
+-extern char * dbus_UPower_Hibernate(void);
++extern gboolean dbus_UPower_Suspend(GError **);
++extern gboolean dbus_UPower_Hibernate(GError **);
+ 
+-/* Interface to HAL for shutdown, reboot, suspend, and hibernate.
+- * HAL is being replaced by the above two mechanisms; this support is legacy. */
+-extern gboolean dbus_HAL_CanShutdown(void);
+-extern gboolean dbus_HAL_CanReboot(void);
+-extern gboolean dbus_HAL_CanSuspend(void);
+-extern gboolean dbus_HAL_CanHibernate(void);
+-extern char * dbus_HAL_Shutdown(void);
+-extern char * dbus_HAL_Reboot(void);
+-extern char * dbus_HAL_Suspend(void);
+-extern char * dbus_HAL_Hibernate(void);
++/* Interface to systemd for suspend, hibernate, shutdown and reboot. */
++extern gboolean dbus_systemd_CanPowerOff(void);
++extern gboolean dbus_systemd_CanReboot(void);
++extern gboolean dbus_systemd_CanSuspend(void);
++extern gboolean dbus_systemd_CanHibernate(void);
++extern void dbus_systemd_PowerOff(GError **);
++extern void dbus_systemd_Reboot(GError **);
++extern void dbus_systemd_Suspend(GError **);
++extern void dbus_systemd_Hibernate(GError **);
+ 
+-extern char * dbus_LXDE_Logout(void);
++/* Interface to lightdm for switch user. */
++extern gboolean dbus_Lightdm_SwitchToGreeter (GError **error);
+ 
+-extern char * dbus_Lightdm_SwitchToGreeter();
++/* Interface to lxde for logout. */
++extern gboolean dbus_LXDE_Logout (GError **error);
+ 
+ #endif
+
+--- lxsession-logout/lxsession-logout.c	2013-05-31 19:38:58.000000000 +0000
++++ lxsession-logout/lxsession-logout.c	2014-07-31 14:47:56.255279153 +0000
+@@ -61,18 +61,14 @@
+     int hibernate_available : 1;	/* Hibernate is available */
+     int switch_user_available : 1;	/* Switch User is available */
+ 
+-    int shutdown_logind : 1;		/* Shutdown is available via logind */
+-    int reboot_logind : 1;		/* Reboot is available via logind */
+-    int suspend_logind : 1;		/* Suspend is available via logind */
+-    int hibernate_logind : 1;		/* Hibernate is available via logind */
++    int shutdown_systemd : 1;		/* Shutdown is available via systemd */
++    int reboot_systemd : 1;		/* Reboot is available via systemd */
++    int suspend_systemd : 1;		/* Suspend is available via systemd */
++    int hibernate_systemd : 1;		/* Hibernate is available via systemd */
+     int shutdown_ConsoleKit : 1;	/* Shutdown is available via ConsoleKit */
+     int reboot_ConsoleKit : 1;		/* Reboot is available via ConsoleKit */
+     int suspend_UPower : 1;		/* Suspend is available via UPower */
+     int hibernate_UPower : 1;		/* Hibernate is available via UPower */
+-    int shutdown_HAL : 1;		/* Shutdown is available via HAL */
+-    int reboot_HAL : 1;			/* Reboot is available via HAL */
+-    int suspend_HAL : 1;		/* Suspend is available via HAL */
+-    int hibernate_HAL : 1;		/* Hibernate is available via HAL */
+     int switch_user_GDM : 1;		/* Switch User is available via GDM */
+     int switch_user_LIGHTDM : 1;	/* Switch User is available via GDM */
+     int switch_user_KDM : 1;		/* Switch User is available via LIGHTDM */
+@@ -212,7 +208,7 @@
+ /* Handler for "clicked" signal on Shutdown button. */
+ static void shutdown_clicked(GtkButton * button, HandlerContext * handler_context)
+ {
+-    char * error_result = NULL;
++    GError *err = NULL;
+     gtk_label_set_text(GTK_LABEL(handler_context->error_label), NULL);
+ 
+     if (handler_context->ltsp)
+@@ -224,21 +220,25 @@
+         }
+     }
+     else if (handler_context->shutdown_ConsoleKit)
+-        error_result = dbus_ConsoleKit_Stop();
+-    else if (handler_context->shutdown_logind)
+-        error_result = dbus_logind_PowerOff();
+-    else if (handler_context->shutdown_HAL)
+-        error_result = dbus_HAL_Shutdown();
+-
+-    if (error_result != NULL)
+-        gtk_label_set_text(GTK_LABEL(handler_context->error_label), error_result);
+-        else gtk_main_quit();
++        dbus_ConsoleKit_Stop(&err);
++    else if (handler_context->shutdown_systemd)
++        dbus_systemd_PowerOff(&err);
++
++	if (err)
++	{
++		gtk_label_set_text(GTK_LABEL(handler_context->error_label), err->message);
++		g_error_free (err);
++	}
++	else
++    {
++        gtk_main_quit();
++    }
+ }
+ 
+ /* Handler for "clicked" signal on Reboot button. */
+ static void reboot_clicked(GtkButton * button, HandlerContext * handler_context)
+ {
+-    char * error_result = NULL;
++    GError *err = NULL;
+     gtk_label_set_text(GTK_LABEL(handler_context->error_label), NULL);
+ 
+     if (handler_context->ltsp)
+@@ -250,58 +250,71 @@
+         }
+     }
+     else if (handler_context->reboot_ConsoleKit)
+-        error_result = dbus_ConsoleKit_Restart();
+-    else if (handler_context->reboot_logind)
+-        error_result = dbus_logind_Reboot();
+-    else if (handler_context->reboot_HAL)
+-        error_result = dbus_HAL_Reboot();
+-
+-    if (error_result != NULL)
+-        gtk_label_set_text(GTK_LABEL(handler_context->error_label), error_result);
+-        else gtk_main_quit();
++        dbus_ConsoleKit_Restart(&err);
++    else if (handler_context->reboot_systemd)
++        dbus_systemd_Reboot(&err);
++
++	if (err)
++	{
++		gtk_label_set_text(GTK_LABEL(handler_context->error_label), err->message);
++		g_error_free (err);
++	}
++	else
++    {
++        gtk_main_quit();
++    }
+ }
+ 
+ /* Handler for "clicked" signal on Suspend button. */
+ static void suspend_clicked(GtkButton * button, HandlerContext * handler_context)
+ {
+-    char * error_result = NULL;
++    GError *err = NULL;
+     gtk_label_set_text(GTK_LABEL(handler_context->error_label), NULL);
+ 
+     lock_screen();
+     if (handler_context->suspend_UPower)
+-        error_result = dbus_UPower_Suspend();
+-    else if (handler_context->suspend_logind)
+-        error_result = dbus_logind_Suspend();
+-    else if (handler_context->suspend_HAL)
+-        error_result = dbus_HAL_Suspend();
+-
+-    if (error_result != NULL)
+-        gtk_label_set_text(GTK_LABEL(handler_context->error_label), error_result);
+-        else gtk_main_quit();
++        dbus_UPower_Suspend(&err);
++    else if (handler_context->suspend_systemd)
++        dbus_systemd_Suspend(&err);
++
++	if (err)
++	{
++		gtk_label_set_text(GTK_LABEL(handler_context->error_label), err->message);
++		g_error_free (err);
++	}
++	else
++    {
++        gtk_main_quit();
++    }
+ }
+ 
+ /* Handler for "clicked" signal on Hibernate button. */
+ static void hibernate_clicked(GtkButton * button, HandlerContext * handler_context)
+ {
+-    char * error_result = NULL;
++    GError *err = NULL;
+     gtk_label_set_text(GTK_LABEL(handler_context->error_label), NULL);
+ 
+     lock_screen();
+     if (handler_context->hibernate_UPower)
+-        error_result = dbus_UPower_Hibernate();
+-    else if (handler_context->hibernate_logind)
+-        error_result = dbus_logind_Hibernate();
+-    else if (handler_context->hibernate_HAL)
+-        error_result = dbus_HAL_Hibernate();
+-
+-    if (error_result != NULL)
+-        gtk_label_set_text(GTK_LABEL(handler_context->error_label), error_result);
+-        else gtk_main_quit();
++        dbus_UPower_Hibernate(&err);
++    else if (handler_context->hibernate_systemd)
++        dbus_systemd_Hibernate(&err);
++
++	if (err)
++	{
++		gtk_label_set_text(GTK_LABEL(handler_context->error_label), err->message);
++		g_error_free (err);
++	}
++	else
++    {
++        gtk_main_quit();
++    }
+ }
+ 
+ /* Handler for "clicked" signal on Switch User button. */
+ static void switch_user_clicked(GtkButton * button, HandlerContext * handler_context)
+ {
++    GError *err = NULL;
+     gtk_label_set_text(GTK_LABEL(handler_context->error_label), NULL);
+ 
+     lock_screen();
+@@ -310,11 +323,19 @@
+     else if (handler_context->switch_user_KDM)
+         g_spawn_command_line_sync("kdmctl reserve", NULL, NULL, NULL, NULL);
+     else if (handler_context->switch_user_LIGHTDM)
+-        dbus_Lightdm_SwitchToGreeter();
++        dbus_Lightdm_SwitchToGreeter(&err);
+     else if(handler_context->switch_user_LXDM)
+         g_spawn_command_line_sync("lxdm-binary -c USER_SWITCH", NULL, NULL, NULL, NULL);
+ 
+-    gtk_main_quit();
++	if (err)
++	{
++		gtk_label_set_text(GTK_LABEL(handler_context->error_label), err->message);
++		g_error_free (err);
++	}
++	else
++    {
++        gtk_main_quit();
++    }
+ }
+ 
+ /* Handler for "clicked" signal on Lock button. */
+@@ -449,26 +470,26 @@
+     const char * p = g_getenv("_LXSESSION_PID");
+     if (p != NULL) handler_context.lxsession_pid = atoi(p);
+ 
+-    /* Initialize capabilities of the logind mechanism. */
+-    if (dbus_logind_CanPowerOff())
++    /* Initialize capabilities of the systemd mechanism. */
++    if (dbus_systemd_CanPowerOff())
+     {
+         handler_context.shutdown_available = TRUE;
+-        handler_context.shutdown_logind = TRUE;
++        handler_context.shutdown_systemd = TRUE;
+     }
+-    if (dbus_logind_CanReboot())
++    if (dbus_systemd_CanReboot())
+     {
+         handler_context.reboot_available = TRUE;
+-        handler_context.reboot_logind = TRUE;
++        handler_context.reboot_systemd = TRUE;
+     }
+-    if (dbus_logind_CanSuspend())
++    if (dbus_systemd_CanSuspend())
+     {
+         handler_context.suspend_available = TRUE;
+-        handler_context.suspend_logind = TRUE;
++        handler_context.suspend_systemd = TRUE;
+     }
+-    if (dbus_logind_CanHibernate())
++    if (dbus_systemd_CanHibernate())
+     {
+         handler_context.hibernate_available = TRUE;
+-        handler_context.hibernate_logind = TRUE;
++        handler_context.hibernate_systemd = TRUE;
+     }
+ 
+     /* Initialize capabilities of the ConsoleKit mechanism. */
+@@ -495,28 +516,6 @@
+         handler_context.hibernate_UPower = TRUE;
+     }
+ 
+-    /* Initialize capabilities of the HAL mechanism. */
+-    if (!handler_context.shutdown_available && dbus_HAL_CanShutdown())
+-    {
+-        handler_context.shutdown_available = TRUE;
+-        handler_context.shutdown_HAL = TRUE;
+-    }
+-    if (!handler_context.reboot_available && dbus_HAL_CanReboot())
+-    {
+-        handler_context.reboot_available = TRUE;
+-        handler_context.reboot_HAL = TRUE;
+-    }
+-    if (!handler_context.suspend_available && dbus_HAL_CanSuspend())
+-    {
+-        handler_context.suspend_available = TRUE;
+-        handler_context.suspend_HAL = TRUE;
+-    }
+-    if (!handler_context.hibernate_available && dbus_HAL_CanHibernate())
+-    {
+-        handler_context.hibernate_available = TRUE;
+-        handler_context.hibernate_HAL = TRUE;
+-    }
+-
+     /* If we are under GDM, its "Switch User" is available. */
+     if (verify_running("gdm", "gdmflexiserver"))
+     {
+@@ -664,20 +663,23 @@
+         if (session_name == NULL)
+             session_name = "LXDE";
+ 
+-        const gchar *command_line = "lsb_release -r -s";
+         gchar *output = NULL;
+-        GError *error;
+ 
+-        if (!g_spawn_command_line_sync( command_line,
+-                                        &output,
+-                                        NULL,
+-                                        NULL,
+-                                        &error))
++        if (g_find_program_in_path("lsb_release"))
+         {
++            const gchar *command_line = "lsb_release -r -s";
++            GError *error;
++            if (!g_spawn_command_line_sync( command_line,
++                                            &output,
++                                            NULL,
++                                            NULL,
++                                            &error))
++            {
+ 
+-            fprintf (stderr, "Error: %s\n", error->message);
+-            g_error_free (error);
++                fprintf (stderr, "Error: %s\n", error->message);
++                g_error_free (error);
+ 
++            }
+         }
+ 
+         if (output == NULL)
