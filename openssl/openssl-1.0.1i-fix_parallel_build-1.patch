@@ -1,3 +1,10 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2013-05-05
+Initial Package Version: 1.0.1e
+Upstream Status:         Unknown
+Origin:                  https://github.com/Alexpux/Qt-builds/tree/master/patches/openssl
+Description:             Fixes build with make -jx, where x is greater than 1.
+
 diff -Naur openssl-1.0.1i.orig/crypto/Makefile openssl-1.0.1i/crypto/Makefile
 --- openssl-1.0.1i.orig/crypto/Makefile	2014-08-06 23:18:30.000000000 +0200
 +++ openssl-1.0.1i/crypto/Makefile	2014-08-09 09:36:33.891343699 +0200
