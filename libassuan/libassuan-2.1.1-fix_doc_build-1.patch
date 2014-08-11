@@ -4,7 +4,7 @@ Initial Package Version: 2.1.1
 Upstream Status:         Unknown
 Origin:                  Self
 Description:             Fixes building pdf and postscript documentation by using
-                         latest licence tex files from www.gnu.org/licenses.
+                         latest license tex files from www.gnu.org/licenses.
 
 --- a/doc/gpl.texi	2010-12-23 12:32:06.000000000 +0100
 +++ b/doc/gpl.texi	2014-08-11 18:23:39.152848523 +0200
