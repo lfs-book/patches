@@ -3,10 +3,10 @@ Date:                    2014-07-31
 Initial Package Version: 0.4.9.2
 Upstream Status:         Commited
 Origin:                  Upstream
-Description:             Backport hibernate, suspend, logind dbus fixes to current version. 
+Description:             Backport hibernate, suspend, logind dbus fixes to current version.
 
---- lxsession-logout/dbus-interface.c	2013-04-12 21:02:19.000000000 +0000
-+++ lxsession-logout/dbus-interface.c	2014-07-31 14:47:55.986279232 +0000
+--- a/lxsession-logout/dbus-interface.c	2013-04-12 23:02:19.000000000 +0200
++++ b/lxsession-logout/dbus-interface.c	2014-08-12 18:35:15.653647205 +0200
 @@ -1,21 +1,17 @@
 -/**
 - * Copyright (c) 2010 LxDE Developers, see the file AUTHORS for details.
@@ -842,9 +842,8 @@ Description:             Backport hibernate, suspend, logind dbus fixes to curre
 -    return dbus_Lightdm_command("SwitchToGreeter");
 +    return lxde_call_function ("Restart", TRUE, error);
  }
-
---- lxsession-logout/dbus-interface.h	2013-03-10 11:48:25.000000000 +0000
-+++ lxsession-logout/dbus-interface.h	2014-07-31 14:47:56.057279211 +0000
+--- a/lxsession-logout/dbus-interface.h	2013-03-10 12:48:25.000000000 +0100
++++ b/lxsession-logout/dbus-interface.h	2014-08-12 18:35:15.654647223 +0200
 @@ -21,41 +21,32 @@
  
  #include <glib.h>
@@ -904,9 +903,8 @@ Description:             Backport hibernate, suspend, logind dbus fixes to curre
 +extern gboolean dbus_LXDE_Logout (GError **error);
  
  #endif
-
---- lxsession-logout/lxsession-logout.c	2013-05-31 19:38:58.000000000 +0000
-+++ lxsession-logout/lxsession-logout.c	2014-07-31 14:47:56.255279153 +0000
+--- a/lxsession-logout/lxsession-logout.c	2013-05-31 21:38:58.000000000 +0200
++++ b/lxsession-logout/lxsession-logout.c	2014-08-12 18:35:15.654647223 +0200
 @@ -61,18 +61,14 @@
      int hibernate_available : 1;	/* Hibernate is available */
      int switch_user_available : 1;	/* Switch User is available */
