@@ -1,175 +1,141 @@
-Submitted By:            Pierre Labastie <pierre dot labastie at eamil dot fr>
-Date:                    2014-03-04
+Submitted By:            Christopher Gregory <me at pc-networking-services dot com>
+Date:                    2014-15-08
 Initial Package Version: 1.12.1
 Upstream Status:         In upstream GIT
 Origin:                  Upstream
-Description:             Fixes http://krbdev.mit.edu/rt/Ticket/Display.html?id=7860
+Description:             Fixes http://diswww.mit.edu:8008/menelaus.mit.edu/cvs-krb5/28346
 
---- a/src/plugins/kdb/db2/libdb2/mpool/mpool.c
-+++ b/src/plugins/kdb/db2/libdb2/mpool/mpool.c
-@@ -81,9 +81,9 @@ mpool_open(key, fd, pagesize, maxcache)
- 	/* Allocate and initialize the MPOOL cookie. */
- 	if ((mp = (MPOOL *)calloc(1, sizeof(MPOOL))) == NULL)
- 		return (NULL);
--	CIRCLEQ_INIT(&mp->lqh);
-+	TAILQ_INIT(&mp->lqh);
- 	for (entry = 0; entry < HASHSIZE; ++entry)
--		CIRCLEQ_INIT(&mp->hqh[entry]);
-+		TAILQ_INIT(&mp->hqh[entry]);
- 	mp->maxcache = maxcache;
- 	mp->npages = sb.st_size / pagesize;
- 	mp->pagesize = pagesize;
-@@ -143,8 +143,8 @@ mpool_new(mp, pgnoaddr, flags)
- 	bp->flags = MPOOL_PINNED | MPOOL_INUSE;
- 
- 	head = &mp->hqh[HASHKEY(bp->pgno)];
--	CIRCLEQ_INSERT_HEAD(head, bp, hq);
--	CIRCLEQ_INSERT_TAIL(&mp->lqh, bp, q);
-+	TAILQ_INSERT_HEAD(head, bp, hq);
-+	TAILQ_INSERT_TAIL(&mp->lqh, bp, q);
- 	return (bp->page);
- }
- 
-@@ -168,8 +168,8 @@ mpool_delete(mp, page)
- 
- 	/* Remove from the hash and lru queues. */
- 	head = &mp->hqh[HASHKEY(bp->pgno)];
--	CIRCLEQ_REMOVE(head, bp, hq);
--	CIRCLEQ_REMOVE(&mp->lqh, bp, q);
-+	TAILQ_REMOVE(head, bp, hq);
-+	TAILQ_REMOVE(&mp->lqh, bp, q);
- 
- 	free(bp);
- 	return (RET_SUCCESS);
-@@ -208,10 +208,10 @@ mpool_get(mp, pgno, flags)
- 		 * of the lru chain.
- 		 */
- 		head = &mp->hqh[HASHKEY(bp->pgno)];
--		CIRCLEQ_REMOVE(head, bp, hq);
--		CIRCLEQ_INSERT_HEAD(head, bp, hq);
--		CIRCLEQ_REMOVE(&mp->lqh, bp, q);
--		CIRCLEQ_INSERT_TAIL(&mp->lqh, bp, q);
-+		TAILQ_REMOVE(head, bp, hq);
-+		TAILQ_INSERT_HEAD(head, bp, hq);
-+		TAILQ_REMOVE(&mp->lqh, bp, q);
-+		TAILQ_INSERT_TAIL(&mp->lqh, bp, q);
- 
- 		/* Return a pinned page. */
- 		bp->flags |= MPOOL_PINNED;
-@@ -261,8 +261,8 @@ mpool_get(mp, pgno, flags)
- 	 * of the lru chain.
- 	 */
- 	head = &mp->hqh[HASHKEY(bp->pgno)];
--	CIRCLEQ_INSERT_HEAD(head, bp, hq);
--	CIRCLEQ_INSERT_TAIL(&mp->lqh, bp, q);
-+	TAILQ_INSERT_HEAD(head, bp, hq);
-+	TAILQ_INSERT_TAIL(&mp->lqh, bp, q);
- 
- 	/* Run through the user's filter. */
- 	if (mp->pgin != NULL)
-@@ -311,8 +311,8 @@ mpool_close(mp)
- 	BKT *bp;
- 
- 	/* Free up any space allocated to the lru pages. */
--	while ((bp = mp->lqh.cqh_first) != (void *)&mp->lqh) {
--		CIRCLEQ_REMOVE(&mp->lqh, mp->lqh.cqh_first, q);
-+	while ((bp = mp->lqh.tqh_first) != NULL) {
-+		TAILQ_REMOVE(&mp->lqh, mp->lqh.tqh_first, q);
- 		free(bp);
- 	}
- 
-@@ -332,8 +332,7 @@ mpool_sync(mp)
- 	BKT *bp;
- 
- 	/* Walk the lru chain, flushing any dirty pages to disk. */
--	for (bp = mp->lqh.cqh_first;
--	    bp != (void *)&mp->lqh; bp = bp->q.cqe_next)
-+	for (bp = mp->lqh.tqh_first; bp != NULL; bp = bp->q.tqe_next)
- 		if (bp->flags & MPOOL_DIRTY &&
- 		    mpool_write(mp, bp) == RET_ERROR)
- 			return (RET_ERROR);
-@@ -363,8 +362,7 @@ mpool_bkt(mp)
- 	 * off any lists.  If we don't find anything we grow the cache anyway.
- 	 * The cache never shrinks.
- 	 */
--	for (bp = mp->lqh.cqh_first;
--	    bp != (void *)&mp->lqh; bp = bp->q.cqe_next)
-+	for (bp = mp->lqh.tqh_first; bp != NULL; bp = bp->q.tqe_next)
- 		if (!(bp->flags & MPOOL_PINNED)) {
- 			/* Flush if dirty. */
- 			if (bp->flags & MPOOL_DIRTY &&
-@@ -375,8 +373,8 @@ mpool_bkt(mp)
- #endif
- 			/* Remove from the hash and lru queues. */
- 			head = &mp->hqh[HASHKEY(bp->pgno)];
--			CIRCLEQ_REMOVE(head, bp, hq);
--			CIRCLEQ_REMOVE(&mp->lqh, bp, q);
-+			TAILQ_REMOVE(head, bp, hq);
-+			TAILQ_REMOVE(&mp->lqh, bp, q);
- #if defined(DEBUG) && !defined(DEBUG_IDX0SPLIT)
- 			{ void *spage;
- 				spage = bp->page;
-@@ -450,7 +448,7 @@ mpool_look(mp, pgno)
- 	BKT *bp;
- 
- 	head = &mp->hqh[HASHKEY(pgno)];
--	for (bp = head->cqh_first; bp != (void *)head; bp = bp->hq.cqe_next)
-+	for (bp = head->tqh_first; bp != NULL; bp = bp->hq.tqe_next)
- 		if ((bp->pgno == pgno) && (bp->flags & MPOOL_INUSE)) {
- #ifdef STATISTICS
- 			++mp->cachehit;
-@@ -494,8 +492,7 @@ mpool_stat(mp)
- 
- 	sep = "";
- 	cnt = 0;
--	for (bp = mp->lqh.cqh_first;
--	    bp != (void *)&mp->lqh; bp = bp->q.cqe_next) {
-+	for (bp = mp->lqh.tqh_first; bp != NULL; bp = bp->q.tqe_next) {
- 		(void)fprintf(stderr, "%s%d", sep, bp->pgno);
- 		if (bp->flags & MPOOL_DIRTY)
- 			(void)fprintf(stderr, "d");
+--- src/kadmin/testing/util/tcl_kadm5.c.orig	2013-11-22 16:22:36.690361910 +0700
++++ src/kadmin/testing/util/tcl_kadm5.c	2013-11-22 16:44:15.022203082 +0700
+@@ -801,7 +801,7 @@
+         return retcode;
+     }
+     if (argc != num_keysalts) {
+-        sprintf(interp->result, "%d keysalts specified, "
++        sprintf(Tcl_GetErrorLine(interp), "%d keysalts specified, "
+                 "but num_keysalts is %d", argc, num_keysalts);
+         retcode = TCL_ERROR;
+         goto finished;
+@@ -814,7 +814,7 @@
+             goto finished;
+         }
+         if (argc1 != 2) {
+-            sprintf(interp->result, "wrong # fields in keysalt "
++            sprintf(Tcl_GetErrorLine(interp), "wrong # fields in keysalt "
+                     "(%d should be 2)", argc1);
+             retcode = TCL_ERROR;
+             goto finished;
+@@ -856,7 +856,7 @@
+     *key_data = NULL;
+     if (list == NULL) {
+         if (n_key_data != 0) {
+-            sprintf(interp->result, "0 key_datas specified, "
++            sprintf(Tcl_GetErrorLine(interp), "0 key_datas specified, "
+                     "but n_key_data is %d", n_key_data);
+             retcode = TCL_ERROR;
+             goto finished;
+@@ -868,14 +868,14 @@
+         return retcode;
+     }
+     if (argc != n_key_data) {
+-        sprintf(interp->result, "%d key_datas specified, "
++        sprintf(Tcl_GetErrorLine(interp), "%d key_datas specified, "
+                 "but n_key_data is %d", argc, n_key_data);
+         retcode = TCL_ERROR;
+         goto finished;
+     }
 
---- a/src/plugins/kdb/db2/libdb2/mpool/mpool.h
-+++ b/src/plugins/kdb/db2/libdb2/mpool/mpool.h
-@@ -47,8 +47,8 @@
- 
- /* The BKT structures are the elements of the queues. */
- typedef struct _bkt {
--	CIRCLEQ_ENTRY(_bkt) hq;		/* hash queue */
--	CIRCLEQ_ENTRY(_bkt) q;		/* lru queue */
-+	TAILQ_ENTRY(_bkt) hq;		/* hash queue */
-+	TAILQ_ENTRY(_bkt) q;		/* lru queue */
- 	void    *page;			/* page */
- 	db_pgno_t   pgno;			/* page number */
- 
-@@ -59,9 +59,9 @@ typedef struct _bkt {
- } BKT;
- 
- typedef struct MPOOL {
--	CIRCLEQ_HEAD(_lqh, _bkt) lqh;	/* lru queue head */
-+	TAILQ_HEAD(_lqh, _bkt) lqh;	/* lru queue head */
- 					/* hash queue array */
--	CIRCLEQ_HEAD(_hqh, _bkt) hqh[HASHSIZE];
-+	TAILQ_HEAD(_hqh, _bkt) hqh[HASHSIZE];
- 	db_pgno_t	curcache;		/* current number of cached pages */
- 	db_pgno_t	maxcache;		/* max number of cached pages */
- 	db_pgno_t	npages;			/* number of pages in the file */
+     if (argc != 0) {
+-        sprintf(interp->result, "cannot parse key_data yet");
++        sprintf(Tcl_GetErrorLine(interp), "cannot parse key_data yet");
+         retcode = TCL_ERROR;
+         goto finished;
+     }
+@@ -896,7 +896,7 @@
+     *tlp = NULL;
+     if (list == NULL) {
+         if (n_tl_data != 0) {
+-            sprintf(interp->result, "0 tl_datas specified, "
++            sprintf(Tcl_GetErrorLine(interp), "0 tl_datas specified, "
+                     "but n_tl_data is %d", n_tl_data);
+             retcode = TCL_ERROR;
+             goto finished;
+@@ -908,7 +908,7 @@
+         return retcode;
+     }
+     if (argc != n_tl_data) {
+-        sprintf(interp->result, "%d tl_datas specified, "
++        sprintf(Tcl_GetErrorLine(interp), "%d tl_datas specified, "
+                 "but n_tl_data is %d", argc, n_tl_data);
+         retcode = TCL_ERROR;
+         goto finished;
+@@ -929,7 +929,7 @@
+             goto finished;
+         }
+         if (argc1 != 3) {
+-            sprintf(interp->result, "wrong # fields in tl_data "
++            sprintf(Tcl_GetErrorLine(interp), "wrong # fields in tl_data "
+                     "(%d should be 3)", argc1);
+             retcode = TCL_ERROR;
+             goto finished;
+@@ -949,7 +949,7 @@
+         }
+         tl->tl_data_length = tmp;
+         if (tl->tl_data_length != strlen(argv1[2])) {
+-            sprintf(interp->result, "specified length %d does not "
++            sprintf(Tcl_GetErrorLine(interp), "specified length %d does not "
+                     "match length %lu of string \"%s\"", tmp,
+                     (unsigned long) strlen(argv1[2]), argv1[2]);
+             retcode = TCL_ERROR;
+@@ -962,7 +962,7 @@
+         tl = tl->tl_data_next;
+     }
+     if (tl != NULL) {
+-        sprintf(interp->result, "tl is not NULL!");
++        sprintf(Tcl_GetErrorLine(interp), "tl is not NULL!");
+         retcode = TCL_ERROR;
+         goto finished;
+     }
+@@ -992,7 +992,7 @@
+     }
 
---- a/src/plugins/kdb/db2/libdb2/test/run.test
-+++ b/src/plugins/kdb/db2/libdb2/test/run.test
-@@ -71,10 +71,11 @@ main()
- }
- 
- getnwords() {
--	# Delete blank lines because the db code appears not to
--	# like empty keys.  On Debian Linux, $DICT appears to contain
--	# some non-ASCII characters, and "rev" chokes on them.
--	sed -e '/^$/d' < $DICT | cat -v | sed -e ${1}q
-+	# Delete blank lines because the db code appears not to like
-+	# empty keys.  Omit lines with non-alphanumeric characters to
-+	# avoid shell metacharacters and non-ASCII characters which
-+	# could cause 'rev' to choke.
-+	LC_ALL=C sed -e '/^$/d' -e '/[^A-Za-z]/d' < $DICT | sed -e ${1}q
- }
- 
- # Take the first hundred entries in the dictionary, and make them
+     if (argc != 20) {
+-        sprintf(interp->result,
++        sprintf(Tcl_GetErrorLine(interp),
+                 "wrong # args in config params structure (%d should be 20)",
+                 argc);
+         retcode = TCL_ERROR;
+@@ -1129,7 +1129,7 @@
+     }
+
+     if (argc != 12 && argc != 20) {
+-        sprintf(interp->result,
++        sprintf(Tcl_GetErrorLine(interp),
+                 "wrong # args in principal structure (%d should be 12 or 20)",
+                 argc);
+         retcode = TCL_ERROR;
+@@ -1391,7 +1391,7 @@
+     }
+
+     if (argc != 7 && argc != 10) {
+-        sprintf(interp->result, "wrong # args in policy structure (%d should be 7 or 10)",
++        sprintf(Tcl_GetErrorLine(interp), "wrong # args in policy structure (%d should be 7 or 10)",
+                 argc);
+         retcode = TCL_ERROR;
+         goto finished;
+--- src/kadmin/testing/util/tcl_kadm5.h.orig	2013-11-22 16:33:21.532338510 +0700
++++ src/kadmin/testing/util/tcl_kadm5.h	2013-11-22 16:33:35.462212999 +0700
+@@ -1,3 +1,12 @@
+ /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+
+ void Tcl_kadm5_init(Tcl_Interp *interp);
++
++/*
++ * Beginning with 8.6, interp->errorLine isn't public visible anymore
++ * (TIP 330)
++*/
++
++#if (TCL_MAJOR_VERSION == 8) && (TCL_MINOR_VERSION < 6)
++# define Tcl_GetErrorLine(interp) (interp)->errorLine
++#endif
+\ No newline at end of file
