@@ -1,0 +1,626 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-07-22
+Initial Package Version: 13.0.2
+Upstream Status:         Fixed
+Origin:                  Upstream
+Description:             All fixes from git repository. Fixes failure at runtime with systemd enabled
+                         xserver among others.
+
+--- a/saa/saa_unaccel.c	2012-06-15 20:19:33.000000000 +0200
++++ b/saa/saa_unaccel.c	2014-08-23 16:31:34.114196582 +0200
+@@ -396,6 +396,7 @@
+  * region fragmentation. In any case, this greatly improves on the performance of
+  * shaped windows on top of accelerated contents, for example unscaled OSD in xine.
+  */
++#if 0
+ static Bool
+ saa_check_poly_fill_rect_noreadback(DrawablePtr pDrawable, GCPtr pGC,
+ 				    int nrect, xRectangle *prect)
+@@ -476,7 +477,7 @@
+ 
+     return FALSE;
+ }
+-
++#endif
+ void
+ saa_check_poly_fill_rect(DrawablePtr pDrawable, GCPtr pGC,
+ 			 int nrect, xRectangle * prect)
+@@ -487,8 +488,17 @@
+ 
+     SAA_FALLBACK(("to %p (%c)\n", pDrawable, saa_drawable_loc(pDrawable)));
+ 
++
++    /*
++     * Disable saa_check_poly_fill_rect_noreadback as it causes rendering
++     * artefacts with some motif applications. There seems to be some
++     * confusion with the damage area.
++     */
++
++#if 0
+     if (saa_check_poly_fill_rect_noreadback(pDrawable, pGC, nrect, prect))
+ 	return;
++#endif
+ 
+     sscreen->fallback_count++;
+ 
+--- a/src/vmware_bootstrap.c	2014-03-20 14:15:03.000000000 +0100
++++ b/src/vmware_bootstrap.c	2014-08-23 16:31:34.117196634 +0200
+@@ -30,6 +30,7 @@
+ #endif
+ 
+ #include "xf86.h"
++#include <xorgVersion.h>
+ #include "compiler.h"
+ #include "xf86Pci.h"		/* pci */
+ #include "vm_device_version.h"
+@@ -50,6 +51,10 @@
+ #include <xf86_libc.h>
+ #endif
+ 
++#ifdef XSERVER_PLATFORM_BUS
++#include "xf86platformBus.h"
++#endif
++
+ #ifdef HaveDriverFuncs
+ #define VMWARE_DRIVER_FUNC HaveDriverFuncs
+ #else
+@@ -247,9 +252,6 @@
+     vmwlegacy_hookup(pScrn);
+ 
+     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
+-    if (pEnt->location.type != BUS_PCI)
+-        return FALSE;
+-
+     pciInfo = xf86GetPciInfoForEntity(pEnt->index);
+     if (pciInfo == NULL)
+         return FALSE;
+@@ -407,6 +409,45 @@
+ }
+ #endif
+ 
++#ifdef XSERVER_PLATFORM_BUS
++static Bool
++VMwarePlatformProbe(DriverPtr drv, int entity, int flags,
++                    struct xf86_platform_device *dev, intptr_t match_data)
++{
++    ScrnInfoPtr pScrn;
++    int scrnFlag = 0;
++
++    if (!dev->pdev)
++        return FALSE;
++
++    if (flags & PLATFORM_PROBE_GPU_SCREEN)
++        scrnFlag = XF86_ALLOCATE_GPU_SCREEN;
++
++    pScrn = xf86AllocateScreen(drv, scrnFlag);
++    if (!pScrn)
++        return FALSE;
++
++    if (xf86IsEntitySharable(entity))
++        xf86SetEntityShared(entity);
++
++    xf86AddEntityToScreen(pScrn, entity);
++
++    pScrn->driverVersion = VMWARE_DRIVER_VERSION;
++    pScrn->driverName = VMWARE_DRIVER_NAME;
++    pScrn->name = VMWARE_NAME;
++    pScrn->Probe = NULL;
++#ifdef BUILD_VMWGFX
++    vmwgfx_hookup(pScrn);
++#else
++    vmwlegacy_hookup(pScrn);
++#endif
++    pScrn->driverPrivate = pScrn->PreInit;
++    pScrn->PreInit = VMwarePreinitStub;
++
++    return TRUE;
++}
++#endif
++
+ static void
+ VMWAREIdentify(int flags)
+ {
+@@ -456,6 +497,10 @@
+ 			      pScrn->yDpi / 2) / pScrn->yDpi;
+       }
+       return TRUE;
++#if XORG_VERSION_CURRENT >= XORG_VERSION_NUMERIC(1,15,99,902,0)
++   case SUPPORTS_SERVER_FDS:
++      return TRUE;
++#endif
+    default:
+       return FALSE;
+    }
+@@ -481,6 +526,14 @@
+ #if XSERVER_LIBPCIACCESS
+     VMwareDeviceMatch,
+     VMwarePciProbe,
++#else
++    NULL,
++    NULL,
++#endif
++#ifdef XSERVER_PLATFORM_BUS
++    VMwarePlatformProbe,
++#else
++    NULL,
+ #endif
+ };
+ 
+--- a/src/vmware.c	2013-04-17 12:02:10.000000000 +0200
++++ b/src/vmware.c	2014-08-23 16:31:34.115196599 +0200
+@@ -310,9 +310,6 @@
+     pVMWARE->pvtSema = &pScrn->vtSema;
+ 
+     pVMWARE->pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
+-    if (pVMWARE->pEnt->location.type != BUS_PCI) {
+-        return FALSE;
+-    }
+     pVMWARE->PciInfo = xf86GetPciInfoForEntity(pVMWARE->pEnt->index);
+     if (pVMWARE->PciInfo == NULL) {
+         return FALSE;
+--- a/src/vmwarevideo.c	2012-08-07 00:31:14.000000000 +0200
++++ b/src/vmwarevideo.c	2014-08-23 16:31:34.124196753 +0200
+@@ -687,7 +687,12 @@
+ 	int nBoxes = REGION_NUM_RECTS(&pVid->clipBoxes);
+ 
+ #if HAVE_FILLKEYHELPERDRAWABLE
+-	xf86XVFillKeyHelperDrawable(draw, pVid->colorKey, clipBoxes);
++	if (draw->type == DRAWABLE_WINDOW) {
++	    xf86XVFillKeyHelperDrawable(draw, pVid->colorKey, clipBoxes);
++	    DamageDamageRegion(draw, clipBoxes);
++	} else {
++	    xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
++        }
+ #else
+         xf86XVFillKeyHelper(pScrn->pScreen, pVid->colorKey, clipBoxes);
+ #endif
+@@ -789,7 +794,8 @@
+     struct PACKED _body {
+         uint32 escape;
+         uint32 streamId;
+-        struct _item items[SVGA_VIDEO_NUM_REGS];
++        /* Old hosts can not handle more then these regs */
++        struct _item items[SVGA_VIDEO_DATA_GMRID];
+     };
+ 
+     struct PACKED _cmdSetRegs {
+@@ -831,7 +837,7 @@
+     cmdSetRegs.body.streamId = pVid->streamId;
+ 
+     items = cmdSetRegs.body.items;
+-    for (i = SVGA_VIDEO_ENABLED; i < SVGA_VIDEO_NUM_REGS; i++) {
++    for (i = SVGA_VIDEO_ENABLED; i < SVGA_VIDEO_DATA_GMRID; i++) {
+         items[i].regId = i;
+     }
+ 
+--- a/vmwgfx/vmwgfx_crtc.c	2013-04-17 12:02:10.000000000 +0200
++++ b/vmwgfx/vmwgfx_crtc.c	2014-08-23 16:31:34.122196719 +0200
+@@ -193,6 +193,7 @@
+ 	crtcp->entry.pixmap = pixmap;
+ 	crtcp->scanout_id = vmwgfx_scanout_ref(&crtcp->entry);
+ 	if (crtcp->scanout_id == -1) {
++	    crtcp->entry.pixmap = NULL;
+ 	    LogMessage(X_ERROR, "Failed to convert pixmap to scanout.\n");
+ 	    return FALSE;
+ 	}
+@@ -276,6 +277,10 @@
+     modesettingPtr ms = modesettingPTR(crtc->scrn);
+     struct crtc_private *crtcp = crtc->driver_private;
+ 
++    /* Seems like newer X servers try to move cursors without images */
++    if (!crtcp->cursor_bo)
++	return;
++
+     drmModeMoveCursor(ms->fd, crtcp->drm_crtc->crtc_id, x, y);
+ }
+ 
+@@ -296,8 +301,11 @@
+     if (!crtcp->cursor_bo) {
+ 	size_t size = 64*64*4;
+         crtcp->cursor_bo = vmwgfx_dmabuf_alloc(ms->fd, size);
+-	if (!crtcp->cursor_bo)
++	if (!crtcp->cursor_bo) {
++	    xf86DrvMsg(crtc->scrn->scrnIndex, X_ERROR,
++		       "Failed to create a dmabuf for cursor.\n");
+ 	    return;
++	}
+ 	crtcp->cursor_handle = crtcp->cursor_bo->handle;
+     }
+ 
+@@ -305,6 +313,9 @@
+     if (ptr) {
+ 	memcpy(ptr, image, 64*64*4);
+ 	vmwgfx_dmabuf_unmap(crtcp->cursor_bo);
++    } else {
++	xf86DrvMsg(crtc->scrn->scrnIndex, X_ERROR,
++		   "Failed to map cursor dmabuf.\n");
+     }
+ 
+     if (crtc->cursor_shown)
+--- a/vmwgfx/vmwgfx_driver.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_driver.c	2014-08-23 16:31:34.123196736 +0200
+@@ -54,6 +54,10 @@
+ 
+ #include <pciaccess.h>
+ 
++#ifdef XSERVER_PLATFORM_BUS
++#include "xf86platformBus.h"
++#endif
++
+ #include "vmwgfx_driver.h"
+ 
+ #include <saa.h>
+@@ -243,6 +247,15 @@
+     .resize = drv_crtc_resize
+ };
+ 
++static Bool vmwgfx_use_server_fd(modesettingPtr ms)
++{
++#ifdef XF86_PDEV_SERVER_FD
++    return ms->platform_dev && (ms->platform_dev->flags & XF86_PDEV_SERVER_FD);
++#else
++    return FALSE;
++#endif
++}
++
+ static Bool
+ drv_init_drm(ScrnInfoPtr pScrn)
+ {
+@@ -253,6 +266,12 @@
+ 
+ 	ms->fd = vmwgfx_hosted_drm_fd(ms->hdriver, ms->hosted, ms->PciInfo);
+ 
++#ifdef ODEV_ATTRIB_FD
++	if (ms->fd < 0 && vmwgfx_use_server_fd(ms))
++	    ms->fd = xf86_get_platform_device_int_attrib(ms->platform_dev,
++	                                                 ODEV_ATTRIB_FD, -1);
++#endif
++
+ 	if (ms->fd < 0) {
+ 
+ 	    char bus_id[64];
+@@ -465,13 +484,18 @@
+ 
+     pScrn->displayWidth = 640;	       /* default it */
+ 
+-    if (ms->pEnt->location.type != BUS_PCI) {
++    ms->PciInfo = xf86GetPciInfoForEntity(ms->pEnt->index);
++    if (!ms->PciInfo) {
+ 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+ 		   "Incorrect bus for device.\n");
+ 	goto out_err_bus;
+     }
+ 
+-    ms->PciInfo = xf86GetPciInfoForEntity(ms->pEnt->index);
++#ifdef XSERVER_PLATFORM_BUS
++    if (pEnt->location.type == BUS_PLATFORM)
++        ms->platform_dev = pEnt->location.id.plat;
++#endif
++
+     xf86SetPrimInitDone(pScrn->entityList[0]);
+ 
+     ms->hdriver = vmwgfx_hosted_detect();
+@@ -605,7 +629,7 @@
+     free(ms->Options);
+   out_depth:
+   out_drm_version:
+-    if (!vmwgfx_is_hosted(ms->hdriver))
++    if (!vmwgfx_is_hosted(ms->hdriver) && !vmwgfx_use_server_fd(ms))
+ 	close(ms->fd);
+   out_no_drm:
+     vmwgfx_hosted_destroy(ms->hdriver, ms->hosted);
+@@ -783,8 +807,8 @@
+ {
+     modesettingPtr ms = modesettingPTR(pScrn);
+ 
+-    if (!vmwgfx_is_hosted(ms->hdriver) && !ms->isMaster &&
+-	drmSetMaster(ms->fd) != 0) {
++    if (!vmwgfx_is_hosted(ms->hdriver) && !vmwgfx_use_server_fd(ms) &&
++            !ms->isMaster && drmSetMaster(ms->fd) != 0) {
+ 	if (errno == EINVAL) {
+ 	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+ 		       "drmSetMaster failed: 2.6.29 or newer kernel required for "
+@@ -1184,7 +1208,8 @@
+ 
+     vmwgfx_saa_drop_master(pScrn->pScreen);
+ 
+-    if (!vmwgfx_is_hosted(ms->hdriver) && drmDropMaster(ms->fd))
++    if (!vmwgfx_is_hosted(ms->hdriver) && !vmwgfx_use_server_fd(ms) &&
++            drmDropMaster(ms->fd))
+ 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+ 		   "drmDropMaster failed: %s\n", strerror(errno));
+     ms->isMaster = FALSE;
+--- a/vmwgfx/vmwgfx_driver.h	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_driver.h	2014-08-23 16:31:34.117196634 +0200
+@@ -83,6 +83,7 @@
+ };
+ 
+ struct vmwgfx_hosted;
++struct xf86_platform_device;
+ 
+ typedef struct _modesettingRec
+ {
+@@ -98,6 +99,7 @@
+     int Chipset;
+     EntityInfoPtr pEnt;
+     struct pci_device *PciInfo;
++    struct xf86_platform_device *platform_dev;
+ 
+     /* Accel */
+     Bool accelerate_render;
+--- a/vmwgfx/vmwgfx_overlay.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_overlay.c	2014-08-23 16:31:34.120196685 +0200
+@@ -162,7 +162,7 @@
+     int (*play)(ScrnInfoPtr, struct vmwgfx_overlay_port *,
+                 short, short, short, short, short,
+                 short, short, short, int, unsigned char*,
+-                short, short, RegionPtr);
++                short, short, RegionPtr, DrawablePtr);
+ 
+     /* values to go into the SVGAOverlayUnit */
+     uint32 streamId;
+@@ -217,13 +217,15 @@
+                                short drw_y, short src_w, short src_h,
+                                short drw_w, short drw_h, int format,
+                                unsigned char *buf, short width,
+-                               short height, RegionPtr clipBoxes);
++                               short height, RegionPtr clipBoxes,
++                               DrawablePtr pDraw);
+ static int vmw_video_port_play(ScrnInfoPtr pScrn, struct vmwgfx_overlay_port *port,
+                                short src_x, short src_y, short drw_x,
+                                short drw_y, short src_w, short src_h,
+                                short drw_w, short drw_h, int format,
+                                unsigned char *buf, short width,
+-                               short height, RegionPtr clipBoxes);
++                               short height, RegionPtr clipBoxes,
++                               DrawablePtr pDraw);
+ static void vmw_video_port_cleanup(ScrnInfoPtr pScrn, struct vmwgfx_overlay_port *port);
+ 
+ static int vmw_video_buffer_alloc(int drm_fd, int size,
+@@ -380,7 +382,7 @@
+                     short drw_y, short src_w, short src_h,
+                     short drw_w, short drw_h, int format,
+                     unsigned char *buf, short width,
+-                    short height, RegionPtr clipBoxes)
++                    short height, RegionPtr clipBoxes, DrawablePtr pDraw)
+ {
+     unsigned short w, h;
+     int i, ret;
+@@ -412,7 +414,7 @@
+     REGION_NULL(pScrn->pScreen, &port->clipBoxes);
+     port->play = vmw_video_port_play;
+     return port->play(pScrn, port, src_x, src_y, drw_x, drw_y, src_w, src_h,
+-                      drw_w, drw_h, format, buf, width, height, clipBoxes);
++                      drw_w, drw_h, format, buf, width, height, clipBoxes, pDraw);
+ 
+   out_no_buffer:
+     while(i-- != 0) {
+@@ -448,7 +450,7 @@
+                     short drw_y, short src_w, short src_h,
+                     short drw_w, short drw_h, int format,
+                     unsigned char *buf, short width,
+-                    short height, RegionPtr clipBoxes)
++                    short height, RegionPtr clipBoxes, DrawablePtr pDraw)
+ {
+     struct drm_vmw_control_stream_arg arg;
+     unsigned short w, h;
+@@ -468,7 +470,7 @@
+         vmw_xv_stop_video(pScrn, port, TRUE);
+         return port->play(pScrn, port, src_x, src_y, drw_x, drw_y, src_w,
+                           src_h, drw_w, drw_h, format, buf, width, height,
+-                          clipBoxes);
++                          clipBoxes, pDraw);
+     }
+ 
+     memcpy(port->bufs[port->currBuf].data, buf, port->size);
+@@ -502,8 +504,14 @@
+      */
+     if (!REGION_EQUAL(pScrn->pScreen, &port->clipBoxes, clipBoxes)) {
+         REGION_COPY(pScrn->pScreen, &port->clipBoxes, clipBoxes);
+-        if (port->isAutoPaintColorkey)
+-            xf86XVFillKeyHelper(pScrn->pScreen, port->colorKey, clipBoxes);
++        if (port->isAutoPaintColorkey) {
++            if (pDraw->type == DRAWABLE_WINDOW) {
++                xf86XVFillKeyHelperDrawable(pDraw, port->colorKey, clipBoxes);
++                DamageDamageRegion(pDraw, clipBoxes);
++            } else {
++                xf86XVFillKeyHelper(pScrn->pScreen, port->colorKey, clipBoxes);
++            }
++        }
+     }
+ 
+     xorg_flush(pScrn->pScreen);
+@@ -667,7 +675,7 @@
+ 		 width, height);
+ 
+     return port->play(pScrn, port, src_x, src_y, drw_x, drw_y, src_w, src_h,
+-                      drw_w, drw_h, format, buf, width, height, clipBoxes);
++                      drw_w, drw_h, format, buf, width, height, clipBoxes, dst);
+ }
+ 
+ 
+--- a/vmwgfx/vmwgfx_saa.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_saa.c	2014-08-23 16:31:34.113196565 +0200
+@@ -610,9 +610,9 @@
+     }
+ 
+     if (vpix->hw) {
+-	if (xa_surface_redefine(vpix->hw, draw->width, draw->height,
+-				draw->depth, xa_type_argb,
+-				xa_format_unknown, vpix->xa_flags, 1) != 0)
++      if (!vmwgfx_xa_surface_redefine(vpix, vpix->hw, draw->width,
++				      draw->height, draw->depth, xa_type_argb,
++				      xa_format_unknown, vpix->xa_flags, 1))
+ 	    return FALSE;
+     }
+ 
+@@ -824,11 +824,11 @@
+ 	return FALSE;
+ 
+     vpix->xa_flags = new_flags;
++    vpix->hw = hw;
+ 
+     if (!vmwgfx_pixmap_add_damage(pixmap))
+ 	goto out_no_damage;
+ 
+-    vpix->hw = hw;
+     vpix->backing |= VMWGFX_PIX_SURFACE;
+     vmwgfx_pixmap_free_storage(vpix);
+ 
+@@ -841,6 +841,7 @@
+     return TRUE;
+ 
+ out_no_damage:
++    vpix->hw = NULL;
+     xa_surface_destroy(hw);
+     return FALSE;
+ }
+@@ -1158,6 +1159,8 @@
+      * and check whether XA can accelerate.
+      */
+ 
++    if (!mask_pix)
++	mask_pict = NULL;
+     xa_comp = vmwgfx_xa_setup_comp(vsaa->vcomp, op,
+ 				   src_pict, mask_pict, dst_pict);
+     if (!xa_comp)
+@@ -1504,7 +1507,8 @@
+ 	     * The KMS fb will be a HW surface. Create it, add damage
+ 	     * and get the handle.
+ 	     */
+-	    if (!vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT, 0, NULL))
++	    if (!vmwgfx_hw_accel_validate(pixmap, 0, XA_FLAG_SCANOUT |
++					  XA_FLAG_RENDER_TARGET, 0, NULL))
+ 		goto out_err;
+ 	    if (_xa_surface_handle(vpix->hw, &handle, &dummy) != 0)
+ 		goto out_err;
+--- a/vmwgfx/vmwgfx_saa_priv.h	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_saa_priv.h	2014-08-23 16:31:34.110196514 +0200
+@@ -100,6 +100,17 @@
+ Bool
+ vmwgfx_hw_commit(PixmapPtr pixmap);
+ 
++Bool
++vmwgfx_xa_surface_redefine(struct vmwgfx_saa_pixmap *vpix,
++			   struct xa_surface *srf,
++			   int width,
++			   int height,
++			   int depth,
++			   enum xa_surface_type stype,
++			   enum xa_formats rgb_format,
++			   unsigned int new_flags,
++			   int copy_contents);
++
+ /*
+  * vmwgfx_xa_composite.c
+  */
+--- a/vmwgfx/vmwgfx_xa_surface.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_xa_surface.c	2014-08-23 16:31:34.111196531 +0200
+@@ -43,6 +43,52 @@
+ static const unsigned int vmwgfx_stype_map_size =
+     sizeof(vmwgfx_stype_map) / sizeof(enum xa_surface_type);
+ 
++/**
++ * vmwgfx_xa_surface_redefine - wrapper around xa_surface_redefine
++ *
++ * @vpix: Pointer to the struct vmwgfx_saa_pixmap the surface is attached to.
++ * @srf: The surface.
++ * @width: New width.
++ * @height: New height.
++ * @depth: New pixel depth.
++ * @stype: New surface type.
++ * @rgb_format: New rgb format.
++ * @new_flags: New surface flags.
++ * @copy_contents: Copy contents if new backing store is allocated.
++ *
++ * This is a wrapper that prints out an error message if the backing store
++ * of an active scanout surface is changed.
++ */
++Bool
++vmwgfx_xa_surface_redefine(struct vmwgfx_saa_pixmap *vpix,
++			   struct xa_surface *srf,
++			   int width,
++			   int height,
++			   int depth,
++			   enum xa_surface_type stype,
++			   enum xa_formats rgb_format,
++			   unsigned int new_flags,
++			   int copy_contents)
++{
++    uint32_t handle, new_handle, dummy;
++    Bool have_handle = FALSE;
++
++    if (!WSBMLISTEMPTY(&vpix->scanout_list))
++	have_handle = (_xa_surface_handle(srf, &handle, &dummy) == XA_ERR_NONE);
++
++    if (xa_surface_redefine(srf, width, height, depth, stype, rgb_format,
++			    new_flags, copy_contents) != XA_ERR_NONE)
++	return FALSE;
++
++    if (!WSBMLISTEMPTY(&vpix->scanout_list) && have_handle &&
++	_xa_surface_handle(srf, &new_handle, &dummy) == XA_ERR_NONE &&
++	new_handle != handle) {
++	LogMessage(X_ERROR, "Changed active scanout surface handle.\n");
++    }
++
++    return TRUE;
++}
++
+ 
+ /*
+  * Create an xa format from a PICT format.
+@@ -323,13 +369,14 @@
+ 	if (vpix->staging_format != xa_surface_format(vpix->hw))
+ 	    LogMessage(X_INFO, "Changing hardware format.\n");
+ 
+-	if (xa_surface_redefine(vpix->hw,
+-				pixmap->drawable.width,
+-				pixmap->drawable.height,
+-				0,
+-				xa_type_other,
+-				vpix->staging_format,
+-				new_flags, 1) != XA_ERR_NONE)
++	if (!vmwgfx_xa_surface_redefine(vpix,
++					vpix->hw,
++					pixmap->drawable.width,
++					pixmap->drawable.height,
++					0,
++					xa_type_other,
++					vpix->staging_format,
++					new_flags, 1) != XA_ERR_NONE)
+ 	    return FALSE;
+ 	vpix->xa_flags = new_flags;
+     } else if (!vmwgfx_create_hw(vsaa, pixmap))
+--- a/vmwgfx/vmwgfx_xmir.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_xmir.c	2014-08-23 16:31:34.112196548 +0200
+@@ -36,6 +36,7 @@
+ 
+ #include "vmwgfx_hosted.h"
+ #include "vmwgfx_saa.h"
++#include <xf86Crtc.h>
+ #include <xf86Priv.h>
+ #include <xmir.h>
+ 
+@@ -103,6 +104,11 @@
+ 	return FALSE;
+ 
+     hosted->pScreen = pScreen;
++    if (!xf86SetDesiredModes(hosted->pScrn)) {
++	xmir_screen_close(hosted->pScreen, hosted->xmir);
++	hosted->pScreen = NULL;
++	return FALSE;
++    }
+ 
+     return TRUE;
+ }
+--- a/vmwgfx/vmwgfx_xwayland.c	2014-03-20 14:15:03.000000000 +0100
++++ b/vmwgfx/vmwgfx_xwayland.c	2014-08-23 16:31:34.118196651 +0200
+@@ -62,7 +62,7 @@
+      * surface.
+      */
+     vpix->hw_is_hosted = TRUE;
+-    if (xa_surface_handle(vpix->hw, &name, &pitch) != XA_ERR_NONE)
++    if (_xa_surface_handle(vpix->hw, &name, &pitch) != XA_ERR_NONE)
+ 	return BadDrawable;
+ 
+     return xwl_create_window_buffer_drm(xwl_window, pixmap, name);
