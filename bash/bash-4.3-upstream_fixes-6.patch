@@ -5,7 +5,7 @@ Initial Package Version: 4.3
 Upstream Status:         Already in upstream patch repo
 Origin:                  Upstream
 Description:             This patch contains upstream patch numbers 001 thru 029
-                         and fixes for CVE-2014-6277, CVE-2014-6271, CVE 2014-7169,
+                         and fixes for CVE-2014-6271, CVE-2014-6277, CVE 2014-7169,
                          and CVE-2014-7187
 
 --- a/arrayfunc.c	2013-08-02 22:19:59.000000000 +0200
