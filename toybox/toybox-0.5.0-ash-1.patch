@@ -3,12 +3,12 @@ Date:                    2014-10-17
 Initial Package Version: 0.5.0
 Upstream Status:         Unknown
 Origin:                  Self
-Description:             Improves configure shell script portability and removes
-                         dependency on bash.
+Description:             Improves configure shell script portability and allows
+                         building with the busybox ash shell.
 
 diff -Naur toybox-0.5.0.orig/scripts/genconfig.sh toybox-0.5.0/scripts/genconfig.sh
 --- toybox-0.5.0.orig/scripts/genconfig.sh	2014-10-02 14:47:08.000000000 +0200
-+++ toybox-0.5.0/scripts/genconfig.sh	2014-10-16 17:57:11.387244684 +0200
++++ toybox-0.5.0/scripts/genconfig.sh	2014-10-17 15:54:36.125496319 +0200
 @@ -1,11 +1,11 @@
 -#!/bin/bash
 +#!/bin/sh
@@ -19,7 +19,7 @@ diff -Naur toybox-0.5.0.orig/scripts/genconfig.sh toybox-0.5.0/scripts/genconfig
  mkdir -p generated
  
 -source configure
-+. configure
++. ./configure
  
  # Probe for a single config symbol with a "compiles or not" test.
  # Symbol name is first argument, flags second, feed C file to stdin
@@ -36,7 +36,7 @@ diff -Naur toybox-0.5.0.orig/scripts/genconfig.sh toybox-0.5.0/scripts/genconfig
  probeconfig()
 diff -Naur toybox-0.5.0.orig/scripts/install.sh toybox-0.5.0/scripts/install.sh
 --- toybox-0.5.0.orig/scripts/install.sh	2014-10-02 14:47:08.000000000 +0200
-+++ toybox-0.5.0/scripts/install.sh	2014-10-17 14:30:37.732429479 +0200
++++ toybox-0.5.0/scripts/install.sh	2014-10-17 15:54:28.021934968 +0200
 @@ -1,8 +1,8 @@
 -#!/bin/bash
 +#!/bin/sh
@@ -74,7 +74,7 @@ diff -Naur toybox-0.5.0.orig/scripts/install.sh toybox-0.5.0/scripts/install.sh
    fi
 diff -Naur toybox-0.5.0.orig/scripts/make.sh toybox-0.5.0/scripts/make.sh
 --- toybox-0.5.0.orig/scripts/make.sh	2014-10-02 14:47:08.000000000 +0200
-+++ toybox-0.5.0/scripts/make.sh	2014-10-17 14:38:34.581696281 +0200
++++ toybox-0.5.0/scripts/make.sh	2014-10-17 15:54:28.021934968 +0200
 @@ -1,11 +1,11 @@
 -#!/bin/bash
 +#!/bin/sh
