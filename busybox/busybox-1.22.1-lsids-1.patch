@@ -1,0 +1,271 @@
+Submitted By:            Igor Živković
+Date:                    2014-10-25
+Initial Package Version: 1.22.1
+Upstream Status:         Rejected
+Origin:                  Sven Dickert
+Description:             Rediffed hack from the BusyBox mailing list adding
+                         support for human readable output to lspci and lsusb.
+                         https://www.mail-archive.com/busybox@busybox.net/msg11323.html
+
+diff -Naur busybox-1.22.1.orig/util-linux/Config.src busybox-1.22.1/util-linux/Config.src
+--- busybox-1.22.1.orig/util-linux/Config.src	2014-01-09 19:15:44.000000000 +0100
++++ busybox-1.22.1/util-linux/Config.src	2014-10-25 14:11:01.035632282 +0200
+@@ -404,6 +404,18 @@
+ 
+ 	  This version uses sysfs (/sys/bus/usb/devices) only.
+ 
++config LSIDS
++	bool "lsids"
++	default n
++	depends on LSPCI
++	depends on LSUSB
++	help
++	  use human readable form when displaying information about PCI and
++	  USB busses in the system and devices connected to them.
++
++	  http://pciids.sourceforge.net/
++	  http://www.linux-usb.org/usb-ids.html
++
+ config MKSWAP
+ 	bool "mkswap"
+ 	default y
+diff -Naur busybox-1.22.1.orig/util-linux/Kbuild.src busybox-1.22.1/util-linux/Kbuild.src
+--- busybox-1.22.1.orig/util-linux/Kbuild.src	2014-01-09 19:15:44.000000000 +0100
++++ busybox-1.22.1/util-linux/Kbuild.src	2014-10-25 14:12:40.136226311 +0200
+@@ -26,6 +26,7 @@
+ lib-$(CONFIG_LOSETUP)           += losetup.o
+ lib-$(CONFIG_LSPCI)             += lspci.o
+ lib-$(CONFIG_LSUSB)             += lsusb.o
++lib-$(CONFIG_LSIDS)             += sprintid.o
+ lib-$(CONFIG_MKFS_EXT2)         += mkfs_ext2.o
+ lib-$(CONFIG_MKFS_MINIX)        += mkfs_minix.o
+ lib-$(CONFIG_MKFS_REISER)       += mkfs_reiser.o
+diff -Naur busybox-1.22.1.orig/util-linux/lspci.c busybox-1.22.1/util-linux/lspci.c
+--- busybox-1.22.1.orig/util-linux/lspci.c	2014-01-09 19:15:44.000000000 +0100
++++ busybox-1.22.1/util-linux/lspci.c	2014-10-25 14:26:24.034191502 +0200
+@@ -22,6 +22,8 @@
+ 	OPT_k = (1 << 1),
+ };
+ 
++#include "sprintid.h"
++
+ /*
+  * PCI_SLOT_NAME PCI_CLASS: PCI_VID:PCI_DID [PCI_SUBSYS_VID:PCI_SUBSYS_DID] [DRIVER]
+  */
+@@ -36,6 +38,7 @@
+ 	char *pci_slot_name = NULL, *driver = NULL;
+ 	int pci_class = 0, pci_vid = 0, pci_did = 0;
+ 	int pci_subsys_vid = 0, pci_subsys_did = 0;
++	char *pci_human_readable;
+ 
+ 	char *uevent_filename = concat_path_file(fileName, "/uevent");
+ 	parser = config_open2(uevent_filename, fopen_for_read);
+@@ -77,8 +80,15 @@
+ 			pci_slot_name, pci_class, pci_vid, pci_did,
+ 			pci_subsys_vid, pci_subsys_did);
+ 	} else {
++		pci_human_readable = sprintid(pci_class, pci_vid, pci_did);
++		if (pci_human_readable != NULL) {
++			printf("%s %s", pci_slot_name, pci_human_readable);
++		}
++		else
++		{
+ 		printf("%s Class %04x: %04x:%04x",
+ 			pci_slot_name, pci_class, pci_vid, pci_did);
++		}
+ 	}
+ 
+ 	if ((option_mask32 & OPT_k) && driver) {
+@@ -101,6 +111,7 @@
+ {
+ 	getopt32(argv, "m" /*non-compat:*/ "k" /*ignored:*/ "nv");
+ 
++	sprintid_init("/usr/share/hwdata/pci.ids");
+ 	recursive_action("/sys/bus/pci/devices",
+ 			ACTION_RECURSE,
+ 			fileAction,
+@@ -108,5 +119,6 @@
+ 			NULL, /* userData */
+ 			0 /* depth */);
+ 
++	sprintid_cleanup();
+ 	return EXIT_SUCCESS;
+ }
+diff -Naur busybox-1.22.1.orig/util-linux/lsusb.c busybox-1.22.1/util-linux/lsusb.c
+--- busybox-1.22.1.orig/util-linux/lsusb.c	2014-01-09 19:15:44.000000000 +0100
++++ busybox-1.22.1/util-linux/lsusb.c	2014-10-25 14:45:39.398851760 +0200
+@@ -11,6 +11,7 @@
+ //usage:#define lsusb_full_usage ""
+ 
+ #include "libbb.h"
++#include "sprintid.h"
+ 
+ static int FAST_FUNC fileAction(
+ 		const char *fileName,
+@@ -22,6 +23,7 @@
+ 	char *tokens[4];
+ 	char *busnum = NULL, *devnum = NULL;
+ 	int product_vid = 0, product_did = 0;
++	char *usb_human_readable;
+ 	char *uevent_filename = concat_path_file(fileName, "/uevent");
+ 
+ 	parser = config_open2(uevent_filename, fopen_for_read);
+@@ -51,7 +53,12 @@
+ 	config_close(parser);
+ 
+ 	if (busnum) {
++		usb_human_readable = sprintid(-1, product_vid, product_did);
++		if (usb_human_readable != NULL) {
++			printf("Bus %s Device %s: ID %04x:%04x %s\n", busnum, devnum, product_vid, product_did, usb_human_readable);
++		} else {
+ 		printf("Bus %s Device %s: ID %04x:%04x\n", busnum, devnum, product_vid, product_did);
++		}
+ 		free(busnum);
+ 		free(devnum);
+ 	}
+@@ -64,6 +71,7 @@
+ {
+ 	/* no options, no getopt */
+ 
++	sprintid_init("/usr/share/hwdata/usb.ids");
+ 	recursive_action("/sys/bus/usb/devices",
+ 			ACTION_RECURSE,
+ 			fileAction,
+@@ -71,5 +79,6 @@
+ 			NULL, /* userData */
+ 			0 /* depth */);
+ 
++	sprintid_cleanup();
+ 	return EXIT_SUCCESS;
+ }
+diff -Naur busybox-1.22.1.orig/util-linux/sprintid.c busybox-1.22.1/util-linux/sprintid.c
+--- busybox-1.22.1.orig/util-linux/sprintid.c	1970-01-01 01:00:00.000000000 +0100
++++ busybox-1.22.1/util-linux/sprintid.c	2014-10-25 14:13:24.758328281 +0200
+@@ -0,0 +1,110 @@
++#include "sprintid.h"
++
++static FILE *sprintid_db;
++static char *sprintid_line;
++
++#define SPRINTID_NAMELEN 128
++
++inline int sprintid_init(char *dbname) {
++   sprintid_db=fopen(dbname,"r");
++   sprintid_line=malloc(3*SPRINTID_NAMELEN);
++   if(sprintid_db==NULL || sprintid_line==NULL)
++       return(1);
++   else
++       return(0);
++}
++
++inline int sprintid_cleanup(void) {
++   if(sprintid_db!=NULL) {
++       fclose(sprintid_db);
++   }
++   if(sprintid_line!=NULL) {
++       free(sprintid_line);
++   }
++   return(0);
++}
++
++char *sprintid(int cidnum, int vidnum, int didnum) {
++   char line[3*SPRINTID_NAMELEN+1];
++   char vendor[SPRINTID_NAMELEN+1];
++   char device[SPRINTID_NAMELEN+1];
++   char class[SPRINTID_NAMELEN+1];
++
++   char cid[5];
++   char vid[5];
++   char did[5];
++
++   int havedevice=0;
++
++   if(sprintid_line==NULL) {
++       return(NULL);
++   }
++
++   sprintf(vid,"%04x",vidnum);
++   sprintf(did,"%04x",didnum);
++
++   if(cidnum>0)
++   {
++       sprintf(cid,"%04x",cidnum);
++       sprintf(sprintid_line,"Class %s: %s:%s",cid,vid,did);
++   } else {
++       sprintf(cid,"");
++       sprintf(sprintid_line,"%s:%s",vid,did);
++   }
++
++   if(sprintid_db==NULL) {
++       return(sprintid_line);
++   }
++
++   if(cidnum>0) {
++       sprintf(class,"Class unknown class %s: ",cid);
++   }
++   sprintf(vendor,"unknown vendor %s",vid);
++   sprintf(device,"unknown device %s",did);
++
++   fseek(sprintid_db,0L,SEEK_SET);
++
++   while(fgets(line, 3*SPRINTID_NAMELEN, sprintid_db)!=NULL) { 
++       if(line[0]!='#' && line[0]!='\r' && line[0]!='\n')
++       {
++               if((havedevice==0) && ((line[0]>='0' && line[0]<='9') || (line[0]>='a' && line[0]<='f'))) { // Vendor
++               if(strncmp(line,vid,4)==0) {
++                   strncpy(vendor,&line[6],SPRINTID_NAMELEN);
++                   while(fgets(line, 3*SPRINTID_NAMELEN, sprintid_db)!=NULL && !((line[0]>='0' && line[0]<='9') || (line[0]>='a' && line[0]<='f'))) { 
++                       if(line[0]=='\t' && ((line[1]>='0' && line[1]<='9') || (line[1]>='a' && line[1]<='f'))) { // Device
++                           if(strncmp(&line[1],did,4)==0) {
++                               strncpy(device,&line[7],SPRINTID_NAMELEN);
++                               break;
++                           }
++                       }
++                   }
++               }
++           }
++
++           if(cidnum>0 && line[0]=='C') { // Classes
++               if(strncmp(&line[2],cid,2)==0) { // found Major 
++                   while(fgets(line, 3*SPRINTID_NAMELEN, sprintid_db)!=NULL && !(line[0]=='C')) {
++                       if(line[0]=='\t' && ((line[1]>='0' && line[1]<='9') || (line[1]>='a' && line[1]<='f'))) { // subclass
++                           if(strncmp(&line[1],&cid[2],2)==0) {
++                               strncpy(class,&line[5],SPRINTID_NAMELEN);
++                               break;
++                           }
++                       }
++                   }
++                   break;
++               }
++           }
++       }
++   }
++   chomp(class);
++   chomp(vendor);
++   chomp(device);
++   if(cidnum>0)
++   {
++       sprintf(sprintid_line,"Class %s: %s:%s",class,vendor,device);
++   } else {
++       sprintf(sprintid_line,"%s:%s",vendor,device);
++   }
++   return(sprintid_line); 
++}
++
+diff -Naur busybox-1.22.1.orig/util-linux/sprintid.h busybox-1.22.1/util-linux/sprintid.h
+--- busybox-1.22.1.orig/util-linux/sprintid.h	1970-01-01 01:00:00.000000000 +0100
++++ busybox-1.22.1/util-linux/sprintid.h	2014-10-25 14:13:24.759328241 +0200
+@@ -0,0 +1,13 @@
++#include <stdio.h>
++#include <string.h>
++#include <libbb.h>
++
++#if CONFIG_LSIDS
++extern char *sprintid(int cidnum, int vidnum, int didnum);
++extern int sprintid_init(char *dbname);
++extern int sprintid_cleanup(void);
++#else
++static inline char *sprintid(int cidnum, int vidnum, int didnum) {}
++static inline int sprintid_init(char *dbname) {}
++static inline int sprintid_cleanup() {}
++#endif
