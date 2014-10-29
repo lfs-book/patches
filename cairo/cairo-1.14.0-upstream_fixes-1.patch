@@ -1,0 +1,20 @@
+Submitted By:            Armin K. <krejzi at email dot com>
+Date:                    2014-10-29
+Initial Package Version: 1.14.0
+Upstream Status:         Fixed
+Origin:                  Upstream
+Description:             Fixes segmentation fault when handling some PDF documents.
+
+--- a/src/cairo-tor-scan-converter.c	2014-10-14 03:46:33.000000000 +0200
++++ b/src/cairo-tor-scan-converter.c	2014-10-29 22:40:03.337773983 +0100
+@@ -1167,8 +1167,8 @@
+ 
+ 	if (e->dy) {
+ 	    struct quorem x = e->x;
+-	    x.quo += e->dxdy_full.quo - e->dxdy.quo/2;
+-	    x.rem += e->dxdy_full.rem - e->dxdy.rem/2;
++	    x.quo += e->dxdy_full.quo;
++	    x.rem += e->dxdy_full.rem;
+ 	    if (x.rem < 0) {
+ 		x.quo--;
+ 		x.rem += e->dy;
