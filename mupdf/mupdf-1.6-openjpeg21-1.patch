@@ -3,7 +3,7 @@ Date:                    2014-11-17
 Initial Package Version: 1.6
 Upstream Status:         Unknown
 Origin:                  Debian
-Description:             Fixes build with libopenjp2.
+Description:             Fixes build with OpenJPEG version >= 2.1.
 
 diff -Naur mupdf-1.6-source.orig/Makerules mupdf-1.6-source/Makerules
 --- mupdf-1.6-source.orig/Makerules	2014-09-30 13:25:12.000000000 +0200
