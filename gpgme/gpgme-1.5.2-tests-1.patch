@@ -1,0 +1,191 @@
+Submitted By:            Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date:                    2014-11-22
+Initial Package Version: 2.5.2
+Upstream Status:         not applied
+Origin:                  Self
+Description:             Revert the test suite to the one in gpgme-2.5.1
+
+diff -Naur a/tests/gpg/Makefile.am b/tests/gpg/Makefile.am
+--- a/tests/gpg/Makefile.am	2014-09-24 09:44:56.000000000 -0300
++++ b/tests/gpg/Makefile.am	2014-07-30 06:40:16.000000000 -0300
+@@ -43,7 +43,7 @@
+ 
+ CLEANFILES = secring.gpg pubring.gpg pubring.kbx trustdb.gpg dirmngr.conf \
+ 	gpg-agent.conf pubring.kbx~ S.gpg-agent gpg.conf pubring.gpg~ \
+-	random_seed S.gpg-agent .gpg-v21-migrated
++	random_seed S.gpg-agent
+ 
+ private_keys = \
+         13CD0F3BDF24BE53FE192D62F18737256FF6E4FD \
+@@ -70,7 +70,7 @@
+ 	-$(srcdir)/start-stop-agent --stop
+ 	-rm -fR private-keys-v1.d
+ 
+-check-local: ./gpg.conf ./gpg-agent.conf ./pubring.gpg \
++all-local: ./gpg.conf ./gpg-agent.conf ./pubring.gpg \
+            ./private-keys-v1.d/gpg-sample.stamp
+ 
+ export GNUPGHOME := $(abs_builddir)
+diff -Naur a/tests/gpg/Makefile.in b/tests/gpg/Makefile.in
+--- a/tests/gpg/Makefile.in	2014-11-21 17:22:22.000000000 -0300
++++ b/tests/gpg/Makefile.in	2014-07-30 06:54:52.000000000 -0300
+@@ -287,8 +287,6 @@
+ GPG_ERROR_CFLAGS = @GPG_ERROR_CFLAGS@
+ GPG_ERROR_CONFIG = @GPG_ERROR_CONFIG@
+ GPG_ERROR_LIBS = @GPG_ERROR_LIBS@
+-GPG_ERROR_MT_CFLAGS = @GPG_ERROR_MT_CFLAGS@
+-GPG_ERROR_MT_LIBS = @GPG_ERROR_MT_LIBS@
+ GREP = @GREP@
+ INSTALL = @INSTALL@
+ INSTALL_DATA = @INSTALL_DATA@
+@@ -337,7 +335,6 @@
+ SET_MAKE = @SET_MAKE@
+ SHELL = @SHELL@
+ STRIP = @STRIP@
+-SYSROOT = @SYSROOT@
+ VERSION = @VERSION@
+ VERSION_NUMBER = @VERSION_NUMBER@
+ abs_builddir = @abs_builddir@
+@@ -412,7 +409,7 @@
+ 
+ CLEANFILES = secring.gpg pubring.gpg pubring.kbx trustdb.gpg dirmngr.conf \
+ 	gpg-agent.conf pubring.kbx~ S.gpg-agent gpg.conf pubring.gpg~ \
+-	random_seed S.gpg-agent .gpg-v21-migrated
++	random_seed S.gpg-agent
+ 
+ private_keys = \
+         13CD0F3BDF24BE53FE192D62F18737256FF6E4FD \
+@@ -771,9 +768,9 @@
+ 	  fi; \
+ 	done
+ check-am: all-am
+-	$(MAKE) $(AM_MAKEFLAGS) check-TESTS check-local
++	$(MAKE) $(AM_MAKEFLAGS) check-TESTS
+ check: check-am
+-all-am: Makefile $(PROGRAMS) $(HEADERS)
++all-am: Makefile $(PROGRAMS) $(HEADERS) all-local
+ installdirs:
+ install: install-am
+ install-exec: install-exec-am
+@@ -879,7 +876,7 @@
+ 
+ .MAKE: check-am install-am install-strip
+ 
+-.PHONY: CTAGS GTAGS all all-am check check-TESTS check-am check-local \
++.PHONY: CTAGS GTAGS all all-am all-local check check-TESTS check-am \
+ 	clean clean-generic clean-libtool clean-local \
+ 	clean-noinstPROGRAMS ctags distclean distclean-compile \
+ 	distclean-generic distclean-libtool distclean-tags distdir dvi \
+@@ -898,7 +895,7 @@
+ 	-$(srcdir)/start-stop-agent --stop
+ 	-rm -fR private-keys-v1.d
+ 
+-check-local: ./gpg.conf ./gpg-agent.conf ./pubring.gpg \
++all-local: ./gpg.conf ./gpg-agent.conf ./pubring.gpg \
+            ./private-keys-v1.d/gpg-sample.stamp
+ 
+ export GNUPGHOME := $(abs_builddir)
+diff -Naur a/tests/gpgsm/Makefile.am b/tests/gpgsm/Makefile.am
+--- a/tests/gpgsm/Makefile.am	2014-09-24 09:44:56.000000000 -0300
++++ b/tests/gpgsm/Makefile.am	2014-07-30 06:40:16.000000000 -0300
+@@ -47,8 +47,7 @@
+ 	-gpg-connect-agent KILLAGENT /bye
+ 	-rm -fR private-keys-v1.d
+ 
+-check-local: ./pubring.kbx ./gpgsm.conf \
+-             ./private-keys-v1.d/$(key_id).key ./trustlist.txt
++all-local: ./pubring.kbx ./gpgsm.conf ./private-keys-v1.d/$(key_id).key ./trustlist.txt
+ 
+ export GNUPGHOME := $(abs_builddir)
+ 
+diff -Naur a/tests/gpgsm/Makefile.in b/tests/gpgsm/Makefile.in
+--- a/tests/gpgsm/Makefile.in	2014-11-21 17:22:22.000000000 -0300
++++ b/tests/gpgsm/Makefile.in	2014-07-30 06:54:52.000000000 -0300
+@@ -230,8 +230,6 @@
+ GPG_ERROR_CFLAGS = @GPG_ERROR_CFLAGS@
+ GPG_ERROR_CONFIG = @GPG_ERROR_CONFIG@
+ GPG_ERROR_LIBS = @GPG_ERROR_LIBS@
+-GPG_ERROR_MT_CFLAGS = @GPG_ERROR_MT_CFLAGS@
+-GPG_ERROR_MT_LIBS = @GPG_ERROR_MT_LIBS@
+ GREP = @GREP@
+ INSTALL = @INSTALL@
+ INSTALL_DATA = @INSTALL_DATA@
+@@ -280,7 +278,6 @@
+ SET_MAKE = @SET_MAKE@
+ SHELL = @SHELL@
+ STRIP = @STRIP@
+-SYSROOT = @SYSROOT@
+ VERSION = @VERSION@
+ VERSION_NUMBER = @VERSION_NUMBER@
+ abs_builddir = @abs_builddir@
+@@ -646,9 +643,9 @@
+ 	  fi; \
+ 	done
+ check-am: all-am
+-	$(MAKE) $(AM_MAKEFLAGS) check-TESTS check-local
++	$(MAKE) $(AM_MAKEFLAGS) check-TESTS
+ check: check-am
+-all-am: Makefile $(PROGRAMS) $(HEADERS)
++all-am: Makefile $(PROGRAMS) $(HEADERS) all-local
+ installdirs:
+ install: install-am
+ install-exec: install-exec-am
+@@ -754,7 +751,7 @@
+ 
+ .MAKE: check-am install-am install-strip
+ 
+-.PHONY: CTAGS GTAGS all all-am check check-TESTS check-am check-local \
++.PHONY: CTAGS GTAGS all all-am all-local check check-TESTS check-am \
+ 	clean clean-generic clean-libtool clean-local \
+ 	clean-noinstPROGRAMS ctags distclean distclean-compile \
+ 	distclean-generic distclean-libtool distclean-tags distdir dvi \
+@@ -773,8 +770,7 @@
+ 	-gpg-connect-agent KILLAGENT /bye
+ 	-rm -fR private-keys-v1.d
+ 
+-check-local: ./pubring.kbx ./gpgsm.conf \
+-             ./private-keys-v1.d/$(key_id).key ./trustlist.txt
++all-local: ./pubring.kbx ./gpgsm.conf ./private-keys-v1.d/$(key_id).key ./trustlist.txt
+ 
+ export GNUPGHOME := $(abs_builddir)
+ 
+diff -Naur a/tests/Makefile.in b/tests/Makefile.in
+--- a/tests/Makefile.in	2014-11-21 17:22:21.000000000 -0300
++++ b/tests/Makefile.in	2014-07-30 06:54:52.000000000 -0300
+@@ -256,8 +256,6 @@
+ GPG_ERROR_CFLAGS = @GPG_ERROR_CFLAGS@
+ GPG_ERROR_CONFIG = @GPG_ERROR_CONFIG@
+ GPG_ERROR_LIBS = @GPG_ERROR_LIBS@
+-GPG_ERROR_MT_CFLAGS = @GPG_ERROR_MT_CFLAGS@
+-GPG_ERROR_MT_LIBS = @GPG_ERROR_MT_LIBS@
+ GREP = @GREP@
+ INSTALL = @INSTALL@
+ INSTALL_DATA = @INSTALL_DATA@
+@@ -306,7 +304,6 @@
+ SET_MAKE = @SET_MAKE@
+ SHELL = @SHELL@
+ STRIP = @STRIP@
+-SYSROOT = @SYSROOT@
+ VERSION = @VERSION@
+ VERSION_NUMBER = @VERSION_NUMBER@
+ abs_builddir = @abs_builddir@
+diff -Naur a/tests/opassuan/Makefile.in b/tests/opassuan/Makefile.in
+--- a/tests/opassuan/Makefile.in	2014-11-21 17:22:22.000000000 -0300
++++ b/tests/opassuan/Makefile.in	2014-07-30 06:54:52.000000000 -0300
+@@ -183,8 +183,6 @@
+ GPG_ERROR_CFLAGS = @GPG_ERROR_CFLAGS@
+ GPG_ERROR_CONFIG = @GPG_ERROR_CONFIG@
+ GPG_ERROR_LIBS = @GPG_ERROR_LIBS@
+-GPG_ERROR_MT_CFLAGS = @GPG_ERROR_MT_CFLAGS@
+-GPG_ERROR_MT_LIBS = @GPG_ERROR_MT_LIBS@
+ GREP = @GREP@
+ INSTALL = @INSTALL@
+ INSTALL_DATA = @INSTALL_DATA@
+@@ -233,7 +231,6 @@
+ SET_MAKE = @SET_MAKE@
+ SHELL = @SHELL@
+ STRIP = @STRIP@
+-SYSROOT = @SYSROOT@
+ VERSION = @VERSION@
+ VERSION_NUMBER = @VERSION_NUMBER@
+ abs_builddir = @abs_builddir@
