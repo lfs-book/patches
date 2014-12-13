@@ -1,9 +1,9 @@
 Submitted By:            Fernando de Oliveira <famobr at yahoo dot com dot br>
 Date:                    2014-11-22
-Initial Package Version: 2.5.2
+Initial Package Version: 1.5.2
 Upstream Status:         not applied
 Origin:                  Self
-Description:             Revert the test suite to the one in gpgme-2.5.1
+Description:             Revert the test suite to the one in gpgme-1.5.1
 
 diff -Naur a/tests/gpg/Makefile.am b/tests/gpg/Makefile.am
 --- a/tests/gpg/Makefile.am	2014-09-24 09:44:56.000000000 -0300
