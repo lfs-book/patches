@@ -1,0 +1,19 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2015-01-04
+Initial Package Version: git20150102
+Upstream Status:         Not submitted
+Origin:                  Self
+Description:             Fixes build with Lua version >= 5.2
+
+diff -Naur elinks.orig/src/scripting/lua/hooks.c elinks/src/scripting/lua/hooks.c
+--- elinks.orig/src/scripting/lua/hooks.c	2015-01-04 23:11:26.140277298 +0100
++++ elinks/src/scripting/lua/hooks.c	2015-01-04 23:43:16.309134833 +0100
+@@ -144,7 +144,7 @@
+ 	if (err) return EVENT_HOOK_STATUS_NEXT;
+ 
+ 	if (lua_isstring(L, -1)) {
+-		int len = lua_strlen(L, -1);
++		int len = lua_rawlen(L, -1);
+ 
+ 		add_fragment(cached, 0, (unsigned char *) lua_tostring(L, -1), len);
+ 		normalize_cache_entry(cached, len);
