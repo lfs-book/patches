@@ -1,0 +1,28 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2015-01-06
+Initial Package Version: 1.1.7
+Upstream Status: Upstream seems to be defunct, package was apparently
+forked to 'pillow' but is still used by e.g. xasy from asymptote.
+Origin: From chromium, found at gentoo.
+Description: Fixed build with current freetype.
+
+https://bugs.gentoo.org/508748
+
+fix building w/freetype-2.5.3
+
+patch by Jungshik Shin <jshin@chromium.org>
+
+--- Imaging-1.1.7/_imagingft.c
++++ Imaging-1.1.7/_imagingft.c
+@@ -70,7 +70,11 @@
+     const char* message;
+ } ft_errors[] =
+ 
++#if defined(USE_FREETYPE_2_1)
++#include FT_ERRORS_H
++#else
+ #include <freetype/fterrors.h>
++#endif
+ 
+ /* -------------------------------------------------------------------- */
+ /* font objects */
