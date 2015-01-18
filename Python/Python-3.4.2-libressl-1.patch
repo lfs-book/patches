@@ -1,0 +1,153 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2015-01-18
+Initial Package Version: 3.4.2
+Upstream Status:         Unknown
+Origin:                  2.7.9 patch
+Description:             Fixes build with LibreSSL.
+
+diff -Naur Python-3.4.2.orig/configure Python-3.4.2/configure
+--- Python-3.4.2.orig/configure	2014-10-08 10:18:16.000000000 +0200
++++ Python-3.4.2/configure	2015-01-18 13:47:21.680754724 +0100
+@@ -8904,6 +8904,52 @@
+ fi
+ 	# Dynamic linking for HP-UX
+ 
++### Fix build with LibreSSL (does not have RAND_egd)
++### PR192511, http://bugs.python.org/issue21356
++{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for RAND_egd in -lcrypto" >&5
++$as_echo_n "checking for RAND_egd in -lcrypto... " >&6; }
++if ${ac_cv_lib_crypto_RAND_egd+:} false; then :
++  $as_echo_n "(cached) " >&6
++else
++  ac_check_lib_save_LIBS=$LIBS
++LIBS="-lcrypto  $LIBS"
++cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++/* Override any GCC internal prototype to avoid an error.
++   Use char because int might match the return type of a GCC
++   builtin and then its argument prototype would still apply.  */
++#ifdef __cplusplus
++extern "C"
++#endif
++char RAND_egd ();
++int
++main ()
++{
++return RAND_egd ();
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"; then :
++  ac_cv_lib_crypto_RAND_egd=yes
++else
++  ac_cv_lib_crypto_RAND_egd=no
++fi
++rm -f core conftest.err conftest.$ac_objext \
++    conftest$ac_exeext conftest.$ac_ext
++LIBS=$ac_check_lib_save_LIBS
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_crypto_RAND_egd" >&5
++$as_echo "$ac_cv_lib_crypto_RAND_egd" >&6; }
++if test "x$ac_cv_lib_crypto_RAND_egd" = xyes; then :
++
++$as_echo "#define HAVE_RAND_EGD 1" >>confdefs.h
++
++fi
++
++### End PR192511
++
+ # only check for sem_init if thread support is requested
+ if test "$with_threads" = "yes" -o -z "$with_threads"; then
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing sem_init" >&5
+diff -Naur Python-3.4.2.orig/Lib/ssl.py Python-3.4.2/Lib/ssl.py
+--- Python-3.4.2.orig/Lib/ssl.py	2014-10-08 10:18:12.000000000 +0200
++++ Python-3.4.2/Lib/ssl.py	2015-01-18 13:47:21.692754067 +0100
+@@ -106,7 +106,15 @@
+ from _ssl import (VERIFY_DEFAULT, VERIFY_CRL_CHECK_LEAF, VERIFY_CRL_CHECK_CHAIN,
+     VERIFY_X509_STRICT)
+ from _ssl import txt2obj as _txt2obj, nid2obj as _nid2obj
+-from _ssl import RAND_status, RAND_egd, RAND_add, RAND_bytes, RAND_pseudo_bytes
++### Fix build with LibreSSL (does not have RAND_egd)
++### PR192511, http://bugs.python.org/issue21356
++from _ssl import RAND_status, RAND_add, RAND_bytes, RAND_pseudo_bytes
++try:
++    from _ssl import RAND_egd
++except ImportError:
++    # LibreSSL does not provide RAND_egd
++    pass
++### End PR192511
+ 
+ def _import_symbols(prefix):
+     for n in dir(_ssl):
+diff -Naur Python-3.4.2.orig/Lib/test/test_ssl.py Python-3.4.2/Lib/test/test_ssl.py
+--- Python-3.4.2.orig/Lib/test/test_ssl.py	2014-10-08 10:18:14.000000000 +0200
++++ Python-3.4.2/Lib/test/test_ssl.py	2015-01-18 13:47:21.696753848 +0100
+@@ -154,8 +154,12 @@
+         self.assertRaises(ValueError, ssl.RAND_bytes, -5)
+         self.assertRaises(ValueError, ssl.RAND_pseudo_bytes, -5)
+ 
+-        self.assertRaises(TypeError, ssl.RAND_egd, 1)
+-        self.assertRaises(TypeError, ssl.RAND_egd, 'foo', 1)
++### Fix build with LibreSSL (does not have RAND_egd)
++### PR192511, http://bugs.python.org/issue21356        
++        if hasattr(ssl, 'RAND_egd'):
++            self.assertRaises(TypeError, ssl.RAND_egd, 1)
++            self.assertRaises(TypeError, ssl.RAND_egd, 'foo', 1)
++### End PR192511
+         ssl.RAND_add("this is a random string", 75.0)
+ 
+     @unittest.skipUnless(os.name == 'posix', 'requires posix')
+diff -Naur Python-3.4.2.orig/Modules/_ssl.c Python-3.4.2/Modules/_ssl.c
+--- Python-3.4.2.orig/Modules/_ssl.c	2014-10-08 10:18:15.000000000 +0200
++++ Python-3.4.2/Modules/_ssl.c	2015-01-18 13:47:28.618375522 +0100
+@@ -3339,6 +3339,9 @@
+ It is necessary to seed the PRNG with RAND_add() on some platforms before\n\
+ using the ssl() function.");
+ 
++/* ### Fix build with LibreSSL (does not have RAND_egd)
++   ### PR192511, http://bugs.python.org/issue21356 */
++#ifdef HAVE_RAND_EGD
+ static PyObject *
+ PySSL_RAND_egd(PyObject *self, PyObject *args)
+ {
+@@ -3366,6 +3369,8 @@
+ Queries the entropy gather daemon (EGD) on the socket named by 'path'.\n\
+ Returns number of bytes read.  Raises SSLError if connection to EGD\n\
+ fails or if it does not provide enough data to seed PRNG.");
++#endif /* HAVE_RAND_EGD */
++/* ### End PR192511 */
+ 
+ #endif /* HAVE_OPENSSL_RAND */
+ 
+@@ -3761,8 +3766,13 @@
+      PySSL_RAND_bytes_doc},
+     {"RAND_pseudo_bytes",   PySSL_RAND_pseudo_bytes, METH_VARARGS,
+      PySSL_RAND_pseudo_bytes_doc},
++/* ### Fix build with LibreSSL (does not have RAND_egd)
++   ### PR192511, http://bugs.python.org/issue21356 */
++#ifdef HAVE_RAND_EGD
+     {"RAND_egd",            PySSL_RAND_egd, METH_VARARGS,
+      PySSL_RAND_egd_doc},
++#endif /* HAVE_RAND_EGD */
++/* ### End PR192551 */
+     {"RAND_status",         (PyCFunction)PySSL_RAND_status, METH_NOARGS,
+      PySSL_RAND_status_doc},
+ #endif
+diff -Naur Python-3.4.2.orig/pyconfig.h.in Python-3.4.2/pyconfig.h.in
+--- Python-3.4.2.orig/pyconfig.h.in	2014-10-08 10:18:16.000000000 +0200
++++ Python-3.4.2/pyconfig.h.in	2015-01-18 13:47:21.809747666 +0100
+@@ -672,6 +672,12 @@
+ /* Define to 1 if you have the `pwrite' function. */
+ #undef HAVE_PWRITE
+ 
++/* ### Fix build with LibreSSL (does not have RAND_egd)
++   ### PR192511, http://bugs.python.org/issue21356 */
++/* Define if the libcrypto has RAND_egd */
++#undef HAVE_RAND_EGD
++
++/* ### End PR192511 */
+ /* Define to 1 if you have the `readlink' function. */
+ #undef HAVE_READLINK
+ 
