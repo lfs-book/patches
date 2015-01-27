@@ -1,0 +1,258 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2015-01-27
+Initial Package Version: 10.4.3
+Upstream Status:         Not submitted
+Origin:                  Self
+Description:             Allows compilation with python3 at least with these:
+
+find -name '*.py' | xargs 2to3 -w &&
+patch -p1 -i ../MesaLib-10.4.3-python3-1.patch &&
+./autogen.sh PYTHON2="python3" \
+             CFLAGS="-O2" CXXFLAGS="-O2" \
+             --prefix=/usr \
+             --sysconfdir=/etc \
+             --disable-dri3 \
+             --enable-sysfs \
+             --enable-texture-float \
+             --enable-gles1 \
+             --enable-gles2 \
+             --enable-osmesa \
+             --enable-xa \
+             --enable-gbm \
+             --enable-glx-tls \
+             --with-egl-platforms="drm,x11" \
+             --with-gallium-drivers="r600" 
+
+--- Mesa-10.4.3.orig/src/gallium/auxiliary/util/u_format_pack.py
++++ Mesa-10.4.3/src/gallium/auxiliary/util/u_format_pack.py
+@@ -239,7 +239,7 @@
+             return truncate_mantissa(value, 23)
+         return value
+     if type.type == FIXED:
+-        return int(value * (1 << (type.size/2)))
++        return int(value * (1 << (type.size//2)))
+     if not type.norm:
+         return int(value)
+     if type.type == UNSIGNED:
+--- Mesa-10.4.3.orig/src/gallium/auxiliary/util/u_format_parse.py
++++ Mesa-10.4.3/src/gallium/auxiliary/util/u_format_parse.py
+@@ -77,7 +77,7 @@
+         if self.type == FLOAT:
+             return VERY_LARGE
+         if self.type == FIXED:
+-            return (1 << (self.size/2)) - 1
++            return (1 << (self.size//2)) - 1
+         if self.norm:
+             return 1
+         if self.type == UNSIGNED:
+@@ -91,7 +91,7 @@
+         if self.type == FLOAT:
+             return -VERY_LARGE
+         if self.type == FIXED:
+-            return -(1 << (self.size/2))
++            return -(1 << (self.size//2))
+         if self.type == UNSIGNED:
+             return 0
+         if self.norm:
+@@ -161,7 +161,7 @@
+         return ref_channel
+ 
+     def is_array(self):
+-        return self.array_element() != None
++        return type(self.array_element()) != type(None)
+ 
+     def is_mixed(self):
+         if self.layout != PLAIN:
+--- Mesa-10.4.3.orig/src/mapi/glapi/gen/glX_proto_common.py
++++ Mesa-10.4.3/src/mapi/glapi/gen/glX_proto_common.py
+@@ -66,7 +66,7 @@
+                     return compsize
+ 
+                 elif len(param.count_parameter_list):
+-                    parameters = string.join( param.count_parameter_list, "," )
++                    parameters = ",".join(param.count_parameter_list)
+                     compsize = "__gl%s_size(%s)" % (func.name, parameters)
+ 
+                     return compsize
+--- Mesa-10.4.3.orig/src/mapi/glapi/gen/glX_proto_send.py
++++ Mesa-10.4.3/src/mapi/glapi/gen/glX_proto_send.py
+@@ -38,7 +38,7 @@
+             tmp = '%s_%s' % (tmp, string.lower(str[i:i+3]))
+             i = i + 2;
+         elif str[i].isupper():
+-            tmp = '%s_%s' % (tmp, string.lower(str[i]))
++            tmp = '%s_%s' % (tmp, str[i].lower())
+         else:
+             tmp = '%s%s' % (tmp, str[i])
+         i += 1
+@@ -627,7 +627,7 @@
+ 
+         if len( condition_list ) > 0:
+             if len( condition_list ) > 1:
+-                skip_condition = "(%s)" % (string.join( condition_list, ") && (" ))
++                skip_condition = "(%s)" % (") && (".join(condition_list))
+             else:
+                 skip_condition = "%s" % (condition_list.pop(0))
+ 
+--- Mesa-10.4.3.orig/src/mapi/glapi/gen/glX_proto_size.py
++++ Mesa-10.4.3/src/mapi/glapi/gen/glX_proto_size.py
+@@ -201,14 +201,14 @@
+                 # a case label, and emit the others as
+                 # commented-out case labels.
+ 
+-                list = {}
++                list_ = {}
+                 for enum_obj in self.enums[e]:
+-                    list[ enum_obj.priority() ] = enum_obj.name
++                    list_[ enum_obj.priority() ] = enum_obj.name
+ 
+-                keys = list(list.keys())
++                keys = list(list_.keys())
+                 keys.sort()
+                 for k in keys:
+-                    j = list[k]
++                    j = list_[k]
+                     if first:
+                         print('        case GL_%s:' % (j))
+                         first = 0
+--- Mesa-10.4.3.orig/src/mapi/glapi/gen/gl_XML.py
++++ Mesa-10.4.3/src/mapi/glapi/gen/gl_XML.py
+@@ -317,7 +317,7 @@
+ 
+     if len(list) == 0: list = ["void"]
+ 
+-    return string.join(list, ", ")
++    return ", ".join(list)
+ 
+ 
+ class gl_item(object):
+@@ -575,9 +575,9 @@
+                 list.append( str(s) )
+ 
+             if len(list) > 1 and use_parens :
+-                return "(%s)" % (string.join(list, " * "))
++                return "(%s)" % (" * ".join(list))
+             else:
+-                return string.join(list, " * ")
++                return " * ".join(list)
+ 
+         elif self.is_image():
+             return "compsize"
+@@ -1026,11 +1026,11 @@
+         keys = list(self.enums_by_name.keys())
+         keys.sort()
+ 
+-        list = []
++        list_ = []
+         for enum in keys:
+-            list.append( self.enums_by_name[ enum ] )
++            list_.append( self.enums_by_name[ enum ] )
+ 
+-        return list.__iter__()
++        return list_.__iter__()
+ 
+ 
+     def categoryIterate(self):
+@@ -1041,15 +1041,15 @@
+         name and number (which may be None) of the category.
+         """
+ 
+-        list = []
++        list_ = []
+         for cat_type in range(0,4):
+             keys = list(self.categories[cat_type].keys())
+             keys.sort()
+ 
+             for key in keys:
+-                list.append(self.categories[cat_type][key])
++                list_.append(self.categories[cat_type][key])
+ 
+-        return list.__iter__()
++        return list_.__iter__()
+ 
+ 
+     def get_category_for_name( self, name ):
+--- Mesa-10.4.3.orig/src/mapi/glapi/gen/typeexpr.py
++++ Mesa-10.4.3/src/mapi/glapi/gen/typeexpr.py
+@@ -125,7 +125,7 @@
+ 
+         # Replace '*' with ' * ' in type_string.  Then, split the string
+         # into tokens, separated by spaces.
+-        tokens = string.split( string.replace( type_string, "*", " * " ) )
++        tokens = type_string.replace("*", " * ").split()
+ 
+         const = 0
+         t = None
+--- Mesa-10.4.3.orig/src/mapi/mapi_abi.py
++++ Mesa-10.4.3/src/mapi/mapi_abi.py
+@@ -120,9 +120,9 @@
+     def __str__(self):
+         return self.c_prototype()
+ 
+-    def __cmp__(self, other):
++    def __lt__(self, other):
+         # compare slot, alias, and then name
+-        res = cmp(self.slot, other.slot)
++        res = (self.slot > other.slot) - (self.slot < other.slot)
+         if not res:
+             if not self.alias:
+                 res = -1
+@@ -130,9 +130,9 @@
+                 res = 1
+ 
+             if not res:
+-                res = cmp(self.name, other.name)
++                res = (self.name > other.name) - (self.name > other.name)
+ 
+-        return res
++        return res < 0
+ 
+ def abi_parse_xml(xml):
+     """Parse a GLAPI XML file for ABI entries."""
+@@ -293,7 +293,7 @@
+ 
+         # sort entries by their names
+         self.entries_sorted_by_names = self.entries[:]
+-        self.entries_sorted_by_names.sort(lambda x, y: cmp(x.name, y.name))
++        self.entries_sorted_by_names.sort(key=lambda x: x.name)
+ 
+         self.indent = ' ' * 3
+         self.noop_warn = 'noop_warn'
+@@ -472,7 +472,7 @@
+         """Return the string pool for use by stubs."""
+         # sort entries by their names
+         sorted_entries = self.entries[:]
+-        sorted_entries.sort(lambda x, y: cmp(x.name, y.name))
++        sorted_entries.sort(key=lambda x: x.name)
+ 
+         pool = []
+         offsets = {}
+--- Mesa-10.4.3.orig/src/mesa/drivers/dri/common/xmlpool/gen_xmlpool.py
++++ Mesa-10.4.3/src/mesa/drivers/dri/common/xmlpool/gen_xmlpool.py
+@@ -129,13 +129,13 @@
+             suffix = ' \\'
+         # Expand the description line. Need to use ugettext in order to allow
+         # non-ascii unicode chars in the original English descriptions.
+-        text = escapeCString (trans.ugettext (str (expandCString (
+-            matches[0].expand (r'\5')), "utf-8"))).encode("utf-8")
++        text = escapeCString (trans.gettext (str (expandCString (
++            matches[0].expand (r'\5')))))
+         print(matches[0].expand (r'\1' + lang + r'\3"' + text + r'"\7') + suffix)
+         # Expand any subsequent enum lines
+         for match in matches[1:]:
+-            text = escapeCString (trans.ugettext (str (expandCString (
+-                match.expand (r'\3')), "utf-8"))).encode("utf-8")
++            text = escapeCString (trans.gettext (str (expandCString (
++                match.expand (r'\3')))))
+             print(match.expand (r'\1"' + text + r'"\5'))
+ 
+         # Expand description end
+@@ -167,7 +167,7 @@
+ 
+ # Process the options template and generate options.h with all
+ # translations.
+-template = file (template_header_path, "r")
++template = open(template_header_path, "r")
+ descMatches = []
+ for line in template:
+     if len(descMatches) > 0:
