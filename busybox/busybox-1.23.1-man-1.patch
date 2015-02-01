@@ -1,0 +1,19 @@
+Submitted By:            Igor Živković <contact@igor-zivkovic.from.hr>
+Date:                    2015-02-01
+Initial Package Version: 1.23.1
+Upstream Status:         Unknown
+Origin:                  Alpine Linux
+Description:             Replaces groff with mdocml runtime dependency for the
+                         man command.
+
+--- busybox-1.23.1.orig/miscutils/man.c
++++ busybox-1.23.1/miscutils/man.c
+@@ -107,7 +107,7 @@
+ 	 * Otherwise it may show just empty screen */
+ 	cmd = xasprintf(
+ 		/* replaced -Tlatin1 with -Tascii for non-UTF8 displays */
+-		man ? "gtbl | nroff -Tascii -mandoc 2>&1 | %s"
++		man ? "mandoc 2>&1 | %s"
+ 		    : "%s",
+ 		pager);
+ 	system(cmd);
