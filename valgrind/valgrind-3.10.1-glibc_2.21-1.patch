@@ -3,7 +3,7 @@ Date: 2015-02-22
 Initial Package Version: 3.10.1
 Upstream Status: Unknown
 Origin: Self
-Description: Allows Valgring to build with glibc-2.21
+Description: Allows Valgrind to build with glibc-2.21
 diff -Naur valgrind-3.10.1.old/configure valgrind-3.10.1.new/configure
 --- valgrind-3.10.1.old/configure	2014-11-25 20:42:25.000000000 +0100
 +++ valgrind-3.10.1.new/configure	2015-02-22 10:46:06.607826488 +0100
