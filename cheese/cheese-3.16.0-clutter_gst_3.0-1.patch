@@ -1,6 +1,6 @@
 Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
 Date: 2015-04-04
-Initial Package Version: 6.46
+Initial Package Version: 3.16.0
 Upstream Status: Unknown
 Origin: Upstream bugzilla + local rediff
 Description: Allows building cheese with clutter-gst-3
