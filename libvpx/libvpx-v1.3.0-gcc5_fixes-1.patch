@@ -1,0 +1,33 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2015-04-18
+Initial Package Version: 1.3.0
+Upstream Status: Unknown
+Origin: Found at FreeBSD, credited to DragonFly (BSD) user "zrj"
+Description: Fixes build with gcc-5 (max_align_t is defined in the ISO 2011 C standard).
+
+When gcc 5 goes into the book, we can use a sed for this.
+ 
+diff -Naur libvpx-v1.3.0.orig/nestegg/halloc/src/align.h libvpx-v1.3.0/nestegg/halloc/src/align.h
+--- libvpx-v1.3.0.orig/nestegg/halloc/src/align.h	2013-12-08 11:30:27.000000000 +0000
++++ libvpx-v1.3.0/nestegg/halloc/src/align.h	2015-04-18 05:27:00.343362297 +0100
+@@ -30,7 +30,7 @@
+ 	void (*q)(void);
+ };
+ 
+-typedef union max_align max_align_t;
++typedef union max_align halloc_max_align_t;
+ 
+ #endif
+ 
+diff -Naur libvpx-v1.3.0.orig/nestegg/halloc/src/halloc.c libvpx-v1.3.0/nestegg/halloc/src/halloc.c
+--- libvpx-v1.3.0.orig/nestegg/halloc/src/halloc.c	2013-12-08 11:30:27.000000000 +0000
++++ libvpx-v1.3.0/nestegg/halloc/src/halloc.c	2015-04-18 05:27:30.754999454 +0100
+@@ -30,7 +30,7 @@
+ #endif
+ 	hlist_item_t  siblings; /* 2 pointers */
+ 	hlist_head_t  children; /* 1 pointer  */
+-	max_align_t   data[1];  /* not allocated, see below */
++	halloc_max_align_t   data[1];  /* not allocated, see below */
+ 	
+ } hblock_t;
+ 
