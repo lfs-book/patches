@@ -1,0 +1,38 @@
+Submitted By:			Douglas R. Reno <renodr2002@gmail.com>
+Date: 				2015-05-21
+Initial Package Version: 	3.10.1
+Upstream Status: Applied
+Origin:				http://sourceforge.net/p/valgrind/mailman/message/33486184/
+Description:			This patch fixes a problem with compilation on a Linux 4.x based kernel. This patch was derived from an upstream commit.
+
+Index: valgrind-3.10.1/configure.ac
+=======================================================================================================================================================
+--- trunk/configure.ac (original)
++++ trunk/configure.ac Mon Feb 23 20:19:03 2015
+@@ -325,20 +325,14 @@
+         kernel=`uname -r`
+ 
+         case "${kernel}" in
+-             2.6.*|3.*) 
+-        	    AC_MSG_RESULT([2.6.x/3.x family (${kernel})])
+-        	    AC_DEFINE([KERNEL_2_6], 1, [Define to 1 if you're using Linux 2.6.x or Linux 3.x])
+-        	    ;;
+-
+-             2.4.*) 
+-        	    AC_MSG_RESULT([2.4 family (${kernel})])
+-        	    AC_DEFINE([KERNEL_2_4], 1, [Define to 1 if you're using Linux 2.4.x])
+-        	    ;;
+-
+-             *) 
++             0.*|1.*|2.0.*|2.1.*|2.2.*|2.3.*|2.4.*|2.5.*) 
+         	    AC_MSG_RESULT([unsupported (${kernel})])
+-        	    AC_MSG_ERROR([Valgrind works on kernels 2.4, 2.6])
++        	    AC_MSG_ERROR([Valgrind needs a Linux kernel >= 2.6])
+         	    ;;
++
++             *)
++        	    AC_MSG_RESULT([2.6 or later (${kernel})])
++                    ;;
+         esac
+ 
+         ;;
