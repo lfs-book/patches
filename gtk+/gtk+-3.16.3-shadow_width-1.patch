@@ -1,0 +1,42 @@
+Submitted By:            Fernando de Oliveira <famobr at yahoo dot com dot br>
+Date:                    2015-06-10
+Initial Package Version: 3.16.3
+Upstream Status:         Fixed
+Origin:                  Upstream
+URL:                     https://git.gnome.org/browse/gtk+/patch/?id=f6d021512a3d076c8a559e52ea1d1c84ff5c4154
+Description:             Fix gtk3 applications windows resize
+
+______________________________________________________________________
+
+From ef72e69183dfa249ef6110a0da03e8feb5e3612d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Mon, 18 May 2015 11:19:14 +0800
+Subject: [PATCH] GtkWindow: Don't assume no shadow width even when not
+ supported
+
+Even if a window doesn't support client side shadow
+(gtk_window_supports_client_shadow returns FALSE), don't assume the
+shadow width is zero, as CSD may have been enabled anyway (meaning
+priv->client_decorated is TRUE). In that case we still need to report
+the correct width.
+
+
+
+--- gtk+-3.16.3/gtk/gtkwindow.c.orig	2015-05-11 15:19:47.000000000 -0300
++++ gtk+-3.16.3/gtk/gtkwindow.c	2015-06-10 11:30:12.075330013 -0300
+@@ -6480,9 +6480,12 @@
+ 
+   *shadow_width = border;
+ 
+-  if (!priv->decorated ||
+-      (!gtk_window_should_use_csd (window) && !priv->client_decorated) ||
+-      !gtk_window_supports_client_shadow (window))
++  if (!priv->decorated)
++    return;
++
++  if (!priv->client_decorated &&
++      !(gtk_window_should_use_csd (window) &&
++        gtk_window_supports_client_shadow (window)))
+     return;
+ 
+   if (priv->maximized ||
