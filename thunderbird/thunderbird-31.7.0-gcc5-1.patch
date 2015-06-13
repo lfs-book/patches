@@ -218,7 +218,7 @@ diff -Nur comm-esr31.orig/mozilla/js/src/vm/ScopeObject-inl.h comm-esr31/mozilla
  {
 diff -Naur comm-esr31.orig/mozilla/netwerk/ipc/NeckoParent.cpp porg-build-2015.05.17-10h30m39s/comm-esr31/mozilla/netwerk/ipc/NeckoParent.cpp
 --- comm-esr31.orig/mozilla/netwerk/ipc/NeckoParent.cpp	2015-05-07 15:53:46.000000000 -0300
-+++ porg-build-2015.05.17-10h30m39s/comm-esr31/mozilla/netwerk/ipc/NeckoParent.cpp	2015-05-17 10:51:24.013181648 -0300
++++ comm-esr31/mozilla/netwerk/ipc/NeckoParent.cpp	2015-05-17 10:51:24.013181648 -0300
 @@ -359,7 +359,7 @@
    RtspChannelParent* p = static_cast<RtspChannelParent*>(aActor);
    return p->Init(aConnectArgs);
