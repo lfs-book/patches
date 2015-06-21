@@ -1,0 +1,44 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2015-06-20
+Initial Package Version: 2.1
+Upstream Status: awaiting review
+Origin: self
+Description: Adds escapes which perl-5.22.0 complains about.
+
+The warnings are apparent (among voluminous 'wide character' noise
+from perl-5.22) when the testsuite is run - most of the complaints
+do not stop the test passing, but with this patch the overall
+failure is reduced to 2 tests instead of 4.  These 2 modules DO get
+installed, so best to fix them.
+
+--- biblatex-biber.orig/lib/Biber/Input/file/bibtex.pm	2015-05-10 16:22:32.000000000 +0100
++++ biblatex-biber.escaped/lib/Biber/Input/file/bibtex.pm	2015-06-20 18:13:09.736610124 +0100
+@@ -759,7 +759,7 @@
+     # Check for malformed names in names which aren't completely escaped
+ 
+     # Too many commas
+-    unless ($name =~ m/\A{\X+}\z/xms) { # Ignore these tests for escaped names
++    unless ($name =~ m/\A\{\X+}\z/xms) { # Ignore these tests for escaped names
+       my @commas = $name =~ m/,/g;
+       if ($#commas > 1) {
+         biber_warn("Name \"$name\" has too many commas: skipping name", $bibentry);
+diff -Naur biblatex-biber.orig/lib/Biber/LaTeX/Recode.pm biblatex-biber.escaped/lib/Biber/LaTeX/Recode.pm
+--- biblatex-biber.orig/lib/Biber/LaTeX/Recode.pm	2015-05-10 16:22:33.000000000 +0100
++++ biblatex-biber.escaped/lib/Biber/LaTeX/Recode.pm	2015-06-20 18:11:28.885241144 +0100
+@@ -230,13 +230,13 @@
+         $text =~ s/\\not\\($re)/$map->{$1}/ge;
+       }
+       elsif ($type eq 'superscripts') {
+-        $text =~ s/\\textsuperscript{($re)}/$map->{$1}/ge;
++        $text =~ s/\\textsuperscript\{($re)}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'cmdsuperscripts') {
+-        $text =~ s/\\textsuperscript{\\($re)}/$map->{$1}/ge;
++        $text =~ s/\\textsuperscript\{\\($re)}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'dings') {
+-        $text =~ s/\\ding{([2-9AF][0-9A-F])}/$map->{$1}/ge;
++        $text =~ s/\\ding\{([2-9AF][0-9A-F])}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'letters') {
+         $text =~ s/\\($re)(?:\{\}|\s+|\b)/$map->{$1}/ge;
