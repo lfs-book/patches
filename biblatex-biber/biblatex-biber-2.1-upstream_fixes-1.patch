@@ -1,0 +1,689 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2015-06-26
+Initial Package Version: 2.1
+Upstream Status: Applied
+Origin: Upstream
+Description: Fixes various issues with perl-5.22.0.
+
+commit d03fc1a65850213ff3254dc18dc374594e144a6c
+Author: Philip Kime <Philip@kime.org.uk>
+Date:   Sun Jun 21 10:25:39 2015 +0200
+
+    Updates for perl 5.22 changes
+
+diff --git a/lib/Biber/Input/file/bibtex.pm b/lib/Biber/Input/file/bibtex.pm
+index 24b2772..a6e240d 100644
+--- a/lib/Biber/Input/file/bibtex.pm
++++ b/lib/Biber/Input/file/bibtex.pm
+@@ -657,8 +657,6 @@ sub _literal {
+   else {
+     $bibentry->set_datafield($field, $value);
+   }
+-
+-
+   return;
+ }
+ 
+@@ -759,7 +757,7 @@ sub _name {
+     # Check for malformed names in names which aren't completely escaped
+ 
+     # Too many commas
+-    unless ($name =~ m/\A{\X+}\z/xms) { # Ignore these tests for escaped names
++    unless ($name =~ m/\A\{\X+\}\z/xms) { # Ignore these tests for escaped names
+       my @commas = $name =~ m/,/g;
+       if ($#commas > 1) {
+         biber_warn("Name \"$name\" has too many commas: skipping name", $bibentry);
+@@ -1262,8 +1260,8 @@ my %months = (
+ 
+ sub _hack_month {
+   my $in_month = shift;
+-  if ($in_month =~ m/\A\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*)\s*\z/i) {
+-    return $months{lc(Unicode::GCString->new($1)->substr(0,3)->as_string)};
++  if (my ($m) = $in_month =~ m/\A\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*)\s*\z/i) {
++    return $months{lc(Unicode::GCString->new($m)->substr(0,3)->as_string)};
+   }
+   else {
+     return $in_month;
+diff --git a/lib/Biber/LaTeX/Recode.pm b/lib/Biber/LaTeX/Recode.pm
+index a2900b2..427f7f5 100644
+--- a/lib/Biber/LaTeX/Recode.pm
++++ b/lib/Biber/LaTeX/Recode.pm
+@@ -230,13 +230,13 @@ sub latex_decode {
+         $text =~ s/\\not\\($re)/$map->{$1}/ge;
+       }
+       elsif ($type eq 'superscripts') {
+-        $text =~ s/\\textsuperscript{($re)}/$map->{$1}/ge;
++        $text =~ s/\\textsuperscript\{($re)\}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'cmdsuperscripts') {
+-        $text =~ s/\\textsuperscript{\\($re)}/$map->{$1}/ge;
++        $text =~ s/\\textsuperscript\{\\($re)\}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'dings') {
+-        $text =~ s/\\ding{([2-9AF][0-9A-F])}/$map->{$1}/ge;
++        $text =~ s/\\ding\{([2-9AF][0-9A-F])\}/$map->{$1}/ge;
+       }
+       elsif ($type eq 'letters') {
+         $text =~ s/\\($re)(?:\{\}|\s+|\b)/$map->{$1}/ge;
+diff --git a/t/basic-misc.t b/t/basic-misc.t
+index bee5728..817fe13 100755
+--- a/t/basic-misc.t
++++ b/t/basic-misc.t
+@@ -37,7 +37,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ Biber::Config->setblxoption('uniquelist', 1);
+ Biber::Config->setblxoption('maxcitenames', 3);
+diff --git a/t/biblatexml.t b/t/biblatexml.t
+index 3bf4b0c..0642d44 100755
+--- a/t/biblatexml.t
++++ b/t/biblatexml.t
+@@ -38,8 +38,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Now generate the information
+ $biber->prepare;
+diff --git a/t/bibtex-aliases.t b/t/bibtex-aliases.t
+index ba0b1d6..c1970e9 100755
+--- a/t/bibtex-aliases.t
++++ b/t/bibtex-aliases.t
+@@ -37,8 +37,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setoption('validate_datamodel', 1);
+ 
+ # THERE IS A MAPPING SECTION IN THE .bcf BEING USED TO TEST USER MAPS TOO!
+diff --git a/t/bibtex-output.t b/t/bibtex-output.t
+index 21c1ae7..673cba7 100755
+--- a/t/bibtex-output.t
++++ b/t/bibtex-output.t
+@@ -36,7 +36,7 @@ Log::Log4perl->init(\$l4pconf);
+ # Biber options
+ Biber::Config->setoption('output_resolve', 1);
+ Biber::Config->setoption('output_format', 'bibtex');
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ $biber->parse_ctrlfile('bibtex-output.bcf');
+ $biber->set_output_obj(Biber::Output::bibtex->new());
+ 
+diff --git a/t/crossrefs.t b/t/crossrefs.t
+index 6108f34..473bec7 100755
+--- a/t/crossrefs.t
++++ b/t/crossrefs.t
+@@ -40,8 +40,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setoption('nodieonerror', 1); # because there is a failing cyclic crossref check
+ 
+ # Now generate the information
+diff --git a/t/dm-constraints.t b/t/dm-constraints.t
+index b16e326..187c482 100755
+--- a/t/dm-constraints.t
++++ b/t/dm-constraints.t
+@@ -50,9 +50,9 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ Biber::Config->setoption('validate_datamodel', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Now generate the information
+ $biber->prepare;
+diff --git a/t/dm-dateformats.t b/t/dm-dateformats.t
+index 85f7927..71a0ab6 100755
+--- a/t/dm-dateformats.t
++++ b/t/dm-dateformats.t
+@@ -35,8 +35,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setoption('validate_datamodel', 1);
+ 
+ # Biblatex options
+diff --git a/t/encoding.t b/t/encoding.t
+index a4aae96..321ca09 100755
+--- a/t/encoding.t
++++ b/t/encoding.t
+@@ -30,8 +30,8 @@ my $l4pconf = qq|
+ |;
+ Log::Log4perl->init(\$l4pconf);
+ 
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ my $encode1 = q|    \entry{testŠ}{book}{}
+       \name{author}{1}{}{%
+diff --git a/t/endnotexml.t b/t/endnotexml.t
+index 7dc871f..dc171f0 100755
+--- a/t/endnotexml.t
++++ b/t/endnotexml.t
+@@ -34,8 +34,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # THERE IS A CONFIG FILE BEING READ TO TEST USER MAPS TOO!
+ 
+diff --git a/t/extratitle.t b/t/extratitle.t
+index 425b458..aa7724b 100755
+--- a/t/extratitle.t
++++ b/t/extratitle.t
+@@ -35,8 +35,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+diff --git a/t/extratitleyear.t b/t/extratitleyear.t
+index df40e14..7c1e311 100755
+--- a/t/extratitleyear.t
++++ b/t/extratitleyear.t
+@@ -35,8 +35,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Now generate the information
+ $biber->prepare;
+diff --git a/t/extrayear.t b/t/extrayear.t
+index 2da61c6..51d1389 100755
+--- a/t/extrayear.t
++++ b/t/extrayear.t
+@@ -35,8 +35,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+diff --git a/t/labelalpha.t b/t/labelalpha.t
+index 3dcf427..8a25c36 100755
+--- a/t/labelalpha.t
++++ b/t/labelalpha.t
+@@ -37,8 +37,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxalphanames', 1);
+diff --git a/t/labelname.t b/t/labelname.t
+index a1362b1..ae731df 100755
+--- a/t/labelname.t
++++ b/t/labelname.t
+@@ -27,8 +27,8 @@ my $l4pconf = qq|
+ |;
+ Log::Log4perl->init(\$l4pconf);
+ 
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ $biber->parse_ctrlfile("general1.bcf");
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+diff --git a/t/names.t b/t/names.t
+index 776ebf0..f14e48b 100755
+--- a/t/names.t
++++ b/t/names.t
+@@ -38,8 +38,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('namesep', 'und'); # Testing custom name splitting string
+ Biber::Config->setoption('others_string', 'andere'); # Testing custom implied "et al"
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setblxoption('mincitenames', 3);
+ 
+ # Now generate the information
+diff --git a/t/options.t b/t/options.t
+index ae19a92..0d845ce 100755
+--- a/t/options.t
++++ b/t/options.t
+@@ -34,8 +34,9 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++
+ # Testing customg xsv format sep
+ Biber::Config->setoption('xsvsep', '\s*\|\s*');
+ 
+diff --git a/t/related-entries.t b/t/related-entries.t
+index 273aa0b..bad2f1c 100755
+--- a/t/related-entries.t
++++ b/t/related-entries.t
+@@ -34,8 +34,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Now generate the information
+ $biber->prepare;
+diff --git a/t/remote-files.t b/t/remote-files.t
+index 76bc4ff..4919522 100755
+--- a/t/remote-files.t
++++ b/t/remote-files.t
+@@ -41,8 +41,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setoption('quiet', 1);
+ Biber::Config->setoption('nodieonerror', 1); # because the remote bibs might be messy
+ 
+diff --git a/t/ris.t b/t/ris.t
+index f558891..97170d9 100755
+--- a/t/ris.t
++++ b/t/ris.t
+@@ -34,8 +34,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # THERE IS A CONFIG FILE BEING READ TO TEST USER MAPS TOO!
+ 
+diff --git a/t/sections-complex.t b/t/sections-complex.t
+index 899b876..4d07f51 100755
+--- a/t/sections-complex.t
++++ b/t/sections-complex.t
+@@ -35,8 +35,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+diff --git a/t/sections.t b/t/sections.t
+index 4ed5a90..51d3ff8 100755
+--- a/t/sections.t
++++ b/t/sections.t
+@@ -36,7 +36,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ Biber::Config->setoption('output_safechars', 1);
+ 
+diff --git a/t/set-dynamic.t b/t/set-dynamic.t
+index d306f58..9ca03c6 100755
+--- a/t/set-dynamic.t
++++ b/t/set-dynamic.t
+@@ -34,8 +34,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ 
+ # Now generate the information
+ $biber->prepare;
+diff --git a/t/set-legacy.t b/t/set-legacy.t
+index 0fe1b22..70fedaa 100755
+--- a/t/set-legacy.t
++++ b/t/set-legacy.t
+@@ -34,7 +34,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ 
+ # Now generate the information
+diff --git a/t/set-static.t b/t/set-static.t
+index e9a3224..f292b05 100755
+--- a/t/set-static.t
++++ b/t/set-static.t
+@@ -34,7 +34,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ 
+ # Now generate the information
+diff --git a/t/skips.t b/t/skips.t
+index 23ff3c7..8c4cf3e 100755
+--- a/t/skips.t
++++ b/t/skips.t
+@@ -34,7 +34,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+ 
+ # Now generate the information
+diff --git a/t/sort-case.t b/t/sort-case.t
+index d8269b6..4eace90 100755
+--- a/t/sort-case.t
++++ b/t/sort-case.t
+@@ -33,7 +33,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ Biber::Config->setoption('sortcase', 1);
+ Biber::Config->setoption('sortupper', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ $S =  [
+                                                 [
+diff --git a/t/sort-complex.t b/t/sort-complex.t
+index b8d2e12..3bd580c 100755
+--- a/t/sort-complex.t
++++ b/t/sort-complex.t
+@@ -34,8 +34,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ # relying on here for tests
+ 
+ # Biber options
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ # Want to ignore SHORTHAND* fields for the first few tests
+ Biber::Config->setoption('sourcemap', [
+   {
+diff --git a/t/sort-order.t b/t/sort-order.t
+index 2590d32..27c5bf5 100755
+--- a/t/sort-order.t
++++ b/t/sort-order.t
+@@ -31,8 +31,8 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Options - we could set these in the control file but it's nice to see what we're
+ # relying on here for tests
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
+ Biber::Config->setblxoption('labelyear', undef);
+ Biber::Config->setblxoption('labelalpha', 0);
+ 
+@@ -498,7 +498,7 @@ $main->set_sortscheme($S);
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Have to set locale to something which understand lexical/case differences for this test
+ # otherwise testing on Windows doesn't work ...
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ $biber->prepare;
+ $section = $biber->sections->get_section(0);
+ is_deeply([$main->get_keys], ['L1B','L1','L1A','L2','L3','L4','L5','L7','L8','L9','L6'], 'location - sortcase=1');
+diff --git a/t/sort-uc.t b/t/sort-uc.t
+index ceb722b..33680ae 100755
+--- a/t/sort-uc.t
++++ b/t/sort-uc.t
+@@ -31,7 +31,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Options - we could set these in the control file but it's nice to see what we're
+ # relying on here for tests
+-Biber::Config->setoption('sortlocale', 'sv_SE');
++Biber::Config->setoption('sortlocale', 'sv_SE.UTF-8');
+ 
+ # U::C Swedish tailoring
+ $biber->prepare;
+diff --git a/t/sorting.t b/t/sorting.t
+index c7ed9d5..3d878cf 100755
+--- a/t/sorting.t
++++ b/t/sorting.t
+@@ -36,7 +36,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ my $yearoff1    = 'mm,,Knuth!Donald E,Computers Typesetting,1984,0000';
+ my $yearoff2    = 'mm,,Knuth!Donald E,Computers Typesetting,198,0000';
+diff --git a/t/tool-bltxml.t b/t/tool-bltxml.t
+index 7bd62b9..9134f98 100644
+--- a/t/tool-bltxml.t
++++ b/t/tool-bltxml.t
+@@ -44,7 +44,7 @@ $out->set_output_target_file(\$outvar);
+ Biber::Config->setoption('tool', 1);
+ Biber::Config->setoption('output_resolve', 1);
+ Biber::Config->setoption('output_format', 'biblatexml');
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # THERE IS A CONFIG FILE BEING READ!
+ 
+diff --git a/t/tool.t b/t/tool.t
+index 8a4283b..22325d0 100755
+--- a/t/tool.t
++++ b/t/tool.t
+@@ -38,7 +38,7 @@ $biber->set_output_obj(Biber::Output::bibtex->new());
+ Biber::Config->setoption('tool', 1);
+ Biber::Config->setoption('output_resolve', 1);
+ Biber::Config->setoption('output_format', 'bibtex');
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # THERE IS A CONFIG FILE BEING READ!
+ 
+diff --git a/t/uniqueness.t b/t/uniqueness.t
+index 23eaf5b..b990e3b 100755
+--- a/t/uniqueness.t
++++ b/t/uniqueness.t
+@@ -36,7 +36,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+@@ -84,7 +84,7 @@ $biber->parse_ctrlfile('uniqueness1.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+@@ -111,7 +111,7 @@ $biber->parse_ctrlfile('uniqueness2.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 5);
+@@ -138,7 +138,7 @@ $biber->parse_ctrlfile('uniqueness1.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 2);
+ Biber::Config->setblxoption('mincitenames', 1);
+@@ -157,7 +157,7 @@ $biber->parse_ctrlfile('uniqueness2.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 1);
+ Biber::Config->setblxoption('uniquelist', 1);
+@@ -218,7 +218,7 @@ $biber->parse_ctrlfile('uniqueness1.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+ Biber::Config->setblxoption('mincitenames', 1);
+@@ -247,7 +247,7 @@ $biber->parse_ctrlfile('uniqueness4.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 3);
+ Biber::Config->setblxoption('mincitenames', 3);
+@@ -317,7 +317,7 @@ $biber->parse_ctrlfile('uniqueness4.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 3);
+ Biber::Config->setblxoption('mincitenames', 1);
+@@ -357,7 +357,7 @@ $biber->parse_ctrlfile('uniqueness4.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 2);
+ Biber::Config->setblxoption('mincitenames', 1);
+@@ -393,7 +393,7 @@ $biber->parse_ctrlfile('uniqueness5.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 1);
+ Biber::Config->setblxoption('mincitenames', 1);
+@@ -422,7 +422,7 @@ $biber->parse_ctrlfile('uniqueness5.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('maxcitenames', 3);
+ Biber::Config->setblxoption('mincitenames', 2);
+@@ -451,7 +451,7 @@ $biber->parse_ctrlfile('uniqueness3.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 1);
+ Biber::Config->setblxoption('uniquelist', 0);
+@@ -480,7 +480,7 @@ $biber->parse_ctrlfile('uniqueness3.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 2);
+ Biber::Config->setblxoption('uniquelist', 1);
+@@ -509,7 +509,7 @@ $biber->parse_ctrlfile('uniqueness3.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 0);
+ Biber::Config->setblxoption('uniquelist', 0);
+@@ -538,7 +538,7 @@ $biber->parse_ctrlfile('uniqueness2.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 3);
+ Biber::Config->setblxoption('uniquelist', 1);
+@@ -565,7 +565,7 @@ $biber->parse_ctrlfile('uniqueness2.bcf');
+ $biber->set_output_obj(Biber::Output::bbl->new());
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ # Biblatex options
+ Biber::Config->setblxoption('uniquename', 4);
+ Biber::Config->setblxoption('uniquelist', 1);
+diff --git a/t/xdata.t b/t/xdata.t
+index 2110639..49d0005 100644
+--- a/t/xdata.t
++++ b/t/xdata.t
+@@ -44,7 +44,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ Biber::Config->setoption('nodieonerror', 1); # because there is a cyclic xdata check
+ 
+ # Now generate the information
+diff --git a/t/zoterordfxml.t b/t/zoterordfxml.t
+index 09b5fa1..33e058e 100755
+--- a/t/zoterordfxml.t
++++ b/t/zoterordfxml.t
+@@ -37,7 +37,7 @@ $biber->set_output_obj(Biber::Output::bbl->new());
+ 
+ # Biber options
+ Biber::Config->setoption('fastsort', 1);
+-Biber::Config->setoption('sortlocale', 'C');
++Biber::Config->setoption('sortlocale', 'en_GB.UTF-8');
+ 
+ # Now generate the information
+ $biber->prepare;
