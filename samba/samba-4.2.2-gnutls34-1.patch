@@ -3,7 +3,7 @@ Date:                    2015-04-24
 Initial Package Version: 4.2.1
 Upstream Status:         Unknown
 Origin:                  Archlinux
-Description:             Fixes building with gnutls-3.4.0.
+Description:             Fixes building with gnutls-3.4.0. 
 
 --- a/source4/lib/tls/tls.c	2014-10-01 11:16:21.000000000 +0200
 +++ b/source4/lib/tls/tls.c	2015-04-16 20:39:57.678772224 +0200
