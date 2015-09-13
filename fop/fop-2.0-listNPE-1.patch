@@ -1,0 +1,191 @@
+Submitted By: Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date: 2015-09-13
+Origin: https://issues.apache.org/jira/browse/FOP-2461
+Initial package Version: 2.0
+Upstream Status: Applied
+Description: Prevent a NullPointerException when "padding-after" is used in
+             a "list-block" (most notably, that occurs often when rendering
+             LFS to PDF).
+diff -Naur fop-2.0.old/src/java/org/apache/fop/layoutmgr/AbstractBreaker.java fop-2.0.new/src/java/org/apache/fop/layoutmgr/AbstractBreaker.java
+--- fop-2.0.old/src/java/org/apache/fop/layoutmgr/AbstractBreaker.java	2015-05-26 10:03:48.000000000 +0200
++++ fop-2.0.new/src/java/org/apache/fop/layoutmgr/AbstractBreaker.java	2015-09-13 09:22:33.862386032 +0200
+@@ -748,6 +748,9 @@
+                 positionIndex++;
+                 KnuthElement element = iter.next();
+                 position = element.getPosition();
++                if (position == Position.EMPTY_POS) {
++                    position = null;
++                }
+                 if (element.isBox()) {
+                     boxFound = true;
+                     firstElements.add(element);
+@@ -773,7 +776,7 @@
+             do {
+                 KnuthElement nextElement = iter.next();
+                 position = nextElement.getPosition();
+-            } while (position == null
++            } while (position == null || position == Position.EMPTY_POS
+                     || position instanceof SpaceResolver.SpaceHandlingPosition
+                     || position instanceof SpaceResolver.SpaceHandlingBreakPosition
+                         && position.getPosition().getIndex() == -1);
+diff -Naur fop-2.0.old/src/java/org/apache/fop/layoutmgr/inline/TextLayoutManager.java fop-2.0.new/src/java/org/apache/fop/layoutmgr/inline/TextLayoutManager.java
+--- fop-2.0.old/src/java/org/apache/fop/layoutmgr/inline/TextLayoutManager.java	2015-05-26 10:03:48.000000000 +0200
++++ fop-2.0.new/src/java/org/apache/fop/layoutmgr/inline/TextLayoutManager.java	2015-09-13 09:22:33.866385960 +0200
+@@ -210,9 +210,10 @@
+         GlyphMapping lastMapping = null;
+         while (posIter.hasNext()) {
+             Position nextPos = posIter.next();
+-            assert (nextPos instanceof LeafPosition);
+-            final LeafPosition tbpNext = (LeafPosition) nextPos;
+-            if (tbpNext == null) {
++            final LeafPosition tbpNext;
++            if (nextPos instanceof LeafPosition) {
++                tbpNext = (LeafPosition)nextPos;
++            } else {
+                 continue; //Ignore elements without Positions
+             }
+             if (tbpNext.getLeafPos() != -1) {
+diff -Naur fop-2.0.old/src/java/org/apache/fop/layoutmgr/list/ListItemLayoutManager.java fop-2.0.new/src/java/org/apache/fop/layoutmgr/list/ListItemLayoutManager.java
+--- fop-2.0.old/src/java/org/apache/fop/layoutmgr/list/ListItemLayoutManager.java	2015-05-26 10:03:48.000000000 +0200
++++ fop-2.0.new/src/java/org/apache/fop/layoutmgr/list/ListItemLayoutManager.java	2015-09-13 09:21:18.015757311 +0200
+@@ -616,7 +616,7 @@
+                 }
+                 lastPos = pos;
+             }
+-            if (pos instanceof NonLeafPosition && pos.getPosition() != null) {
++            if (pos instanceof NonLeafPosition && !isSubPositionEmpty(pos.getPosition())) {
+                 // pos contains a ListItemPosition created by this ListBlockLM
+                 positionList.add(pos.getPosition());
+             }
+@@ -697,6 +697,10 @@
+         checkEndOfLayout(lastPos);
+     }
+ 
++    private boolean isSubPositionEmpty(Position sub) {
++        return sub == Position.EMPTY_POS;
++    }
++
+     /**
+      * Return an Area which can contain the passed childArea. The childArea
+      * may not yet have any content, but it has essential traits set.
+diff -Naur fop-2.0.old/src/java/org/apache/fop/layoutmgr/ListElement.java fop-2.0.new/src/java/org/apache/fop/layoutmgr/ListElement.java
+--- fop-2.0.old/src/java/org/apache/fop/layoutmgr/ListElement.java	2015-05-26 10:03:48.000000000 +0200
++++ fop-2.0.new/src/java/org/apache/fop/layoutmgr/ListElement.java	2015-09-13 09:22:33.866385960 +0200
+@@ -34,7 +34,11 @@
+      * @param position the Position instance needed by the addAreas stage of the LMs.
+      */
+     public ListElement(Position position) {
+-        this.position = position;
++        if (position != null) {
++            this.position = position;
++        } else {
++            this.position = Position.EMPTY_POS;
++        }
+     }
+ 
+     /**
+@@ -49,7 +53,11 @@
+      * @param position the Position instance
+      */
+     public void setPosition(Position position) {
+-        this.position = position;
++        if (position != null) {
++            this.position = position;
++        }  else {
++            this.position = Position.EMPTY_POS;
++        }
+     }
+ 
+     /**
+diff -Naur fop-2.0.old/src/java/org/apache/fop/layoutmgr/Position.java fop-2.0.new/src/java/org/apache/fop/layoutmgr/Position.java
+--- fop-2.0.old/src/java/org/apache/fop/layoutmgr/Position.java	2015-05-26 10:03:48.000000000 +0200
++++ fop-2.0.new/src/java/org/apache/fop/layoutmgr/Position.java	2015-09-13 09:22:33.866385960 +0200
+@@ -24,6 +24,7 @@
+ 
+     private LayoutManager layoutManager;
+     private int index = -1;
++    public static final Position EMPTY_POS = new EmptyPosition();
+ 
+     /**
+      * Construct a position.
+@@ -127,5 +128,11 @@
+         sb.append(")");
+         return sb.toString();
+     }
++
++    public static final class EmptyPosition extends Position {
++        public EmptyPosition() {
++            super(null);
++        }
++    }
+ }
+ 
+diff -Naur fop-2.0.old/test/layoutengine/standard-testcases/List-item-block-padding-after.xml fop-2.0.new/test/layoutengine/standard-testcases/List-item-block-padding-after.xml
+--- fop-2.0.old/test/layoutengine/standard-testcases/List-item-block-padding-after.xml	1970-01-01 01:00:00.000000000 +0100
++++ fop-2.0.new/test/layoutengine/standard-testcases/List-item-block-padding-after.xml	2015-09-13 09:22:33.866385960 +0200
+@@ -0,0 +1,65 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++  Licensed to the Apache Software Foundation (ASF) under one or more
++  contributor license agreements.  See the NOTICE file distributed with
++  this work for additional information regarding copyright ownership.
++  The ASF licenses this file to You under the Apache License, Version 2.0
++  (the "License"); you may not use this file except in compliance with
++  the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++  Unless required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  See the License for the specific language governing permissions and
++  limitations under the License.
++-->
++<!-- $Id$ -->
++<testcase>
++  <info>
++    <p>
++      This test checks that padding-after property in list block.
++    </p>
++  </info>
++  <fo>
++<fo:root xmlns:fo="http://www.w3.org/1999/XSL/Format">
++    <fo:layout-master-set>
++        <fo:simple-page-master margin="20mm" master-name="A4" page-height="297mm" page-width="210mm">
++            <fo:region-body/>
++        </fo:simple-page-master>
++    </fo:layout-master-set>
++    <fo:page-sequence master-reference="A4">
++        <fo:flow flow-name="xsl-region-body">
++			<fo:table table-layout="fixed" width="100%">
++				<fo:table-column column-width="proportional-column-width(1)"/>
++				<fo:table-body>
++					<fo:table-row>
++						<fo:table-cell>
++							<fo:block>
++								<fo:list-block provisional-distance-between-starts="5mm">
++									<fo:list-item>
++										<fo:list-item-label end-indent="label-end()">
++											<fo:block padding-after="1mm" padding-before="1.8mm">*</fo:block>
++										</fo:list-item-label>
++										<fo:list-item-body start-indent="body-start()">
++											<fo:block padding-after="1mm" padding-before="1.8mm"> test </fo:block>
++										</fo:list-item-body>
++									</fo:list-item>
++								</fo:list-block>
++							</fo:block>
++						</fo:table-cell>
++					</fo:table-row>
++				</fo:table-body>
++			</fo:table>
++        </fo:flow>
++    </fo:page-sequence>
++</fo:root>
++ </fo>
++  <checks>
++      <eval expected="2834" xpath="//flow/block/block/block/block/block/block[1]/block/@padding-after"/>
++      <eval expected="5102" xpath="//flow/block/block/block/block/block/block[1]/block/@padding-before"/>
++      <eval expected="2834" xpath="//flow/block/block/block/block/block/block[1]/block/@padding-after"/>
++      <eval expected="5102" xpath="//flow/block/block/block/block/block/block[1]/block/@padding-before"/>
++  </checks>
++</testcase>
