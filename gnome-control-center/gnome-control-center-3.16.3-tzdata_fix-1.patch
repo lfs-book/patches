@@ -1,0 +1,38 @@
+Submitted by:                       Douglas R. Reno <renodr2002 at gmail dot com>
+Date:                               2015-09-14
+Initial Package Version:            3.16.3
+Upstream Status:                    Fixed upstream
+Origin:                             Upstream Bugzilla
+Description:                        Fixes compilation with tzdata-2015f and higher.
+
+=================================================================================================
+
+diff --git a/panels/datetime/data/timezone_8.5.png b/panels/datetime/data/timezone_8.5.png
+new file mode 120000
+index 0000000..e4d1020
+--- /dev/null
++++ b/panels/datetime/data/timezone_8.5.png
+@@ -0,0 +1 @@
++timezone_9.png
+\ No newline at end of file
+diff --git a/panels/datetime/data/timezone_8.5_dim.png b/panels/datetime/data/timezone_8.5_dim.png
+new file mode 120000
+index 0000000..5930745
+--- /dev/null
++++ b/panels/datetime/data/timezone_8.5_dim.png
+@@ -0,0 +1 @@
++timezone_9_dim.png
+\ No newline at end of file
+diff --git a/panels/datetime/datetime.gresource.xml b/panels/datetime/datetime.gresource.xml
+index 3282dcd..ccbf955 100644
+--- a/panels/datetime/datetime.gresource.xml
++++ b/panels/datetime/datetime.gresource.xml
+@@ -81,6 +81,8 @@
+     <file alias="timezone_-8_dim.png">data/timezone_-8_dim.png</file>
+     <file alias="timezone_8.png">data/timezone_8.png</file>
+     <file alias="timezone_8_dim.png">data/timezone_8_dim.png</file>
++    <file alias="timezone_8.5.png">data/timezone_8.5.png</file>
++    <file alias="timezone_8.5_dim.png">data/timezone_8.5_dim.png</file>
+     <file alias="timezone_8.75.png">data/timezone_8.75.png</file>
+     <file alias="timezone_8.75_dim.png">data/timezone_8.75_dim.png</file>
+     <file alias="timezone_-9.png">data/timezone_-9.png</file>
