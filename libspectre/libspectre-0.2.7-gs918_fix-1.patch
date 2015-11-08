@@ -1,0 +1,65 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2015-11-08
+Initial Package Version: 0.2.7
+Upstream Status: Unknown.
+Origin: Gentoo
+Description: Fixes breakage from ghostscript-9.18 (the gentoo
+patch creates a separate patch file, and changes their ebuild,
+so I edited it to actually apply the changes.  If this package
+was in BLFS, we could do this with a sed.
+
+From 8d34151aea08aa04cca35e1f5da59445af0440d0 Mon Sep 17 00:00:00 2001
+From: Lars Wendler <polynomial-c@gentoo.org>
+Date: Fri, 23 Oct 2015 15:25:42 +0200
+Subject: app-text/libspectre: >=app-text/ghostscript-gpl-9.18 compile fix
+
+(bug #563540).
+
+Package-Manager: portage-2.2.23
+Signed-off-by: Lars Wendler <polynomial-c@gentoo.org>
+---
+ .../libspectre/files/libspectre-0.2.7-gs918.patch  | 42 ++++++++++++++++++++++
+ app-text/libspectre/libspectre-0.2.7.ebuild        |  2 ++
+ 2 files changed, 44 insertions(+)
+ create mode 100644 app-text/libspectre/files/libspectre-0.2.7-gs918.patch
+
+
+--- libspectre-0.2.7/libspectre/spectre-gs.c
++++ libspectre-0.2.7/libspectre/spectre-gs.c
+@@ -43,12 +43,12 @@
+ 	
+ 	if (code <= -100) {
+ 		switch (code) {
+-			case e_Fatal:
++			case gs_error_Fatal:
+ 				fprintf (stderr, "fatal internal error %d", code);
+ 				return TRUE;
+ 				break;
+ 
+-			case e_ExecStackUnderflow:
++			case gs_error_ExecStackUnderflow:
+ 				fprintf (stderr, "stack overflow %d", code);
+ 				return TRUE;
+ 				break;
+@@ -109,9 +109,9 @@
+ 		set = _spectre_strdup_printf ("%d %d translate\n", -x, -y);
+ 		error = gsapi_run_string_continue (ghostscript_instance, set, strlen (set),
+ 						   0, &exit_code);
+-		error = error == e_NeedInput ? 0 : error;
++		error = error == gs_error_NeedInput ? 0 : error;
+ 		free (set);
+-		if (error != e_NeedInput && critic_error_code (error)) {
++		if (error != gs_error_NeedInput && critic_error_code (error)) {
+ 			fclose (fd);
+ 			return FALSE;
+ 		}
+@@ -126,7 +126,7 @@
+ 		read = fread (buf, sizeof (char), to_read, fd);
+ 		error = gsapi_run_string_continue (ghostscript_instance,
+ 						   buf, read, 0, &exit_code);
+-		error = error == e_NeedInput ? 0 : error;
++		error = error == gs_error_NeedInput ? 0 : error;
+ 		left -= read;
+ 	}
+ 	
+
