@@ -1,0 +1,32 @@
+Submitted By:            DJ Lucas
+Date:                    2016-01-04
+Initial Package Version: 228
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fix test suite failures due to newer version of perl
+                         and libtool.
+
+diff -Naurp autoconf-2.69-orig/bin/autoscan.in autoconf-2.69/bin/autoscan.in
+--- autoconf-2.69-orig/bin/autoscan.in	2012-04-25 02:37:26.000000000 +0000
++++ autoconf-2.69/bin/autoscan.in	2016-01-05 04:01:30.003350326 +0000
+@@ -358,7 +358,7 @@ sub scan_sh_file ($)
+     {
+       # Strip out comments and variable references.
+       s/#.*//;
+-      s/\${[^\}]*}//g;
++      s/\$\{[^\}]*}//g;
+       s/@[^@]*@//g;
+ 
+       # Tokens in the code.
+diff -Naurp autoconf-2.69-orig/tests/foreign.at autoconf-2.69/tests/foreign.at
+--- autoconf-2.69-orig/tests/foreign.at	2012-03-07 17:35:26.000000000 +0000
++++ autoconf-2.69/tests/foreign.at	2016-01-05 04:01:30.003350326 +0000
+@@ -57,7 +57,7 @@ AT_CHECK([./config.guess || exit 77], []
+ # Make sure at-path contains something valid, and let the test suite
+ # display it when verbose.  And fail, skipping would too easily hide
+ # problems.
+-AT_CHECK([sed -n ["s,^.*\`\\(/[^']*\\)'.*,\\1,p"] stdout], [0], [stdout])
++AT_CHECK([sed -n ["s,^[^']*[\`']\\(/[^']*\\)'.*,\\1,p"] stdout], [0], [stdout])
+ AT_CHECK([test -f "`sed -n 1p stdout`"])
+ 
+ # Older libtoolize installed everything but install-sh...
