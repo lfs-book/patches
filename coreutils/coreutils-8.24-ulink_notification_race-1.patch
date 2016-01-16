@@ -1,0 +1,92 @@
+Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
+Date:                    2016-01-16
+Initial Package Version: 8.24
+Upstream Status:         Applied
+Origin:                  https://lists.gnu.org/archive/html/bug-coreutils/2015-10/txtlhdkw0E4Uv.txt
+Description:             Fixes race condition. See thread begining at
+                         https://lists.gnu.org/archive/html/bug-coreutils/2015-09/msg00013.html
+                         for a detailed eplanation
+
+>From 07ca8a227e04f9fb7bb0b21968056a562b8c2f83 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?P=C3=A1draig=20Brady?= <address@hidden>
+Date: Thu, 2 Jul 2015 08:41:25 +0100
+Subject: [PATCH] tail: handle kernel dentry unlink race
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Avoid the intermittent loss of "... has become inaccessible" messages.
+That would cause tests/tail-2/assert.sh to fail sometimes,
+mainly on uniprocessor systems.
+
+* src/tail.c (tail_forever_inotify): Also monitor IN_DELETE
+events on the directory, to avoid a dentry unlink()..open() race,
+where the open() on the deleted file was seen to succeed after an,
+unlink() and a subsequent IN_ATTRIB, was sent to tail.  Note an
+IN_ATTRIB is sent on the monitored file to indicate the change in
+number of links, and we can't just use a decrease in the number of
+links to determine the file being unlinked, due to the possibility
+of the file having multiple links.
+
+Reported by Assaf Gordon and Ludovic CourtÃ¨s.
+Fixes http://bugs.gnu.org/21460
+---
+ src/tail.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
+
+diff --git a/src/tail.c b/src/tail.c
+index f916d74..7a34b0b 100644
+--- a/src/tail.c
++++ b/src/tail.c
+@@ -1429,8 +1429,8 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
+                /* It's fine to add the same directory more than once.
+                   In that case the same watch descriptor is returned.  */
+               f[i].parent_wd = inotify_add_watch (wd, dirlen ? f[i].name : ".",
+-                                                  (IN_CREATE | IN_MOVED_TO
+-                                                   | IN_ATTRIB));
++                                                  (IN_CREATE | IN_DELETE
++                                                   | IN_MOVED_TO | IN_ATTRIB));
+ 
+               f[i].name[dirlen] = prev;
+ 
+@@ -1619,9 +1619,16 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
+ 
+           fspec = &(f[j]);
+ 
+-          /* Adding the same inode again will look up any existing wd.  */
+-          int new_wd = inotify_add_watch (wd, f[j].name, inotify_wd_mask);
+-          if (new_wd < 0)
++          int new_wd = -1;
++          bool deleting = !! (ev->mask & IN_DELETE);
++
++          if (! deleting)
++            {
++              /* Adding the same inode again will look up any existing wd.  */
++              new_wd = inotify_add_watch (wd, f[j].name, inotify_wd_mask);
++            }
++
++          if (! deleting && new_wd < 0)
+             {
+               if (errno == ENOSPC || errno == ENOMEM)
+                 {
+@@ -1641,7 +1648,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
+           /* This will be false if only attributes of file change.  */
+           bool new_watch = fspec->wd < 0 || new_wd != fspec->wd;
+ 
+-          if (new_watch)
++          if (! deleting && new_watch)
+             {
+               if (0 <= fspec->wd)
+                 {
+@@ -1683,7 +1690,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
+       if (! fspec)
+         continue;
+ 
+-      if (ev->mask & (IN_ATTRIB | IN_DELETE_SELF | IN_MOVE_SELF))
++      if (ev->mask & (IN_ATTRIB | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF))
+         {
+           /* Note for IN_MOVE_SELF (the file we're watching has
+              been clobbered via a rename) we leave the watch
+-- 
+2.5.0
+
