@@ -5,8 +5,9 @@ Upstream Status:         BLFS Specific
 Origin:                  Armin K. <krejzi at email dot com> and Debian 
 Comment:                 Rediffed by Fernando de Oliveira <famobr at yahoo dot
                          com dot br> for version 2.4.44 - 2016.02.06
-                         Rediffed by Pierre Labastie <pierre dot labastie at neuf
-                         dot fr> to add mdb backend and slapd.ldif - 2016.02.16
+                         Rediffed by Pierre Labastie <pierre dot labastie at
+                         neuf dot fr> to add mdb backend and slapd.ldif. See
+                         ticket #7394 - 2016.02.24
 Description:             Consolidate earlier patches to:
  1. Update various installation options, such as ldap database path, 
     configuration file options, slapd install location, etc.
