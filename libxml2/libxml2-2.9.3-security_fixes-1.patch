@@ -1,0 +1,101 @@
+Submitted By: Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date: 2016-05-14
+Initial Package Version: 2.9.3
+Upstream Status: Applied
+Origin: Upstream
+Description: Fixes for CVE-2016-3627 and CVE-2016-3705
+
+diff -Naur libxml2-2.9.3.orig/parser.c libxml2-2.9.3/parser.c
+--- libxml2-2.9.3.orig/parser.c	2015-11-20 01:56:41.000000000 -0600
++++ libxml2-2.9.3/parser.c	2016-05-14 18:13:13.031997168 -0500
+@@ -144,8 +144,10 @@
+ 
+ 	ent->checked = 1;
+ 
++        ++ctxt->depth;
+ 	rep = xmlStringDecodeEntities(ctxt, ent->content,
+ 				  XML_SUBSTITUTE_REF, 0, 0, 0);
++        --ctxt->depth;
+ 
+ 	ent->checked = (ctxt->nbentities - oldnbent + 1) * 2;
+ 	if (rep != NULL) {
+@@ -3966,8 +3968,10 @@
+ 	 * an entity declaration, it is bypassed and left as is.
+ 	 * so XML_SUBSTITUTE_REF is not set here.
+ 	 */
++        ++ctxt->depth;
+ 	ret = xmlStringDecodeEntities(ctxt, buf, XML_SUBSTITUTE_PEREF,
+ 				      0, 0, 0);
++        --ctxt->depth;
+ 	if (orig != NULL)
+ 	    *orig = buf;
+ 	else
+@@ -4092,9 +4096,11 @@
+ 		} else if ((ent != NULL) &&
+ 		           (ctxt->replaceEntities != 0)) {
+ 		    if (ent->etype != XML_INTERNAL_PREDEFINED_ENTITY) {
++			++ctxt->depth;
+ 			rep = xmlStringDecodeEntities(ctxt, ent->content,
+ 						      XML_SUBSTITUTE_REF,
+ 						      0, 0, 0);
++			--ctxt->depth;
+ 			if (rep != NULL) {
+ 			    current = rep;
+ 			    while (*current != 0) { /* non input consuming */
+@@ -4130,8 +4136,10 @@
+ 			(ent->content != NULL) && (ent->checked == 0)) {
+ 			unsigned long oldnbent = ctxt->nbentities;
+ 
++			++ctxt->depth;
+ 			rep = xmlStringDecodeEntities(ctxt, ent->content,
+ 						  XML_SUBSTITUTE_REF, 0, 0, 0);
++			--ctxt->depth;
+ 
+ 			ent->checked = (ctxt->nbentities - oldnbent + 1) * 2;
+ 			if (rep != NULL) {
+diff -Naur libxml2-2.9.3.orig/tree.c libxml2-2.9.3/tree.c
+--- libxml2-2.9.3.orig/tree.c	2015-11-03 01:28:09.000000000 -0600
++++ libxml2-2.9.3/tree.c	2016-05-14 18:13:22.849436714 -0500
+@@ -1464,6 +1464,8 @@
+     return(ret);
+ }
+ 
++static xmlNodePtr xmlStringGetNodeListInternal(const xmlDoc *doc, const xmlChar *value, size_t recursionLevel);
++
+ /**
+  * xmlStringGetNodeList:
+  * @doc:  the document
+@@ -1475,6 +1477,12 @@
+  */
+ xmlNodePtr
+ xmlStringGetNodeList(const xmlDoc *doc, const xmlChar *value) {
++   return xmlStringGetNodeListInternal(doc, value, 0);
++ }
++
++xmlNodePtr
++xmlStringGetNodeListInternal(const xmlDoc *doc, const xmlChar *value, size_t recursionLevel) {
++
+     xmlNodePtr ret = NULL, last = NULL;
+     xmlNodePtr node;
+     xmlChar *val;
+@@ -1483,6 +1491,8 @@
+     xmlEntityPtr ent;
+     xmlBufPtr buf;
+ 
++    if (recursionLevel > 1024) return(NULL);
++
+     if (value == NULL) return(NULL);
+ 
+     buf = xmlBufCreateSize(0);
+@@ -1593,8 +1603,9 @@
+ 			else if ((ent != NULL) && (ent->children == NULL)) {
+ 			    xmlNodePtr temp;
+ 
+-			    ent->children = xmlStringGetNodeList(doc,
+-				    (const xmlChar*)node->content);
++			    ent->children = xmlStringGetNodeListInternal(doc,
++				    (const xmlChar*)node->content,
++                                    recursionLevel+1);
+ 			    ent->owner = 1;
+ 			    temp = ent->children;
+ 			    while (temp) {
