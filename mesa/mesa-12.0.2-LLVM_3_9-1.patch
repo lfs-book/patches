@@ -1,0 +1,154 @@
+Submitted By:            Pierre Labastie <pierre dot labastie ar neuf dot fr>
+Date:                    2016-09-12
+Initial Package Version: 12.0.2
+Upstream Status:         Fixed in master
+Origin:                  https://cgit.freedesktop.org/mesa/mesa/patch/src/gallium/drivers/swr/rasterizer/jitter/builder_misc.cpp?id=f8109076696a182da8180b0ee102c5a39f73d36a
+Description:             Add support to build with LLVM 3.9
+================================================================================
+From f8109076696a182da8180b0ee102c5a39f73d36a Mon Sep 17 00:00:00 2001
+From: Tim Rowley <timothy.o.rowley@intel.com>
+Date: Tue, 14 Jun 2016 17:54:34 -0600
+Subject: swr: [rasterizer] add support for llvm-3.9
+
+v2: use signed compare, remove unneeded vmask
+
+Signed-off-by: Tim Rowley <timothy.o.rowley@intel.com>
+
+diff --git a/src/gallium/drivers/swr/rasterizer/jitter/builder_misc.cpp b/src/gallium/drivers/swr/rasterizer/jitter/builder_misc.cpp
+index 671178f..da77f60 100644
+--- a/src/gallium/drivers/swr/rasterizer/jitter/builder_misc.cpp
++++ b/src/gallium/drivers/swr/rasterizer/jitter/builder_misc.cpp
+@@ -700,20 +700,22 @@ Value *Builder::PSHUFB(Value* a, Value* b)
+ /// lower 8 values are used.
+ Value *Builder::PMOVSXBD(Value* a)
+ {
+-    Value* res;
++    // llvm-3.9 removed the pmovsxbd intrinsic
++#if HAVE_LLVM < 0x309
+     // use avx2 byte sign extend instruction if available
+     if(JM()->mArch.AVX2())
+     {
+-        res = VPMOVSXBD(a);
++        Function *pmovsxbd = Intrinsic::getDeclaration(JM()->mpCurrentModule, Intrinsic::x86_avx2_pmovsxbd);
++        return CALL(pmovsxbd, std::initializer_list<Value*>{a});
+     }
+     else
++#endif
+     {
+         // VPMOVSXBD output type
+         Type* v8x32Ty = VectorType::get(mInt32Ty, 8);
+         // Extract 8 values from 128bit lane and sign extend
+-        res = S_EXT(VSHUFFLE(a, a, C<int>({0, 1, 2, 3, 4, 5, 6, 7})), v8x32Ty);
++        return S_EXT(VSHUFFLE(a, a, C<int>({0, 1, 2, 3, 4, 5, 6, 7})), v8x32Ty);
+     }
+-    return res;
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////
+@@ -722,20 +724,22 @@ Value *Builder::PMOVSXBD(Value* a)
+ /// @param a - 128bit SIMD lane(8x16bit) of 16bit integer values.
+ Value *Builder::PMOVSXWD(Value* a)
+ {
+-    Value* res;
++    // llvm-3.9 removed the pmovsxwd intrinsic
++#if HAVE_LLVM < 0x309
+     // use avx2 word sign extend if available
+     if(JM()->mArch.AVX2())
+     {
+-        res = VPMOVSXWD(a);
++        Function *pmovsxwd = Intrinsic::getDeclaration(JM()->mpCurrentModule, Intrinsic::x86_avx2_pmovsxwd);
++        return CALL(pmovsxwd, std::initializer_list<Value*>{a});
+     }
+     else
++#endif
+     {
+         // VPMOVSXWD output type
+         Type* v8x32Ty = VectorType::get(mInt32Ty, 8);
+         // Extract 8 values from 128bit lane and sign extend
+-        res = S_EXT(VSHUFFLE(a, a, C<int>({0, 1, 2, 3, 4, 5, 6, 7})), v8x32Ty);
++        return S_EXT(VSHUFFLE(a, a, C<int>({0, 1, 2, 3, 4, 5, 6, 7})), v8x32Ty);
+     }
+-    return res;
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////
+@@ -875,9 +879,15 @@ Value *Builder::CVTPS2PH(Value* a, Value* rounding)
+ 
+ Value *Builder::PMAXSD(Value* a, Value* b)
+ {
++    // llvm-3.9 removed the pmax intrinsics
++#if HAVE_LLVM >= 0x309
++    Value* cmp = ICMP_SGT(a, b);
++    return SELECT(cmp, a, b);
++#else
+     if (JM()->mArch.AVX2())
+     {
+-        return VPMAXSD(a, b);
++        Function* pmaxsd = Intrinsic::getDeclaration(JM()->mpCurrentModule, Intrinsic::x86_avx2_pmaxs_d);
++        return CALL(pmaxsd, {a, b});
+     }
+     else
+     {
+@@ -900,13 +910,20 @@ Value *Builder::PMAXSD(Value* a, Value* b)
+ 
+         return result;
+     }
++#endif
+ }
+ 
+ Value *Builder::PMINSD(Value* a, Value* b)
+ {
++    // llvm-3.9 removed the pmin intrinsics
++#if HAVE_LLVM >= 0x309
++    Value* cmp = ICMP_SLT(a, b);
++    return SELECT(cmp, a, b);
++#else
+     if (JM()->mArch.AVX2())
+     {
+-        return VPMINSD(a, b);
++        Function* pminsd = Intrinsic::getDeclaration(JM()->mpCurrentModule, Intrinsic::x86_avx2_pmins_d);
++        return CALL(pminsd, {a, b});
+     }
+     else
+     {
+@@ -929,6 +946,7 @@ Value *Builder::PMINSD(Value* a, Value* b)
+ 
+         return result;
+     }
++#endif
+ }
+ 
+ void Builder::Gather4(const SWR_FORMAT format, Value* pSrcBase, Value* byteOffsets, 
+diff --git a/src/gallium/drivers/swr/rasterizer/jitter/scripts/gen_llvm_ir_macros.py b/src/gallium/drivers/swr/rasterizer/jitter/scripts/gen_llvm_ir_macros.py
+index 4963c5e..234889b 100644
+--- a/src/gallium/drivers/swr/rasterizer/jitter/scripts/gen_llvm_ir_macros.py
++++ b/src/gallium/drivers/swr/rasterizer/jitter/scripts/gen_llvm_ir_macros.py
+@@ -91,8 +91,6 @@ intrinsics = [
+         ["VRCPPS", "x86_avx_rcp_ps_256", ["a"]],
+         ["VMINPS", "x86_avx_min_ps_256", ["a", "b"]],
+         ["VMAXPS", "x86_avx_max_ps_256", ["a", "b"]],
+-        ["VPMINSD", "x86_avx2_pmins_d", ["a", "b"]],
+-        ["VPMAXSD", "x86_avx2_pmaxs_d", ["a", "b"]],
+         ["VROUND", "x86_avx_round_ps_256", ["a", "rounding"]],
+         ["VCMPPS", "x86_avx_cmp_ps_256", ["a", "b", "cmpop"]],
+         ["VBLENDVPS", "x86_avx_blendv_ps_256", ["a", "b", "mask"]],
+@@ -100,8 +98,6 @@ intrinsics = [
+         ["VMASKLOADD", "x86_avx2_maskload_d_256", ["src", "mask"]],
+         ["VMASKMOVPS", "x86_avx_maskload_ps_256", ["src", "mask"]],
+         ["VPSHUFB", "x86_avx2_pshuf_b", ["a", "b"]],
+-        ["VPMOVSXBD", "x86_avx2_pmovsxbd", ["a"]],  # sign extend packed 8bit components
+-        ["VPMOVSXWD", "x86_avx2_pmovsxwd", ["a"]],  # sign extend packed 16bit components
+         ["VPERMD", "x86_avx2_permd", ["idx", "a"]],
+         ["VPERMPS", "x86_avx2_permps", ["idx", "a"]],
+         ["VCVTPH2PS", "x86_vcvtph2ps_256", ["a"]],
+@@ -110,7 +106,6 @@ intrinsics = [
+         ["VPTESTC", "x86_avx_ptestc_256", ["a", "b"]],
+         ["VPTESTZ", "x86_avx_ptestz_256", ["a", "b"]],
+         ["VFMADDPS", "x86_fma_vfmadd_ps_256", ["a", "b", "c"]],
+-        ["VCVTTPS2DQ", "x86_avx_cvtt_ps2dq_256", ["a"]],
+         ["VMOVMSKPS", "x86_avx_movmsk_ps_256", ["a"]],
+         ["INTERRUPT", "x86_int", ["a"]],
+     ]
+-- 
+cgit v0.10.2
+
