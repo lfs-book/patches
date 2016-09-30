@@ -1,0 +1,57 @@
+Submitted By:            Douglas R. Reno
+Date:                    2016-09-29
+Initial Package Version: 231
+Upstream Status:         Committed
+Origin:                  Upstream git repository
+Description:             Fix a security flaw caused by allowing a zero-length
+                         notification in systemd-notify
+
+diff -Naur systemd-231.orig/src/core/manager.c systemd-231/src/core/manager.c
+--- systemd-231.orig/src/core/manager.c	2016-07-26 07:46:03.285891872 -0500
++++ systemd-231/src/core/manager.c	2016-09-29 18:51:25.351829738 -0500
+@@ -1584,13 +1584,12 @@
+         return 0;
+ }
+ 
+-static void manager_invoke_notify_message(Manager *m, Unit *u, pid_t pid, const char *buf, size_t n, FDSet *fds) {
++static void manager_invoke_notify_message(Manager *m, Unit *u, pid_t pid, const char *buf, FDSet *fds) {
+         _cleanup_strv_free_ char **tags = NULL;
+ 
+         assert(m);
+         assert(u);
+         assert(buf);
+-        assert(n > 0);
+ 
+         tags = strv_split(buf, "\n\r");
+         if (!tags) {
+@@ -1683,25 +1682,27 @@
+                 return 0;
+         }
+ 
++        /* The message should be a string. Here we make sure it's NUL-terminated,
++         * but only the part until the first NUL will be used anyway. */
+         buf[n] = 0;
+ 
+         /* Notify every unit that might be interested, but try
+          * to avoid notifying the same one multiple times. */
+         u1 = manager_get_unit_by_pid_cgroup(m, ucred->pid);
+         if (u1) {
+-                manager_invoke_notify_message(m, u1, ucred->pid, buf, n, fds);
++                manager_invoke_notify_message(m, u1, ucred->pid, buf, fds);
+                 found = true;
+         }
+ 
+         u2 = hashmap_get(m->watch_pids1, PID_TO_PTR(ucred->pid));
+         if (u2 && u2 != u1) {
+-                manager_invoke_notify_message(m, u2, ucred->pid, buf, n, fds);
++                manager_invoke_notify_message(m, u2, ucred->pid, buf, fds);
+                 found = true;
+         }
+ 
+         u3 = hashmap_get(m->watch_pids2, PID_TO_PTR(ucred->pid));
+         if (u3 && u3 != u2 && u3 != u1) {
+-                manager_invoke_notify_message(m, u3, ucred->pid, buf, n, fds);
++                manager_invoke_notify_message(m, u3, ucred->pid, buf, fds);
+                 found = true;
+         }
+ 
