@@ -1,0 +1,23 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2016-10-13
+Initial Package Version: 0.11.0
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Move a misplaced endif to its proper location
+
+--- a/providers.cpp
++++ b/providers.cpp
+@@ -885,6 +885,8 @@ MathProvider::MathProvider()
+     append(new MathItem());
+ }
+ 
++#endif
++
+ ExternalProviderItem::ExternalProviderItem()
+ {
+ }
+@@ -974,4 +976,3 @@ void ExternalProvider::readFromProcess()
+     }
+ }
+ 
+-#endif
