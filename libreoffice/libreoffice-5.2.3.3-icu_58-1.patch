@@ -1,0 +1,40 @@
+Submitted By: Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date: 2016-11-10
+Initial Package Version: 5.2.3.3
+Upstream Status: Fixed in master
+Origin: Upstream
+Description: Fix for icu_58
+The upstream patch contains a lot more, but it seems enough to comment
+out parts of the code, which use a now private function.
+
+diff -Naur libreoffice-5.2.3.3.old/i18npool/source/breakiterator/breakiterator_unicode.cxx libreoffice-5.2.3.3.new/i18npool/source/breakiterator/breakiterator_unicode.cxx
+--- libreoffice-5.2.3.3.old/i18npool/source/breakiterator/breakiterator_unicode.cxx	2016-10-28 16:50:26.000000000 +0200
++++ libreoffice-5.2.3.3.new/i18npool/source/breakiterator/breakiterator_unicode.cxx	2016-11-09 20:59:43.317886442 +0100
+@@ -63,10 +63,10 @@
+ class OOoRuleBasedBreakIterator : public RuleBasedBreakIterator
+ {
+     public:
+-    inline void publicSetBreakType(int32_t type)
++/*    inline void publicSetBreakType(int32_t type)
+         {
+             setBreakType(type);
+-        };
++        };*/
+     OOoRuleBasedBreakIterator(UDataMemory* image,
+                               UErrorCode &status)
+         : RuleBasedBreakIterator(image, status)
+@@ -142,12 +142,12 @@
+                 }
+             }
+             if (rbi) {
+-                switch (rBreakType) {
++/*                switch (rBreakType) {
+                     case LOAD_CHARACTER_BREAKITERATOR: rbi->publicSetBreakType(UBRK_CHARACTER); break;
+                     case LOAD_WORD_BREAKITERATOR: rbi->publicSetBreakType(UBRK_WORD); break;
+                     case LOAD_SENTENCE_BREAKITERATOR: rbi->publicSetBreakType(UBRK_SENTENCE); break;
+                     case LOAD_LINE_BREAKITERATOR: rbi->publicSetBreakType(UBRK_LINE); break;
+-                }
++                }*/
+                 icuBI->aBreakIterator = rbi;
+             }
+         }
