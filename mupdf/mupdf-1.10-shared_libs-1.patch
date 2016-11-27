@@ -34,7 +34,7 @@ diff -Naur a/Makefile b/Makefile
 +$(MUPDF_LIB) : $(MUPDF_OBJ) $(THIRD_LIB)
 +	$(LINK_CMD) -shared -Wl,-soname -Wl,libmupdf.so -Wl,--no-undefined
  $(THIRD_LIB) : $(THIRD_OBJ)
-+	$(LINK_CMD) -shared -Wl,-soname -Wl,libmupdf.so -Wl,--no-undefined
++	$(LINK_CMD) -shared -Wl,-soname -Wl,libmupdfthird.so -Wl,--no-undefined
  
  INSTALL_LIBS := $(MUPDF_LIB) $(THIRD_LIB)
  
