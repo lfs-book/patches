@@ -1,0 +1,1086 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2017-02-03
+Initial Package Version: 9.20
+Upstream Status: Applied
+Origin: Upstream (found at fedora)
+Description: Fixes for CVE-2016-7976..9, CVE-2016-8602, CVE-2016-9601
+
+diff -Naur a/base/gsdevice.c b/base/gsdevice.c
+--- a/base/gsdevice.c	2016-09-26 11:41:28.000000000 +0100
++++ b/base/gsdevice.c	2017-02-03 01:15:16.401217398 +0000
+@@ -614,6 +614,7 @@
+     dev->memory = mem;
+     dev->retained = !internal;
+     rc_init(dev, mem, (internal ? 0 : 1));
++    rc_increment(dev->icc_struct);
+ }
+ 
+ void
+diff -Naur a/base/gsicc_manage.c b/base/gsicc_manage.c
+--- a/base/gsicc_manage.c	2016-09-26 11:41:28.000000000 +0100
++++ b/base/gsicc_manage.c	2017-02-03 01:15:16.396214873 +0000
+@@ -1124,10 +1124,12 @@
+     }
+ 
+     /* First just try it like it is */
+-    str = sfopen(pname, "r", mem_gc);
+-    if (str != NULL) {
+-        *strp = str;
+-        return 0;
++    if (gs_check_file_permission(mem_gc, pname, namelen, "r") >= 0) {
++        str = sfopen(pname, "r", mem_gc);
++        if (str != NULL) {
++            *strp = str;
++            return 0;
++        }
+     }
+ 
+     /* If that fails, try %rom% */ /* FIXME: Not sure this is needed or correct */
+diff -Naur a/base/gslibctx.c b/base/gslibctx.c
+--- a/base/gslibctx.c	2016-09-26 11:41:28.000000000 +0100
++++ b/base/gslibctx.c	2017-02-03 01:15:16.396214873 +0000
+@@ -183,7 +183,7 @@
+         mem->gs_lib_ctx = NULL;
+         return -1;
+     }
+-    
++    pio->client_check_file_permission = NULL;
+     gp_get_realtime(pio->real_time_0);
+ 
+     /* Set scanconverter to 1 (default) */
+@@ -336,3 +336,13 @@
+         fflush(mem->gs_lib_ctx->fstderr);
+     /* else nothing to flush */
+ }
++
++int
++gs_check_file_permission (gs_memory_t *mem, const char *fname, const int len, const char *permission)
++{
++    int code = 0;
++    if (mem->gs_lib_ctx->client_check_file_permission != NULL) {
++        code = mem->gs_lib_ctx->client_check_file_permission(mem, fname, len, permission);
++    }
++    return code;
++}
+diff -Naur a/base/gslibctx.h b/base/gslibctx.h
+--- a/base/gslibctx.h	2016-09-26 11:41:28.000000000 +0100
++++ b/base/gslibctx.h	2017-02-03 01:15:16.396214873 +0000
+@@ -32,6 +32,9 @@
+ #  define gs_font_dir_DEFINED
+ typedef struct gs_font_dir_s gs_font_dir;
+ #endif
++
++typedef int (*client_check_file_permission_t) (gs_memory_t *mem, const char *fname, const int len, const char *permission);
++
+ typedef struct gs_lib_ctx_s
+ {
+     gs_memory_t *memory;  /* mem->gs_lib_ctx->memory == mem */
+@@ -61,6 +64,7 @@
+     struct gx_io_device_s **io_device_table;
+     int io_device_table_count;
+     int io_device_table_size;
++    client_check_file_permission_t client_check_file_permission;
+     /* Define the default value of AccurateScreens that affects setscreen
+        and setcolorscreen. */
+     bool screen_accurate_screens;
+@@ -132,6 +136,9 @@
+ gs_lib_ctx_get_default_device_list(const gs_memory_t *mem, char** dev_list_str,
+                         int *list_str_len);
+ 
++int
++gs_check_file_permission (gs_memory_t *mem, const char *fname, const int len, const char *permission);
++
+ #define IS_LIBCTX_STDOUT(mem, f) (f == mem->gs_lib_ctx->fstdout)
+ #define IS_LIBCTX_STDERR(mem, f) (f == mem->gs_lib_ctx->fstderr)
+ 
+diff -Naur a/jbig2dec/jbig2.c b/jbig2dec/jbig2.c
+--- a/jbig2dec/jbig2.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2.c	2017-02-03 01:15:16.408220934 +0000
+@@ -379,7 +379,7 @@
+ } Jbig2WordStreamBuf;
+ 
+ static int
+-jbig2_word_stream_buf_get_next_word(Jbig2WordStream *self, int offset, uint32_t *word)
++jbig2_word_stream_buf_get_next_word(Jbig2WordStream *self, size_t offset, uint32_t *word)
+ {
+     Jbig2WordStreamBuf *z = (Jbig2WordStreamBuf *) self;
+     const byte *data = z->data;
+@@ -390,7 +390,7 @@
+     else if (offset > z->size)
+         return -1;
+     else {
+-        int i;
++        size_t i;
+ 
+         result = 0;
+         for (i = 0; i < z->size - offset; i++)
+diff -Naur a/jbig2dec/jbig2_generic.c b/jbig2dec/jbig2_generic.c
+--- a/jbig2dec/jbig2_generic.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_generic.c	2017-02-03 01:15:16.408220934 +0000
+@@ -718,7 +718,7 @@
+     byte seg_flags;
+     int8_t gbat[8];
+     int offset;
+-    int gbat_bytes = 0;
++    uint32_t gbat_bytes = 0;
+     Jbig2GenericRegionParams params;
+     int code = 0;
+     Jbig2Image *image = NULL;
+diff -Naur a/jbig2dec/jbig2.h b/jbig2dec/jbig2.h
+--- a/jbig2dec/jbig2.h	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2.h	2017-02-03 01:15:16.408220934 +0000
+@@ -56,17 +56,19 @@
+ */
+ 
+ struct _Jbig2Image {
+-    int width, height, stride;
++    uint32_t width;
++    uint32_t height;
++    uint32_t stride;
+     uint8_t *data;
+     int refcount;
+ };
+ 
+-Jbig2Image *jbig2_image_new(Jbig2Ctx *ctx, int width, int height);
++Jbig2Image *jbig2_image_new(Jbig2Ctx *ctx, uint32_t width, uint32_t height);
+ Jbig2Image *jbig2_image_clone(Jbig2Ctx *ctx, Jbig2Image *image);
+ void jbig2_image_release(Jbig2Ctx *ctx, Jbig2Image *image);
+ void jbig2_image_free(Jbig2Ctx *ctx, Jbig2Image *image);
+ void jbig2_image_clear(Jbig2Ctx *ctx, Jbig2Image *image, int value);
+-Jbig2Image *jbig2_image_resize(Jbig2Ctx *ctx, Jbig2Image *image, int width, int height);
++Jbig2Image *jbig2_image_resize(Jbig2Ctx *ctx, Jbig2Image *image, uint32_t width, uint32_t height);
+ 
+ /* errors are returned from the library via a callback. If no callback
+    is provided (a NULL argument is passed ot jbig2_ctx_new) a default
+diff -Naur a/jbig2dec/jbig2_halftone.c b/jbig2dec/jbig2_halftone.c
+--- a/jbig2dec/jbig2_halftone.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_halftone.c	2017-02-03 01:15:16.408220934 +0000
+@@ -257,8 +257,8 @@
+ {
+     uint8_t **GSVALS = NULL;
+     size_t consumed_bytes = 0;
+-    int i, j, code, stride;
+-    int x, y;
++    uint32_t i, j, stride, x, y;
++    int code;
+     Jbig2Image **GSPLANES;
+     Jbig2GenericRegionParams rparams;
+     Jbig2WordStream *ws = NULL;
+@@ -276,9 +276,8 @@
+         if (GSPLANES[i] == NULL) {
+             jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "failed to allocate %dx%d image for GSPLANES", GSW, GSH);
+             /* free already allocated */
+-            for (j = i - 1; j >= 0; --j) {
+-                jbig2_image_release(ctx, GSPLANES[j]);
+-            }
++            for (j = i; j > 0;)
++                jbig2_image_release(ctx, GSPLANES[--j]);
+             jbig2_free(ctx->allocator, GSPLANES);
+             return NULL;
+         }
+@@ -323,9 +322,10 @@
+     }
+ 
+     /* C.5 step 2. Set j = GSBPP-2 */
+-    j = GSBPP - 2;
++    j = GSBPP - 1;
+     /* C.5 step 3. decode loop */
+-    while (j >= 0) {
++    while (j > 0) {
++        j--;
+         /*  C.5 step 3. (a) */
+         if (GSMMR) {
+             code = jbig2_decode_halftone_mmr(ctx, &rparams, data + consumed_bytes, size - consumed_bytes, GSPLANES[j], &consumed_bytes);
+@@ -345,7 +345,6 @@
+             GSPLANES[j]->data[i] ^= GSPLANES[j + 1]->data[i];
+ 
+         /*  C.5 step 3. (c) */
+-        --j;
+     }
+ 
+     /* allocate GSVALS */
+@@ -359,9 +358,8 @@
+         if (GSVALS[i] == NULL) {
+             jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "failed to allocate GSVALS: %d bytes", GSH * GSW);
+             /* free already allocated */
+-            for (j = i - 1; j >= 0; --j) {
+-                jbig2_free(ctx->allocator, GSVALS[j]);
+-            }
++            for (j = i; j > 0;)
++                jbig2_free(ctx->allocator, GSVALS[--j]);
+             jbig2_free(ctx->allocator, GSVALS);
+             GSVALS = NULL;
+             goto cleanup;
+@@ -450,7 +448,7 @@
+     uint8_t **GI;
+     Jbig2Image *HSKIP = NULL;
+     Jbig2PatternDict *HPATS;
+-    int i;
++    uint32_t i;
+     uint32_t mg, ng;
+     int32_t x, y;
+     uint8_t gray_val;
+@@ -476,7 +474,7 @@
+ 
+     /* calculate ceil(log2(HNUMPATS)) */
+     HBPP = 0;
+-    while (HNUMPATS > (1 << ++HBPP));
++    while (HNUMPATS > (1U << ++HBPP));
+ 
+     /* 6.6.5 point 4. decode gray-scale image as mentioned in annex C */
+     GI = jbig2_decode_gray_scale_image(ctx, segment, data, size,
+diff -Naur a/jbig2dec/jbig2_huffman.c b/jbig2dec/jbig2_huffman.c
+--- a/jbig2dec/jbig2_huffman.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_huffman.c	2017-02-03 01:15:16.408220934 +0000
+@@ -47,16 +47,16 @@
+        is (offset + 4) * 8. */
+     uint32_t this_word;
+     uint32_t next_word;
+-    int offset_bits;
+-    int offset;
+-    int offset_limit;
++    uint32_t offset_bits;
++    uint32_t offset;
++    uint32_t offset_limit;
+ 
+     Jbig2WordStream *ws;
+     Jbig2Ctx *ctx;
+ };
+ 
+ static uint32_t
+-huff_get_next_word(Jbig2HuffmanState *hs, int offset)
++huff_get_next_word(Jbig2HuffmanState *hs, uint32_t offset)
+ {
+     uint32_t word = 0;
+     Jbig2WordStream *ws = hs->ws;
+@@ -213,7 +213,7 @@
+ /* return the offset of the huffman decode pointer (in bytes)
+  * from the beginning of the WordStream
+  */
+-int
++uint32_t
+ jbig2_huffman_offset(Jbig2HuffmanState *hs)
+ {
+     return hs->offset + (hs->offset_bits >> 3);
+diff -Naur a/jbig2dec/jbig2_huffman.h b/jbig2dec/jbig2_huffman.h
+--- a/jbig2dec/jbig2_huffman.h	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_huffman.h	2017-02-03 01:15:16.408220934 +0000
+@@ -64,7 +64,7 @@
+ 
+ void jbig2_huffman_advance(Jbig2HuffmanState *hs, int offset);
+ 
+-int jbig2_huffman_offset(Jbig2HuffmanState *hs);
++uint32_t jbig2_huffman_offset(Jbig2HuffmanState *hs);
+ 
+ int32_t jbig2_huffman_get(Jbig2HuffmanState *hs, const Jbig2HuffmanTable *table, bool *oob);
+ 
+diff -Naur a/jbig2dec/jbig2_image.c b/jbig2dec/jbig2_image.c
+--- a/jbig2dec/jbig2_image.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_image.c	2017-02-03 01:15:16.408220934 +0000
+@@ -32,10 +32,10 @@
+ 
+ /* allocate a Jbig2Image structure and its associated bitmap */
+ Jbig2Image *
+-jbig2_image_new(Jbig2Ctx *ctx, int width, int height)
++jbig2_image_new(Jbig2Ctx *ctx, uint32_t width, uint32_t height)
+ {
+     Jbig2Image *image;
+-    int stride;
++    uint32_t stride;
+     int64_t check;
+ 
+     image = jbig2_new(ctx, Jbig2Image, 1);
+@@ -99,7 +99,7 @@
+ 
+ /* resize a Jbig2Image */
+ Jbig2Image *
+-jbig2_image_resize(Jbig2Ctx *ctx, Jbig2Image *image, int width, int height)
++jbig2_image_resize(Jbig2Ctx *ctx, Jbig2Image *image, uint32_t width, uint32_t height)
+ {
+     if (width == image->width) {
+         /* check for integer multiplication overflow */
+@@ -133,11 +133,11 @@
+ static int
+ jbig2_image_compose_unopt(Jbig2Ctx *ctx, Jbig2Image *dst, Jbig2Image *src, int x, int y, Jbig2ComposeOp op)
+ {
+-    int i, j;
+-    int sw = src->width;
+-    int sh = src->height;
+-    int sx = 0;
+-    int sy = 0;
++    uint32_t i, j;
++    uint32_t sw = src->width;
++    uint32_t sh = src->height;
++    uint32_t sx = 0;
++    uint32_t sy = 0;
+ 
+     /* clip to the dst image boundaries */
+     if (x < 0) {
+@@ -200,10 +200,10 @@
+ int
+ jbig2_image_compose(Jbig2Ctx *ctx, Jbig2Image *dst, Jbig2Image *src, int x, int y, Jbig2ComposeOp op)
+ {
+-    int i, j;
+-    int w, h;
+-    int leftbyte, rightbyte;
+-    int shift;
++    uint32_t i, j;
++    uint32_t w, h;
++    uint32_t leftbyte, rightbyte;
++    uint32_t shift;
+     uint8_t *s, *ss;
+     uint8_t *d, *dd;
+     uint8_t mask, rightmask;
+@@ -226,8 +226,8 @@
+         h += y;
+         y = 0;
+     }
+-    w = (x + w < dst->width) ? w : dst->width - x;
+-    h = (y + h < dst->height) ? h : dst->height - y;
++    w = ((uint32_t)x + w < dst->width) ? w : ((dst->width >= (uint32_t)x) ? dst->width - (uint32_t)x : 0);
++    h = ((uint32_t)y + h < dst->height) ? h : ((dst->height >= (uint32_t)y) ? dst->height - (uint32_t)y : 0);
+ #ifdef JBIG2_DEBUG
+     jbig2_error(ctx, JBIG2_SEVERITY_DEBUG, -1, "compositing %dx%d at (%d, %d) after clipping\n", w, h, x, y);
+ #endif
+@@ -249,8 +249,8 @@
+     }
+ #endif
+ 
+-    leftbyte = x >> 3;
+-    rightbyte = (x + w - 1) >> 3;
++    leftbyte = (uint32_t)x >> 3;
++    rightbyte = ((uint32_t)x + w - 1) >> 3;
+     shift = x & 7;
+ 
+     /* general OR case */
+diff -Naur a/jbig2dec/jbig2_mmr.c b/jbig2dec/jbig2_mmr.c
+--- a/jbig2dec/jbig2_mmr.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_mmr.c	2017-02-03 01:15:16.408220934 +0000
+@@ -38,19 +38,21 @@
+ #include "jbig2_mmr.h"
+ 
+ typedef struct {
+-    int width;
+-    int height;
++    uint32_t width;
++    uint32_t height;
+     const byte *data;
+     size_t size;
+-    int data_index;
+-    int bit_index;
++    uint32_t data_index;
++    uint32_t bit_index;
+     uint32_t word;
+ } Jbig2MmrCtx;
+ 
++#define MINUS1 ((uint32_t)-1)
++
+ static void
+ jbig2_decode_mmr_init(Jbig2MmrCtx *mmr, int width, int height, const byte *data, size_t size)
+ {
+-    int i;
++    size_t i;
+     uint32_t word = 0;
+ 
+     mmr->width = width;
+@@ -732,14 +734,14 @@
+ #define getbit(buf, x) ( ( buf[x >> 3] >> ( 7 - (x & 7) ) ) & 1 )
+ 
+ static int
+-jbig2_find_changing_element(const byte *line, int x, int w)
++jbig2_find_changing_element(const byte *line, uint32_t x, uint32_t w)
+ {
+     int a, b;
+ 
+     if (line == 0)
+-        return w;
++        return (int)w;
+ 
+-    if (x == -1) {
++    if (x == MINUS1) {
+         a = 0;
+         x = 0;
+     } else {
+@@ -758,7 +760,7 @@
+ }
+ 
+ static int
+-jbig2_find_changing_element_of_color(const byte *line, int x, int w, int color)
++jbig2_find_changing_element_of_color(const byte *line, uint32_t x, uint32_t w, int color)
+ {
+     if (line == 0)
+         return w;
+@@ -772,9 +774,9 @@
+ static const byte rm[8] = { 0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE };
+ 
+ static void
+-jbig2_set_bits(byte *line, int x0, int x1)
++jbig2_set_bits(byte *line, uint32_t x0, uint32_t x1)
+ {
+-    int a0, a1, b0, b1, a;
++    uint32_t a0, a1, b0, b1, a;
+ 
+     a0 = x0 >> 3;
+     a1 = x1 >> 3;
+@@ -831,8 +833,8 @@
+ static int
+ jbig2_decode_mmr_line(Jbig2MmrCtx *mmr, const byte *ref, byte *dst)
+ {
+-    int a0 = -1;
+-    int a1, a2, b1, b2;
++    uint32_t a0 = MINUS1;
++    uint32_t a1, a2, b1, b2;
+     int c = 0;                  /* 0 is white, black is 1 */
+ 
+     while (1) {
+@@ -840,7 +842,7 @@
+ 
+         /* printf ("%08x\n", word); */
+ 
+-        if (a0 >= mmr->width)
++        if (a0 != MINUS1 && a0 >= mmr->width)
+             break;
+ 
+         if ((word >> (32 - 3)) == 1) {
+@@ -848,7 +850,7 @@
+ 
+             jbig2_decode_mmr_consume(mmr, 3);
+ 
+-            if (a0 == -1)
++            if (a0 == MINUS1)
+                 a0 = 0;
+ 
+             if (c == 0) {
+@@ -860,7 +862,7 @@
+                     a1 = mmr->width;
+                 if (a2 > mmr->width)
+                     a2 = mmr->width;
+-                if (a2 < a1 || a1 < 0)
++                if (a1 == MINUS1 || a2 < a1)
+                     return -1;
+                 jbig2_set_bits(dst, a1, a2);
+                 a0 = a2;
+@@ -874,7 +876,7 @@
+                     a1 = mmr->width;
+                 if (a2 > mmr->width)
+                     a2 = mmr->width;
+-                if (a1 < a0 || a0 < 0)
++                if (a0 == MINUS1 || a1 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, a1);
+                 a0 = a2;
+@@ -888,7 +890,7 @@
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+             b2 = jbig2_find_changing_element(ref, b1, mmr->width);
+             if (c) {
+-                if (b2 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b2 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b2);
+             }
+@@ -900,7 +902,7 @@
+             jbig2_decode_mmr_consume(mmr, 1);
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+             if (c) {
+-                if (b1 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1);
+             }
+@@ -915,7 +917,7 @@
+             if (b1 + 1 > mmr->width)
+                 break;
+             if (c) {
+-                if (b1 + 1 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 + 1 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1 + 1);
+             }
+@@ -930,7 +932,7 @@
+             if (b1 + 2 > mmr->width)
+                 break;
+             if (c) {
+-                if (b1 + 2 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 + 2 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1 + 2);
+             }
+@@ -942,10 +944,10 @@
+             /* printf ("VR(3)\n"); */
+             jbig2_decode_mmr_consume(mmr, 7);
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+-            if (b1 + 3 > mmr->width)
++            if (b1 + 3 > (int)mmr->width)
+                 break;
+             if (c) {
+-                if (b1 + 3 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 + 3 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1 + 3);
+             }
+@@ -957,10 +959,10 @@
+             /* printf ("VL(1)\n"); */
+             jbig2_decode_mmr_consume(mmr, 3);
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+-            if (b1 - 1 < 0)
++            if (b1 < 1)
+                 break;
+             if (c) {
+-                if (b1 - 1 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 - 1 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1 - 1);
+             }
+@@ -972,7 +974,7 @@
+             /* printf ("VL(2)\n"); */
+             jbig2_decode_mmr_consume(mmr, 6);
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+-            if (b1 - 2 < 0)
++            if (b1 < 2)
+                 break;
+             if (c) {
+                 if (b1 - 2 < a0 || a0 < 0)
+@@ -987,10 +989,10 @@
+             /* printf ("VL(3)\n"); */
+             jbig2_decode_mmr_consume(mmr, 7);
+             b1 = jbig2_find_changing_element_of_color(ref, a0, mmr->width, !c);
+-            if (b1 - 3 < 0)
++            if (b1 < 3)
+                 break;
+             if (c) {
+-                if (b1 - 3 < a0 || a0 < 0)
++                if (a0 == MINUS1 || b1 - 3 < a0)
+                     return -1;
+                 jbig2_set_bits(dst, a0, b1 - 3);
+             }
+@@ -1009,10 +1011,10 @@
+ jbig2_decode_generic_mmr(Jbig2Ctx *ctx, Jbig2Segment *segment, const Jbig2GenericRegionParams *params, const byte *data, size_t size, Jbig2Image *image)
+ {
+     Jbig2MmrCtx mmr;
+-    const int rowstride = image->stride;
++    const uint32_t rowstride = image->stride;
+     byte *dst = image->data;
+     byte *ref = NULL;
+-    int y;
++    uint32_t y;
+     int code = 0;
+ 
+     jbig2_decode_mmr_init(&mmr, image->width, image->height, data, size);
+@@ -1047,10 +1049,10 @@
+ jbig2_decode_halftone_mmr(Jbig2Ctx *ctx, const Jbig2GenericRegionParams *params, const byte *data, size_t size, Jbig2Image *image, size_t *consumed_bytes)
+ {
+     Jbig2MmrCtx mmr;
+-    const int rowstride = image->stride;
++    const uint32_t rowstride = image->stride;
+     byte *dst = image->data;
+     byte *ref = NULL;
+-    int y;
++    uint32_t y;
+     int code = 0;
+     const uint32_t EOFB = 0x001001;
+ 
+diff -Naur a/jbig2dec/jbig2_page.c b/jbig2dec/jbig2_page.c
+--- a/jbig2dec/jbig2_page.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_page.c	2017-02-03 01:15:16.408220934 +0000
+@@ -155,9 +155,9 @@
+ jbig2_end_of_stripe(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data)
+ {
+     Jbig2Page page = ctx->pages[ctx->current_page];
+-    int end_row;
++    uint32_t end_row;
+ 
+-    end_row = jbig2_get_int32(segment_data);
++    end_row = jbig2_get_uint32(segment_data);
+     if (end_row < page.end_row) {
+         jbig2_error(ctx, JBIG2_SEVERITY_WARNING, segment->number,
+                     "end of stripe segment with non-positive end row advance" " (new end row %d vs current end row %d)", end_row, page.end_row);
+@@ -248,7 +248,7 @@
+ 
+     /* grow the page to accomodate a new stripe if necessary */
+     if (page->striped) {
+-        int new_height = y + image->height + page->end_row;
++        uint32_t new_height = y + image->height + page->end_row;
+ 
+         if (page->image->height < new_height) {
+             jbig2_error(ctx, JBIG2_SEVERITY_DEBUG, -1, "growing page buffer to %d rows " "to accomodate new stripe", new_height);
+diff -Naur a/jbig2dec/jbig2_priv.h b/jbig2dec/jbig2_priv.h
+--- a/jbig2dec/jbig2_priv.h	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_priv.h	2017-02-03 01:15:16.408220934 +0000
+@@ -132,7 +132,7 @@
+     uint32_t x_resolution, y_resolution;        /* in pixels per meter */
+     uint16_t stripe_size;
+     bool striped;
+-    int end_row;
++    uint32_t end_row;
+     uint8_t flags;
+     Jbig2Image *image;
+ };
+@@ -182,7 +182,7 @@
+ typedef struct _Jbig2WordStream Jbig2WordStream;
+ 
+ struct _Jbig2WordStream {
+-    int (*get_next_word)(Jbig2WordStream *self, int offset, uint32_t *word);
++    int (*get_next_word)(Jbig2WordStream *self, size_t offset, uint32_t *word);
+ };
+ 
+ Jbig2WordStream *jbig2_word_stream_buf_new(Jbig2Ctx *ctx, const byte *data, size_t size);
+diff -Naur a/jbig2dec/jbig2_segment.c b/jbig2dec/jbig2_segment.c
+--- a/jbig2dec/jbig2_segment.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_segment.c	2017-02-03 01:15:16.408220934 +0000
+@@ -39,10 +39,10 @@
+     uint8_t rtscarf;
+     uint32_t rtscarf_long;
+     uint32_t *referred_to_segments;
+-    int referred_to_segment_count;
+-    int referred_to_segment_size;
+-    int pa_size;
+-    int offset;
++    uint32_t referred_to_segment_count;
++    uint32_t referred_to_segment_size;
++    uint32_t pa_size;
++    uint32_t offset;
+ 
+     /* minimum possible size of a jbig2 segment header */
+     if (buf_size < 11)
+@@ -83,7 +83,7 @@
+ 
+     /* 7.2.5 */
+     if (referred_to_segment_count) {
+-        int i;
++        uint32_t i;
+ 
+         referred_to_segments = jbig2_new(ctx, uint32_t, referred_to_segment_count * referred_to_segment_size);
+         if (referred_to_segments == NULL) {
+diff -Naur a/jbig2dec/jbig2_symbol_dict.c b/jbig2dec/jbig2_symbol_dict.c
+--- a/jbig2dec/jbig2_symbol_dict.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_symbol_dict.c	2017-02-03 01:15:16.408220934 +0000
+@@ -88,40 +88,40 @@
+ 
+ /* return a new empty symbol dict */
+ Jbig2SymbolDict *
+-jbig2_sd_new(Jbig2Ctx *ctx, int n_symbols)
++jbig2_sd_new(Jbig2Ctx *ctx, uint32_t n_symbols)
+ {
+-    Jbig2SymbolDict *new = NULL;
++    Jbig2SymbolDict *new_dict = NULL;
+ 
+     if (n_symbols < 0) {
+         jbig2_error(ctx, JBIG2_SEVERITY_FATAL, -1, "Negative number of symbols in symbol dict: %d", n_symbols);
+         return NULL;
+     }
+ 
+-    new = jbig2_new(ctx, Jbig2SymbolDict, 1);
+-    if (new != NULL) {
+-        new->glyphs = jbig2_new(ctx, Jbig2Image *, n_symbols);
+-        new->n_symbols = n_symbols;
++    new_dict = jbig2_new(ctx, Jbig2SymbolDict, 1);
++    if (new_dict != NULL) {
++        new_dict->glyphs = jbig2_new(ctx, Jbig2Image *, n_symbols);
++        new_dict->n_symbols = n_symbols;
+     } else {
+         jbig2_error(ctx, JBIG2_SEVERITY_FATAL, -1, "unable to allocate new empty symbol dict");
+         return NULL;
+     }
+ 
+-    if (new->glyphs != NULL) {
+-        memset(new->glyphs, 0, n_symbols * sizeof(Jbig2Image *));
++    if (new_dict->glyphs != NULL) {
++        memset(new_dict->glyphs, 0, n_symbols * sizeof(Jbig2Image *));
+     } else {
+         jbig2_error(ctx, JBIG2_SEVERITY_FATAL, -1, "unable to allocate glyphs for new empty symbol dict");
+-        jbig2_free(ctx->allocator, new);
++        jbig2_free(ctx->allocator, new_dict);
+         return NULL;
+     }
+ 
+-    return new;
++    return new_dict;
+ }
+ 
+ /* release the memory associated with a symbol dict */
+ void
+ jbig2_sd_release(Jbig2Ctx *ctx, Jbig2SymbolDict *dict)
+ {
+-    int i;
++    uint32_t i;
+ 
+     if (dict == NULL)
+         return;
+@@ -142,12 +142,12 @@
+ }
+ 
+ /* count the number of dictionary segments referred to by the given segment */
+-int
++uint32_t
+ jbig2_sd_count_referred(Jbig2Ctx *ctx, Jbig2Segment *segment)
+ {
+     int index;
+     Jbig2Segment *rsegment;
+-    int n_dicts = 0;
++    uint32_t n_dicts = 0;
+ 
+     for (index = 0; index < segment->referred_to_segment_count; index++) {
+         rsegment = jbig2_find_segment(ctx, segment->referred_to_segments[index]);
+@@ -166,8 +166,8 @@
+     int index;
+     Jbig2Segment *rsegment;
+     Jbig2SymbolDict **dicts;
+-    int n_dicts = jbig2_sd_count_referred(ctx, segment);
+-    int dindex = 0;
++    uint32_t n_dicts = jbig2_sd_count_referred(ctx, segment);
++    uint32_t dindex = 0;
+ 
+     dicts = jbig2_new(ctx, Jbig2SymbolDict *, n_dicts);
+     if (dicts == NULL) {
+@@ -195,10 +195,10 @@
+ /* generate a new symbol dictionary by concatenating a list of
+    existing dictionaries */
+ Jbig2SymbolDict *
+-jbig2_sd_cat(Jbig2Ctx *ctx, int n_dicts, Jbig2SymbolDict **dicts)
++jbig2_sd_cat(Jbig2Ctx *ctx, uint32_t n_dicts, Jbig2SymbolDict **dicts)
+ {
+-    int i, j, k, symbols;
+-    Jbig2SymbolDict *new = NULL;
++    uint32_t i, j, k, symbols;
++    Jbig2SymbolDict *new_dict = NULL;
+ 
+     /* count the imported symbols and allocate a new array */
+     symbols = 0;
+@@ -206,17 +206,17 @@
+         symbols += dicts[i]->n_symbols;
+ 
+     /* fill a new array with cloned glyph pointers */
+-    new = jbig2_sd_new(ctx, symbols);
+-    if (new != NULL) {
++    new_dict = jbig2_sd_new(ctx, symbols);
++    if (new_dict != NULL) {
+         k = 0;
+         for (i = 0; i < n_dicts; i++)
+             for (j = 0; j < dicts[i]->n_symbols; j++)
+-                new->glyphs[k++] = jbig2_image_clone(ctx, dicts[i]->glyphs[j]);
++                new_dict->glyphs[k++] = jbig2_image_clone(ctx, dicts[i]->glyphs[j]);
+     } else {
+         jbig2_error(ctx, JBIG2_SEVERITY_WARNING, -1, "failed to allocate new symbol dictionary");
+     }
+ 
+-    return new;
++    return new_dict;
+ }
+ 
+ /* Decoding routines */
+@@ -431,7 +431,7 @@
+ 
+                     if (REFAGGNINST > 1) {
+                         Jbig2Image *image;
+-                        int i;
++                        uint32_t i;
+ 
+                         if (tparams == NULL) {
+                             /* First time through, we need to initialise the */
+@@ -512,7 +512,7 @@
+                         uint32_t ID;
+                         int32_t RDX, RDY;
+                         int BMSIZE = 0;
+-                        int ninsyms = params->SDNUMINSYMS;
++                        uint32_t ninsyms = params->SDNUMINSYMS;
+                         int code1 = 0;
+                         int code2 = 0;
+                         int code3 = 0;
+@@ -609,8 +609,9 @@
+         if (params->SDHUFF && !params->SDREFAGG) {
+             /* 6.5.9 */
+             Jbig2Image *image;
+-            int BMSIZE = jbig2_huffman_get(hs, params->SDHUFFBMSIZE, &code);
+-            int j, x;
++            uint32_t BMSIZE = jbig2_huffman_get(hs, params->SDHUFFBMSIZE, &code);
++            uint32_t j;
++            int x;
+ 
+             if (code || (BMSIZE < 0)) {
+                 jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "error decoding size of collective bitmap!");
+@@ -700,22 +701,22 @@
+         jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "failed to allocate symbols exported from symbols dictionary");
+         goto cleanup4;
+     } else {
+-        int i = 0;
+-        int j = 0;
+-        int k;
++        uint32_t i = 0;
++        uint32_t j = 0;
++        uint32_t k;
+         int exflag = 0;
+-        int64_t limit = params->SDNUMINSYMS + params->SDNUMNEWSYMS;
+-        int32_t exrunlength;
++        uint32_t limit = params->SDNUMINSYMS + params->SDNUMNEWSYMS;
++        uint32_t exrunlength;
+         int zerolength = 0;
+ 
+         while (i < limit) {
+             if (params->SDHUFF)
+                 exrunlength = jbig2_huffman_get(hs, SBHUFFRSIZE, &code);
+             else
+-                code = jbig2_arith_int_decode(IAEX, as, &exrunlength);
++                code = jbig2_arith_int_decode(IAEX, as, (int32_t *)&exrunlength);
+             /* prevent infinite loop */
+             zerolength = exrunlength > 0 ? 0 : zerolength + 1;
+-            if (code || (exrunlength > limit - i) || (exrunlength < 0) || (zerolength > 4) || (exflag && (exrunlength > params->SDNUMEXSYMS - j))) {
++            if (code || (exrunlength > limit - i) || (exrunlength < 0) || (zerolength > 4) || (exflag && (exrunlength + j > params->SDNUMEXSYMS))) {
+                 if (code)
+                     jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "failed to decode exrunlength for exported symbols");
+                 else if (exrunlength <= 0)
+@@ -797,8 +798,8 @@
+ {
+     Jbig2SymbolDictParams params;
+     uint16_t flags;
+-    int sdat_bytes;
+-    int offset;
++    uint32_t sdat_bytes;
++    uint32_t offset;
+     Jbig2ArithCx *GB_stats = NULL;
+     Jbig2ArithCx *GR_stats = NULL;
+     int table_index = 0;
+@@ -951,7 +952,7 @@
+ 
+     /* 7.4.2.2 (2) */
+     {
+-        int n_dicts = jbig2_sd_count_referred(ctx, segment);
++        uint32_t n_dicts = jbig2_sd_count_referred(ctx, segment);
+         Jbig2SymbolDict **dicts = NULL;
+ 
+         if (n_dicts > 0) {
+diff -Naur a/jbig2dec/jbig2_symbol_dict.h b/jbig2dec/jbig2_symbol_dict.h
+--- a/jbig2dec/jbig2_symbol_dict.h	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_symbol_dict.h	2017-02-03 01:15:16.408220934 +0000
+@@ -32,18 +32,18 @@
+ Jbig2Image *jbig2_sd_glyph(Jbig2SymbolDict *dict, unsigned int id);
+ 
+ /* return a new empty symbol dict */
+-Jbig2SymbolDict *jbig2_sd_new(Jbig2Ctx *ctx, int n_symbols);
++Jbig2SymbolDict *jbig2_sd_new(Jbig2Ctx *ctx, uint32_t n_symbols);
+ 
+ /* release the memory associated with a symbol dict */
+ void jbig2_sd_release(Jbig2Ctx *ctx, Jbig2SymbolDict *dict);
+ 
+ /* generate a new symbol dictionary by concatenating a list of
+    existing dictionaries */
+-Jbig2SymbolDict *jbig2_sd_cat(Jbig2Ctx *ctx, int n_dicts, Jbig2SymbolDict **dicts);
++Jbig2SymbolDict *jbig2_sd_cat(Jbig2Ctx *ctx, uint32_t n_dicts, Jbig2SymbolDict **dicts);
+ 
+ /* count the number of dictionary segments referred
+    to by the given segment */
+-int jbig2_sd_count_referred(Jbig2Ctx *ctx, Jbig2Segment *segment);
++uint32_t jbig2_sd_count_referred(Jbig2Ctx *ctx, Jbig2Segment *segment);
+ 
+ /* return an array of pointers to symbol dictionaries referred
+    to by a segment */
+diff -Naur a/jbig2dec/jbig2_text.c b/jbig2dec/jbig2_text.c
+--- a/jbig2dec/jbig2_text.c	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_text.c	2017-02-03 01:15:16.408220934 +0000
+@@ -55,7 +55,7 @@
+ int
+ jbig2_decode_text_region(Jbig2Ctx *ctx, Jbig2Segment *segment,
+                          const Jbig2TextRegionParams *params,
+-                         const Jbig2SymbolDict *const *dicts, const int n_dicts,
++                         const Jbig2SymbolDict *const *dicts, const uint32_t n_dicts,
+                          Jbig2Image *image, const byte *data, const size_t size, Jbig2ArithCx *GR_stats, Jbig2ArithState *as, Jbig2WordStream *ws)
+ {
+     /* relevent bits of 6.4.4 */
+@@ -476,19 +476,19 @@
+ int
+ jbig2_text_region(Jbig2Ctx *ctx, Jbig2Segment *segment, const byte *segment_data)
+ {
+-    int offset = 0;
++    uint32_t offset = 0;
+     Jbig2RegionSegmentInfo region_info;
+     Jbig2TextRegionParams params;
+     Jbig2Image *image = NULL;
+     Jbig2SymbolDict **dicts = NULL;
+-    int n_dicts = 0;
++    uint32_t n_dicts = 0;
+     uint16_t flags = 0;
+     uint16_t huffman_flags = 0;
+     Jbig2ArithCx *GR_stats = NULL;
+     int code = 0;
+     Jbig2WordStream *ws = NULL;
+     Jbig2ArithState *as = NULL;
+-    int table_index = 0;
++    uint32_t table_index = 0;
+     const Jbig2HuffmanParams *huffman_params = NULL;
+ 
+     /* 7.4.1 */
+@@ -779,7 +779,7 @@
+         code = jbig2_error(ctx, JBIG2_SEVERITY_FATAL, segment->number, "unable to retrive symbol dictionaries! previous parsing error?");
+         goto cleanup1;
+     } else {
+-        int index;
++        uint32_t index;
+ 
+         if (dicts[0] == NULL) {
+             code = jbig2_error(ctx, JBIG2_SEVERITY_WARNING, segment->number, "unable to find first referenced symbol dictionary!");
+@@ -823,8 +823,8 @@
+     }
+ 
+     if (!params.SBHUFF) {
+-        int SBSYMCODELEN, index;
+-        int SBNUMSYMS = 0;
++        uint32_t SBSYMCODELEN, index;
++        uint32_t SBNUMSYMS = 0;
+ 
+         for (index = 0; index < n_dicts; index++) {
+             SBNUMSYMS += dicts[index]->n_symbols;
+@@ -840,7 +840,7 @@
+         }
+ 
+         /* Table 31 */
+-        for (SBSYMCODELEN = 0; (1 << SBSYMCODELEN) < SBNUMSYMS; SBSYMCODELEN++) {
++        for (SBSYMCODELEN = 0; (1U << SBSYMCODELEN) < SBNUMSYMS; SBSYMCODELEN++) {
+         }
+         params.IAID = jbig2_arith_iaid_ctx_new(ctx, SBSYMCODELEN);
+         params.IARI = jbig2_arith_int_ctx_new(ctx);
+diff -Naur a/jbig2dec/jbig2_text.h b/jbig2dec/jbig2_text.h
+--- a/jbig2dec/jbig2_text.h	2016-09-26 11:41:29.000000000 +0100
++++ b/jbig2dec/jbig2_text.h	2017-02-03 01:15:16.408220934 +0000
+@@ -70,5 +70,5 @@
+ int
+ jbig2_decode_text_region(Jbig2Ctx *ctx, Jbig2Segment *segment,
+                          const Jbig2TextRegionParams *params,
+-                         const Jbig2SymbolDict *const *dicts, const int n_dicts,
++                         const Jbig2SymbolDict *const *dicts, const uint32_t n_dicts,
+                          Jbig2Image *image, const byte *data, const size_t size, Jbig2ArithCx *GR_stats, Jbig2ArithState *as, Jbig2WordStream *ws);
+diff -Naur a/psi/imain.c b/psi/imain.c
+--- a/psi/imain.c	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/imain.c	2017-02-03 01:15:16.396214873 +0000
+@@ -57,6 +57,7 @@
+ #include "ivmspace.h"
+ #include "idisp.h"              /* for setting display device callback */
+ #include "iplugin.h"
++#include "zfile.h"
+ 
+ #ifdef PACIFY_VALGRIND
+ #include "valgrind.h"
+@@ -212,6 +213,7 @@
+                                            "the_gs_name_table");
+             if (code < 0)
+                 return code;
++            mem->gs_lib_ctx->client_check_file_permission = z_check_file_permissions;
+         }
+         code = obj_init(&minst->i_ctx_p, &idmem);  /* requires name_init */
+         if (code < 0)
+diff -Naur a/psi/int.mak b/psi/int.mak
+--- a/psi/int.mak	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/int.mak	2017-02-03 01:15:16.396214873 +0000
+@@ -2024,7 +2024,7 @@
+  $(ialloc_h) $(iconf_h) $(idebug_h) $(idict_h) $(idisp_h) $(iinit_h)\
+  $(iname_h) $(interp_h) $(iplugin_h) $(isave_h) $(iscan_h) $(ivmspace_h)\
+  $(iinit_h) $(main_h) $(oper_h) $(ostack_h)\
+- $(sfilter_h) $(store_h) $(stream_h) $(strimpl_h)\
++ $(sfilter_h) $(store_h) $(stream_h) $(strimpl_h) $(zfile_h)\
+  $(INT_MAK) $(MAKEDIRS)
+ 	$(PSCC) $(PSO_)imain.$(OBJ) $(C_) $(PSSRC)imain.c
+ 
+diff -Naur a/psi/zdscpars.c b/psi/zdscpars.c
+--- a/psi/zdscpars.c	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/zdscpars.c	2017-02-03 01:15:16.403218408 +0000
+@@ -150,11 +150,16 @@
+     ref local_ref;
+     int code;
+     os_ptr const op = osp;
+-    dict * const pdict = op->value.pdict;
+-    gs_memory_t * const mem = (gs_memory_t *)dict_memory(pdict);
+-    dsc_data_t * const data =
+-        gs_alloc_struct(mem, dsc_data_t, &st_dsc_data_t, "DSC parser init");
++    dict *pdict;
++    gs_memory_t *mem;
++    dsc_data_t *data;
+ 
++    check_read_type(*op, t_dictionary);
++
++    pdict = op->value.pdict;
++    mem = (gs_memory_t *)dict_memory(pdict);
++
++    data = gs_alloc_struct(mem, dsc_data_t, &st_dsc_data_t, "DSC parser init");
+     if (!data)
+         return_error(gs_error_VMerror);
+     data->document_level = 0;
+diff -Naur a/psi/zfile.c b/psi/zfile.c
+--- a/psi/zfile.c	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/zfile.c	2017-02-03 01:15:16.399216388 +0000
+@@ -197,6 +197,25 @@
+     return check_file_permissions_reduced(i_ctx_p, fname_reduced, rlen, permitgroup);
+ }
+ 
++/* z_check_file_permissions: see zfile.h for explanation
++ */
++int
++z_check_file_permissions(gs_memory_t *mem, const char *fname, const int len, const char *permission)
++{
++    i_ctx_t *i_ctx_p = get_minst_from_memory(mem)->i_ctx_p;
++    gs_parsed_file_name_t pname;
++    const char *permitgroup = permission[0] == 'r' ? "PermitFileReading" : "PermitFileWriting";
++    int code = gs_parse_file_name(&pname, fname, len, imemory);
++    if (code < 0)
++        return code;
++
++    if (pname.iodev && i_ctx_p->LockFilePermissions && strcmp(pname.iodev->dname, "%pipe%") == 0)
++        return gs_error_invalidfileaccess;
++        
++    code = check_file_permissions(i_ctx_p, fname, len, permitgroup);
++    return code;
++}
++
+ /* <name_string> <access_string> file <file> */
+ int                             /* exported for zsysvm.c */
+ zfile(i_ctx_t *i_ctx_p)
+@@ -1081,6 +1100,9 @@
+     gs_main_instance *minst = get_minst_from_memory(mem);
+     int code;
+ 
++    if (i_ctx_p && starting_arg_file)
++        i_ctx_p->starting_arg_file = false;
++
+     /* when starting arg files (@ files) iodev_default is not yet set */
+     if (iodev == 0)
+         iodev = (gx_io_device *)gx_io_device_table[0];
+diff -Naur a/psi/zfile.h b/psi/zfile.h
+--- a/psi/zfile.h	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/zfile.h	2017-02-03 01:15:16.396214873 +0000
+@@ -22,4 +22,11 @@
+ int zopen_file(i_ctx_t *i_ctx_p, const gs_parsed_file_name_t *pfn,
+            const char *file_access, stream **ps, gs_memory_t *mem);
+ 
++/* z_check_file_permissions: a callback (via mem->gs_lib_ctx->client_check_file_permission)
++ * to allow applying the above permissions checks when opening file(s) from
++ * the graphics library
++ */
++int
++z_check_file_permissions(gs_memory_t *mem, const char *fname,
++                                 const int len, const char *permission);
+ #endif
+diff -Naur a/psi/zht2.c b/psi/zht2.c
+--- a/psi/zht2.c	2016-09-26 11:41:29.000000000 +0100
++++ b/psi/zht2.c	2017-02-03 01:15:16.405219419 +0000
+@@ -82,14 +82,22 @@
+     gs_memory_t *mem;
+     uint edepth = ref_stack_count(&e_stack);
+     int npop = 2;
+-    int dict_enum = dict_first(op);
++    int dict_enum;
+     ref rvalue[2];
+     int cname, colorant_number;
+     byte * pname;
+     uint name_size;
+     int halftonetype, type = 0;
+     gs_gstate *pgs = igs;
+-    int space_index = r_space_index(op - 1);
++    int space_index;
++
++    if (ref_stack_count(&o_stack) < 2)
++        return_error(gs_error_stackunderflow);
++    check_type(*op, t_dictionary);
++    check_type(*(op - 1), t_dictionary);
++
++    dict_enum = dict_first(op);
++    space_index = r_space_index(op - 1);
+ 
+     mem = (gs_memory_t *) idmemory->spaces_indexed[space_index];
+ 
