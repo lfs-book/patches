@@ -1,0 +1,43 @@
+Submitted by: Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date: 2017-02-12
+Initial Package Version: 1.20.7
+Origin: Self
+Description: Fix build failures due to internal header file not being included properly.
+Upstream Status: Unknown
+
+diff -Naurp gpm-1.20.7.orig/src/prog/display-buttons.c gpm-1.20.7/src/prog/display-buttons.c
+--- gpm-1.20.7.orig/src/prog/display-buttons.c	2012-10-26 16:21:38.000000000 -0500
++++ gpm-1.20.7/src/prog/display-buttons.c	2017-02-12 12:17:17.754453735 -0600
+@@ -36,7 +36,7 @@
+ #include <stdio.h>            /* printf()             */
+ #include <time.h>             /* time()               */
+ #include <errno.h>            /* errno                */
+-#include <gpm.h>              /* gpm information      */
++#include "headers/gpm.h"  /* gpm information      */
+ 
+ /* display resulting data */
+ int display_data(Gpm_Event *event, void *data)
+diff -Naurp gpm-1.20.7.orig/src/prog/display-coords.c gpm-1.20.7/src/prog/display-coords.c
+--- gpm-1.20.7.orig/src/prog/display-coords.c	2012-10-26 16:21:38.000000000 -0500
++++ gpm-1.20.7/src/prog/display-coords.c	2017-02-12 12:17:40.310551912 -0600
+@@ -37,7 +37,7 @@
+ #include <stdio.h>            /* printf()             */
+ #include <time.h>             /* time()               */
+ #include <errno.h>            /* errno                */
+-#include <gpm.h>              /* gpm information      */
++#include "headers/gpm.h"      /* gpm information      */
+ 
+ /* display resulting data */
+ int display_data(Gpm_Event *event, void *data)
+diff -Naurp gpm-1.20.7.orig/src/prog/get-versions.c gpm-1.20.7/src/prog/get-versions.c
+--- gpm-1.20.7.orig/src/prog/get-versions.c	2012-10-26 16:21:38.000000000 -0500
++++ gpm-1.20.7/src/prog/get-versions.c	2017-02-12 12:18:02.953650420 -0600
+@@ -22,7 +22,7 @@
+  ********/
+ 
+ #include <stdio.h>            /* printf()             */
+-#include <gpm.h>              /* gpm information      */
++#include "headers/gpm.h"      /* gpm information      */
+ 
+ int main()
+ {
