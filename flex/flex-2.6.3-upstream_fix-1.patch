@@ -1,0 +1,22 @@
+Submitted By:            Bruce Dubbs <bdubbs_AT_linuxfromscratch_DOT_org>
+Date:                    2017-04-28
+Initial Package Version: 2.6.3
+Upstream Status:         Applied
+Origin:                  Upstream 
+Description:             Fixes a bug introduced in this release.
+
+diff -Naur flex-2.6.3.orig/src/main.c flex-2.6.3/src/main.c
+--- flex-2.6.3.orig/src/main.c	2016-12-29 14:03:14.000000000 -0600
++++ flex-2.6.3/src/main.c	2017-04-28 12:10:44.374349376 -0500
+@@ -1586,9 +1586,9 @@
+ 	if (!do_yywrap) {
+ 		if (!C_plus_plus) {
+ 			 if (reentrant)
+-				outn ("\n#define yywrap(yyscanner) (/*CONSTCOND*/1)");
++				out_str ("\n#define %swrap(yyscanner) (/*CONSTCOND*/1)\n", prefix);
+ 			 else
+-				outn ("\n#define yywrap() (/*CONSTCOND*/1)");
++				out_str ("\n#define %swrap() (/*CONSTCOND*/1)\n", prefix);
+ 		}
+ 		outn ("#define YY_SKIP_YYWRAP");
+ 	}
