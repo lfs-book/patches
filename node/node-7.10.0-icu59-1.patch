@@ -1,0 +1,66 @@
+Submitted By:            DJ Lucas <dj_AT_linuxfromscratch_DOT_org>
+Date:                    2017-05-06
+Initial Package Version: 7.10.0
+Upstream Status:         Comitted
+Origin:                  https://chromium.googlesource.com/v8/v8.git/+/fd5b3e755df541b44128caed625215017ef59989
+Description:             Fix build with icu59.
+
+diff -Naurp node-7.10.0-orig/deps/v8/src/i18n.cc node-7.10.0/deps/v8/src/i18n.cc
+--- node-7.10.0-orig/deps/v8/src/i18n.cc	2017-05-06 00:23:19.818669694 -0500
++++ node-7.10.0/deps/v8/src/i18n.cc	2017-05-06 00:24:46.185490227 -0500
+@@ -29,8 +29,13 @@
+ #include "unicode/ucol.h"
+ #include "unicode/ucurr.h"
+ #include "unicode/unum.h"
++#include "unicode/uvernum.h"
+ #include "unicode/uversion.h"
+ 
++#if U_ICU_VERSION_MAJOR_NUM >= 59
++#include "unicode/char16ptr.h"
++#endif
++
+ namespace v8 {
+ namespace internal {
+ 
+@@ -286,8 +291,13 @@ icu::DecimalFormat* CreateICUNumberForma
+       }
+ 
+       UErrorCode status_digits = U_ZERO_ERROR;
++#if U_ICU_VERSION_MAJOR_NUM >= 59
+       uint32_t fraction_digits = ucurr_getDefaultFractionDigits(
+-        currency.getTerminatedBuffer(), &status_digits);
++          icu::toUCharPtr(currency.getTerminatedBuffer()), &status_digits);
++#else
++      uint32_t fraction_digits = ucurr_getDefaultFractionDigits(
++          currency.getTerminatedBuffer(), &status_digits);
++#endif
+       if (U_SUCCESS(status_digits)) {
+         number_format->setMinimumFractionDigits(fraction_digits);
+         number_format->setMaximumFractionDigits(fraction_digits);
+diff -Naurp node-7.10.0-orig/deps/v8/src/runtime/runtime-i18n.cc node-7.10.0/deps/v8/src/runtime/runtime-i18n.cc
+--- node-7.10.0-orig/deps/v8/src/runtime/runtime-i18n.cc	2017-05-06 00:23:19.832003051 -0500
++++ node-7.10.0/deps/v8/src/runtime/runtime-i18n.cc	2017-05-06 00:24:46.185490227 -0500
+@@ -41,6 +41,7 @@
+ #include "unicode/uloc.h"
+ #include "unicode/unistr.h"
+ #include "unicode/unum.h"
++#include "unicode/ustring.h"
+ #include "unicode/uversion.h"
+ 
+ 
+@@ -719,10 +720,11 @@ RUNTIME_FUNCTION(Runtime_InternalCompare
+     String::FlatContent flat2 = string2->GetFlatContent();
+     std::unique_ptr<uc16[]> sap1;
+     std::unique_ptr<uc16[]> sap2;
+-    const UChar* string_val1 = GetUCharBufferFromFlat(flat1, &sap1, length1);
+-    const UChar* string_val2 = GetUCharBufferFromFlat(flat2, &sap2, length2);
+-    result =
+-        collator->compare(string_val1, length1, string_val2, length2, status);
++    icu::UnicodeString string_val1(
++        FALSE, GetUCharBufferFromFlat(flat1, &sap1, length1), length1);
++    icu::UnicodeString string_val2(
++        FALSE, GetUCharBufferFromFlat(flat2, &sap2, length2), length2);
++    result = collator->compare(string_val1, string_val2, status);
+   }
+   if (U_FAILURE(status)) return isolate->ThrowIllegalOperation();
+ 
