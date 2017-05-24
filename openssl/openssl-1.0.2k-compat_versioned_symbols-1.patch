@@ -1,6 +1,6 @@
 Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
-Date:                    2017-03-12
-Initial Package Version: 8.27
+Date:                    2017-05-24
+Initial Package Version: 1.0.2k
 Upstream Status:         n/a
 Origin:                  https://git.archlinux.org/svntogit/packages.git/plain/trunk/openssl-1.0-versioned-symbols.patch?h=packages/openssl-1.0
 Description:             Use versioned symbols for OpenSSL binary compatibility.
