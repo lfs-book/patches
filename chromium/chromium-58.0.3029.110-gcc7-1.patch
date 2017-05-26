@@ -1,0 +1,101 @@
+Submitted By:            DJ Lucas <dj_AT_linuxfromscratch_DOT_org>
+Date:                    2017-05-26
+Initial Package Version: 58.0.3029.110
+Upstream Status:         Committed
+Origin:                  Upstream
+Description:             Allows building with GCC-7.1.0.
+
+diff -Naurp chromium-58.0.3029.110-orig/v8/src/objects-body-descriptors.h chromium-58.0.3029.110/v8/src/objects-body-descriptors.h
+--- chromium-58.0.3029.110-orig/v8/src/objects-body-descriptors.h	2017-05-25 01:00:35.919340167 -0500
++++ chromium-58.0.3029.110/v8/src/objects-body-descriptors.h	2017-05-25 01:02:02.896748350 -0500
+@@ -99,7 +99,7 @@ class FixedBodyDescriptor final : public
+ 
+   template <typename StaticVisitor>
+   static inline void IterateBody(HeapObject* obj, int object_size) {
+-    IterateBody(obj);
++    IterateBody<StaticVisitor>(obj);
+   }
+ };
+ 
+diff -Naurp chromium-58.0.3029.110-orig/v8/src/objects-inl.h chromium-58.0.3029.110/v8/src/objects-inl.h
+--- chromium-58.0.3029.110-orig/v8/src/objects-inl.h	2017-05-25 01:00:35.926006896 -0500
++++ chromium-58.0.3029.110/v8/src/objects-inl.h	2017-05-25 01:05:22.191293156 -0500
+@@ -43,6 +43,25 @@
+ namespace v8 {
+ namespace internal {
+ 
++template <typename Derived, typename Shape, typename Key>
++uint32_t HashTable<Derived, Shape, Key>::Hash(Key key) {
++  if (Shape::UsesSeed) {
++    return Shape::SeededHash(key, GetHeap()->HashSeed());
++  } else {
++    return Shape::Hash(key);
++  }
++}
++
++template <typename Derived, typename Shape, typename Key>
++uint32_t HashTable<Derived, Shape, Key>::HashForObject(Key key,
++                                                       Object* object) {
++  if (Shape::UsesSeed) {
++    return Shape::SeededHashForObject(key, GetHeap()->HashSeed(), object);
++  } else {
++    return Shape::HashForObject(key, object);
++  }
++}
++
+ PropertyDetails::PropertyDetails(Smi* smi) {
+   value_ = smi->value();
+ }
+diff -Naurp chromium-58.0.3029.110-orig/v8/src/objects.h chromium-58.0.3029.110/v8/src/objects.h
+--- chromium-58.0.3029.110-orig/v8/src/objects.h	2017-05-25 01:00:35.919340167 -0500
++++ chromium-58.0.3029.110/v8/src/objects.h	2017-05-25 01:04:20.824315766 -0500
+@@ -3358,22 +3358,10 @@ class HashTable : public HashTableBase {
+  public:
+   typedef Shape ShapeT;
+ 
+-  // Wrapper methods
+-  inline uint32_t Hash(Key key) {
+-    if (Shape::UsesSeed) {
+-      return Shape::SeededHash(key, GetHeap()->HashSeed());
+-    } else {
+-      return Shape::Hash(key);
+-    }
+-  }
+-
+-  inline uint32_t HashForObject(Key key, Object* object) {
+-    if (Shape::UsesSeed) {
+-      return Shape::SeededHashForObject(key, GetHeap()->HashSeed(), object);
+-    } else {
+-      return Shape::HashForObject(key, object);
+-    }
+-  }
++  // Wrapper methods.  Defined in src/objects-inl.h
++  // to break a cycle with src/heap/heap.h.
++  inline uint32_t Hash(Key key);
++  inline uint32_t HashForObject(Key key, Object* object);
+ 
+   // Returns a new HashTable object.
+   MUST_USE_RESULT static Handle<Derived> New(
+diff -Naurp chromium-58.0.3029.110-orig/third_party/WebKit/Source/wtf/LinkedHashSet.h chromium-58.0.3029.110/third_party/WebKit/Source/wtf/LinkedHashSet.h
+--- chromium-58.0.3029.110-orig/third_party/WebKit/Source/wtf/LinkedHashSet.h	2017-05-25 01:00:47.959451969 -0500
++++ chromium-58.0.3029.110/third_party/WebKit/Source/wtf/LinkedHashSet.h	2017-05-25 01:11:08.915644292 -0500
+@@ -687,6 +687,8 @@ inline LinkedHashSet<T, U, V, W>& Linked
+   return *this;
+ }
+ 
++inline void swapAnchor(LinkedHashSetNodeBase& a, LinkedHashSetNodeBase& b);
++
+ template <typename T, typename U, typename V, typename W>
+ inline void LinkedHashSet<T, U, V, W>::swap(LinkedHashSet& other) {
+   m_impl.swap(other.m_impl);
+diff -Naurp chromium-58.0.3029.110-orig/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h chromium-58.0.3029.110/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h
+--- chromium-58.0.3029.110-orig/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h	2017-05-25 01:00:47.909451510 -0500
++++ chromium-58.0.3029.110/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h	2017-05-25 19:12:53.217370518 -0500
+@@ -5,6 +5,7 @@
+ #include "platform/PlatformExport.h"
+ #include "wtf/ThreadSpecific.h"
+ 
++#include <functional>
+ #include <memory>
+ 
+ namespace gpu {
