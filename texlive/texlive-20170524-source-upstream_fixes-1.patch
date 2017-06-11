@@ -1,0 +1,61 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2017-06-11
+Initial Package Version: 2017-05-25
+Upstream Status: Applied
+Origin: Upstream
+Description: Removes debugging code which was accidentally left in
+luatex, which made the (infrequently needed) io.popen useless.  Also
+disables io.saved_popen and changes the reported date of the luatex
+version.  Upstream revisions r44518, r44530.
+
+diff -Naur a/texk/web2c/luatexdir/lua/liolibext.c b/texk/web2c/luatexdir/lua/liolibext.c
+--- a/texk/web2c/luatexdir/lua/liolibext.c	2017-03-11 01:04:06.000000000 +0000
++++ b/texk/web2c/luatexdir/lua/liolibext.c	2017-06-11 02:13:03.646084696 +0100
+@@ -365,7 +365,7 @@
+         lua_pushliteral(L,"all command execution is disabled");
+     } else if (restrictedshell == 0) {
+         lua_pushboolean(L,1);
+-        lua_pushliteral(L,"all commands are permitted");
++        lua_pushstring(L,filename);
+     } else {
+         char *safecmd = NULL;
+         char *cmdname = NULL;
+@@ -374,10 +374,6 @@
+                 lua_pushboolean(L,0);
+                 lua_pushliteral(L, "specific command execution disabled");
+                 break;
+-            case 1:
+-                lua_pushboolean(L,1);
+-                lua_pushstring(L,filename);
+-                break;
+             case 2:
+                 lua_pushboolean(L,1);
+                 lua_pushstring(L,safecmd);
+diff -Naur a/texk/web2c/luatexdir/lua/luatex-core.lua b/texk/web2c/luatexdir/lua/luatex-core.lua
+--- a/texk/web2c/luatexdir/lua/luatex-core.lua	2017-04-19 11:07:10.000000000 +0100
++++ b/texk/web2c/luatexdir/lua/luatex-core.lua	2017-06-11 02:13:16.874221267 +0100
+@@ -29,7 +29,7 @@
+ local kpseused            = status.kpse_used    -- 0 1
+ 
+ io.saved_open             = io_open  -- can be protected
+-io.saved_popen            = io_popen -- can be protected
++-- (deleted for tl17 rebuild) io.saved_popen            = io_popen -- can be protected
+ io.saved_lines            = io_lines -- always readonly
+ mt.saved_lines            = mt_lines -- always readonly
+ 
+diff -Naur a/texk/web2c/luatexdir/luatex.c b/texk/web2c/luatexdir/luatex.c
+--- a/texk/web2c/luatexdir/luatex.c	2017-03-31 14:27:09.000000000 +0100
++++ b/texk/web2c/luatexdir/luatex.c	2017-06-11 02:13:16.874221267 +0100
+@@ -28,9 +28,11 @@
+ 
+ #define TeX
+ 
++/* for tl17 update, change luatex_date_info but nothing else,
++   as context depends on the numeric version number. */
+ int luatex_version = 100;        /* \.{\\luatexversion}  */
+ int luatex_revision = '4';      /* \.{\\luatexrevision}  */
+-int luatex_date_info = 2017033109;     /* the compile date is now hardwired :YEAR MONTH DAY HOUR*/
++int luatex_date_info = 2017060901;     /* the compile date is now hardwired :YEAR MONTH DAY HOUR*/
+ const char *luatex_version_string = "1.0.4";
+ const char *engine_name = my_name;     /* the name of this engine */
+ 
