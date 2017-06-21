@@ -1,0 +1,58 @@
+Submitted By:            Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date:                    2017-06-21
+Initial Package Version: 0.3.9
+Upstream Status:         Unknown
+Origin:                  Various internet files
+Description:             Fixes build with latest python and an installed header
+
+diff -Naur volume_key-volume_key-0.3.9.orig/configure.ac volume_key-volume_key-0.3.9/configure.ac
+--- volume_key-volume_key-0.3.9.orig/configure.ac	2012-09-22 14:40:53.000000000 -0500
++++ volume_key-volume_key-0.3.9/configure.ac	2017-06-19 22:56:40.255347462 -0500
+@@ -27,7 +27,13 @@
+ AC_PROG_CC
+ AM_PROG_CC_C_O
+ LT_INIT([disable-static])
+-AM_PATH_PYTHON
++
++PKG_CHECK_MODULES([PYTHON], [python], [has_python=yes], [])
++AS_IF([test "x$has_python" = "xyes"], [
++    AM_PATH_PYTHON
++    AC_SUBST([PYTHON_CFLAGS])
++    AC_SUBST([PYTHON_LIBS])
++])
+ 
+ dnl Not gpg2, it cannot receive passphrases from gpgme
+ AC_PATH_PROG([GPG], [gpg])
+diff -Naur volume_key-volume_key-0.3.9.orig/lib/libvolume_key.h volume_key-volume_key-0.3.9/lib/libvolume_key.h
+--- volume_key-volume_key-0.3.9.orig/lib/libvolume_key.h	2012-09-22 14:40:53.000000000 -0500
++++ volume_key-volume_key-0.3.9/lib/libvolume_key.h	2017-06-19 22:54:23.364118738 -0500
+@@ -18,8 +18,6 @@
+ #ifndef LIBVOLUME_KEY_H__
+ #define LIBVOLUME_KEY_H__
+ 
+-#include <config.h>
+-
+ #include <cert.h>
+ #include <glib.h>
+ 
+diff -Naur volume_key-volume_key-0.3.9.orig/Makefile.am volume_key-volume_key-0.3.9/Makefile.am
+--- volume_key-volume_key-0.3.9.orig/Makefile.am	2012-09-22 14:40:53.000000000 -0500
++++ volume_key-volume_key-0.3.9/Makefile.am	2017-06-19 22:56:05.896042178 -0500
+@@ -20,7 +20,7 @@
+ AM_CPPFLAGS = $(blkid_CFLAGS) $(glib_CFLAGS) $(GPGME_CFLAGS) \
+ 	$(libcryptsetup_CFLAGS) $(nss_CFLAGS)
+ LOCALEDIR_CPPFLAGS = -DLOCALEDIR='"$(localedir)"'
+-PYTHON_CPPFLAGS = -I/usr/include/python$(PYTHON_VERSION)
++PYTHON_CPPFLAGS = $(PYTHON_CFLAGS)
+ 
+ ## Targets
+ SUBDIRS = po
+@@ -65,7 +65,7 @@
+ python__volume_key_la_SOURCES = python/volume_key_wrap.c
+ python__volume_key_la_CPPFLAGS = $(AM_CPPFLAGS) $(PYTHON_CPPFLAGS)
+ python__volume_key_la_LDFLAGS = -module -avoid-version $(glib_LIBS)
+-python__volume_key_la_LIBADD = lib/libvolume_key.la -lpython$(PYTHON_VERSION) \
++python__volume_key_la_LIBADD = lib/libvolume_key.la $(PYTHON_LIBS) \
+ 	$(glib_LIBS) $(nss_LIBS)
+ 
+ src_volume_key_SOURCES = src/volume_key.c
