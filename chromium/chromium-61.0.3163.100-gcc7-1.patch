@@ -1,0 +1,129 @@
+Submitted By:            DJ Lucas <dj_AT_linuxfromscratch_DOT_org>
+Date:                    2017-10-13
+Initial Package Version: 61.0.3163.100
+Upstream Status:         Pending
+Origin:                  upstream
+Description:             Allows building with GCC-7.2.0.
+
+
+diff -Naurp chromium-61.0.3163.100-orig/base/numerics/safe_math_shared_impl.h chromium-61.0.3163.100/base/numerics/safe_math_shared_impl.h
+--- chromium-61.0.3163.100-orig/base/numerics/safe_math_shared_impl.h	2017-09-21 17:04:50.000000000 -0500
++++ chromium-61.0.3163.100/base/numerics/safe_math_shared_impl.h	2017-10-11 23:30:39.809656293 -0500
+@@ -21,8 +21,7 @@
+ #if !defined(__native_client__) &&                         \
+     ((defined(__clang__) &&                                \
+       ((__clang_major__ > 3) ||                            \
+-       (__clang_major__ == 3 && __clang_minor__ >= 4))) || \
+-     (defined(__GNUC__) && __GNUC__ >= 5))
++       (__clang_major__ == 3 && __clang_minor__ >= 4))))
+ #include "base/numerics/safe_math_clang_gcc_impl.h"
+ #define BASE_HAS_OPTIMIZED_SAFE_MATH (1)
+ #else
+diff -Naurp chromium-61.0.3163.100-orig/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h chromium-61.0.3163.100/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h
+--- chromium-61.0.3163.100-orig/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h	2017-09-21 17:05:18.000000000 -0500
++++ chromium-61.0.3163.100/third_party/WebKit/Source/platform/graphics/gpu/SharedGpuContext.h	2017-10-11 23:30:39.806323020 -0500
+@@ -8,6 +8,7 @@
+ #include "platform/PlatformExport.h"
+ #include "platform/wtf/ThreadSpecific.h"
+ 
++#include <functional>
+ #include <memory>
+ 
+ namespace gpu {
+diff -Naurp chromium-61.0.3163.100-orig/third_party/WebKit/Source/platform/wtf/LinkedHashSet.h chromium-61.0.3163.100/third_party/WebKit/Source/platform/wtf/LinkedHashSet.h
+--- chromium-61.0.3163.100-orig/third_party/WebKit/Source/platform/wtf/LinkedHashSet.h	2017-09-21 17:05:18.000000000 -0500
++++ chromium-61.0.3163.100/third_party/WebKit/Source/platform/wtf/LinkedHashSet.h	2017-10-11 23:30:39.806323020 -0500
+@@ -685,6 +685,31 @@ inline LinkedHashSet<T, U, V, W>& Linked
+   return *this;
+ }
+ 
++inline void SwapAnchor(LinkedHashSetNodeBase& a, LinkedHashSetNodeBase& b) {
++  DCHECK(a.prev_);
++  DCHECK(a.next_);
++  DCHECK(b.prev_);
++  DCHECK(b.next_);
++  swap(a.prev_, b.prev_);
++  swap(a.next_, b.next_);
++  if (b.next_ == &a) {
++    DCHECK_EQ(b.prev_, &a);
++    b.next_ = &b;
++    b.prev_ = &b;
++  } else {
++    b.next_->prev_ = &b;
++    b.prev_->next_ = &b;
++  }
++  if (a.next_ == &b) {
++    DCHECK_EQ(a.prev_, &b);
++    a.next_ = &a;
++    a.prev_ = &a;
++  } else {
++    a.next_->prev_ = &a;
++    a.prev_->next_ = &a;
++  }
++}
++
+ template <typename T, typename U, typename V, typename W>
+ inline void LinkedHashSet<T, U, V, W>::Swap(LinkedHashSet& other) {
+   impl_.swap(other.impl_);
+@@ -877,31 +902,6 @@ inline void LinkedHashSet<T, U, V, W>::e
+   erase(find(value));
+ }
+ 
+-inline void SwapAnchor(LinkedHashSetNodeBase& a, LinkedHashSetNodeBase& b) {
+-  DCHECK(a.prev_);
+-  DCHECK(a.next_);
+-  DCHECK(b.prev_);
+-  DCHECK(b.next_);
+-  swap(a.prev_, b.prev_);
+-  swap(a.next_, b.next_);
+-  if (b.next_ == &a) {
+-    DCHECK_EQ(b.prev_, &a);
+-    b.next_ = &b;
+-    b.prev_ = &b;
+-  } else {
+-    b.next_->prev_ = &b;
+-    b.prev_->next_ = &b;
+-  }
+-  if (a.next_ == &b) {
+-    DCHECK_EQ(a.prev_, &b);
+-    a.next_ = &a;
+-    a.prev_ = &a;
+-  } else {
+-    a.next_->prev_ = &a;
+-    a.prev_->next_ = &a;
+-  }
+-}
+-
+ inline void swap(LinkedHashSetNodeBase& a, LinkedHashSetNodeBase& b) {
+   DCHECK_NE(a.next_, &a);
+   DCHECK_NE(b.next_, &b);
+diff -Naurp chromium-61.0.3163.100-orig/chrome/browser/devtools/devtools_file_system_indexer.cc chromium-61.0.3163.100/chrome/browser/devtools/devtools_file_system_indexer.cc
+--- chromium-61.0.3163.100-orig/chrome/browser/devtools/devtools_file_system_indexer.cc
++++ chromium-61.0.3163.100/chrome/browser/devtools/devtools_file_system_indexer.cc
+@@ -34,12 +34,13 @@
+ using base::TimeTicks;
+ using content::BrowserThread;
+ using std::map;
+-using std::set;
+ using std::string;
+ using std::vector;
+ 
+ namespace {
+ 
++using std::set;
++
+ base::SequencedTaskRunner* impl_task_runner() {
+   constexpr base::TaskTraits kBlockingTraits = {base::MayBlock(),
+                                                 base::TaskPriority::BACKGROUND};
+diff -Naurp chromium-61.0.3163.100-orig/ui/views/examples/box_layout_example.h chromium-61.0.3163.100/ui/views/examples/box_layout_example.h
+--- chromium-61.0.3163.100-orig/ui/views/examples/box_layout_example.h
++++ chromium-61.0.3163.100/ui/views/examples/box_layout_example.h
+@@ -38,7 +38,7 @@
+   void CreateExampleView(View* container) override;
+ 
+  private:
+-  friend class ChildPanel;
++  friend class views::examples::ChildPanel;
+   // ButtonListener
+   void ButtonPressed(Button* sender, const ui::Event& event) override;
+ 
