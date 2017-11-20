@@ -1,0 +1,52 @@
+Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
+Date:                    2017-11-20
+Initial Package Version: 2.36.11
+Upstream Status:         Not submitted
+Origin:                  Self
+Description:             Fixes minor build issues with meson
+
+--- gdk-pixbuf-2.36.11-orig/meson.build	2017-10-02 10:24:27.000000000 -0500
++++ gdk-pixbuf-2.36.11/meson.build	2017-11-20 01:10:37.135084816 -0600
+@@ -1,5 +1,5 @@
+ project('gdk-pixbuf', 'c',
+-        version: '2.36.10',
++        version: '2.36.11',
+         license: 'LGPLv2.1+',
+         default_options: [
+           'buildtype=debugoptimized',
+@@ -25,11 +25,7 @@ gdk_pixbuf_binary_version = '2.10.0'
+ 
+ gdk_pixbuf_api_name = '@0@-@1@'.format(meson.project_name(), gdk_pixbuf_api_version)
+ 
+-if gdk_pixbuf_version_minor.is_odd()
+-  gdk_pixbuf_interface_age = 0
+-else
+-  gdk_pixbuf_interface_age = gdk_pixbuf_version_micro
+-endif
++gdk_pixbuf_interface_age = 0
+ 
+ gdk_pixbuf_binary_age = 100 * gdk_pixbuf_version_minor + gdk_pixbuf_version_micro
+ 
+@@ -37,10 +33,10 @@ gdk_pixbuf_binary_age = 100 * gdk_pixbuf
+ # current = binary - interface
+ # revision = interface
+ soversion = 0
+-current = gdk_pixbuf_binary_age - gdk_pixbuf_interface_age
++current = gdk_pixbuf_binary_age
+ revision = gdk_pixbuf_interface_age
+ libversion = '@0@.@1@.@2@'.format(soversion, current, revision)
+-age = gdk_pixbuf_binary_age - gdk_pixbuf_interface_age
++age = gdk_pixbuf_binary_age
+ current_minus_age = current - age
+ 
+ # Paths
+--- gdk-pixbuf-2.36.11-orig/gdk-pixbuf/meson.build	2017-10-02 10:24:27.000000000 -0500
++++ gdk-pixbuf-2.36.11/gdk-pixbuf/meson.build	2017-11-20 01:16:13.104788447 -0600
+@@ -63,6 +63,7 @@ gdkpixbuf_headers = [
+   'gdk-pixbuf-io.h',
+   'gdk-pixbuf-loader.h',
+   'gdk-pixbuf-macros.h',
++  'gdk-pixbuf-marshal.h',
+   'gdk-pixbuf-simple-anim.h',
+   'gdk-pixbuf-transform.h',
+ ]
