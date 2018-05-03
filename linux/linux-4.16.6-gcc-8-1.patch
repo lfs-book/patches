@@ -1,0 +1,18 @@
+Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
+Date:                    2018-05-04
+Initial Package Version: 4.16.6
+Upstream Status:         Comitted
+Origin:                  https://marc.info/?l=linux-kernel&m=152116992412107&w=2
+Description:             Fixes build issue with gcc-8.1.
+
+diff -Naurp linux-4.16.6-orig/tools/lib/str_error_r.c linux-4.16.6/tools/lib/str_error_r.c
+--- linux-4.16.6-orig/tools/lib/str_error_r.c	2018-05-03 17:38:39.855482052 -0500
++++ linux-4.16.6/tools/lib/str_error_r.c	2018-05-03 17:42:25.051427141 -0500
+@@ -22,6 +22,6 @@ char *str_error_r(int errnum, char *buf,
+ {
+ 	int err = strerror_r(errnum, buf, buflen);
+ 	if (err)
+-		snprintf(buf, buflen, "INTERNAL ERROR: strerror_r(%d, %p, %zd)=%d", errnum, buf, buflen, err);
++		snprintf(buf, buflen, "INTERNAL ERROR: strerror_r(%d, [buf], %zd)=%d", errnum, buflen, err);
+ 	return buf;
+ }
