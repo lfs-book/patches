@@ -1,6 +1,6 @@
 Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
-Date:                    2017-03-12
-Initial Package Version: 8.27
+Date:                    2018-05-03
+Initial Package Version: 0.170
 Upstream Status:         Comitted
 Origin:                  Debian. Partial backport of https://sourceware.org/git/?p=elfutils.git;a=commit;h=17d7194d291bf91d130b78e06cbe27b290e0376d
 Description:             Fixes build issue with gcc-8.1.
