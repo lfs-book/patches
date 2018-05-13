@@ -1,3 +1,10 @@
+Submitted By:            Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date:                    2018-05-12
+Initial Package Version: 13.2.1
+Upstream Status:         Unknown
+Origin:                  Arch Linux
+Description:             Fixes for gcc8 and xorg-server-1.20
+
 diff -Naur xf86-video-vmware-13.2.1.orig/saa/saa.c xf86-video-vmware-13.2.1/saa/saa.c
 --- xf86-video-vmware-13.2.1.orig/saa/saa.c	2015-12-03 07:55:45.000000000 -0600
 +++ xf86-video-vmware-13.2.1/saa/saa.c	2018-05-12 13:30:01.397137316 -0500
