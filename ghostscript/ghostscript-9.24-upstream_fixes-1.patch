@@ -1,0 +1,64 @@
+Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date: 2018-09-10
+Initial Package Version: 9.24
+Upstream Status: Applied
+Origin: Upstream
+Description: 
+  The temp and ICC profile paths need to finish with wildcards to work correctly.
+
+  There was also an issue that the string being returned from the graphics
+library was null terminated, and Postscript strings are not (and Ghostscript
+strings are not necessarily). We leave the null termination in place, but
+reduce the length returned by 1.
+
+diff -Naur ghostscript-9.24.orig/base/gsicc_manage.c ghostscript-9.24/base/gsicc_manage.c
+--- ghostscript-9.24.orig/base/gsicc_manage.c	2018-09-03 03:50:27.000000000 -0500
++++ ghostscript-9.24/base/gsicc_manage.c	2018-09-10 13:01:39.021778175 -0500
+@@ -2972,7 +2972,7 @@
+         pval->persistent = true;
+     } else {
+         pval->data = (const byte *)(lib_ctx->profiledir);
+-        pval->size = lib_ctx->profiledir_len;
++        pval->size = lib_ctx->profiledir_len - 1;
+         pval->persistent = false;
+     }
+ }
+diff -Naur ghostscript-9.24.orig/Resource/Init/gs_init.ps ghostscript-9.24/Resource/Init/gs_init.ps
+--- ghostscript-9.24.orig/Resource/Init/gs_init.ps	2018-09-03 03:50:27.000000000 -0500
++++ ghostscript-9.24/Resource/Init/gs_init.ps	2018-09-10 13:05:46.716012555 -0500
+@@ -2027,7 +2027,7 @@
+     <<
+       /PermitFileReading [
+         currentuserparams /PermitFileReading get aload pop
+-        //tempfilepaths aload pop
++        [//tempfilepaths aload pop] (*) .generate_dir_list_templates
+         /FONTPATH .systemvar (*) .generate_dir_list_templates
+           % Library files :
+         /LIBPATH  .systemvar (*) .generate_dir_list_templates
+@@ -2042,14 +2042,15 @@
+           [ currentsystemparams /GenericResourceDir get] (*) .file_name_separator (*)
+             concatstrings concatstrings .generate_dir_list_templates
+         } if
++        currentuserparams /ICCProfilesDir known {[currentuserparams /ICCProfilesDir get] (*) .generate_dir_list_templates} if
+       ]
+       /PermitFileWriting [
+           currentuserparams /PermitFileWriting get aload pop
+-          //tempfilepaths aload pop
++          [//tempfilepaths aload pop] (*) .generate_dir_list_templates
+       ]
+       /PermitFileControl [
+           currentuserparams /PermitFileControl get aload pop
+-          //tempfilepaths aload pop
++          [//tempfilepaths aload pop] (*) .generate_dir_list_templates
+       ]
+       /LockFilePermissions //true
+     >> setuserparams
+@@ -2132,7 +2133,7 @@
+   /.setshapealpha            % transparency-example.ps
+   /.endtransparencygroup     % transparency-example.ps
+   /.setdotlength             % Bug687720.ps
+-  /.sort /.setdebug /.mementolistnewblocks /getenv
++  /.sort /.mementolistnewblocks /getenv
+ 
+   /.makeoperator /.setCPSImode              % gs_cet.ps, this won't work on cluster with -dSAFER
+ 
