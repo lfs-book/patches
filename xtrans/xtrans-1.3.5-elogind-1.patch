@@ -1,0 +1,38 @@
+Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
+Date:                    2018-12-22
+Initial Package Version: 1.20.3
+Upstream Status:         Submitted
+Origin:                  Self
+Description:             Allows use of elogind in xtrans consumers
+
+diff -Naurp xtrans-1.3.5-orig/Xtrans.c xtrans-1.3.5/Xtrans.c
+--- xtrans-1.3.5-orig/Xtrans.c	2014-09-12 13:32:47.000000000 -0500
++++ xtrans-1.3.5/Xtrans.c	2018-12-18 20:56:54.797445618 -0600
+@@ -53,6 +53,9 @@ from The Open Group.
+ #ifdef HAVE_SYSTEMD_DAEMON
+ #include <systemd/sd-daemon.h>
+ #endif
++#ifdef HAVE_ELOGIND
++#include <elogind/sd-daemon.h>
++#endif
+ 
+ /*
+  * The transport table contains a definition for every transport (protocol)
+@@ -1103,7 +1106,7 @@ receive_listening_fds(const char* port,
+                       int* count_ret)
+ 
+ {
+-#ifdef HAVE_SYSTEMD_DAEMON
++#if defined(HAVE_SYSTEMD_DAEMON) || defined(HAVE_ELOGIND)
+     XtransConnInfo ciptr;
+     int i, systemd_listen_fds;
+ 
+@@ -1168,7 +1171,7 @@ receive_listening_fds(const char* port,
+         temp_ciptrs[(*count_ret)++] = ciptr;
+         TRANS(Received)(tn);
+     }
+-#endif /* HAVE_SYSTEMD_DAEMON */
++#endif /* HAVE_SYSTEMD_DAEMON || HAVE_ELOGIND */
+     return 0;
+ }
+ 
