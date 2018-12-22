@@ -1,0 +1,214 @@
+Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
+Date:                    2018-12-22
+Initial Package Version: 1.20.3
+Upstream Status:         Submitted
+Origin:                  Self
+Description:             Allows detection and use of elogind
+
+diff -Naurp xorg-server-1.20.3-orig/configure.ac xorg-server-1.20.3/configure.ac
+--- xorg-server-1.20.3-orig/configure.ac	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/configure.ac	2018-12-20 16:05:05.571415145 -0600
+@@ -581,6 +581,7 @@ AC_ARG_ENABLE(pciaccess, AS_HELP_STRING(
+ AC_ARG_ENABLE(linux_acpi, AS_HELP_STRING([--disable-linux-acpi], [Disable building ACPI support on Linux (if available).]), [enable_linux_acpi=$enableval], [enable_linux_acpi=yes])
+ AC_ARG_ENABLE(linux_apm, AS_HELP_STRING([--disable-linux-apm], [Disable building APM support on Linux (if available).]), [enable_linux_apm=$enableval], [enable_linux_apm=yes])
+ AC_ARG_ENABLE(systemd-logind, AS_HELP_STRING([--enable-systemd-logind], [Build systemd-logind support (default: auto)]), [SYSTEMD_LOGIND=$enableval], [SYSTEMD_LOGIND=auto])
++AC_ARG_ENABLE(elogind, AS_HELP_STRING([--enable-elogind], [Build elogind support (default: auto)]), [ELOGIND_LOGIND=$enableval], [ELOGIND_LOGIND=auto])
+ AC_ARG_ENABLE(suid-wrapper, AS_HELP_STRING([--enable-suid-wrapper], [Build suid-root wrapper for legacy driver support on rootless xserver systems (default: no)]), [SUID_WRAPPER=$enableval], [SUID_WRAPPER=no])
+ 
+ dnl DDXes.
+@@ -852,6 +853,15 @@ if test "x$WITH_SYSTEMD_DAEMON" = "xyes"
+ fi
+ AM_CONDITIONAL([HAVE_SYSTEMD_DAEMON], [test "x$HAVE_SYSTEMD_DAEMON" = "xyes"])
+ 
++dnl elogind socket fds detection for xtrans
++PKG_CHECK_MODULES(ELOGIND, [libelogind >= 209], [HAVE_ELOGIND=yes], [HAVE_ELOGIND=no])
++if test "x$HAVE_ELOGIND" = xyes -a "x$HAVE_SYSTEMD_DAEMON" = xno; then
++        REQUIRED_LIBS="$REQUIRED_LIBS libelogind >= 209"
++else
++        HAVE_ELOGIND="no"
++fi
++AM_CONDITIONAL([HAVE_ELOGIND], [test "x$HAVE_ELOGIND" = "xyes"])
++
+ if test "x$CONFIG_UDEV" = xyes && test "x$CONFIG_HAL" = xyes; then
+ 	AC_MSG_ERROR([Hotplugging through both libudev and hal not allowed])
+ fi
+@@ -885,6 +895,7 @@ if test "x$CONFIG_UDEV" = xyes; then
+ fi
+ AM_CONDITIONAL(CONFIG_UDEV_KMS, [test "x$CONFIG_UDEV_KMS" = xyes])
+ 
++
+ PKG_CHECK_MODULES(DBUS, $LIBDBUS, [HAVE_DBUS=yes], [HAVE_DBUS=no])
+ if test "x$HAVE_DBUS" = xyes; then
+ 	AC_DEFINE(HAVE_DBUS, 1, [Have D-Bus support])
+@@ -925,6 +936,27 @@ if test "x$SYSTEMD_LOGIND" = xyes; then
+ fi
+ AM_CONDITIONAL(SYSTEMD_LOGIND, [test "x$SYSTEMD_LOGIND" = xyes])
+ 
++dnl Chcek for elogind integration
++if test "x$ELOGIND_LOGIND" = xauto; then
++        if test "x$HAVE_DBUS" = xyes -a "x$CONFIG_UDEV" = xyes -a "x$HAVE_ELOGIND" = xyes -a "x$SYSTEMD_LOGIND" = xno; then
++                ELOGIND_LOGIND=yes
++        else
++                ELOGIND_LOGIND=no
++        fi
++fi
++if test "x$ELOGIND_LOGIND" = xyes; then
++        if ! test "x$HAVE_DBUS" = xyes; then
++                AC_MSG_ERROR([elogind requested, but D-Bus is not installed.])
++        fi
++        if ! test "x$CONFIG_UDEV" = xyes ; then
++                AC_MSG_ERROR([elogind is only supported in combination with udev configuration.])
++        fi
++
++        AC_DEFINE(ELOGIND_LOGIND, 1, [Enable elogind integration])
++        NEED_DBUS="yes"
++fi
++AM_CONDITIONAL(ELOGIND_LOGIND, [test "x$ELOGIND_LOGIND" = xyes])
++
+ if test "x$SUID_WRAPPER" = xyes; then
+         dnl This is a define so that if some platforms want to put the wrapper
+         dnl somewhere else this can be easily changed
+diff -Naurp xorg-server-1.20.3-orig/hw/kdrive/src/kdrive.c xorg-server-1.20.3/hw/kdrive/src/kdrive.c
+--- xorg-server-1.20.3-orig/hw/kdrive/src/kdrive.c	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/hw/kdrive/src/kdrive.c	2018-12-20 16:05:05.571415145 -0600
+@@ -1007,7 +1007,7 @@ xf86_find_platform_device_by_devnum(int
+     return NULL;
+ }
+ 
+-#ifdef SYSTEMD_LOGIND
++#if defined (SYSTEMD_LOGIND) || defined(ELOGIND_LOGIND)
+ void
+ systemd_logind_vtenter(void)
+ {
+diff -Naurp xorg-server-1.20.3-orig/hw/xfree86/os-support/linux/Makefile.am xorg-server-1.20.3/hw/xfree86/os-support/linux/Makefile.am
+--- xorg-server-1.20.3-orig/hw/xfree86/os-support/linux/Makefile.am	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/hw/xfree86/os-support/linux/Makefile.am	2018-12-20 16:05:05.571415145 -0600
+@@ -18,6 +18,11 @@ LOGIND_SRCS = systemd-logind.c
+ XORG_CFLAGS += $(DBUS_CFLAGS)
+ endif
+ 
++if ELOGIND_LOGIND
++LOGIND_SRCS = systemd-logind.c
++XORG_CFLAGS += $(DBUS_CFLAGS)
++endif
++
+ liblinux_la_SOURCES = linux.h lnx_init.c lnx_video.c \
+                      lnx_agp.c lnx_kmod.c lnx_bell.c lnx_platform.c \
+ 		     $(srcdir)/../shared/VTsw_usl.c \
+diff -Naurp xorg-server-1.20.3-orig/hw/xfree86/os-support/meson.build xorg-server-1.20.3/hw/xfree86/os-support/meson.build
+--- xorg-server-1.20.3-orig/hw/xfree86/os-support/meson.build	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/hw/xfree86/os-support/meson.build	2018-12-22 11:57:38.060218816 -0600
+@@ -39,6 +39,10 @@ if host_machine.system() == 'linux'
+         srcs_xorg_os_support += 'linux/systemd-logind.c'
+     endif
+ 
++    if build_elogind
++        srcs_xorg_os_support += 'linux/systemd-logind.c'
++    endif
++
+     # this is ugly because the code is also
+     if build_apm or build_acpi
+         srcs_xorg_os_support += 'linux/lnx_apm.c'
+diff -Naurp xorg-server-1.20.3-orig/include/dix-config.h.in xorg-server-1.20.3/include/dix-config.h.in
+--- xorg-server-1.20.3-orig/include/dix-config.h.in	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/include/dix-config.h.in	2018-12-20 16:05:05.571415145 -0600
+@@ -424,6 +424,9 @@
+ /* Enable systemd-logind integration */
+ #undef SYSTEMD_LOGIND 1
+ 
++/* Enable elogind integration */
++#undef ELOGIND_LOGIND 1
++
+ /* Have a monotonic clock from clock_gettime() */
+ #undef MONOTONIC_CLOCK
+ 
+diff -Naurp xorg-server-1.20.3-orig/include/do-not-use-config.h.in xorg-server-1.20.3/include/do-not-use-config.h.in
+--- xorg-server-1.20.3-orig/include/do-not-use-config.h.in	2018-10-25 09:13:28.000000000 -0500
++++ xorg-server-1.20.3/include/do-not-use-config.h.in	2018-12-20 16:05:05.571415145 -0600
+@@ -105,6 +105,9 @@
+ /* Default DRI driver path */
+ #undef DRI_DRIVER_PATH
+ 
++/* Enable elogind integration */
++#undef ELOGIND_LOGIND
++
+ /* Fallback input driver */
+ #undef FALLBACK_INPUT_DRIVER
+ 
+diff -Naurp xorg-server-1.20.3-orig/include/meson.build xorg-server-1.20.3/include/meson.build
+--- xorg-server-1.20.3-orig/include/meson.build	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/include/meson.build	2018-12-22 11:57:38.060218816 -0600
+@@ -61,13 +61,15 @@ conf_data.set('HAVE_INPUTTHREAD', '1') #
+ conf_data.set('HAVE_PTHREAD_SETNAME_NP_WITHOUT_TID', '1') # XXX
+ conf_data.set('HAVE_LIBBSD', libbsd_dep.found())
+ # XXX: HAVE_SYSTEMD_DAEMON
++# XXX: HAVE_ELOGIND
+ # XXX: HAVE_LIBUDEV
+ conf_data.set('CONFIG_UDEV', build_udev)
+ conf_data.set('CONFIG_UDEV_KMS', build_udev)
+ conf_data.set('HAVE_DBUS', build_dbus)
+ conf_data.set('CONFIG_HAL', build_hal)
+ conf_data.set('SYSTEMD_LOGIND', build_systemd_logind)
+-conf_data.set('NEED_DBUS', build_systemd_logind or build_hal)
++conf_data.set('ELOGIND_LOGIND', build_systemd_logind)
++conf_data.set('NEED_DBUS', build_elogind or build_systemd_logind or build_hal)
+ conf_data.set('CONFIG_WSCONS', host_machine.system() == 'openbsd')
+ 
+ # XXX: SHMDIR is weird in autoconf, probing the build system for
+diff -Naurp xorg-server-1.20.3-orig/include/systemd-logind.h xorg-server-1.20.3/include/systemd-logind.h
+--- xorg-server-1.20.3-orig/include/systemd-logind.h	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/include/systemd-logind.h	2018-12-20 16:05:05.572415149 -0600
+@@ -26,7 +26,7 @@
+ #ifndef SYSTEMD_LOGIND_H
+ #define SYSTEMD_LOGIND_H
+ 
+-#ifdef SYSTEMD_LOGIND
++#if defined(SYSTEMD_LOGIND) || defined(ELOGIND_LOGIND)
+ int systemd_logind_init(void);
+ void systemd_logind_fini(void);
+ int systemd_logind_take_fd(int major, int minor, const char *path, Bool *paus);
+diff -Naurp xorg-server-1.20.3-orig/meson.build xorg-server-1.20.3/meson.build
+--- xorg-server-1.20.3-orig/meson.build	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/meson.build	2018-12-22 11:57:38.061218815 -0600
+@@ -94,6 +94,7 @@ xfont2_dep = dependency('xfont2', versio
+ nettle_dep = dependency('nettle')
+ 
+ dbus_required = get_option('systemd_logind') == 'true'
++dbus_requried = get_option('elogind') == 'true'
+ dbus_dep = dependency('dbus-1', version: '>= 1.0', required: dbus_required)
+ 
+ build_hashtable = false
+@@ -151,6 +152,12 @@ else
+     build_systemd_logind = get_option('systemd_logind') == 'true'
+ endif
+ 
++if get_option('elogind') == 'auto'
++    build_elogind = build_udev and dbus_dep.found()
++else
++    build_elogind = get_option('elogind') == 'true'
++endif
++
+ build_xorg = false
+ if (host_machine.system() != 'darwin' and
+     host_machine.system() != 'windows')
+@@ -257,7 +264,7 @@ if build_udev and build_hal
+     error('Hotplugging through both libudev and hal not allowed')
+ endif
+ 
+-build_dbus = build_hal or build_systemd_logind
++build_dbus = build_hal or build_systemd_logind or build_elogind
+ 
+ udev_dep = dependency('', required:false)
+ if build_udev
+diff -Naurp xorg-server-1.20.3-orig/meson_options.txt xorg-server-1.20.3/meson_options.txt
+--- xorg-server-1.20.3-orig/meson_options.txt	2018-10-25 09:13:21.000000000 -0500
++++ xorg-server-1.20.3/meson_options.txt	2018-12-22 11:57:38.061218815 -0600
+@@ -64,6 +64,8 @@ option('hal', type: 'combo', choices: ['
+        description: 'Enable HAL integration')
+ option('systemd_logind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
+        description: 'Enable systemd-logind integration')
++option('elogind', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
++       description: 'Enable elogind integration')
+ option('vbe', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
+        description: 'Xorg VBE module')
+ option('vgahw', type: 'combo', choices: ['true', 'false', 'auto'], value: 'auto',
