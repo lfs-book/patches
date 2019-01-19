@@ -1,0 +1,29 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-01-19
+Initial Package Version: 5.12.0
+Upstream Status:         Not submitted
+Origin:                  Arch Linux 32 / Self (improvements in comments)
+Description:             This fixes usage of the alignof operator to use
+                         the proper behavior implemented before gcc8. Without
+                         this change, alignof will return 4 instead of 8.
+
+diff -Naurp qtwebengine-everywhere-src-5.12.0.orig/src/3rdparty/chromium/mojo/public/c/system/macros.h qtwebengine-everywhere-src-5.12.0/src/3rdparty/chromium/mojo/public/c/system/macros.h
+--- qtwebengine-everywhere-src-5.12.0.orig/src/3rdparty/chromium/mojo/public/c/system/macros.h	2018-11-13 12:25:11.000000000 -0600
++++ qtwebengine-everywhere-src-5.12.0/src/3rdparty/chromium/mojo/public/c/system/macros.h	2019-01-19 11:45:57.175570538 -0600
+@@ -27,7 +27,15 @@
+   (sizeof(void*) == 4 ? 32 : 0)
+ 
+ // Like the C++11 |alignof| operator.
+-#if __cplusplus >= 201103L
++#if defined(__GNUC__) && __GNUC__ >= 8
++/*
++ * GCC 8 changed the alignof operator to return the minimal alignment
++ * required by the target ABI, instead of the preferred alignment.
++ * This means that on 32-bit x86 (i686), it will return 4 instead of 8.
++ * Use __alignof__ to avoid this.
++ */
++#define MOJO_ALIGNOF(type) __alignof__(type)
++#elif __cplusplus >= 201103L
+ #define MOJO_ALIGNOF(type) alignof(type)
+ #elif defined(__GNUC__)
+ #define MOJO_ALIGNOF(type) __alignof__(type)
