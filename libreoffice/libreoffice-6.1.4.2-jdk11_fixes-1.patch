@@ -1,0 +1,50 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-02-01
+Initial Package Version: 6.1.4.2
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fix the build of hsqldb using JDK11, and apply changes
+                         for syntax in Javadoc under JDK11.
+
+diff -Naurp libreoffice-6.1.4.2.orig/external/hsqldb/patches/hsqldb-runFinalizersOnExit.patch libreoffice-6.1.4.2/external/hsqldb/patches/hsqldb-runFinalizersOnExit.patch
+--- libreoffice-6.1.4.2.orig/external/hsqldb/patches/hsqldb-runFinalizersOnExit.patch	1969-12-31 18:00:00.000000000 -0600
++++ libreoffice-6.1.4.2/external/hsqldb/patches/hsqldb-runFinalizersOnExit.patch	2019-01-30 23:03:05.757696797 -0600
+@@ -0,0 +1,15 @@
++--- misc/hsqldb/src/org/hsqldb/lib/java/JavaSystem.java  2008-03-16 23:51:35.000000000 +0100
+++++ misc/build/hsqldb/src/org/hsqldb/lib/java/JavaSystem.java  2018-07-12 11:46:57.997837180 +0200
++@@ -160,8 +160,9 @@
++     public static void runFinalizers() {
++ 
++ //#ifdef JAVA2FULL
++-        System.runFinalizersOnExit(true);
++-
+++        try {
+++            System.class.getMethod("runFinalizersOnExit", boolean.class).invoke(null, true);
+++        } catch (Exception e) {}
++ //#endif
++     }
++ 
++
+diff -Naurp libreoffice-6.1.4.2.orig/external/hsqldb/UnpackedTarball_hsqldb.mk libreoffice-6.1.4.2/external/hsqldb/UnpackedTarball_hsqldb.mk
+--- libreoffice-6.1.4.2.orig/external/hsqldb/UnpackedTarball_hsqldb.mk	2018-12-12 15:59:14.000000000 -0600
++++ libreoffice-6.1.4.2/external/hsqldb/UnpackedTarball_hsqldb.mk	2019-01-30 23:03:28.835225999 -0600
+@@ -24,6 +24,7 @@ $(eval $(call gb_UnpackedTarball_add_pat
+ 	external/hsqldb/patches/i104901.patch \
+ 	external/hsqldb/patches/fdo36824.patch \
+ 	external/hsqldb/patches/limit_as_table_alias.patch \
++	external/hsqldb/patches/hsqldb-runFinalizersOnExit.patch \
+ 	$(if $(HSQLDB_USE_JDBC_4_1),\
+ 		external/hsqldb/patches/jdbc-4.1.patch \
+ 		external/hsqldb/patches/multipleResultSets.patch \
+diff -Naurp libreoffice-6.1.4.2.orig/odk/CustomTarget_javadoc.mk libreoffice-6.1.4.2/odk/CustomTarget_javadoc.mk
+--- libreoffice-6.1.4.2.orig/odk/CustomTarget_javadoc.mk	2018-12-12 15:59:14.000000000 -0600
++++ libreoffice-6.1.4.2/odk/CustomTarget_javadoc.mk	2019-01-30 23:04:07.081441543 -0600
+@@ -32,7 +32,7 @@ $(call gb_CustomTarget_get_workdir,odk/d
+ 		$(call gb_Jar_get_target,ridl)
+ 	$(call gb_Output_announce,$(subst $(WORKDIR)/,,$@),$(true),JDC,1)
+ 	$(call gb_Helper_abbreviate_dirs,\
+-		$(JAVADOC) -J-Xmx120m -use -splitindex \
++		$(JAVADOC) -source $(JAVA_SOURCE_VER) -J-Xmx120m -use -splitindex \
+ 		-windowtitle "Java UNO Runtime Reference" \
+ 		-header "$(PRODUCTNAME) $(PRODUCTVERSION) SDK Java API Reference"\
+ 		-tag attention:a:"Attention:" \
