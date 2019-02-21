@@ -1,0 +1,67 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-02-21
+Initial Package Version: 3.30.2
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fixes CVE-2019-3820, an authentication bypass via
+                         keybindings.
+
+diff -Naurp gnome-shell-3.30.2.orig/js/gdm/authPrompt.js gnome-shell-3.30.2/js/gdm/authPrompt.js
+--- gnome-shell-3.30.2.orig/js/gdm/authPrompt.js	2018-11-13 16:50:31.000000000 -0600
++++ gnome-shell-3.30.2/js/gdm/authPrompt.js	2019-02-20 23:21:09.721993501 -0600
+@@ -11,6 +11,7 @@ const Animation = imports.ui.animation;
+ const Batch = imports.gdm.batch;
+ const GdmUtil = imports.gdm.util;
+ const Params = imports.misc.params;
++const Shell = imports.gi.Shell;
+ const ShellEntry = imports.ui.shellEntry;
+ const Tweener = imports.ui.tweener;
+ const UserWidget = imports.ui.userWidget;
+@@ -99,7 +100,7 @@ var AuthPrompt = new Lang.Class({
+                          x_align: St.Align.START });
+         this._entry = new St.Entry({ style_class: 'login-dialog-prompt-entry',
+                                      can_focus: true });
+-        ShellEntry.addContextMenu(this._entry, { isPassword: true });
++        ShellEntry.addContextMenu(this._entry, { isPassword: true, actionMode: Shell.ActionMode.NONE });
+ 
+         this.actor.add(this._entry,
+                        { expand: true,
+diff -Naurp gnome-shell-3.30.2.orig/js/gdm/loginDialog.js gnome-shell-3.30.2/js/gdm/loginDialog.js
+--- gnome-shell-3.30.2.orig/js/gdm/loginDialog.js	2018-11-13 16:50:31.000000000 -0600
++++ gnome-shell-3.30.2/js/gdm/loginDialog.js	2019-02-20 23:21:02.146081342 -0600
+@@ -342,7 +342,8 @@ var SessionMenuButton = new Lang.Class({
+                  this._button.remove_style_pseudo_class('active');
+         });
+ 
+-        this._manager = new PopupMenu.PopupMenuManager({ actor: this._button });
++        this._manager = new PopupMenu.PopupMenuManager({ actor: this._button },
++                                                       { actionMode: Shell.ActionMode.NONE });
+         this._manager.addMenu(this._menu);
+ 
+         this._button.connect('clicked', () => { this._menu.toggle(); });
+diff -Naurp gnome-shell-3.30.2.orig/js/ui/shellEntry.js gnome-shell-3.30.2/js/ui/shellEntry.js
+--- gnome-shell-3.30.2.orig/js/ui/shellEntry.js	2018-11-13 16:50:31.000000000 -0600
++++ gnome-shell-3.30.2/js/ui/shellEntry.js	2019-02-20 23:22:23.969128773 -0600
+@@ -9,6 +9,7 @@ const BoxPointer = imports.ui.boxpointer
+ const Main = imports.ui.main;
+ const Params = imports.misc.params;
+ const PopupMenu = imports.ui.popupMenu;
++const Shell = imports.gi.Shell;
+ 
+ var EntryMenu = new Lang.Class({
+     Name: 'ShellEntryMenu',
+@@ -150,11 +151,12 @@ function addContextMenu(entry, params) {
+     if (entry.menu)
+         return;
+ 
+-    params = Params.parse (params, { isPassword: false });
++    params = Params.parse (params, { isPassword: false, actionMode: Shell.ActionMode.POPUP });
+ 
+     entry.menu = new EntryMenu(entry);
+     entry.menu.isPassword = params.isPassword;
+-    entry._menuManager = new PopupMenu.PopupMenuManager({ actor: entry });
++    entry._menuManager = new PopupMenu.PopupMenuManager({ actor: entry },
++                                                        { actionMode: params.actionMode });
+     entry._menuManager.addMenu(entry.menu);
+ 
+     // Add an event handler to both the entry and its clutter_text; the former
