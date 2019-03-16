@@ -1,19 +1,19 @@
---- sysvinit-2.94/src/Makefile.orig	2019-03-06 10:11:25.182053597 -0600
-+++ sysvinit-2.94/src/Makefile	2019-03-06 10:19:39.690959830 -0600
-@@ -23,19 +23,22 @@
- 
- # For some known distributions we do not build all programs, otherwise we do.
 Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
 Date: 2018-03-30
 Initial Package Version: 2.89
 Upstream Status: Not Submitted
 Origin: Self
-Description: Remove programs superceeded by other packages: wall, mountpoint, 
+Description: Remove programs superseded by other packages: wall, mountpoint, 
              last, lastb, mesg, sulogin, and utmpdump.
 
-Rediffed for vsrsion 2.94.
+Rediffed for version 2.94.
 Remove logsave also.
 
+--- sysvinit-2.94/src/Makefile.orig	2019-03-06 10:11:25.182053597 -0600
++++ sysvinit-2.94/src/Makefile	2019-03-06 10:19:39.690959830 -0600
+@@ -23,19 +23,22 @@
+ 
+ # For some known distributions we do not build all programs, otherwise we do.
  BIN	=
 -SBIN	= init halt shutdown runlevel killall5 fstab-decode logsave
 -USRBIN	= last mesg readbootlog
