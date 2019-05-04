@@ -1,0 +1,61 @@
+Submitted by: Xi Ruoyao <xry111 at mengyan1223 dot wang>
+Date: 2019-05-04
+Initial Package Version: 3.32.1
+Upstream Status: Comitted
+Origin: Upstream Git Repository
+Description: Allows building cheese with gstreamer built with -Dgst_debug=false
+
+diff --git a/libcheese/cheese-camera-device-monitor.c b/libcheese/cheese-camera-device-monitor.c
+index 5b4b43b5..19f4ff0b 100644
+--- a/libcheese/cheese-camera-device-monitor.c
++++ b/libcheese/cheese-camera-device-monitor.c
+@@ -240,10 +240,12 @@ cheese_camera_device_monitor_class_init (CheeseCameraDeviceMonitorClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+ 
++#ifndef GST_DISABLE_GST_DEBUG
+   if (cheese_device_monitor_cat == NULL)
+     GST_DEBUG_CATEGORY_INIT (cheese_device_monitor_cat,
+                              "cheese-device-monitor",
+                              0, "Cheese Camera Device Monitor");
++#endif
+ 
+   object_class->finalize = cheese_camera_device_monitor_finalize;
+ 
+diff --git a/libcheese/cheese-camera-device.c b/libcheese/cheese-camera-device.c
+index e994c5f5..942fa468 100644
+--- a/libcheese/cheese-camera-device.c
++++ b/libcheese/cheese-camera-device.c
+@@ -630,10 +630,12 @@ cheese_camera_device_class_init (CheeseCameraDeviceClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+ 
++#ifndef GST_DISABLE_GST_DEBUG
+   if (cheese_camera_device_cat == NULL)
+     GST_DEBUG_CATEGORY_INIT (cheese_camera_device_cat,
+                              "cheese-camera-device",
+                              0, "Cheese Camera Device");
++#endif
+ 
+   object_class->finalize     = cheese_camera_device_finalize;
+   object_class->get_property = cheese_camera_device_get_property;
+diff --git a/libcheese/cheese-camera.c b/libcheese/cheese-camera.c
+index 7b18dea5..7aa38066 100644
+--- a/libcheese/cheese-camera.c
++++ b/libcheese/cheese-camera.c
+@@ -1337,10 +1337,12 @@ cheese_camera_class_init (CheeseCameraClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+ 
++#ifndef GST_DISABLE_GST_DEBUG
+   if (cheese_camera_cat == NULL)
+     GST_DEBUG_CATEGORY_INIT (cheese_camera_cat,
+                              "cheese-camera",
+                              0, "Cheese Camera");
++#endif
+ 
+   object_class->finalize     = cheese_camera_finalize;
+   object_class->get_property = cheese_camera_get_property;
+-- 
+2.18.1
+
