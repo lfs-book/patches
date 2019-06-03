@@ -1,0 +1,447 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2019-06-03
+Initial Package Version: 14.4.2
+Upstream Status: Varies, all taken from debian
+Origin: Debian
+Description: various CVE and similar fixes, and a general update to
+14.4.2+git20190427.  I had been using the fixes for the CVE-2017
+issues (I took them from fedora) for a few months, but when I tried
+building with -D_FORTIFY_SOURCE=2 attempts to run sox or its variants
+hung, burning one core.  And the same if I built a default version on
+the otherwise fortified system.
+
+By updating to these patches, a default build was able to run.
+
+Adding my own CFLAGS with FORTIFY again hung, but with my CFLAGS and
+without FORTIFY this again works.  There was an old reference to
+problems with FORTIFY in
+https://sourceforge.net/p/sox/mailman/sox-commits/ which appears to be
+part of commit 8dcd32b1a08c95fd84a7c7b2f8811a40b568a8cd which removed
+debian packaging files, including their Changelog.  I conclude that
+sox should NOT be built with -D_FORTIFY_SOURCE=2.
+
+The debian patches on top of sox git are:
+0005-CVE-2017-15371.patch
+0006-CVE-2017-11358.patch
+0007-CVE-2017-15370.patch
+0008-CVE-2017-11332.patch
+0009-CVE-2017-11359.patch
+0010-wavpack_check_errors.patch
+0011-lintian-man-sox.patch
+0012-xa-validate-channel-count.patch
+0013-CVE-2017-15372.patch
+0014-CVE-2017-15642.patch
+0015-Handle-vorbis_analysis_headerout-errors.patch
+0016-CVE-2019-8354.patch
+0017-CVE-2019-8355.patch
+0018-CVE-2019-8356.patch
+0019-CVE-2019-8357.patch
+
+11 is not a vulnerability fix, 12 and 15 are, it just seemed
+convenient to apply these as a series (ignoring the two irrelevant
+earlier patches for fix-build (debian-specific) and spelling, and to
+fix up one item in src/Makefile.am which was rejected.
+
+N.B. this now requires autoreconf (I use autoreconf -fiv) because of
+the Makefile.am changes.
+
+
+diff -Naur a/sox.1 b/sox.1
+--- a/sox.1	2014-12-22 16:37:58.000000000 +0000
++++ b/sox.1	2019-06-02 22:45:56.811013209 +0100
+@@ -2699,7 +2699,7 @@
+ .ne 6
+ .TS
+ center;
+-lB lw52.
++lB lw51.
+ \-M/\-I/\-L	Phase response = minimum/intermediate/linear
+ \-s	Steep filter (band-width = 99%)
+ \-a	Allow aliasing/imaging above the pass-band
+diff -Naur a/src/adpcm.c b/src/adpcm.c
+--- a/src/adpcm.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/adpcm.c	2019-06-02 22:45:56.814018399 +0100
+@@ -71,6 +71,11 @@
+                         { 392,-232}
+ };
+ 
++extern void *lsx_ms_adpcm_alloc(unsigned chans)
++{
++        return lsx_malloc(chans * sizeof(MsState_t));
++}
++
+ static inline sox_sample_t AdpcmDecode(sox_sample_t c, MsState_t *state,
+                                sox_sample_t sample1, sox_sample_t sample2)
+ {
+@@ -102,6 +107,7 @@
+ 
+ /* lsx_ms_adpcm_block_expand_i() outputs interleaved samples into one output buffer */
+ const char *lsx_ms_adpcm_block_expand_i(
++        void *priv,
+         unsigned chans,          /* total channels             */
+         int nCoef,
+         const short *coef,
+@@ -113,7 +119,7 @@
+   const unsigned char *ip;
+   unsigned ch;
+   const char *errmsg = NULL;
+-  MsState_t state[4];  /* One decompressor state for each channel */
++  MsState_t *state = priv;  /* One decompressor state for each channel */
+ 
+   /* Read the four-byte header for each channel */
+   ip = ibuff;
+diff -Naur a/src/adpcm.h b/src/adpcm.h
+--- a/src/adpcm.h	2012-01-23 22:27:33.000000000 +0000
++++ b/src/adpcm.h	2019-06-02 22:45:56.814018399 +0100
+@@ -29,8 +29,11 @@
+ /* default coef sets */
+ extern const short lsx_ms_adpcm_i_coef[7][2];
+ 
++extern void *lsx_ms_adpcm_alloc(unsigned chans);
++
+ /* lsx_ms_adpcm_block_expand_i() outputs interleaved samples into one output buffer */
+ extern const char *lsx_ms_adpcm_block_expand_i(
++	void *priv,
+ 	unsigned chans,          /* total channels             */
+ 	int nCoef,
+ 	const short *coef,
+diff -Naur a/src/aiff.c b/src/aiff.c
+--- a/src/aiff.c	2014-10-30 03:29:54.000000000 +0000
++++ b/src/aiff.c	2019-06-02 22:45:56.815020129 +0100
+@@ -62,7 +62,6 @@
+   size_t ssndsize = 0;
+   char *annotation;
+   char *author;
+-  char *comment = NULL;
+   char *copyright;
+   char *nametext;
+ 
+@@ -270,6 +269,7 @@
+       free(annotation);
+     }
+     else if (strncmp(buf, "COMT", (size_t)4) == 0) {
++      char *comment = NULL;
+       rc = commentChunk(&comment, "Comment:", ft);
+       if (rc) {
+         /* Fail already called in function */
+diff -Naur a/src/effects_i_dsp.c b/src/effects_i_dsp.c
+--- a/src/effects_i_dsp.c	2014-10-30 03:29:54.000000000 +0000
++++ b/src/effects_i_dsp.c	2019-06-02 22:45:56.822032240 +0100
+@@ -357,11 +357,14 @@
+     double scale, sox_bool dc_norm)
+ {
+   int i, m = num_taps - 1;
+-  double * h = malloc(num_taps * sizeof(*h)), sum = 0;
++  double * h = calloc(num_taps, sizeof(*h)), sum = 0;
+   double mult = scale / lsx_bessel_I_0(beta), mult1 = 1 / (.5 * m + rho);
+   assert(Fc >= 0 && Fc <= 1);
+   lsx_debug("make_lpf(n=%i Fc=%.7g β=%g ρ=%g dc-norm=%i scale=%g)", num_taps, Fc, beta, rho, dc_norm, scale);
+ 
++  if (!h)
++    return NULL;
++
+   for (i = 0; i <= m / 2; ++i) {
+     double z = i - .5 * m, x = z * M_PI, y = z * mult1;
+     h[i] = x? sin(Fc * x) / x : Fc;
+diff -Naur a/src/fft4g.c b/src/fft4g.c
+--- a/src/fft4g.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/fft4g.c	2019-06-02 22:45:56.821030510 +0100
+@@ -322,6 +322,9 @@
+ 
+ void cdft(int n, int isgn, double *a, int *ip, double *w)
+ {
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     if (n > (ip[0] << 2)) {
+         makewt(n >> 2, ip, w);
+     }
+@@ -344,6 +347,9 @@
+     int nw, nc;
+     double xi;
+     
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     nw = ip[0];
+     if (n > (nw << 2)) {
+         nw = n >> 2;
+@@ -384,6 +390,9 @@
+     int j, nw, nc;
+     double xr;
+     
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     nw = ip[0];
+     if (n > (nw << 2)) {
+         nw = n >> 2;
+@@ -435,6 +444,9 @@
+     int j, nw, nc;
+     double xr;
+     
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     nw = ip[0];
+     if (n > (nw << 2)) {
+         nw = n >> 2;
+@@ -486,6 +498,9 @@
+     int j, k, l, m, mh, nw, nc;
+     double xr, xi, yr, yi;
+     
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     nw = ip[0];
+     if (n > (nw << 3)) {
+         nw = n >> 3;
+@@ -576,6 +591,9 @@
+     int j, k, l, m, mh, nw, nc;
+     double xr, xi, yr, yi;
+     
++    if (n > FFT4G_MAX_SIZE)
++        return;
++
+     nw = ip[0];
+     if (n > (nw << 3)) {
+         nw = n >> 3;
+diff -Naur a/src/fft4g.h b/src/fft4g.h
+--- a/src/fft4g.h	2012-01-23 22:27:33.000000000 +0000
++++ b/src/fft4g.h	2019-06-02 22:45:56.821030510 +0100
+@@ -13,6 +13,8 @@
+  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#define FFT4G_MAX_SIZE 262144
++
+ void lsx_cdft(int, int, double *, int *, double *);
+ void lsx_rdft(int, int, double *, int *, double *);
+ void lsx_ddct(int, int, double *, int *, double *);
+diff -Naur a/src/flac.c b/src/flac.c
+--- a/src/flac.c	2014-10-06 03:02:30.000000000 +0100
++++ b/src/flac.c	2019-06-02 22:45:56.802999368 +0100
+@@ -119,9 +119,10 @@
+     p->total_samples = metadata->data.stream_info.total_samples;
+   }
+   else if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
++    const FLAC__StreamMetadata_VorbisComment *vc = &metadata->data.vorbis_comment;
+     size_t i;
+ 
+-    if (metadata->data.vorbis_comment.num_comments == 0)
++    if (vc->num_comments == 0)
+       return;
+ 
+     if (ft->oob.comments != NULL) {
+@@ -129,8 +130,9 @@
+       return;
+     }
+ 
+-    for (i = 0; i < metadata->data.vorbis_comment.num_comments; ++i)
+-      sox_append_comment(&ft->oob.comments, (char const *) metadata->data.vorbis_comment.comments[i].entry);
++    for (i = 0; i < vc->num_comments; ++i)
++      if (vc->comments[i].entry)
++        sox_append_comment(&ft->oob.comments, (char const *) vc->comments[i].entry);
+   }
+ }
+ 
+diff -Naur a/src/hcom.c b/src/hcom.c
+--- a/src/hcom.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/hcom.c	2019-06-02 22:45:56.804001098 +0100
+@@ -150,6 +150,11 @@
+                 lsx_debug("%d %d",
+                        p->dictionary[i].dict_leftson,
+                        p->dictionary[i].dict_rightson);
++                if ((unsigned) p->dictionary[i].dict_leftson >= dictsize ||
++                    (unsigned) p->dictionary[i].dict_rightson >= dictsize) {
++                        lsx_fail_errno(ft, SOX_EHDR, "Invalid dictionary");
++                        return SOX_EOF;
++                }
+         }
+         rc = lsx_skipbytes(ft, (size_t) 1); /* skip pad byte */
+         if (rc)
+diff -Naur a/src/Makefile.am b/src/Makefile.am
+--- a/src/Makefile.am	2014-10-30 03:29:54.000000000 +0000
++++ b/src/Makefile.am	2019-06-02 22:48:32.320599703 +0100
+@@ -95,7 +95,7 @@
+ 
+ libsox_la_CFLAGS = @WARN_CFLAGS@
+ libsox_la_LDFLAGS = @APP_LDFLAGS@ -version-info @SHLIB_VERSION@ \
+-  -export-symbols-regex '^(sox_.*|lsx_(check_read_params|(close|open)_dllibrary|(debug(_more|_most)?|fail|report|warn)_impl|eof|fail_errno|filelength|find_(enum_(text|value)|file_extension)|getopt(_init)?|lpc10_(create_(de|en)coder_state|(de|en)code)|raw(read|write)|read(_b_buf|buf|chars)|realloc|rewind|seeki|sigfigs3p?|strcasecmp|tell|unreadb|write(b|_b_buf|buf|s)))$$'
++  -export-symbols-regex '^(sox_.*|lsx_(([cm]|re)alloc.*|check_read_params|(close|open)_dllibrary|(debug(_more|_most)?|fail|report|warn)_impl|eof|error|fail_errno|filelength|find_(enum_(text|value)|file_extension)|flush|getopt(_init)?|lpc10_(create_(de|en)coder_state|(de|en)code)|raw(read|write)|read(_b_buf|buf|chars)|rewind|seeki|sigfigs3p?|strcasecmp|strdup|tell|unreadb|write(b|_b_buf|buf|s)))$$'
+ 
+ if HAVE_WIN32_LTDL
+   libsox_la_SOURCES += win32-ltdl.c win32-ltdl.h
+diff -Naur a/src/vorbis.c b/src/vorbis.c
+--- a/src/vorbis.c	2014-10-06 03:02:30.000000000 +0100
++++ b/src/vorbis.c	2019-06-02 22:45:56.817023589 +0100
+@@ -270,8 +270,11 @@
+       vc.comment_lengths[i] = strlen(text);
+     }
+   }
+-  vorbis_analysis_headerout(    /* Build the packets */
+-      &ve->vd, &vc, &header_main, &header_comments, &header_codebooks);
++  if (vorbis_analysis_headerout(    /* Build the packets */
++      &ve->vd, &vc, &header_main, &header_comments, &header_codebooks) < 0) {
++      ret = HEADER_ERROR;
++      goto cleanup;
++  }
+ 
+   ogg_stream_packetin(&ve->os, &header_main);   /* And stream them out */
+   ogg_stream_packetin(&ve->os, &header_comments);
+@@ -280,6 +283,7 @@
+   while (ogg_stream_flush(&ve->os, &ve->og) && ret == HEADER_OK)
+     if (!oe_write_page(&ve->og, ft))
+       ret = HEADER_ERROR;
++cleanup:
+   for (i = 0; i < vc.comments; ++i)
+     free(vc.user_comments[i]);
+   free(vc.user_comments);
+diff -Naur a/src/wav.c b/src/wav.c
+--- a/src/wav.c	2014-12-22 16:38:05.000000000 +0000
++++ b/src/wav.c	2019-06-02 22:45:56.814018399 +0100
+@@ -82,6 +82,7 @@
+     /* following used by *ADPCM wav files */
+     unsigned short nCoefs;          /* ADPCM: number of coef sets */
+     short         *lsx_ms_adpcm_i_coefs;          /* ADPCM: coef sets           */
++    void          *ms_adpcm_data;   /* Private data of adpcm decoder */
+     unsigned char *packet;          /* Temporary buffer for packets */
+     short         *samples;         /* interleaved samples buffer */
+     short         *samplePtr;       /* Pointer to current sample  */
+@@ -127,7 +128,7 @@
+         /* work with partial blocks.  Specs say it should be null */
+         /* padded but I guess this is better than trailing quiet. */
+         samplesThisBlock = lsx_ima_samples_in((size_t)0, (size_t)ft->signal.channels, bytesRead, (size_t) 0);
+-        if (samplesThisBlock == 0)
++        if (samplesThisBlock == 0 || samplesThisBlock > wav->samplesPerBlock)
+         {
+             lsx_warn("Premature EOF on .wav input file");
+             return 0;
+@@ -175,7 +176,7 @@
+         }
+     }
+ 
+-    errmsg = lsx_ms_adpcm_block_expand_i(ft->signal.channels, wav->nCoefs, wav->lsx_ms_adpcm_i_coefs, wav->packet, wav->samples, samplesThisBlock);
++    errmsg = lsx_ms_adpcm_block_expand_i(wav->ms_adpcm_data, ft->signal.channels, wav->nCoefs, wav->lsx_ms_adpcm_i_coefs, wav->packet, wav->samples, samplesThisBlock);
+ 
+     if (errmsg)
+         lsx_warn("%s", errmsg);
+@@ -712,6 +713,11 @@
+     else
+         lsx_report("User options overriding channels read in .wav header");
+ 
++    if (ft->signal.channels == 0) {
++        lsx_fail_errno(ft, SOX_EHDR, "Channel count is zero");
++        return SOX_EOF;
++    }
++
+     if (ft->signal.rate == 0 || ft->signal.rate == dwSamplesPerSecond)
+         ft->signal.rate = dwSamplesPerSecond;
+     else
+@@ -786,6 +792,7 @@
+ 
+         /* nCoefs, lsx_ms_adpcm_i_coefs used by adpcm.c */
+         wav->lsx_ms_adpcm_i_coefs = lsx_malloc(wav->nCoefs * 2 * sizeof(short));
++        wav->ms_adpcm_data = lsx_ms_adpcm_alloc(wChannels);
+         {
+             int i, errct=0;
+             for (i=0; len>=2 && i < 2*wav->nCoefs; i++) {
+@@ -1211,6 +1218,7 @@
+     free(wav->packet);
+     free(wav->samples);
+     free(wav->lsx_ms_adpcm_i_coefs);
++    free(wav->ms_adpcm_data);
+     free(wav->comment);
+     wav->comment = NULL;
+ 
+@@ -1374,6 +1382,12 @@
+     long blocksWritten = 0;
+     sox_bool isExtensible = sox_false;    /* WAVE_FORMAT_EXTENSIBLE? */
+ 
++    if (ft->signal.channels > UINT16_MAX) {
++        lsx_fail_errno(ft, SOX_EOF, "Too many channels (%u)",
++                       ft->signal.channels);
++        return SOX_EOF;
++    }
++
+     dwSamplesPerSecond = ft->signal.rate;
+     wChannels = ft->signal.channels;
+     wBitsPerSample = ft->encoding.bits_per_sample;
+diff -Naur a/src/wavpack.c b/src/wavpack.c
+--- a/src/wavpack.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/wavpack.c	2019-06-02 22:45:56.810011479 +0100
+@@ -65,6 +65,10 @@
+   char msg[80];
+ 
+   p->codec = WavpackOpenFileInputEx(&io_fns, ft, NULL, msg, OPEN_NORMALIZE, 0);
++  if (!p->codec) {
++    lsx_fail_errno(ft, SOX_EHDR, "%s", msg);
++    return SOX_EOF;
++  }
+   ft->encoding.bits_per_sample = WavpackGetBytesPerSample(p->codec) << 3;
+   ft->signal.channels   = WavpackGetNumChannels(p->codec);
+   if (WavpackGetSampleRate(p->codec) && ft->signal.rate && ft->signal.rate != WavpackGetSampleRate(p->codec))
+@@ -108,6 +112,10 @@
+   uint64_t size64;
+ 
+   p->codec = WavpackOpenFileOutput(ft_write_b_buf, ft, NULL);
++  if (!p->codec) {
++    lsx_fail_errno(ft, SOX_ENOMEM, "WavPack error creating output instance");
++    return SOX_EOF;
++  }
+   memset(&config, 0, sizeof(config));
+   config.bytes_per_sample  = ft->encoding.bits_per_sample >> 3;
+   config.bits_per_sample   = ft->encoding.bits_per_sample;
+diff -Naur a/src/xa.c b/src/xa.c
+--- a/src/xa.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/xa.c	2019-06-02 22:45:56.812014939 +0100
+@@ -143,6 +143,12 @@
+         lsx_report("User options overriding rate read in .xa header");
+     }
+ 
++    if (ft->signal.channels == 0 || ft->signal.channels > UINT16_MAX) {
++        lsx_fail_errno(ft, SOX_EFMT, "invalid channel count %d",
++                       ft->signal.channels);
++        return SOX_EOF;
++    }
++
+     /* Check for supported formats */
+     if (ft->encoding.bits_per_sample != 16) {
+         lsx_fail_errno(ft, SOX_EFMT, "%d-bit sample resolution not supported.",
+diff -Naur a/src/xmalloc.c b/src/xmalloc.c
+--- a/src/xmalloc.c	2012-01-23 22:27:33.000000000 +0000
++++ b/src/xmalloc.c	2019-06-02 22:45:56.820028780 +0100
+@@ -41,3 +41,13 @@
+ 
+   return ptr;
+ }
++
++void *lsx_realloc_array(void *p, size_t n, size_t size)
++{
++  if (n > (size_t)-1 / size) {
++    lsx_fail("malloc size overflow");
++    exit(2);
++  }
++
++  return lsx_realloc(p, n * size);
++}
+diff -Naur a/src/xmalloc.h b/src/xmalloc.h
+--- a/src/xmalloc.h	2012-01-23 22:27:33.000000000 +0000
++++ b/src/xmalloc.h	2019-06-02 22:45:56.820028780 +0100
+@@ -23,12 +23,14 @@
+ #include <stddef.h>
+ #include <string.h>
+ 
++LSX_RETURN_VALID void *lsx_realloc_array(void *p, size_t n, size_t size);
++
+ #define lsx_malloc(size) lsx_realloc(NULL, (size))
+ #define lsx_calloc(n,s) (((n)*(s))? memset(lsx_malloc((n)*(s)),0,(n)*(s)) : NULL)
+ #define lsx_Calloc(v,n)  v = lsx_calloc(n,sizeof(*(v)))
+ #define lsx_strdup(p) ((p)? strcpy((char *)lsx_malloc(strlen(p) + 1), p) : NULL)
+ #define lsx_memdup(p,s) ((p)? memcpy(lsx_malloc(s), p, s) : NULL)
+-#define lsx_valloc(v,n)  v = lsx_malloc((n)*sizeof(*(v)))
+-#define lsx_revalloc(v,n)  v = lsx_realloc(v, (n)*sizeof(*(v)))
++#define lsx_valloc(v,n)  v = lsx_realloc_array(NULL, n, sizeof(*(v)))
++#define lsx_revalloc(v,n)  v = lsx_realloc_array(v, n, sizeof(*(v)))
+ 
+ #endif
