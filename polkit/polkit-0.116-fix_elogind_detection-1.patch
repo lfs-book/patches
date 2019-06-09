@@ -1,6 +1,6 @@
 Submitted by:            DJ Lucas (dj_AT_linuxfromscratch_DOT_org)
 Date:                    2018-12-18
-Initial Package Version: 1.20.3
+Initial Package Version: 0.115
 Upstream Status:         Submitted
 Origin:                  https://gitlab.freedesktop.org/polkit/polkit/issues/29
 Description:             Allows detection and use of elogind
