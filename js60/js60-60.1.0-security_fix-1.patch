@@ -1,0 +1,90 @@
+Submitted by:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-07-04
+Initial Package Version: 60.1.0
+Upstream Status:         Applied
+Origin:                  https://hg.mozilla.org/releases/mozilla-esr60/rev/560efdce1d072281398a98244e2ec43ab1f92186
+Description:             Fix CVE-2019-11707 as it applies to Mozilla's JavaScript
+                         Engine by implementing extra checks for indexed
+                         properties.
+
+diff -Naurp mozjs-60.1.0.orig/js/src/jit/MCallOptimize.cpp mozjs-60.1.0/js/src/jit/MCallOptimize.cpp
+--- mozjs-60.1.0.orig/js/src/jit/MCallOptimize.cpp	2018-06-18 17:23:58.000000000 -0500
++++ mozjs-60.1.0/js/src/jit/MCallOptimize.cpp	2019-07-04 19:44:56.375188478 -0500
+@@ -695,8 +695,9 @@ IonBuilder::inlineArrayPopShift(CallInfo
+         return InliningStatus_NotInlined;
+     }
+ 
++    // Watch out for extra indexed properties on the object or it's prototype.
+     bool hasIndexedProperty;
+-    MOZ_TRY_VAR(hasIndexedProperty, ArrayPrototypeHasIndexedProperty(this, script()));
++    MOZ_TRY_VAR(hasIndexedProperty, ElementAccessHasExtraIndexedProperty(this, obj));
+     if (hasIndexedProperty) {
+         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
+         return InliningStatus_NotInlined;
+@@ -797,15 +798,9 @@ IonBuilder::inlineArrayPush(CallInfo& ca
+     const Class* clasp = thisTypes->getKnownClass(constraints());
+     if (clasp != &ArrayObject::class_)
+         return InliningStatus_NotInlined;
+-    if (thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
+-                                  OBJECT_FLAG_LENGTH_OVERFLOW))
+-    {
+-        trackOptimizationOutcome(TrackedOutcome::ArrayBadFlags);
+-        return InliningStatus_NotInlined;
+-    }
+ 
+     bool hasIndexedProperty;
+-    MOZ_TRY_VAR(hasIndexedProperty, ArrayPrototypeHasIndexedProperty(this, script()));
++    MOZ_TRY_VAR(hasIndexedProperty, ElementAccessHasExtraIndexedProperty(this, obj));
+     if (hasIndexedProperty) {
+         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
+         return InliningStatus_NotInlined;
+@@ -929,16 +924,10 @@ IonBuilder::inlineArraySlice(CallInfo& c
+     const Class* clasp = thisTypes->getKnownClass(constraints());
+     if (clasp != &ArrayObject::class_)
+         return InliningStatus_NotInlined;
+-    if (thisTypes->hasObjectFlags(constraints(), OBJECT_FLAG_SPARSE_INDEXES |
+-                                  OBJECT_FLAG_LENGTH_OVERFLOW))
+-    {
+-        trackOptimizationOutcome(TrackedOutcome::ArrayBadFlags);
+-        return InliningStatus_NotInlined;
+-    }
+ 
+-    // Watch out for indexed properties on the prototype.
++    // Watch out for extra indexed properties on the object or it's prototype
+     bool hasIndexedProperty;
+-    MOZ_TRY_VAR(hasIndexedProperty, ArrayPrototypeHasIndexedProperty(this, script()));
++    MOZ_TRY_VAR(hasIndexedProperty, ElementAccessHasExtraIndexedProperty(this, obj));
+     if (hasIndexedProperty) {
+         trackOptimizationOutcome(TrackedOutcome::ProtoIndexedProps);
+         return InliningStatus_NotInlined;
+diff -Naurp mozjs-60.1.0.orig/js/src/jit/MIR.cpp mozjs-60.1.0/js/src/jit/MIR.cpp
+--- mozjs-60.1.0.orig/js/src/jit/MIR.cpp	2018-06-18 17:23:58.000000000 -0500
++++ mozjs-60.1.0/js/src/jit/MIR.cpp	2019-07-04 19:45:48.507408696 -0500
+@@ -6437,15 +6437,6 @@ PrototypeHasIndexedProperty(IonBuilder*
+     return false;
+ }
+ 
+-// Whether Array.prototype, or an object on its proto chain, has an indexed property.
+-AbortReasonOr<bool>
+-jit::ArrayPrototypeHasIndexedProperty(IonBuilder* builder, JSScript* script)
+-{
+-    if (JSObject* proto = script->global().maybeGetArrayPrototype())
+-        return PrototypeHasIndexedProperty(builder, proto);
+-    return true;
+-}
+-
+ // Whether obj or any of its prototypes have an indexed property.
+ AbortReasonOr<bool>
+ jit::TypeCanHaveExtraIndexedProperties(IonBuilder* builder, TemporaryTypeSet* types)
+diff -Naurp mozjs-60.1.0.orig/js/src/jit/MIR.h mozjs-60.1.0/js/src/jit/MIR.h
+--- mozjs-60.1.0.orig/js/src/jit/MIR.h	2018-06-18 17:23:59.000000000 -0500
++++ mozjs-60.1.0/js/src/jit/MIR.h	2019-07-04 19:46:29.775395467 -0500
+@@ -15082,8 +15082,6 @@ bool PropertyWriteNeedsTypeBarrier(TempA
+                                    PropertyName* name, MDefinition** pvalue,
+                                    bool canModify, MIRType implicitType = MIRType::None);
+ AbortReasonOr<bool>
+-ArrayPrototypeHasIndexedProperty(IonBuilder* builder, JSScript* script);
+-AbortReasonOr<bool>
+ TypeCanHaveExtraIndexedProperties(IonBuilder* builder, TemporaryTypeSet* types);
+ 
+ inline MIRType
