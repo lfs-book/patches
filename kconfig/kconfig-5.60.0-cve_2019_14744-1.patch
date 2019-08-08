@@ -1,0 +1,119 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-08-08
+Initial Package Version: 5.60.0
+Origin:                  Upstream
+URL:                     https://cgit.kde.org/kconfig.git/commit/?id=5d3e71b1d2ecd2cb2f910036e614ffdfc895aa22
+Description:             Fixes CVE-2019-14744, a 0day vulnerability that allows
+                         execution of unauthorized/malicious code through
+                         .desktop and .directory files. This can be triggered by
+                         any file that Baloo indexes, as well as through a File
+                         Manager or Ark.
+
+diff -Naurp kconfig-5.60.0.orig/autotests/kconfigtest.cpp kconfig-5.60.0/autotests/kconfigtest.cpp
+--- kconfig-5.60.0.orig/autotests/kconfigtest.cpp	2019-07-07 13:31:29.000000000 -0500
++++ kconfig-5.60.0/autotests/kconfigtest.cpp	2019-08-08 00:18:14.862566708 -0500
+@@ -38,7 +38,7 @@
+ #include <utime.h>
+ #endif
+ #ifndef Q_OS_WIN
+-#include <unistd.h> // gethostname
++#include <unistd.h> // getuid
+ #endif
+ 
+ KCONFIGGROUP_DECLARE_ENUM_QOBJECT(KConfigTest, Testing)
+@@ -546,14 +546,8 @@ void KConfigTest::testPath()
+     QCOMPARE(group.readPathEntry("withBraces", QString()), QString("file://" + HOMEPATH));
+     QVERIFY(group.hasKey("URL"));
+     QCOMPARE(group.readEntry("URL", QString()), QString("file://" + HOMEPATH));
+-#if !defined(Q_OS_WIN32) && !defined(Q_OS_MAC)
+-    // I don't know if this will work on windows
+-    // This test hangs on OS X
+     QVERIFY(group.hasKey("hostname"));
+-    char hostname[256];
+-    QVERIFY(::gethostname(hostname, sizeof(hostname)) == 0);
+-    QCOMPARE(group.readEntry("hostname", QString()), QString::fromLatin1(hostname));
+-#endif
++    QCOMPARE(group.readEntry("hostname", QString()), QStringLiteral("(hostname)")); // the $ got removed because of an empty var name
+     QVERIFY(group.hasKey("noeol"));
+     QCOMPARE(group.readEntry("noeol", QString()), QString("foo"));
+ 
+diff -Naurp kconfig-5.60.0.orig/docs/options.md kconfig-5.60.0/docs/options.md
+--- kconfig-5.60.0.orig/docs/options.md	2019-07-07 13:31:29.000000000 -0500
++++ kconfig-5.60.0/docs/options.md	2019-08-08 00:19:43.065462121 -0500
+@@ -67,18 +67,16 @@ environment variables (and `XDG_CONFIG_H
+ Shell Expansion
+ ---------------
+ 
+-If an entry is marked with `$e`, environment variables and shell commands will
+-be expanded.
++If an entry is marked with `$e`, environment variable will be expanded.
+ 
+     Name[$e]=$USER
+     Host[$e]=$(hostname)
+ 
+ When the "Name" entry is read `$USER` will be replaced with the value of the
+-`$USER` environment variable, and `$(hostname)` will be replaced with the output
+-of the `hostname` command.
++`$USER` environment variable.
+ 
+-Note that the application will replace `$USER` and `$(hostname)` with their
+-respective expanded values after saving. To prevent this combine the `$e` option
++Note that the application will replace `$USER` with its
++expanded values after saving. To prevent this combine the `$e` option
+ with `$i` (immmutable) option.  For example:
+ 
+     Name[$ei]=$USER
+diff -Naurp kconfig-5.60.0.orig/src/core/kconfig.cpp kconfig-5.60.0/src/core/kconfig.cpp
+--- kconfig-5.60.0.orig/src/core/kconfig.cpp	2019-07-07 13:31:29.000000000 -0500
++++ kconfig-5.60.0/src/core/kconfig.cpp	2019-08-08 00:22:17.370555147 -0500
+@@ -28,19 +28,6 @@
+ #include <cstdlib>
+ #include <fcntl.h>
+ 
+-#ifdef _MSC_VER
+-static inline FILE *popen(const char *cmd, const char *mode)
+-{
+-    return _popen(cmd, mode);
+-}
+-static inline int pclose(FILE *stream)
+-{
+-    return _pclose(stream);
+-}
+-#else
+-#include <unistd.h>
+-#endif
+-
+ #include "kconfigbackend_p.h"
+ #include "kconfiggroup.h"
+ 
+@@ -183,29 +170,7 @@ QString KConfigPrivate::expandString(con
+     int nDollarPos = aValue.indexOf(QLatin1Char('$'));
+     while (nDollarPos != -1 && nDollarPos + 1 < aValue.length()) {
+         // there is at least one $
+-        if (aValue[nDollarPos + 1] == QLatin1Char('(')) {
+-            int nEndPos = nDollarPos + 1;
+-            // the next character is not $
+-            while ((nEndPos <= aValue.length()) && (aValue[nEndPos] != QLatin1Char(')'))) {
+-                nEndPos++;
+-            }
+-            nEndPos++;
+-            QString cmd = aValue.mid(nDollarPos + 2, nEndPos - nDollarPos - 3);
+-
+-            QString result;
+-
+-// FIXME: wince does not have pipes
+-#ifndef _WIN32_WCE
+-            FILE *fs = popen(QFile::encodeName(cmd).data(), "r");
+-            if (fs) {
+-                QTextStream ts(fs, QIODevice::ReadOnly);
+-                result = ts.readAll().trimmed();
+-                pclose(fs);
+-            }
+-#endif
+-            aValue.replace(nDollarPos, nEndPos - nDollarPos, result);
+-            nDollarPos += result.length();
+-        } else if (aValue[nDollarPos + 1] != QLatin1Char('$')) {
++        if (aValue[nDollarPos + 1] != QLatin1Char('$')) {
+             int nEndPos = nDollarPos + 1;
+             // the next character is not $
+             QStringRef aVarName;
