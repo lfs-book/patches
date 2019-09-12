@@ -1,0 +1,26 @@
+Submitted By:            Xi Ruoyao <xry111@mengyan1223.wang>
+Date:                    2019-09-12
+Initial Package Version: 1.1.1d
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fixes an issue causing test failure (20-test_enc.t)
+                         and potential data loss.
+
+diff --git a/crypto/comp/c_zlib.c b/crypto/comp/c_zlib.c
+index d688deee5f2..19b48fb09b0 100644
+--- a/crypto/comp/c_zlib.c
++++ b/crypto/comp/c_zlib.c
+@@ -564,6 +564,13 @@ static long bio_zlib_ctrl(BIO *b, int cmd, long num, void *ptr)
+             ret = BIO_flush(next);
+         break;
+ 
++    case BIO_CTRL_PENDING:
++        ret = ctx->zin.avail_in != 0;
++        break;
++    case BIO_CTRL_WPENDING:
++        ret = ctx->ocount != 0;
++        break;
++
+     case BIO_C_SET_BUFF_SIZE:
+         ibs = -1;
+         obs = -1;
