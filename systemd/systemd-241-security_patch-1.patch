@@ -1,0 +1,24 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-09-20
+Initial Package Version: 241
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fixes CVE-2019-15718, a missing access control
+                         vulnerability in systemd-resolved that allows
+                         unprivileged users to modify DNS settings
+                         system-wide.
+
+diff -Naurp systemd-241.orig/src/shared/bus-util.c systemd-241/src/shared/bus-util.c
+--- systemd-241.orig/src/shared/bus-util.c	2019-02-14 04:11:58.000000000 -0600
++++ systemd-241/src/shared/bus-util.c	2019-09-20 11:29:32.310489796 -0500
+@@ -1696,10 +1696,6 @@ int bus_open_system_watch_bind_with_desc
+         if (r < 0)
+                 return r;
+ 
+-        r = sd_bus_set_trusted(bus, true);
+-        if (r < 0)
+-                return r;
+-
+         r = sd_bus_negotiate_creds(bus, true, SD_BUS_CREDS_UID|SD_BUS_CREDS_EUID|SD_BUS_CREDS_EFFECTIVE_CAPS);
+         if (r < 0)
+                 return r;

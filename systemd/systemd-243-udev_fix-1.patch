@@ -1,0 +1,196 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2019-09-20
+Initial Package Version: 243
+Upstream Status:         Applied
+Origin:                  https://github.com/systemd/systemd/issues/13518
+Description:             Fixes a bug in systemd-243 where devices in the
+                         evdev class of udev do not have device nodes created
+                         at startup.
+
+diff -Naurp systemd-243.orig/src/udev/udev-rules.c systemd-243/src/udev/udev-rules.c
+--- systemd-243.orig/src/udev/udev-rules.c	2019-09-03 04:27:19.000000000 -0500
++++ systemd-243/src/udev/udev-rules.c	2019-09-20 11:14:17.904506115 -0500
+@@ -43,10 +43,12 @@ typedef enum {
+ } UdevRuleOperatorType;
+ 
+ typedef enum {
+-        MATCH_TYPE_EMPTY,     /* empty string */
+-        MATCH_TYPE_PLAIN,     /* no special characters */
+-        MATCH_TYPE_GLOB,      /* shell globs ?,*,[] */
+-        MATCH_TYPE_SUBSYSTEM, /* "subsystem", "bus", or "class" */
++        MATCH_TYPE_EMPTY,            /* empty string */
++        MATCH_TYPE_PLAIN,            /* no special characters */
++        MATCH_TYPE_PLAIN_WITH_EMPTY, /* no special characters with empty string, e.g., "|foo" */
++        MATCH_TYPE_GLOB,             /* shell globs ?,*,[] */
++        MATCH_TYPE_GLOB_WITH_EMPTY,  /* shell globs ?,*,[] with empty string, e.g., "|foo*" */
++        MATCH_TYPE_SUBSYSTEM,        /* "subsystem", "bus", or "class" */
+         _MATCH_TYPE_MAX,
+         _MATCH_TYPE_INVALID = -1
+ } UdevRuleMatchType;
+@@ -431,35 +433,30 @@ static int rule_line_add_token(UdevRuleL
+ 
+                 if (type < TK_M_TEST || type == TK_M_RESULT) {
+                         /* Convert value string to nulstr. */
+-                        len = strlen(value);
+-                        if (len > 1 && (value[len - 1] == '|' || strstr(value, "||"))) {
+-                                /* In this case, just replacing '|' -> '\0' does not work... */
+-                                _cleanup_free_ char *tmp = NULL;
+-                                char *i, *j;
+-                                bool v = true;
++                        bool bar = true, empty = false;
++                        char *a, *b;
+ 
+-                                tmp = strdup(value);
+-                                if (!tmp)
+-                                        return log_oom();
+-
+-                                for (i = tmp, j = value; *i != '\0'; i++)
+-                                        if (*i == '|')
+-                                                v = true;
+-                                        else {
+-                                                if (v) {
+-                                                        *j++ = '\0';
+-                                                        v = false;
+-                                                }
+-                                                *j++ = *i;
+-                                        }
+-                                j[0] = j[1] = '\0';
+-                        } else {
+-                                /* Simple conversion. */
+-                                char *i;
+-
+-                                for (i = value; *i != '\0'; i++)
+-                                        if (*i == '|')
+-                                                *i = '\0';
++                        for (a = b = value; *a != '\0'; a++) {
++                           if (*a != '|') {
++                              *b++ = *a;
++                              bar = false;
++                           } else {
++                              if (bar)
++                                 empty = true;
++                              else
++                                 *b++ = '\0';
++                              bar = true;
++                           }
++                        }
++                        *b = '\0';
++                        if (bar)
++                           empty = true;
++
++                        if (empty) {
++                           if (match_type == MATCH_TYPE_GLOB)
++                              match_type = MATCH_TYPE_GLOB_WITH_EMPTY;
++                           if (match_type == MATCH_TYPE_PLAIN)
++                              match_type = MATCH_TYPE_PLAIN_WITH_EMPTY;
+                         }
+                 }
+         }
+@@ -1325,7 +1322,17 @@ static bool token_match_string(UdevRuleT
+                 match = isempty(str);
+                 break;
+         case MATCH_TYPE_SUBSYSTEM:
+-                value = "subsystem\0class\0bus\0";
++                NULSTR_FOREACH(i, "subsystem\0class\0bus\0")
++                   if (streq(i, str)) {
++                      match = true;
++                      break;
++                   }
++                break;
++        case MATCH_TYPE_PLAIN_WITH_EMPTY:
++                if (isempty(str)) {
++                   match = true;
++                   break;
++                }
+                 _fallthrough_;
+         case MATCH_TYPE_PLAIN:
+                 NULSTR_FOREACH(i, value)
+@@ -1334,6 +1341,12 @@ static bool token_match_string(UdevRuleT
+                                 break;
+                         }
+                 break;
++        case MATCH_TYPE_GLOB_WITH_EMPTY:
++                if (isempty(str)) {
++                   match = true;
++                   break;
++                }
++                _fallthrough_;
+         case MATCH_TYPE_GLOB:
+                 NULSTR_FOREACH(i, value)
+                         if ((fnmatch(i, str, 0) == 0)) {
+diff -Naurp systemd-243.orig/test/udev-test.pl systemd-243/test/udev-test.pl
+--- systemd-243.orig/test/udev-test.pl	2019-09-03 04:27:19.000000000 -0500
++++ systemd-243/test/udev-test.pl	2019-09-20 11:10:28.252116973 -0500
+@@ -1259,6 +1259,72 @@ KERNEL=="ttyACM0a|nothing", SYMLINK+="wr
+ EOF
+         },
+         {
++                desc            => "test multi matches 5",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG="foo"
++TAGS=="|foo", SYMLINK+="found"
++TAGS=="|aaa", SYMLINK+="bad"
++EOF
++        },
++        {
++                desc            => "test multi matches 6",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG=""
++TAGS=="|foo", SYMLINK+="found"
++TAGS=="aaa|bbb", SYMLINK+="bad"
++EOF
++        },
++        {
++                desc            => "test multi matches 7",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG="foo"
++TAGS=="foo||bar", SYMLINK+="found"
++TAGS=="aaa||bbb", SYMLINK+="bad"
++EOF
++        },
++        {
++                desc            => "test multi matches 8",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG=""
++TAGS=="foo||bar", SYMLINK+="found"
++TAGS=="aaa|bbb", SYMLINK+="bad"
++EOF
++        },
++        {
++                desc            => "test multi matches 9",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG=""
++TAGS=="foo|", SYMLINK+="found"
++TAGS=="aaa|", SYMLINK+="bad"
++EOF
++        },
++        {
++                desc            => "test multi matches 10",
++                devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
++                exp_name        => "found",
++                not_exp_name    => "bad",
++                rules           => <<EOF
++KERNEL=="sda", TAG=""
++TAGS=="foo|", SYMLINK+="found"
++TAGS=="aaa|bbb", SYMLINK+="bad"
++EOF
++        },
++        {
+                 desc            => "IMPORT parent test sequence 1/2 (keep)",
+                 devpath         => "/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda",
+                 exp_name        => "parent",
