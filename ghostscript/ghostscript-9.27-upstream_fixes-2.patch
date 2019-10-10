@@ -1,0 +1,293 @@
+Original Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Updated By: Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date: 2019-08-14
+Updated Date: 2019-10-09
+Initial Package Version: 9.27
+Upstream Status: Applied
+Origin: Ghostscript Git Repository (previous patch came from Debian Security)
+Description: Fixes CVE-2019-10216
+Updated Description: Fixes new vulnerabilities CVE-2019-14811, CVE-2019-14812,
+                     CVE-2019-14813, and CVE-2019-14817 (Safer Mode Bypass).
+
+diff -Naurp ghostscript-9.27.orig/base/fapi_ft.c ghostscript-9.27/base/fapi_ft.c
+--- ghostscript-9.27.orig/base/fapi_ft.c	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/base/fapi_ft.c	2019-10-09 22:25:27.222924814 -0500
+@@ -974,13 +974,19 @@ make_rotation(FT_Matrix * a_transform, c
+  */
+ static void
+ transform_decompose(FT_Matrix * a_transform, FT_UInt * xresp, FT_UInt * yresp,
+-                    FT_Fixed * a_x_scale, FT_Fixed * a_y_scale)
++                    FT_Fixed * a_x_scale, FT_Fixed * a_y_scale, int units_per_EM)
+ {
+     double scalex, scaley, fact = 1.0;
+     double factx = 1.0, facty = 1.0;
+     FT_Matrix ftscale_mat;
+     FT_UInt xres;
+     FT_UInt yres;
++    /* We have to account for units_per_EM as we fiddle with the scaling
++     * in order to avoid underflow (mostly in the TTF hinting code), but
++     * we also want to clamp to a lower value (512, admittedly arrived at
++     * via experimentation) in order to preserve the fidelity of the outlines.
++     */
++    double upe = units_per_EM > 512 ? (float)units_per_EM : 512.0;
+ 
+     scalex = hypot((double)a_transform->xx, (double)a_transform->xy);
+     scaley = hypot((double)a_transform->yx, (double)a_transform->yy);
+@@ -1067,10 +1073,25 @@ transform_decompose(FT_Matrix * a_transf
+         scalex *= fact;
+     }
+ 
+-    ftscale_mat.xx = (FT_Fixed) (65536.0 / scalex);
+-    ftscale_mat.xy = (FT_Fixed) 0;
+-    ftscale_mat.yx = (FT_Fixed) 0;
+-    ftscale_mat.yy = (FT_Fixed) (65536.0 / scaley);
++    /* see above */
++    fact = 1.0;
++    while (scaley * yres > (double)upe * 72.0 && (xres > 0 && yres > 0)
++           && (scalex > 0.0 && scaley > 0.0)) {
++        if (scaley < yres) {
++            xres >>= 1;
++            yres >>= 1;
++            fact *= 2.0;
++        }
++        else {
++            scalex /= 1.25;
++            scaley /= 1.25;
++        }
++    }
++
++    ftscale_mat.xx = (FT_Fixed) ((65536.0 / scalex) * fact);
++    ftscale_mat.xy = 0;
++    ftscale_mat.yx = 0;
++    ftscale_mat.yy = (FT_Fixed) ((65536.0 / scaley) * fact);
+ 
+     FT_Matrix_Multiply(a_transform, &ftscale_mat);
+     memcpy(a_transform, &ftscale_mat, sizeof(FT_Matrix));
+@@ -1315,7 +1336,7 @@ gs_fapi_ft_get_scaled_font(gs_fapi_serve
+          * transform.
+          */
+         transform_decompose(&face->ft_transform, &face->horz_res,
+-                            &face->vert_res, &face->width, &face->height);
++                            &face->vert_res, &face->width, &face->height, face->ft_face->units_per_EM);
+ 
+         ft_error = FT_Set_Char_Size(face->ft_face, face->width, face->height,
+                                     face->horz_res, face->vert_res);
+diff -Naurp ghostscript-9.27.orig/Resource/Init/gs_lev2.ps ghostscript-9.27/Resource/Init/gs_lev2.ps
+--- ghostscript-9.27.orig/Resource/Init/gs_lev2.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/gs_lev2.ps	2019-10-09 22:26:20.430212715 -0500
+@@ -158,7 +158,7 @@ end
+     {
+       pop pop
+     } ifelse
+-  } forall
++  } executeonly forall
+         % A context switch might have occurred during the above loop,
+         % causing the interpreter-level parameters to be reset.
+         % Set them again to the new values.  From here on, we are safe,
+@@ -229,9 +229,9 @@ end
+        { pop pop
+        }
+       ifelse
+-    }
++    } executeonly
+    forall pop
+-} .bind odef
++} .bind executeonly odef
+ 
+ % Initialize the passwords.
+ % NOTE: the names StartJobPassword and SystemParamsPassword are known to
+diff -Naurp ghostscript-9.27.orig/Resource/Init/gs_pdfwr.ps ghostscript-9.27/Resource/Init/gs_pdfwr.ps
+--- ghostscript-9.27.orig/Resource/Init/gs_pdfwr.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/gs_pdfwr.ps	2019-10-09 22:27:00.227417463 -0500
+@@ -652,11 +652,11 @@ currentdict /.pdfmarkparams .undef
+           systemdict /.pdf_hooked_DSC_Creator //true .forceput
+         } executeonly if
+         pop
+-      } if
++      } executeonly if
+     } {
+       pop
+     } ifelse
+-  }
++  } executeonly
+   {
+     pop
+   } ifelse
+diff -Naurp ghostscript-9.27.orig/Resource/Init/gs_type1.ps ghostscript-9.27/Resource/Init/gs_type1.ps
+--- ghostscript-9.27.orig/Resource/Init/gs_type1.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/gs_type1.ps	2019-10-09 22:25:27.223924819 -0500
+@@ -118,25 +118,25 @@
+                          ( to be the same as glyph: ) print 1 index //== exec } if
+                    3 index exch 3 index .forceput
+                                                                  % scratch(string) RAGL(dict) AGL(dict) CharStrings(dict) cstring gname
+-                 }
++                 }executeonly
+                  {pop} ifelse
+-               } forall
++               } executeonly forall
+                pop pop
+-             }
++             } executeonly
+              {
+                pop pop pop
+              } ifelse
+-           }
++           } executeonly
+            {
+                                                                % scratch(string) RAGL(dict) AGL(dict) CharStrings(dict) cstring gname
+              pop pop
+            } ifelse
+-         } forall
++         } executeonly forall
+          3 1 roll pop pop
+-     } if
++     } executeonly if
+      pop
+      dup /.AGLprocessed~GS //true .forceput
+-   } if
++   } executeonly if
+ 
+    %% We need to excute the C .buildfont1 in a stopped context so that, if there
+    %% are errors we can put the stack back sanely and exit. Otherwise callers won't
+diff -Naurp ghostscript-9.27.orig/Resource/Init/pdf_base.ps ghostscript-9.27/Resource/Init/pdf_base.ps
+--- ghostscript-9.27.orig/Resource/Init/pdf_base.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/pdf_base.ps	2019-10-09 22:28:34.075868531 -0500
+@@ -157,7 +157,7 @@ currentdict /num-chars-dict .undef
+     {
+       dup ==only () = flush
+     } ifelse % PDFSTEP
+-  } if % PDFDEBUG
++  } executeonly if % PDFDEBUG
+   2 copy .knownget {
+     exch pop exch pop exch pop exec
+   } {
+diff -Naurp ghostscript-9.27.orig/Resource/Init/pdf_draw.ps ghostscript-9.27/Resource/Init/pdf_draw.ps
+--- ghostscript-9.27.orig/Resource/Init/pdf_draw.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/pdf_draw.ps	2019-10-09 22:30:18.052323566 -0500
+@@ -501,8 +501,8 @@ end
+       (        Output may be incorrect.\n) pdfformaterror
+       //pdfdict /.gs_warning_issued //true .forceput
+       PDFSTOPONERROR { /gs /undefined signalerror } if
+-    } if
+-  }
++    } executeonly if
++  } executeonly
+   ifelse
+ } bind executeonly def
+ 
+@@ -1142,7 +1142,7 @@ currentdict end readonly def
+           .setglobal
+           pdfformaterror
+         } executeonly ifelse
+-      }
++      } executeonly
+       {
+         currentglobal //pdfdict gcheck .setglobal
+         //pdfdict /.Qqwarning_issued //true .forceput
+@@ -1150,8 +1150,8 @@ currentdict end readonly def
+         pdfformaterror
+       } executeonly ifelse
+       end
+-    } ifelse
+-  } loop
++    } executeonly ifelse
++  } executeonly loop
+   {
+     (\n   **** Error: File has unbalanced q/Q operators \(too many q's\)\n               Output may be incorrect.\n)
+     //pdfdict /.Qqwarning_issued .knownget
+@@ -1165,14 +1165,14 @@ currentdict end readonly def
+         .setglobal
+         pdfformaterror
+       } executeonly ifelse
+-    }
++    } executeonly
+     {
+       currentglobal //pdfdict gcheck .setglobal
+       //pdfdict /.Qqwarning_issued //true .forceput
+       .setglobal
+       pdfformaterror
+     } executeonly ifelse
+-  } if
++  } executeonly if
+   pop
+ 
+   % restore pdfemptycount
+diff -Naurp ghostscript-9.27.orig/Resource/Init/pdf_font.ps ghostscript-9.27/Resource/Init/pdf_font.ps
+--- ghostscript-9.27.orig/Resource/Init/pdf_font.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/pdf_font.ps	2019-10-09 22:35:22.421458715 -0500
+@@ -677,7 +677,7 @@ currentdict end readonly def
+                 currentglobal 2 index dup gcheck setglobal
+                 /FontInfo 5 dict dup 5 1 roll .forceput
+                 setglobal
+-              } if
++              } executeonly if
+               dup /GlyphNames2Unicode .knownget not {
+                 //true                        % No existing G2U, make one
+               } {
+@@ -701,9 +701,9 @@ currentdict end readonly def
+         } if
+         PDFDEBUG {
+           (.processToUnicode end) =
+-        } if
+-      } if
+-    } stopped
++        } executeonly if
++      } executeonly if
++    } executeonly stopped
+     {
+       .dstackdepth 1 countdictstack 1 sub
+       {pop end} for
+@@ -2045,9 +2045,9 @@ currentdict /CMap_read_dict undef
+           (Will continue, but content may be missing.) = flush
+         } ifelse
+       } if
+-    } if
++    } executeonly if
+     /findresource cvx /undefined signalerror
+-  } loop
++  } executeonly loop
+ } bind executeonly odef
+ 
+ /buildCIDType0 {	% <CIDFontType0-font-resource> buildCIDType0 <font>
+diff -Naurp ghostscript-9.27.orig/Resource/Init/pdf_main.ps ghostscript-9.27/Resource/Init/pdf_main.ps
+--- ghostscript-9.27.orig/Resource/Init/pdf_main.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/pdf_main.ps	2019-10-09 22:36:43.409724841 -0500
+@@ -2749,15 +2749,15 @@ currentdict /PDF2PS_matrix_key undef
+           .setglobal
+           pdfformaterror
+         } executeonly ifelse
+-      }
++      } executeonly
+       {
+         currentglobal //pdfdict gcheck .setglobal
+         //pdfdict /.Qqwarning_issued //true .forceput
+         .setglobal
+         pdfformaterror
+       } executeonly ifelse
+-    } if
+-  } if
++    } executeonly if
++  } executeonly if
+   pop
+   count PDFexecstackcount sub { pop } repeat
+   (after exec) VMDEBUG
+diff -Naurp ghostscript-9.27.orig/Resource/Init/pdf_ops.ps ghostscript-9.27/Resource/Init/pdf_ops.ps
+--- ghostscript-9.27.orig/Resource/Init/pdf_ops.ps	2019-04-04 02:43:14.000000000 -0500
++++ ghostscript-9.27/Resource/Init/pdf_ops.ps	2019-10-09 22:37:40.792906635 -0500
+@@ -186,14 +186,14 @@ currentdict /gput_always_allow .undef
+         .setglobal
+         pdfformaterror
+       } executeonly ifelse
+-    }
++    } executeonly
+     {
+       currentglobal //pdfdict gcheck .setglobal
+       //pdfdict /.Qqwarning_issued //true .forceput
+       .setglobal
+       pdfformaterror
+     } executeonly ifelse
+-  } if
++  } executeonly if
+ } bind executeonly odef
+ 
+ % Save PDF gstate
