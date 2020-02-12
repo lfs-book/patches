@@ -1,0 +1,51 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-02-11
+Initial Package Version: 8.1p1
+Origin:                  Fedora (https://src.fedoraproject.org/rpms/openssh/raw/master/f/openssh-8.1p1-seccomp-nanosleep.patch) + Self
+Description:             Updates OpenSSH to be compliant with 2020+ dates and
+                         fixes problems related to new SECCOMP-capable time
+                         instructions.
+
+diff -Naurp openssh-8.1p1.orig/regress/cert-hostkey.sh openssh-8.1p1/regress/cert-hostkey.sh
+--- openssh-8.1p1.orig/regress/cert-hostkey.sh	2019-10-08 19:31:03.000000000 -0500
++++ openssh-8.1p1/regress/cert-hostkey.sh	2020-02-11 15:54:03.894563896 -0600
+@@ -252,7 +252,7 @@ test_one() {
+ test_one "user-certificate"	failure "-n $HOSTS"
+ test_one "empty principals"	success "-h"
+ test_one "wrong principals"	failure "-h -n foo"
+-test_one "cert not yet valid"	failure "-h -V20200101:20300101"
++test_one "cert not yet valid"	failure "-h -V20300101:20320101"
+ test_one "cert expired"		failure "-h -V19800101:19900101"
+ test_one "cert valid interval"	success "-h -V-1w:+2w"
+ test_one "cert has constraints"	failure "-h -Oforce-command=false"
+diff -Naurp openssh-8.1p1.orig/regress/cert-userkey.sh openssh-8.1p1/regress/cert-userkey.sh
+--- openssh-8.1p1.orig/regress/cert-userkey.sh	2019-10-08 19:31:03.000000000 -0500
++++ openssh-8.1p1/regress/cert-userkey.sh	2020-02-11 15:54:34.823693805 -0600
+@@ -338,7 +338,7 @@ test_one() {
+ test_one "correct principal"	success "-n ${USER}"
+ test_one "host-certificate"	failure "-n ${USER} -h"
+ test_one "wrong principals"	failure "-n foo"
+-test_one "cert not yet valid"	failure "-n ${USER} -V20200101:20300101"
++test_one "cert not yet valid"	failure "-n ${USER} -V20300101:20320101"
+ test_one "cert expired"		failure "-n ${USER} -V19800101:19900101"
+ test_one "cert valid interval"	success "-n ${USER} -V-1w:+2w"
+ test_one "wrong source-address"	failure "-n ${USER} -Osource-address=10.0.0.0/8"
+diff -Naurp openssh-8.1p1.orig/sandbox-seccomp-filter.c openssh-8.1p1/sandbox-seccomp-filter.c
+--- openssh-8.1p1.orig/sandbox-seccomp-filter.c	2019-10-08 19:31:03.000000000 -0500
++++ openssh-8.1p1/sandbox-seccomp-filter.c	2020-02-11 15:14:21.539249003 -0600
+@@ -242,6 +242,15 @@ static const struct sock_filter preauth_
+ #ifdef __NR_nanosleep
+ 	SC_ALLOW(__NR_nanosleep),
+ #endif
++#ifdef __NR_clock_nanosleep
++   SC_ALLOW(__NR_clock_nanosleep),
++#endif
++#ifdef __NR_clock_nanosleep_time64
++   SC_ALLOW(__NR_clock_nanosleep_time64),
++#endif
++#ifdef __NR_clock_gettime64
++   SC_ALLOW(__NR_clock_gettime64),
++#endif
+ #ifdef __NR__newselect
+ 	SC_ALLOW(__NR__newselect),
+ #endif
