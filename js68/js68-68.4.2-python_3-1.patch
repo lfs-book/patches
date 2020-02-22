@@ -1,0 +1,2947 @@
+Submitted by:            Xi Ruoyao <xry111 at mengyan1223 dot wang>
+Date:                    2020-02-22
+Initial Package Version: 68.4.2
+Upstream Status:         Not Applicable (containing BLFS specific hack)
+Origin:                  Self
+Description:             Allows Mozilla's JavaScript Engine to be built
+                         with Python 3, instead of the EOL'ed Python 2.
+--
+ build/moz.configure/init.configure            |  12 +-
+ build/moz.configure/old.configure             |  12 +-
+ build/moz.configure/rust.configure            |   3 +-
+ build/moz.configure/toolchain.configure       |  62 ++++-----
+ build/moz.configure/util.configure            |  22 +---
+ config/MozZipFile.py                          |   2 +-
+ configure.py                                  |  30 +++--
+ js/src/builtin/embedjs.py                     |  14 +-
+ js/src/configure                              |   2 +-
+ js/src/frontend/GenerateReservedWords.py      |   6 +-
+ js/src/gc/GenerateStatsPhases.py              |   2 +-
+ .../mozbuild/mozbuild/action/check_binary.py  |   4 +-
+ .../mozbuild/mozbuild/action/file_generate.py |   2 +-
+ .../mozbuild/action/process_define_files.py   |   3 +-
+ python/mozbuild/mozbuild/backend/base.py      |   5 +-
+ .../mozbuild/backend/configenvironment.py     |  12 +-
+ .../mozbuild/mozbuild/backend/fastermake.py   |  12 +-
+ .../mozbuild/backend/recursivemake.py         |  33 ++---
+ python/mozbuild/mozbuild/base.py              |   4 +-
+ python/mozbuild/mozbuild/config_status.py     |  11 +-
+ .../mozbuild/mozbuild/configure/__init__.py   |  62 +++++----
+ .../mozbuild/configure/check_debug_ranges.py  |   5 +-
+ python/mozbuild/mozbuild/configure/options.py |  24 ++--
+ python/mozbuild/mozbuild/configure/util.py    |   4 +-
+ python/mozbuild/mozbuild/frontend/context.py  |  99 +++++++-------
+ python/mozbuild/mozbuild/frontend/data.py     |   3 +-
+ python/mozbuild/mozbuild/frontend/emitter.py  |  18 +--
+ python/mozbuild/mozbuild/frontend/reader.py   |  29 +++--
+ python/mozbuild/mozbuild/jar.py               |   5 +-
+ python/mozbuild/mozbuild/makeutil.py          |  16 +--
+ python/mozbuild/mozbuild/mozinfo.py           |   3 +-
+ python/mozbuild/mozbuild/preprocessor.py      |  51 ++++----
+ python/mozbuild/mozbuild/shellutil.py         |   3 +-
+ python/mozbuild/mozbuild/testing.py           |   7 +-
+ python/mozbuild/mozbuild/util.py              | 123 +++++++++++-------
+ python/mozbuild/mozbuild/virtualenv.py        |  11 +-
+ python/mozbuild/mozpack/copier.py             |   7 +-
+ python/mozbuild/mozpack/files.py              |  15 ++-
+ python/mozbuild/mozpack/manifests.py          |  17 ++-
+ python/mozbuild/mozpack/mozjar.py             |  15 ++-
+ .../manifestparser/manifestparser/ini.py      |   6 +-
+ .../manifestparser/manifestparser.py          |  20 +--
+ testing/mozbase/mozinfo/mozinfo/mozinfo.py    |   5 +-
+ third_party/python/six/six.py                 |  17 +++
+ third_party/python/which/which.py             |  12 +-
+ 45 files changed, 489 insertions(+), 341 deletions(-)
+
+diff --git a/build/moz.configure/init.configure b/build/moz.configure/init.configure
+index c77260403..8be11a27d 100644
+--- a/build/moz.configure/init.configure
++++ b/build/moz.configure/init.configure
+@@ -21,6 +21,7 @@ option(env='DIST', nargs=1, help='DIST directory')
+ @depends('--help', 'DIST')
+ @imports(_from='__builtin__', _import='open')
+ @imports(_from='os.path', _import='exists')
++@imports(_from='six', _import='ensure_text')
+ def check_build_environment(help, dist):
+     topobjdir = os.path.realpath(os.path.abspath('.'))
+     topsrcdir = os.path.realpath(os.path.abspath(
+@@ -69,7 +70,7 @@ def check_build_environment(help, dist):
+ 
+     # Check for CRLF line endings.
+     with open(os.path.join(topsrcdir, 'configure.py'), 'rb') as fh:
+-        data = fh.read()
++        data = ensure_text(fh.read())
+         if '\r' in data:
+             die('\n ***\n'
+                 ' * The source tree appears to have Windows-style line endings.\n'
+@@ -290,10 +291,11 @@ add_old_configure_assignment('PYTHON', virtualenv_python)
+ def early_options():
+     @dependable
+     @imports('__sandbox__')
++    @imports('six')
+     def early_options():
+         return set(
+             option.env
+-            for option in __sandbox__._options.itervalues()
++            for option in six.itervalues(__sandbox__._options)
+             if option.env
+         )
+     return early_options
+@@ -389,6 +391,7 @@ option(env='PYTHON3', nargs=1, help='Python 3 interpreter (3.5 or later)')
+ @checking('for Python 3',
+           callback=lambda x: '%s (%s)' % (x.path, x.str_version) if x else 'no')
+ @imports(_from='__builtin__', _import='Exception')
++@imports(_from='six', _import='ensure_text')
+ @imports(_from='mozbuild.pythonutil', _import='find_python3_executable')
+ @imports(_from='mozbuild.pythonutil', _import='python_executable_version')
+ def python3(env_python, mozillabuild):
+@@ -416,7 +419,7 @@ def python3(env_python, mozillabuild):
+ 
+         # The API returns a bytes whereas everything in configure is unicode.
+         if python:
+-            python = python.decode('utf-8')
++            python = ensure_text(python)
+ 
+     if not python:
+         raise FatalCheckError('Python 3.5 or newer is required to build. '
+@@ -795,6 +798,7 @@ def config_sub(shell, triplet):
+ @checking('for host system type', lambda h: h.alias)
+ @imports('os')
+ @imports('subprocess')
++@imports(_from='six', _import='ensure_text')
+ @imports('sys')
+ @imports(_from='__builtin__', _import='ValueError')
+ def real_host(value, shell):
+@@ -811,7 +815,7 @@ def real_host(value, shell):
+                                     'autoconf', 'config.guess')
+         host = subprocess.check_output([shell, config_guess]).strip()
+         try:
+-            return split_triplet(host)
++            return split_triplet(ensure_text(host))
+         except ValueError:
+             pass
+     else:
+diff --git a/build/moz.configure/old.configure b/build/moz.configure/old.configure
+index 7286b23ce..30f09a2c8 100644
+--- a/build/moz.configure/old.configure
++++ b/build/moz.configure/old.configure
+@@ -299,7 +299,8 @@ def prepare_configure_options(extra_old_configure_args, all_options, *options):
+ @imports('types')
+ @imports(_from='mozbuild.shellutil', _import='quote')
+ @imports(_from='mozbuild.shellutil', _import='split')
+-@imports(_from='mozbuild.util', _import='encode')
++@imports(_from='six', _import='exec_')
++@imports(_from='six', _import='string_types')
+ def old_configure(prepare_configure, prepare_configure_options, altered_path):
+     cmd = prepare_configure + prepare_configure_options.options
+     extra_env = prepare_configure_options.extra_env
+@@ -331,7 +332,7 @@ def old_configure(prepare_configure, prepare_configure_options, altered_path):
+         env['PATH'] = altered_path
+ 
+     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+-                            env=encode(env))
++                            env=env)
+     while True:
+         line = proc.stdout.readline()
+         if not line:
+@@ -364,7 +365,7 @@ def old_configure(prepare_configure, prepare_configure_options, altered_path):
+         # Every variation of the exec() function I tried led to:
+         # SyntaxError: unqualified exec is not allowed in function 'main' it
+         # contains a nested function with free variables
+-        exec code in raw_config # noqa
++        exec_(code, raw_config) # noqa
+ 
+     # Ensure all the flags known to old-configure appear in the
+     # @old_configure_options above.
+@@ -380,7 +381,7 @@ def old_configure(prepare_configure, prepare_configure_options, altered_path):
+ 
+     for c in ('substs', 'defines'):
+         raw_config[c] = [
+-            (k[1:-1], v[1:-1] if isinstance(v, types.StringTypes) else v)
++            (k[1:-1], v[1:-1] if isinstance(v, string_types) else v)
+             for k, v in raw_config[c]
+         ]
+ 
+@@ -403,11 +404,12 @@ def set_old_configure_define(name, value):
+ 
+ 
+ @depends(old_configure)
++@imports('six')
+ def post_old_configure(raw_config):
+     for k, v in raw_config['substs']:
+         set_old_configure_config(k, v)
+ 
+-    for k, v in dict(raw_config['defines']).iteritems():
++    for k, v in six.iteritems(dict(raw_config['defines'])):
+         set_old_configure_define(k, v)
+ 
+     set_old_configure_config('non_global_defines',
+diff --git a/build/moz.configure/rust.configure b/build/moz.configure/rust.configure
+index 9647cbc40..58d2c332c 100644
+--- a/build/moz.configure/rust.configure
++++ b/build/moz.configure/rust.configure
+@@ -235,6 +235,7 @@ def rust_triple_alias(host_or_target):
+     @imports('subprocess')
+     @imports(_from='mozbuild.configure.util', _import='LineIO')
+     @imports(_from='mozbuild.shellutil', _import='quote')
++    @imports(_from='six', _import='ensure_binary')
+     @imports(_from='tempfile', _import='mkstemp')
+     @imports(_from='textwrap', _import='dedent')
+     def rust_target(rustc, host_or_target, compiler_info,
+@@ -292,7 +293,7 @@ def rust_triple_alias(host_or_target):
+             with LineIO(lambda l: log.debug('| %s', l)) as out:
+                 out.write(source)
+ 
+-            os.write(in_fd, source)
++            os.write(in_fd, ensure_binary(source))
+             os.close(in_fd)
+ 
+             cmd = [
+diff --git a/build/moz.configure/toolchain.configure b/build/moz.configure/toolchain.configure
+index d44fc0852..f1dee44a1 100755
+--- a/build/moz.configure/toolchain.configure
++++ b/build/moz.configure/toolchain.configure
+@@ -208,42 +208,42 @@ with only_when(host_is_osx):
+     # Xcode state
+     # ===========
+     js_option('--disable-xcode-checks',
+-	      help='Do not check that Xcode is installed and properly configured')
++              help='Do not check that Xcode is installed and properly configured')
+ 
+ 
+     @depends(host, '--disable-xcode-checks')
+     def xcode_path(host, xcode_checks):
+-	if host.kernel != 'Darwin' or not xcode_checks:
+-	    return
++        if host.kernel != 'Darwin' or not xcode_checks:
++            return
+ 
+-	# xcode-select -p prints the path to the installed Xcode. It
+-	# should exit 0 and return non-empty result if Xcode is installed.
++        # xcode-select -p prints the path to the installed Xcode. It
++        # should exit 0 and return non-empty result if Xcode is installed.
+ 
+-	def bad_xcode_select():
+-	    die('Could not find installed Xcode; install Xcode from the App '
+-		'Store, run it once to perform initial configuration, and then '
+-		'try again; in the rare case you wish to build without Xcode '
+-		'installed, add the --disable-xcode-checks configure flag')
++        def bad_xcode_select():
++            die('Could not find installed Xcode; install Xcode from the App '
++                'Store, run it once to perform initial configuration, and then '
++                'try again; in the rare case you wish to build without Xcode '
++                'installed, add the --disable-xcode-checks configure flag')
+ 
+-	xcode_path = check_cmd_output('xcode-select', '--print-path',
+-				      onerror=bad_xcode_select).strip()
++        xcode_path = check_cmd_output('xcode-select', '--print-path',
++                                      onerror=bad_xcode_select).strip()
+ 
+-	if not xcode_path:
+-	    bad_xcode_select()
++        if not xcode_path:
++            bad_xcode_select()
+ 
+-	# Now look for the Command Line Tools.
+-	def no_cltools():
+-	    die('Could not find installed Xcode Command Line Tools; '
+-		'run `xcode-select --install` and follow the instructions '
+-		'to install them then try again; if you wish to build without '
+-		'Xcode Command Line Tools installed, '
+-		'add the --disable-xcode-checks configure flag')
++        # Now look for the Command Line Tools.
++        def no_cltools():
++            die('Could not find installed Xcode Command Line Tools; '
++                'run `xcode-select --install` and follow the instructions '
++                'to install them then try again; if you wish to build without '
++                'Xcode Command Line Tools installed, '
++                'add the --disable-xcode-checks configure flag')
+ 
+-	check_cmd_output('pkgutil', '--pkg-info',
+-			 'com.apple.pkg.CLTools_Executables',
+-			 onerror=no_cltools)
++        check_cmd_output('pkgutil', '--pkg-info',
++                         'com.apple.pkg.CLTools_Executables',
++                         onerror=no_cltools)
+ 
+-	return xcode_path
++        return xcode_path
+ 
+ 
+     set_config('XCODE_PATH', xcode_path)
+@@ -401,6 +401,7 @@ def try_preprocess(compiler, language, source):
+          _import='OS_preprocessor_checks')
+ @imports(_from='textwrap', _import='dedent')
+ @imports(_from='__builtin__', _import='Exception')
++@imports(_import='six')
+ def get_compiler_info(compiler, language):
+     '''Returns information about the given `compiler` (command line in the
+     form of a list or tuple), in the given `language`.
+@@ -450,7 +451,7 @@ def get_compiler_info(compiler, language):
+         ('KERNEL', kernel_preprocessor_checks),
+         ('OS', OS_preprocessor_checks),
+     ):
+-        for n, (value, condition) in enumerate(preprocessor_checks.iteritems()):
++        for n, (value, condition) in enumerate(six.iteritems(preprocessor_checks)):
+             check += dedent('''\
+                 #%(if)s %(condition)s
+                 %%%(name)s "%(value)s"
+@@ -483,7 +484,7 @@ def get_compiler_info(compiler, language):
+     # have non-ASCII characters. Treat the output as bytearray.
+     data = {}
+     for line in result.splitlines():
+-        if line.startswith(b'%'):
++        if line.startswith('%'):
+             k, _, v = line.partition(' ')
+             k = k.lstrip('%')
+             data[k] = v.replace(' ', '').lstrip('"').rstrip('"')
+@@ -2054,9 +2055,7 @@ def select_linker(linker, c_compiler, developer_options, enable_gold,
+         # specific to it on stderr when it fails to process --version.
+         env = dict(os.environ)
+         env['LD_PRINT_OPTIONS'] = '1'
+-        retcode, stdout, stderr = get_cmd_output(*cmd, env=env)
+-        cmd_output = stdout.decode('utf-8')
+-        stderr = stderr.decode('utf-8')
++        retcode, cmd_output, stderr = get_cmd_output(*cmd, env=env)
+         if retcode == 1 and 'Logging ld64 options' in stderr:
+             kind = 'ld64'
+ 
+@@ -2193,6 +2192,7 @@ add_old_configure_assignment('ac_cv_prog_AS', as_with_flags)
+ 
+ 
+ @depends(assembler, c_compiler, extra_toolchain_flags)
++@imports('six')
+ @imports('subprocess')
+ @imports(_from='os', _import='devnull')
+ def gnu_as(assembler, c_compiler, toolchain_flags):
+@@ -2209,7 +2209,7 @@ def gnu_as(assembler, c_compiler, toolchain_flags):
+         # close the stdin pipe.
+         # clang will error if it uses its integrated assembler for this target,
+         # so handle failures gracefully.
+-        if 'GNU' in check_cmd_output(*cmd, stdin=subprocess.PIPE, onerror=lambda: '').decode('utf-8'):
++        if 'GNU' in six.ensure_text(check_cmd_output(*cmd, stdin=subprocess.PIPE, onerror=lambda: '')):
+             return True
+ 
+ 
+diff --git a/build/moz.configure/util.configure b/build/moz.configure/util.configure
+index 322224a0e..55bf3b552 100644
+--- a/build/moz.configure/util.configure
++++ b/build/moz.configure/util.configure
+@@ -23,26 +23,11 @@ def configure_error(message):
+ # A wrapper to obtain a process' output and return code.
+ # Returns a tuple (retcode, stdout, stderr).
+ @imports('os')
+-@imports(_from='__builtin__', _import='unicode')
++@imports('six')
+ @imports('subprocess')
+ @imports(_from='mozbuild.shellutil', _import='quote')
++@imports(_from='mozbuild.util', _import='system_encoding')
+ def get_cmd_output(*args, **kwargs):
+-    # subprocess on older Pythons can't handle unicode keys or values in
+-    # environment dicts. Normalize automagically so callers don't have to
+-    # deal with this.
+-    if 'env' in kwargs:
+-        normalized_env = {}
+-        for k, v in kwargs['env'].items():
+-            if isinstance(k, unicode):
+-                k = k.encode('utf-8', 'strict')
+-
+-            if isinstance(v, unicode):
+-                v = v.encode('utf-8', 'strict')
+-
+-            normalized_env[k] = v
+-
+-        kwargs['env'] = normalized_env
+-
+     log.debug('Executing: `%s`', quote(*args))
+     proc = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+@@ -51,8 +36,11 @@ def get_cmd_output(*args, **kwargs):
+                             # Elsewhere, it simply prevents it from inheriting
+                             # extra file descriptors, which is what we want.
+                             close_fds=os.name != 'nt',
++                            universal_newlines=True,
+                             **kwargs)
+     stdout, stderr = proc.communicate()
++    stdout = six.ensure_text(stdout, encoding=system_encoding, errors='replace')
++    stderr = six.ensure_text(stderr, encoding=system_encoding, errors='replace')
+     return proc.wait(), stdout, stderr
+ 
+ 
+diff --git a/config/MozZipFile.py b/config/MozZipFile.py
+index d48361435..f7f3d2268 100644
+--- a/config/MozZipFile.py
++++ b/config/MozZipFile.py
+@@ -47,7 +47,7 @@ class ZipFile(zipfile.ZipFile):
+                                     date_time=time.localtime(time.time()))
+             zinfo.compress_type = self.compression
+             # Add some standard UNIX file access permissions (-rw-r--r--).
+-            zinfo.external_attr = (0x81a4 & 0xFFFF) << 16L
++            zinfo.external_attr = (0x81a4 & 0xFFFF) << 16
+         else:
+             zinfo = zinfo_or_arcname
+ 
+diff --git a/configure.py b/configure.py
+index 913dd35f9..6bba82326 100644
+--- a/configure.py
++++ b/configure.py
+@@ -8,8 +8,10 @@ import codecs
+ import itertools
+ import logging
+ import os
++import six
+ import sys
+ import textwrap
++from collections import Iterable
+ 
+ 
+ base_dir = os.path.abspath(os.path.dirname(__file__))
+@@ -22,7 +24,6 @@ from mozbuild.pythonutil import iter_modules_in_path
+ from mozbuild.backend.configenvironment import PartialConfigEnvironment
+ from mozbuild.util import (
+     indented_repr,
+-    encode,
+ )
+ import mozpack.path as mozpath
+ 
+@@ -57,12 +58,12 @@ def config_status(config):
+ 
+     sanitized_config = {}
+     sanitized_config['substs'] = {
+-        k: sanitized_bools(v) for k, v in config.iteritems()
++        k: sanitized_bools(v) for k, v in six.iteritems(config)
+         if k not in ('DEFINES', 'non_global_defines', 'TOPSRCDIR', 'TOPOBJDIR',
+                      'CONFIG_STATUS_DEPS')
+     }
+     sanitized_config['defines'] = {
+-        k: sanitized_bools(v) for k, v in config['DEFINES'].iteritems()
++        k: sanitized_bools(v) for k, v in six.iteritems(config['DEFINES'])
+     }
+     sanitized_config['non_global_defines'] = config['non_global_defines']
+     sanitized_config['topsrcdir'] = config['TOPSRCDIR']
+@@ -77,15 +78,13 @@ def config_status(config):
+     with codecs.open('config.status', 'w', encoding) as fh:
+         fh.write(textwrap.dedent('''\
+             #!%(python)s
+-            # coding=%(encoding)s
++            # coding=utf-8
+             from __future__ import unicode_literals
+-            from mozbuild.util import encode
+-            encoding = '%(encoding)s'
+-        ''') % {'python': config['PYTHON'], 'encoding': encoding})
++        ''') % {'python': config['PYTHON']})
+         # A lot of the build backend code is currently expecting byte
+         # strings and breaks in subtle ways with unicode strings. (bug 1296508)
+-        for k, v in sanitized_config.iteritems():
+-            fh.write('%s = encode(%s, encoding)\n' % (k, indented_repr(v)))
++        for k, v in six.iteritems(sanitized_config):
++            fh.write('%s = %s\n' % (k, indented_repr(v)))
+         fh.write("__all__ = ['topobjdir', 'topsrcdir', 'defines', "
+                  "'non_global_defines', 'substs', 'mozconfig']")
+ 
+@@ -124,7 +123,18 @@ def config_status(config):
+ 
+         # A lot of the build backend code is currently expecting byte strings
+         # and breaks in subtle ways with unicode strings.
+-        return config_status(args=[], **encode(sanitized_config, encoding))
++        def normalize(obj):
++            if isinstance(obj, dict):
++                return {
++                    k: normalize(v)
++                    for k, v in six.iteritems(obj)
++                }
++            if isinstance(obj, six.text_type):
++                return six.text_type(obj)
++            if isinstance(obj, Iterable):
++                return [normalize(o) for o in obj]
++            return obj
++        return config_status(args=[], **normalize(sanitized_config))
+     return 0
+ 
+ 
+diff --git a/js/src/builtin/embedjs.py b/js/src/builtin/embedjs.py
+index fdec789e9..2bfbc1323 100644
+--- a/js/src/builtin/embedjs.py
++++ b/js/src/builtin/embedjs.py
+@@ -38,6 +38,7 @@
+ 
+ from __future__ import with_statement
+ import re
++import six
+ import sys
+ import os
+ import mozpack.path as mozpath
+@@ -50,7 +51,10 @@ import buildconfig
+ def ToCAsciiArray(lines):
+     result = []
+     for chr in lines:
+-        value = ord(chr)
++        if isinstance(chr, int):
++            value = chr
++        else:
++            value = ord(chr)
+         assert value < 128
+         result.append(str(value))
+     return ", ".join(result)
+@@ -59,7 +63,9 @@ def ToCAsciiArray(lines):
+ def ToCArray(lines):
+     result = []
+     for chr in lines:
+-        result.append(str(ord(chr)))
++        if not isinstance(chr, int):
++            chr = ord(chr)
++        result.append(str(chr))
+     return ", ".join(result)
+ 
+ 
+@@ -99,7 +105,7 @@ def embed(cxx, preprocessorOption, cppflags, msgs, sources, c_out, js_out, names
+ 
+     js_out.write(processed)
+     import zlib
+-    compressed = zlib.compress(processed)
++    compressed = zlib.compress(six.ensure_binary(processed))
+     data = ToCArray(compressed)
+     c_out.write(HEADER_TEMPLATE % {
+         'sources_type': 'unsigned char',
+@@ -121,7 +127,7 @@ def preprocess(cxx, preprocessorOption, source, args=[]):
+     outputArg = shlex.split(preprocessorOption + tmpOut)
+ 
+     with open(tmpIn, 'wb') as input:
+-        input.write(source)
++        input.write(six.ensure_binary(source))
+     print(' '.join(cxx + outputArg + args + [tmpIn]))
+     result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()
+     if (result != 0):
+diff --git a/js/src/configure b/js/src/configure
+index 3b3a39af3..76fe666d0 100755
+--- a/js/src/configure
++++ b/js/src/configure
+@@ -24,4 +24,4 @@ export OLD_CONFIGURE="$SRCDIR"/old-configure
+ 
+ set -- "$@" --enable-project=js
+ 
+-which python2.7 > /dev/null && exec python2.7 "$TOPSRCDIR/configure.py" "$@" || exec python "$TOPSRCDIR/configure.py" "$@"
++which python3.8 > /dev/null && exec python3.8 "$TOPSRCDIR/configure.py" "$@" || exec python3 "$TOPSRCDIR/configure.py" "$@"
+diff --git a/js/src/frontend/GenerateReservedWords.py b/js/src/frontend/GenerateReservedWords.py
+index 87ad1ae5a..0ca18aecf 100644
+--- a/js/src/frontend/GenerateReservedWords.py
++++ b/js/src/frontend/GenerateReservedWords.py
+@@ -87,7 +87,7 @@ def split_list_per_column(reserved_word_list, column):
+         per_column = column_dict.setdefault(word[column], [])
+         per_column.append(item)
+ 
+-    return sorted(column_dict.items(), key=lambda (char, word): ord(char))
++    return sorted(column_dict.items(), key=lambda char_word: char_word[0])
+ 
+ 
+ def generate_letter_switch(opt, unprocessed_columns, reserved_word_list,
+@@ -95,7 +95,7 @@ def generate_letter_switch(opt, unprocessed_columns, reserved_word_list,
+     assert(len(reserved_word_list) != 0)
+ 
+     if not columns:
+-        columns = range(0, unprocessed_columns)
++        columns = list(range(0, unprocessed_columns))
+ 
+     if len(reserved_word_list) == 1:
+         index, word = reserved_word_list[0]
+@@ -170,7 +170,7 @@ def split_list_per_length(reserved_word_list):
+         per_length = length_dict.setdefault(len(word), [])
+         per_length.append(item)
+ 
+-    return sorted(length_dict.items(), key=lambda (length, word): length)
++    return sorted(length_dict.items(), key=lambda length_word: length_word[0])
+ 
+ 
+ def generate_switch(opt, reserved_word_list):
+diff --git a/js/src/gc/GenerateStatsPhases.py b/js/src/gc/GenerateStatsPhases.py
+index a1471c3a6..aee00382f 100644
+--- a/js/src/gc/GenerateStatsPhases.py
++++ b/js/src/gc/GenerateStatsPhases.py
+@@ -265,7 +265,7 @@ def writeList(out, items):
+ 
+ 
+ def writeEnumClass(out, name, type, items, extraItems):
+-    items = ["FIRST"] + items + ["LIMIT"] + extraItems
++    items = ["FIRST"] + list(items) + ["LIMIT"] + list(extraItems)
+     items[1] += " = " + items[0]
+     out.write("enum class %s : %s {\n" % (name, type))
+     writeList(out, items)
+diff --git a/python/mozbuild/mozbuild/action/check_binary.py b/python/mozbuild/mozbuild/action/check_binary.py
+index b00e36d74..a6fde377c 100644
+--- a/python/mozbuild/mozbuild/action/check_binary.py
++++ b/python/mozbuild/mozbuild/action/check_binary.py
+@@ -149,8 +149,8 @@ def iter_symbols(binary):
+ def iter_readelf_dynamic(target, binary):
+     for line in get_output(target['readelf'], '-d', binary):
+         data = line.split(None, 2)
+-        if data and len(data) == 3 and data[0].startswith('0x'):
+-            yield data[1].rstrip(')').lstrip('('), data[2]
++        if data and len(data) == 3 and data[0].startswith(b'0x'):
++            yield data[1].rstrip(b')').lstrip(b'('), data[2]
+ 
+ 
+ def check_dep_versions(target, binary, lib, prefix, max_version):
+diff --git a/python/mozbuild/mozbuild/action/file_generate.py b/python/mozbuild/mozbuild/action/file_generate.py
+index bb52c1ca5..b3b102467 100644
+--- a/python/mozbuild/mozbuild/action/file_generate.py
++++ b/python/mozbuild/mozbuild/action/file_generate.py
+@@ -66,7 +66,7 @@ def main(argv):
+ 
+     ret = 1
+     try:
+-        with FileAvoidWrite(args.output_file, mode='rb') as output:
++        with FileAvoidWrite(args.output_file, readmode='rb') as output:
+             try:
+                 ret = module.__dict__[method](output, *args.additional_arguments, **kwargs)
+             except:
+diff --git a/python/mozbuild/mozbuild/action/process_define_files.py b/python/mozbuild/mozbuild/action/process_define_files.py
+index f66bc68ad..59981a88a 100644
+--- a/python/mozbuild/mozbuild/action/process_define_files.py
++++ b/python/mozbuild/mozbuild/action/process_define_files.py
+@@ -7,6 +7,7 @@ from __future__ import absolute_import, print_function, unicode_literals
+ import argparse
+ import os
+ import re
++import six
+ import sys
+ from buildconfig import topsrcdir, topobjdir
+ from mozbuild.backend.configenvironment import PartialConfigEnvironment
+@@ -63,7 +64,7 @@ def process_define_file(output, input):
+                             return define
+                         defines = '\n'.join(sorted(
+                             define_for_name(name, val)
+-                            for name, val in config.defines['ALLDEFINES'].iteritems()))
++                            for name, val in six.iteritems(config.defines['ALLDEFINES'])))
+                         l = l[:m.start('cmd') - 1] \
+                             + defines + l[m.end('name'):]
+                     elif cmd == 'define':
+diff --git a/python/mozbuild/mozbuild/backend/base.py b/python/mozbuild/mozbuild/backend/base.py
+index 14023e45c..0251df795 100644
+--- a/python/mozbuild/mozbuild/backend/base.py
++++ b/python/mozbuild/mozbuild/backend/base.py
+@@ -12,6 +12,7 @@ from abc import (
+ import errno
+ import itertools
+ import os
++import six
+ import time
+ 
+ from contextlib import contextmanager
+@@ -278,7 +279,7 @@ class BuildBackend(LoggingMixin):
+         if path is not None:
+             assert fh is None
+             fh = FileAvoidWrite(path, capture_diff=True, dry_run=self.dry_run,
+-                                mode=mode)
++                                readmode=mode)
+         else:
+             assert fh is not None
+ 
+@@ -311,7 +312,7 @@ class BuildBackend(LoggingMixin):
+         srcdir = mozpath.dirname(obj.input_path)
+         pp.context.update({
+             k: ' '.join(v) if isinstance(v, list) else v
+-            for k, v in obj.config.substs.iteritems()
++            for k, v in six.iteritems(obj.config.substs)
+         })
+         pp.context.update(
+             top_srcdir=obj.topsrcdir,
+diff --git a/python/mozbuild/mozbuild/backend/configenvironment.py b/python/mozbuild/mozbuild/backend/configenvironment.py
+index 76eec5889..a63770423 100644
+--- a/python/mozbuild/mozbuild/backend/configenvironment.py
++++ b/python/mozbuild/mozbuild/backend/configenvironment.py
+@@ -5,11 +5,12 @@
+ from __future__ import absolute_import
+ 
+ import os
++import six
+ import sys
+ import json
+ 
+ from collections import Iterable, OrderedDict
+-from types import StringTypes, ModuleType
++from types import ModuleType
+ 
+ import mozpack.path as mozpath
+ 
+@@ -153,7 +154,7 @@ class ConfigEnvironment(object):
+             shell_quote(self.defines[name]).replace('$', '$$'))
+             for name in sorted(global_defines)])
+         def serialize(name, obj):
+-            if isinstance(obj, StringTypes):
++            if isinstance(obj, six.string_types):
+                 return obj
+             if isinstance(obj, Iterable):
+                 return ' '.join(obj)
+@@ -188,7 +189,7 @@ class ConfigEnvironment(object):
+                     return v.decode('utf-8', 'replace')
+ 
+         for k, v in self.substs.items():
+-            if not isinstance(v, StringTypes):
++            if not isinstance(v, six.string_types):
+                 if isinstance(v, Iterable):
+                     type(v)(decode(i) for i in v)
+             elif not isinstance(v, text_type):
+@@ -241,10 +242,9 @@ class PartialConfigDict(object):
+         return existing_files
+ 
+     def _write_file(self, key, value):
+-        encoding = 'mbcs' if sys.platform == 'win32' else 'utf-8'
+         filename = mozpath.join(self._datadir, key)
+         with FileAvoidWrite(filename) as fh:
+-            json.dump(value, fh, indent=4, encoding=encoding)
++            json.dump(value, fh, indent=4)
+         return filename
+ 
+     def _fill_group(self, values):
+@@ -258,7 +258,7 @@ class PartialConfigDict(object):
+         existing_files = self._load_config_track()
+ 
+         new_files = set()
+-        for k, v in values.iteritems():
++        for k, v in six.iteritems(values):
+             new_files.add(self._write_file(k, v))
+ 
+         for filename in existing_files - new_files:
+diff --git a/python/mozbuild/mozbuild/backend/fastermake.py b/python/mozbuild/mozbuild/backend/fastermake.py
+index 61479a465..1bab9ff04 100644
+--- a/python/mozbuild/mozbuild/backend/fastermake.py
++++ b/python/mozbuild/mozbuild/backend/fastermake.py
+@@ -4,6 +4,8 @@
+ 
+ from __future__ import absolute_import, unicode_literals, print_function
+ 
++import six
++
+ from mozbuild.backend.base import PartialBackend
+ from mozbuild.backend.common import CommonBackend
+ from mozbuild.frontend.context import (
+@@ -178,7 +180,7 @@ class FasterMakeBackend(CommonBackend, PartialBackend):
+         # Add information for chrome manifest generation
+         manifest_targets = []
+ 
+-        for target, entries in self._manifest_entries.iteritems():
++        for target, entries in six.iteritems(self._manifest_entries):
+             manifest_targets.append(target)
+             install_target = mozpath.basedir(target, install_manifests_bases)
+             self._install_manifests[install_target].add_content(
+@@ -190,7 +192,7 @@ class FasterMakeBackend(CommonBackend, PartialBackend):
+                          % ' '.join(self._install_manifests.keys()))
+ 
+         # Add dependencies we inferred:
+-        for target, deps in self._dependencies.iteritems():
++        for target, deps in six.iteritems(self._dependencies):
+             mk.create_rule([target]).add_dependencies(
+                 '$(TOPOBJDIR)/%s' % d for d in deps)
+ 
+@@ -202,7 +204,7 @@ class FasterMakeBackend(CommonBackend, PartialBackend):
+             '$(TOPSRCDIR)/third_party/python/compare-locales/compare_locales/paths.py',
+         ]
+         # Add l10n dependencies we inferred:
+-        for target, deps in self._l10n_dependencies.iteritems():
++        for target, deps in six.iteritems(self._l10n_dependencies):
+             mk.create_rule([target]).add_dependencies(
+                 '%s' % d[0] for d in deps)
+             for (merge, ref_file, l10n_file) in deps:
+@@ -214,7 +216,7 @@ class FasterMakeBackend(CommonBackend, PartialBackend):
+ 
+         mk.add_statement('include $(TOPSRCDIR)/config/faster/rules.mk')
+ 
+-        for base, install_manifest in self._install_manifests.iteritems():
++        for base, install_manifest in six.iteritems(self._install_manifests):
+             with self._write_file(
+                     mozpath.join(self.environment.topobjdir, 'faster',
+                                  'install_%s' % base.replace('/', '_'))) as fh:
+@@ -223,7 +225,7 @@ class FasterMakeBackend(CommonBackend, PartialBackend):
+         # For artifact builds only, write a single unified manifest for consumption by |mach watch|.
+         if self.environment.is_artifact_build:
+             unified_manifest = InstallManifest()
+-            for base, install_manifest in self._install_manifests.iteritems():
++            for base, install_manifest in six.iteritems(self._install_manifests):
+                 # Expect 'dist/bin/**', which includes 'dist/bin' with no trailing slash.
+                 assert base.startswith('dist/bin')
+                 base = base[len('dist/bin'):]
+diff --git a/python/mozbuild/mozbuild/backend/recursivemake.py b/python/mozbuild/mozbuild/backend/recursivemake.py
+index d550cd876..aeac948c3 100644
+--- a/python/mozbuild/mozbuild/backend/recursivemake.py
++++ b/python/mozbuild/mozbuild/backend/recursivemake.py
+@@ -12,7 +12,7 @@ from collections import (
+     defaultdict,
+     namedtuple,
+ )
+-from StringIO import StringIO
++import six
+ from itertools import chain
+ 
+ from mozpack.manifests import (
+@@ -209,8 +209,7 @@ class BackendMakeFile(object):
+         self.fh.write(buf)
+ 
+     def write_once(self, buf):
+-        if isinstance(buf, unicode):
+-            buf = buf.encode('utf-8')
++        buf = six.ensure_binary(buf)
+         if b'\n' + buf not in self.fh.getvalue():
+             self.write(buf)
+ 
+@@ -795,7 +794,7 @@ class RecursiveMakeBackend(CommonBackend):
+             if main:
+                 rule.add_dependencies('%s/%s' % (d, tier) for d in main)
+ 
+-        all_compile_deps = reduce(lambda x,y: x|y,
++        all_compile_deps = six.moves.reduce(lambda x,y: x|y,
+             self._compile_graph.values()) if self._compile_graph else set()
+         # Include the following as dependencies of the top recursion target for
+         # compilation:
+@@ -809,7 +808,7 @@ class RecursiveMakeBackend(CommonBackend):
+         #   as direct dependencies of the top recursion target, to somehow
+         #   prioritize them.
+         #   1. See bug 1262241 comment 5.
+-        compile_roots = [t for t, deps in self._compile_graph.iteritems()
++        compile_roots = [t for t, deps in six.iteritems(self._compile_graph)
+                          if not deps or t not in all_compile_deps]
+ 
+         def add_category_rules(category, roots, graph):
+@@ -847,7 +846,7 @@ class RecursiveMakeBackend(CommonBackend):
+                 self._no_skip['syms'].remove(dirname)
+ 
+         add_category_rules('compile', compile_roots, self._compile_graph)
+-        for category, graph in non_default_graphs.iteritems():
++        for category, graph in six.iteritems(non_default_graphs):
+             add_category_rules(category, non_default_roots[category], graph)
+ 
+         root_mk = Makefile()
+@@ -867,7 +866,7 @@ class RecursiveMakeBackend(CommonBackend):
+         root_mk.add_statement('non_default_tiers := %s' % ' '.join(sorted(
+             non_default_roots.keys())))
+ 
+-        for category, graphs in non_default_graphs.iteritems():
++        for category, graphs in six.iteritems(non_default_graphs):
+             category_dirs = [mozpath.dirname(target)
+                              for target in graphs.keys()]
+             root_mk.add_statement('%s_dirs := %s' % (category,
+@@ -911,16 +910,18 @@ class RecursiveMakeBackend(CommonBackend):
+             rule.add_dependencies(['$(CURDIR)/%: %'])
+ 
+     def _check_blacklisted_variables(self, makefile_in, makefile_content):
+-        if b'EXTERNALLY_MANAGED_MAKE_FILE' in makefile_content:
++        if 'EXTERNALLY_MANAGED_MAKE_FILE' in makefile_content:
+             # Bypass the variable restrictions for externally managed makefiles.
+             return
+ 
+         for l in makefile_content.splitlines():
+             l = l.strip()
+             # Don't check comments
+-            if l.startswith(b'#'):
++            if l.startswith('#'):
+                 continue
+-            for x in chain(MOZBUILD_VARIABLES, DEPRECATED_VARIABLES):
++            mozbuild_var = [six.ensure_text(s) for s in MOZBUILD_VARIABLES]
++            deprecated_var = [six.ensure_text(s) for s in DEPRECATED_VARIABLES]
++            for x in chain(mozbuild_var, deprecated_var):
+                 if x not in l:
+                     continue
+ 
+@@ -928,7 +929,7 @@ class RecursiveMakeBackend(CommonBackend):
+                 # may just appear as part of something else, like DIRS appears
+                 # in GENERATED_DIRS.
+                 if re.search(r'\b%s\s*[:?+]?=' % x, l):
+-                    if x in MOZBUILD_VARIABLES:
++                    if x in mozbuild_var:
+                         message = MOZBUILD_VARIABLES_MESSAGE
+                     else:
+                         message = DEPRECATED_VARIABLES_MESSAGE
+@@ -971,15 +972,15 @@ class RecursiveMakeBackend(CommonBackend):
+                 obj.config = bf.environment
+                 self._create_makefile(obj, stub=stub)
+                 with open(obj.output_path) as fh:
+-                    content = fh.read()
++                    content = six.ensure_text(fh.read())
+                     # Directories with a Makefile containing a tools target, or
+                     # XPI_PKGNAME or INSTALL_EXTENSION_ID can't be skipped and
+                     # must run during the 'tools' tier.
+-                    for t in (b'XPI_PKGNAME', b'INSTALL_EXTENSION_ID',
+-                            b'tools'):
++                    for t in ('XPI_PKGNAME', 'INSTALL_EXTENSION_ID',
++                              'tools'):
+                         if t not in content:
+                             continue
+-                        if t == b'tools' and not re.search('(?:^|\s)tools.*::', content, re.M):
++                        if t == 'tools' and not re.search('(?:^|\s)tools.*::', content, re.M):
+                             continue
+                         if objdir == self.environment.topobjdir:
+                             continue
+@@ -1140,7 +1141,7 @@ class RecursiveMakeBackend(CommonBackend):
+ 
+         mk.add_statement('all_idl_dirs := %s' % ' '.join(sorted(all_directories)))
+ 
+-        rules = StringIO()
++        rules = six.StringIO()
+         mk.dump(rules, removal_guard=False)
+ 
+         # Create dependency for output header so we force regeneration if the
+diff --git a/python/mozbuild/mozbuild/base.py b/python/mozbuild/mozbuild/base.py
+index 93b9ed82a..9e4f16827 100644
+--- a/python/mozbuild/mozbuild/base.py
++++ b/python/mozbuild/mozbuild/base.py
+@@ -10,6 +10,7 @@ import mozpack.path as mozpath
+ import multiprocessing
+ import os
+ import subprocess
++import six
+ import sys
+ import types
+ import errno
+@@ -19,7 +20,6 @@ except ImportError:
+     # shutil.which is not available in Python 2.7
+     import which
+ 
+-from StringIO import StringIO
+ from mach.mixin.process import ProcessExecutionMixin
+ from mozversioncontrol import (
+     get_repository_from_build_config,
+@@ -266,7 +266,7 @@ class MozbuildObject(ProcessExecutionMixin):
+         # the environment variable, which has an impact on autodetection (when
+         # path is MozconfigLoader.AUTODETECT), and memoization wouldn't account
+         # for it without the explicit (unused) argument.
+-        out = StringIO()
++        out = six.StringIO()
+         env = os.environ
+         if path and path != MozconfigLoader.AUTODETECT:
+             env = dict(env)
+diff --git a/python/mozbuild/mozbuild/config_status.py b/python/mozbuild/mozbuild/config_status.py
+index c5bd24728..a40945508 100644
+--- a/python/mozbuild/mozbuild/config_status.py
++++ b/python/mozbuild/mozbuild/config_status.py
+@@ -10,10 +10,17 @@ from __future__ import absolute_import, print_function
+ 
+ import logging
+ import os
++import six
+ import subprocess
+ import sys
+ import time
+ 
++if six.PY2:
++    time_clock = time.clock
++else:
++    time_clock = time.process_time
++
++
+ from argparse import ArgumentParser
+ 
+ from mach.logging import LoggingManager
+@@ -118,7 +125,7 @@ def config_status(topobjdir='.', topsrcdir='.', defines=None,
+     with FileAvoidWrite(os.path.join(topobjdir, 'mozinfo.json')) as f:
+         write_mozinfo(f, env, os.environ)
+ 
+-    cpu_start = time.clock()
++    cpu_start = time_clock()
+     time_start = time.time()
+ 
+     # Make appropriate backend instances, defaulting to RecursiveMakeBackend,
+@@ -154,7 +161,7 @@ def config_status(topobjdir='.', topsrcdir='.', defines=None,
+             summary = obj.gyp_summary()
+             print(summary, file=sys.stderr)
+ 
+-    cpu_time = time.clock() - cpu_start
++    cpu_time = time_clock() - cpu_start
+     wall_time = time.time() - time_start
+     efficiency = cpu_time / wall_time if wall_time else 100
+     untracked = wall_time - execution_time
+diff --git a/python/mozbuild/mozbuild/configure/__init__.py b/python/mozbuild/mozbuild/configure/__init__.py
+index 6b411bdc2..71096abd7 100644
+--- a/python/mozbuild/mozbuild/configure/__init__.py
++++ b/python/mozbuild/mozbuild/configure/__init__.py
+@@ -4,11 +4,12 @@
+ 
+ from __future__ import absolute_import, print_function, unicode_literals
+ 
+-import __builtin__
+ import inspect
+ import logging
+ import os
+ import re
++import six
++from six.moves import builtins as __builtin__
+ import sys
+ import types
+ from collections import OrderedDict
+@@ -28,12 +29,13 @@ from mozbuild.configure.util import (
+     LineIO,
+ )
+ from mozbuild.util import (
+-    encode,
++    ensure_subprocess_env,
+     exec_,
+     memoize,
+     memoized_property,
+     ReadOnlyDict,
+     ReadOnlyNamespace,
++	system_encoding,
+ )
+ 
+ import mozpack.path as mozpath
+@@ -102,6 +104,9 @@ class SandboxDependsFunction(object):
+         raise ConfigureError(
+             'Cannot do boolean operations on @depends functions.')
+ 
++    def __hash__(self):
++        return object.__hash__(self)
++
+ 
+ class DependsFunction(object):
+     __slots__ = (
+@@ -230,6 +235,9 @@ class CombinedDependsFunction(DependsFunction):
+                 self._func is other._func and
+                 set(self.dependencies) == set(other.dependencies))
+ 
++    def __hash__(self):
++        return object.__hash__(self)
++
+     def __ne__(self, other):
+         return not self == other
+ 
+@@ -283,8 +291,9 @@ class ConfigureSandbox(dict):
+         b: getattr(__builtin__, b)
+         for b in ('None', 'False', 'True', 'int', 'bool', 'any', 'all', 'len',
+                   'list', 'tuple', 'set', 'dict', 'isinstance', 'getattr',
+-                  'hasattr', 'enumerate', 'range', 'zip', 'AssertionError')
+-    }, __import__=forbidden_import, str=unicode)
++                  'hasattr', 'enumerate', 'range', 'zip', 'AssertionError',
++                  '__build_class__')
++    }, __import__=forbidden_import, str=six.text_type)
+ 
+     # Expose a limited set of functions from os.path
+     OS = ReadOnlyNamespace(path=ReadOnlyNamespace(**{
+@@ -363,8 +372,8 @@ class ConfigureSandbox(dict):
+                 return method
+             def wrapped(*args, **kwargs):
+                 out_args = [
+-                    arg.decode(encoding) if isinstance(arg, str) else arg
+-                    for arg in args
++                    six.ensure_text(arg, encoding=encoding or 'utf-8')
++                    if isinstance(arg, six.binary_type) else arg for arg in args
+                 ]
+                 return method(*out_args, **kwargs)
+             return wrapped
+@@ -430,7 +439,7 @@ class ConfigureSandbox(dict):
+         if path:
+             self.include_file(path)
+ 
+-        for option in self._options.itervalues():
++        for option in six.itervalues(self._options):
+             # All options must be referenced by some @depends function
+             if option not in self._seen:
+                 raise ConfigureError(
+@@ -596,7 +605,7 @@ class ConfigureSandbox(dict):
+         return value
+ 
+     def _dependency(self, arg, callee_name, arg_name=None):
+-        if isinstance(arg, types.StringTypes):
++        if isinstance(arg, six.string_types):
+             prefix, name, values = Option.split_option(arg)
+             if values != ():
+                 raise ConfigureError("Option must not contain an '='")
+@@ -660,7 +669,7 @@ class ConfigureSandbox(dict):
+         '''
+         when = self._normalize_when(kwargs.get('when'), 'option')
+         args = [self._resolve(arg) for arg in args]
+-        kwargs = {k: self._resolve(v) for k, v in kwargs.iteritems()
++        kwargs = {k: self._resolve(v) for k, v in six.iteritems(kwargs)
+                                       if k != 'when'}
+         option = Option(*args, **kwargs)
+         if when:
+@@ -740,7 +749,7 @@ class ConfigureSandbox(dict):
+         with self.only_when_impl(when):
+             what = self._resolve(what)
+             if what:
+-                if not isinstance(what, types.StringTypes):
++                if not isinstance(what, six.string_types):
+                     raise TypeError("Unexpected type: '%s'" % type(what).__name__)
+                 self.include_file(what)
+ 
+@@ -758,7 +767,7 @@ class ConfigureSandbox(dict):
+                 (k[:-len('_impl')], getattr(self, k))
+                 for k in dir(self) if k.endswith('_impl') and k != 'template_impl'
+             )
+-            glob.update((k, v) for k, v in self.iteritems() if k not in glob)
++            glob.update((k, v) for k, v in six.iteritems(self) if k not in glob)
+ 
+         template = self._prepare_function(func, update_globals)
+ 
+@@ -783,7 +792,7 @@ class ConfigureSandbox(dict):
+             def wrapper(*args, **kwargs):
+                 args = [maybe_prepare_function(arg) for arg in args]
+                 kwargs = {k: maybe_prepare_function(v)
+-                          for k, v in kwargs.iteritems()}
++                          for k, v in kwargs.items()}
+                 ret = template(*args, **kwargs)
+                 if isfunction(ret):
+                     # We can't expect the sandboxed code to think about all the
+@@ -818,7 +827,7 @@ class ConfigureSandbox(dict):
+         for value, required in (
+                 (_import, True), (_from, False), (_as, False)):
+ 
+-            if not isinstance(value, types.StringTypes) and (
++            if not isinstance(value, six.string_types) and (
+                     required or value is not None):
+                 raise TypeError("Unexpected type: '%s'" % type(value).__name__)
+             if value is not None and not self.RE_MODULE.match(value):
+@@ -866,7 +875,8 @@ class ConfigureSandbox(dict):
+         def wrap(function):
+             def wrapper(*args, **kwargs):
+                 if 'env' not in kwargs:
+-                    kwargs['env'] = encode(self._environ)
++                    kwargs['env'] = dict(self._environ)
++                kwargs['env'] = ensure_subprocess_env(kwargs['env'], encoding=system_encoding)
+                 return function(*args, **kwargs)
+             return wrapper
+ 
+@@ -883,7 +893,9 @@ class ConfigureSandbox(dict):
+         # Special case for the open() builtin, because otherwise, using it
+         # fails with "IOError: file() constructor not accessible in
+         # restricted mode"
+-        if what == '__builtin__.open':
++        if what == '__builtin__.open' or what == 'builtins.open':
++            if six.PY3:
++                return open
+             return lambda *args, **kwargs: open(*args, **kwargs)
+         # Special case os and os.environ so that os.environ is our copy of
+         # the environment.
+@@ -902,7 +914,11 @@ class ConfigureSandbox(dict):
+         import_line = ''
+         if '.' in what:
+             _from, what = what.rsplit('.', 1)
++            if _from == '__builtin__' or _from.startswith('__builtin__.'):
++                _from = _from.replace('__builtin__', 'six.moves.builtins')
+             import_line += 'from %s ' % _from
++            if what == '__builtin__':
++                what = 'six.move.builtins'
+         import_line += 'import %s as imported' % what
+         glob = {}
+         exec_(import_line, {}, glob)
+@@ -917,7 +933,7 @@ class ConfigureSandbox(dict):
+         name = self._resolve(name)
+         if name is None:
+             return
+-        if not isinstance(name, types.StringTypes):
++        if not isinstance(name, six.string_types):
+             raise TypeError("Unexpected type: '%s'" % type(name).__name__)
+         if name in data:
+             raise ConfigureError(
+@@ -1015,7 +1031,7 @@ class ConfigureSandbox(dict):
+                 if isinstance(possible_reasons[0], Option):
+                     reason = possible_reasons[0]
+         if not reason and (isinstance(value, (bool, tuple)) or
+-                           isinstance(value, types.StringTypes)):
++                           isinstance(value, six.string_types)):
+             # A reason can be provided automatically when imply_option
+             # is called with an immediate value.
+             _, filename, line, _, _, _ = inspect.stack()[1]
+@@ -1051,7 +1067,7 @@ class ConfigureSandbox(dict):
+             return func
+ 
+         glob = SandboxedGlobal(
+-            (k, v) for k, v in func.func_globals.iteritems()
++            (k, v) for k, v in six.iteritems(func.__globals__)
+             if (inspect.isfunction(v) and v not in self._templates) or (
+                 inspect.isclass(v) and issubclass(v, Exception))
+         )
+@@ -1074,20 +1090,20 @@ class ConfigureSandbox(dict):
+         # Note this is not entirely bullet proof (if the value is e.g. a list,
+         # the list contents could have changed), but covers the bases.
+         closure = None
+-        if func.func_closure:
++        if func.__closure__:
+             def makecell(content):
+                 def f():
+                     content
+-                return f.func_closure[0]
++                return f.__closure__[0]
+ 
+             closure = tuple(makecell(cell.cell_contents)
+-                            for cell in func.func_closure)
++                            for cell in func.__closure__)
+ 
+         new_func = self.wraps(func)(types.FunctionType(
+-            func.func_code,
++            func.__code__,
+             glob,
+             func.__name__,
+-            func.func_defaults,
++            func.__defaults__,
+             closure
+         ))
+         @self.wraps(new_func)
+diff --git a/python/mozbuild/mozbuild/configure/check_debug_ranges.py b/python/mozbuild/mozbuild/configure/check_debug_ranges.py
+index c0caa9cc5..6d8da42d3 100644
+--- a/python/mozbuild/mozbuild/configure/check_debug_ranges.py
++++ b/python/mozbuild/mozbuild/configure/check_debug_ranges.py
+@@ -9,6 +9,7 @@
+ from __future__ import absolute_import
+ 
+ import subprocess
++from six import ensure_text
+ import sys
+ import re
+ 
+@@ -43,8 +44,10 @@ def get_range_length(range, debug_ranges):
+     return length
+ 
+ def main(bin, compilation_unit):
+-    p = subprocess.Popen(['objdump', '-W', bin], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
++    p = subprocess.Popen(['objdump', '-W', bin], stdout = subprocess.PIPE, stderr = subprocess.PIPE, universal_newlines = True)
+     (out, err) = p.communicate()
++    out = ensure_text(out)
++    err = ensure_text(err)
+     sections = re.split('\n(Contents of the|The section) ', out)
+     debug_info = [s for s in sections if s.startswith('.debug_info')]
+     debug_ranges = [s for s in sections if s.startswith('.debug_ranges')]
+diff --git a/python/mozbuild/mozbuild/configure/options.py b/python/mozbuild/mozbuild/configure/options.py
+index 8022c304a..c24d88577 100644
+--- a/python/mozbuild/mozbuild/configure/options.py
++++ b/python/mozbuild/mozbuild/configure/options.py
+@@ -5,6 +5,7 @@
+ from __future__ import absolute_import, print_function, unicode_literals
+ 
+ import os
++import six
+ import sys
+ import types
+ from collections import OrderedDict
+@@ -12,7 +13,7 @@ from collections import OrderedDict
+ 
+ def istupleofstrings(obj):
+     return isinstance(obj, tuple) and len(obj) and all(
+-        isinstance(o, types.StringTypes) for o in obj)
++        isinstance(o, six.string_types) for o in obj)
+ 
+ 
+ class OptionValue(tuple):
+@@ -92,7 +93,7 @@ class OptionValue(tuple):
+             return PositiveOptionValue()
+         elif value is False or value == ():
+             return NegativeOptionValue()
+-        elif isinstance(value, types.StringTypes):
++        elif isinstance(value, six.string_types):
+             return PositiveOptionValue((value,))
+         elif isinstance(value, tuple):
+             return PositiveOptionValue(value)
+@@ -106,6 +107,9 @@ class PositiveOptionValue(OptionValue):
+     in the form of a tuple for when values are given to the option (in the form
+     --option=value[,value2...].
+     '''
++    def __bool__(self):
++        return True
++
+     def __nonzero__(self):
+         return True
+ 
+@@ -167,7 +171,7 @@ class Option(object):
+                 'At least an option name or an environment variable name must '
+                 'be given')
+         if name:
+-            if not isinstance(name, types.StringTypes):
++            if not isinstance(name, six.string_types):
+                 raise InvalidOptionError('Option must be a string')
+             if not name.startswith('--'):
+                 raise InvalidOptionError('Option must start with `--`')
+@@ -176,7 +180,7 @@ class Option(object):
+             if not name.islower():
+                 raise InvalidOptionError('Option must be all lowercase')
+         if env:
+-            if not isinstance(env, types.StringTypes):
++            if not isinstance(env, six.string_types):
+                 raise InvalidOptionError(
+                     'Environment variable name must be a string')
+             if not env.isupper():
+@@ -186,8 +190,8 @@ class Option(object):
+                 isinstance(nargs, int) and nargs >= 0):
+             raise InvalidOptionError(
+                 "nargs must be a positive integer, '?', '*' or '+'")
+-        if (not isinstance(default, types.StringTypes) and
+-                not isinstance(default, (bool, types.NoneType)) and
++        if (not isinstance(default, six.string_types) and
++                not isinstance(default, (bool, type(None))) and
+                 not istupleofstrings(default)):
+             raise InvalidOptionError(
+                 'default must be a bool, a string or a tuple of strings')
+@@ -259,7 +263,7 @@ class Option(object):
+                     ', '.join("'%s'" % c for c in choices))
+         elif has_choices:
+             maxargs = self.maxargs
+-            if len(choices) < maxargs and maxargs != sys.maxint:
++            if len(choices) < maxargs and maxargs != sys.maxsize:
+                 raise InvalidOptionError('Not enough `choices` for `nargs`')
+         self.choices = choices
+         self.help = help
+@@ -273,7 +277,7 @@ class Option(object):
+         where prefix is one of 'with', 'without', 'enable' or 'disable'.
+         The '=values' part is optional. Values are separated with commas.
+         '''
+-        if not isinstance(option, types.StringTypes):
++        if not isinstance(option, six.string_types):
+             raise InvalidOptionError('Option must be a string')
+ 
+         elements = option.split('=', 1)
+@@ -326,7 +330,7 @@ class Option(object):
+     def maxargs(self):
+         if isinstance(self.nargs, int):
+             return self.nargs
+-        return 1 if self.nargs == '?' else sys.maxint
++        return 1 if self.nargs == '?' else sys.maxsize
+ 
+     def _validate_nargs(self, num):
+         minargs, maxargs = self.minargs, self.maxargs
+@@ -516,5 +520,5 @@ class CommandLineHelper(object):
+ 
+     def __iter__(self):
+         for d in (self._args, self._extra_args):
+-            for arg, pos in d.itervalues():
++            for arg, pos in six.itervalues(d):
+                 yield arg
+diff --git a/python/mozbuild/mozbuild/configure/util.py b/python/mozbuild/mozbuild/configure/util.py
+index 9d8b2eb0e..acdb07156 100644
+--- a/python/mozbuild/mozbuild/configure/util.py
++++ b/python/mozbuild/mozbuild/configure/util.py
+@@ -9,6 +9,7 @@ import itertools
+ import locale
+ import logging
+ import os
++import six
+ import sys
+ from collections import deque
+ from contextlib import contextmanager
+@@ -200,8 +201,7 @@ class LineIO(object):
+         self._errors = errors
+ 
+     def write(self, buf):
+-        if self._encoding and isinstance(buf, str):
+-            buf = buf.decode(self._encoding, self._errors)
++        buf = six.ensure_text(buf, encoding=self._encoding or 'utf-8')
+         lines = buf.splitlines()
+         if not lines:
+             return
+diff --git a/python/mozbuild/mozbuild/frontend/context.py b/python/mozbuild/mozbuild/frontend/context.py
+index 2e3242937..5abbeb33f 100644
+--- a/python/mozbuild/mozbuild/frontend/context.py
++++ b/python/mozbuild/mozbuild/frontend/context.py
+@@ -50,6 +50,7 @@ import mozpack.path as mozpath
+ from types import FunctionType
+ 
+ import itertools
++import six
+ 
+ 
+ class ContextDerivedValue(object):
+@@ -310,7 +311,7 @@ class BaseCompileFlags(ContextDerivedValue, dict):
+         # a template were set and which were provided as defaults.
+         template_name = getattr(context, 'template', None)
+         if template_name in (None, 'Gyp'):
+-            dict.__init__(self, ((k, v if v is None else TypedList(unicode)(v))
++            dict.__init__(self, ((k, v if v is None else TypedList(six.text_type)(v))
+                                  for k, v, _ in self.flag_variables))
+         else:
+             dict.__init__(self)
+@@ -506,13 +507,13 @@ class CompileFlags(BaseCompileFlags):
+         if key in self and self[key] is None:
+             raise ValueError('`%s` may not be set in COMPILE_FLAGS from moz.build, this '
+                              'value is resolved from the emitter.' % key)
+-        if not (isinstance(value, list) and all(isinstance(v, basestring) for v in value)):
++        if not (isinstance(value, list) and all(isinstance(v, six.string_types) for v in value)):
+             raise ValueError('A list of strings must be provided as a value for a '
+                              'compile flags category.')
+         dict.__setitem__(self, key, value)
+ 
+ 
+-class FinalTargetValue(ContextDerivedValue, unicode):
++class FinalTargetValue(ContextDerivedValue, six.text_type):
+     def __new__(cls, context, value=""):
+         if not value:
+             value = 'dist/'
+@@ -522,7 +523,7 @@ class FinalTargetValue(ContextDerivedValue, unicode):
+                 value += 'bin'
+             if context['DIST_SUBDIR']:
+                 value += '/' + context['DIST_SUBDIR']
+-        return unicode.__new__(cls, value)
++        return six.text_type.__new__(cls, value)
+ 
+ 
+ def Enum(*values):
+@@ -570,7 +571,7 @@ class PathMeta(type):
+                 cls = SourcePath
+         return super(PathMeta, cls).__call__(context, value)
+ 
+-class Path(ContextDerivedValue, unicode):
++class Path(six.with_metaclass(PathMeta, ContextDerivedValue, six.text_type)):
+     """Stores and resolves a source path relative to a given context
+ 
+     This class is used as a backing type for some of the sandbox variables.
+@@ -581,7 +582,6 @@ class Path(ContextDerivedValue, unicode):
+       - '!objdir/relative/paths'
+       - '%/filesystem/absolute/paths'
+     """
+-    __metaclass__ = PathMeta
+ 
+     def __new__(cls, context, value=None):
+         return super(Path, cls).__new__(cls, value)
+@@ -599,29 +599,40 @@ class Path(ContextDerivedValue, unicode):
+         return Path(self.context, mozpath.join(self, *p))
+ 
+     def __cmp__(self, other):
+-        if isinstance(other, Path) and self.srcdir != other.srcdir:
+-            return cmp(self.full_path, other.full_path)
+-        return cmp(unicode(self), other)
++        # do not use it
++        raise AssertionError()
+ 
+     # __cmp__ is not enough because unicode has __eq__, __ne__, etc. defined
+     # and __cmp__ is only used for those when they don't exist.
+     def __eq__(self, other):
+-        return self.__cmp__(other) == 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path == other.full_path
++        return six.text_type(self) == other
+ 
+     def __ne__(self, other):
+-        return self.__cmp__(other) != 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path != other.full_path
++        return six.text_type(self) != other
+ 
+     def __lt__(self, other):
+-        return self.__cmp__(other) < 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path < other.full_path
++        return six.text_type(self) < other
+ 
+     def __gt__(self, other):
+-        return self.__cmp__(other) > 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path > other.full_path
++        return six.text_type(self) > other
+ 
+     def __le__(self, other):
+-        return self.__cmp__(other) <= 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path <= other.full_path
++        return six.text_type(self) <= other
+ 
+     def __ge__(self, other):
+-        return self.__cmp__(other) >= 0
++        if isinstance(other, Path) and self.srcdir != other.srcdir:
++            return self.full_path >= other.full_path
++        return six.text_type(self) >= other
+ 
+     def __repr__(self):
+         return '<%s (%s)%s>' % (self.__class__.__name__, self.srcdir, self)
+@@ -900,18 +911,18 @@ ReftestManifestList = OrderedPathListWithAction(read_reftest_manifest)
+ OrderedSourceList = ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList)
+ OrderedTestFlavorList = TypedList(Enum(*all_test_flavors()),
+                                   StrictOrderingOnAppendList)
+-OrderedStringList = TypedList(unicode, StrictOrderingOnAppendList)
++OrderedStringList = TypedList(six.text_type, StrictOrderingOnAppendList)
+ DependentTestsEntry = ContextDerivedTypedRecord(('files', OrderedSourceList),
+                                                 ('tags', OrderedStringList),
+                                                 ('flavors', OrderedTestFlavorList))
+ BugzillaComponent = TypedNamedTuple('BugzillaComponent',
+-                        [('product', unicode), ('component', unicode)])
++                        [('product', six.text_type), ('component', six.text_type)])
+ SchedulingComponents = ContextDerivedTypedRecord(
+-        ('inclusive', TypedList(unicode, StrictOrderingOnAppendList)),
+-        ('exclusive', TypedList(unicode, StrictOrderingOnAppendList)))
++        ('inclusive', TypedList(six.text_type, StrictOrderingOnAppendList)),
++        ('exclusive', TypedList(six.text_type, StrictOrderingOnAppendList)))
+ 
+ GeneratedFilesList = StrictOrderingOnAppendListWithFlagsFactory({
+-    'script': unicode,
++    'script': six.text_type,
+     'inputs': list,
+     'force': bool,
+     'flags': list, })
+@@ -1215,7 +1226,7 @@ VARIABLES = {
+         RustLibrary template instead.
+         """),
+ 
+-    'RUST_LIBRARY_TARGET_DIR': (unicode, unicode,
++    'RUST_LIBRARY_TARGET_DIR': (six.text_type, six.text_type,
+         """Where CARGO_TARGET_DIR should point when compiling this library.  If
+         not set, it defaults to the current objdir.  It should be a relative path
+         to the current objdir; absolute paths should not be used.
+@@ -1231,11 +1242,11 @@ VARIABLES = {
+         HostRustLibrary template instead.
+         """),
+ 
+-    'RUST_TESTS': (TypedList(unicode), list,
++    'RUST_TESTS': (TypedList(six.text_type), list,
+         """Names of Rust tests to build and run via `cargo test`.
+         """),
+ 
+-    'RUST_TEST_FEATURES': (TypedList(unicode), list,
++    'RUST_TEST_FEATURES': (TypedList(six.text_type), list,
+         """Cargo features to activate for RUST_TESTS.
+         """),
+ 
+@@ -1469,7 +1480,7 @@ VARIABLES = {
+         """Like ``OBJDIR_FILES``, with preprocessing. Use sparingly.
+         """),
+ 
+-    'FINAL_LIBRARY': (unicode, unicode,
++    'FINAL_LIBRARY': (six.text_type, six.text_type,
+         """Library in which the objects of the current directory will be linked.
+ 
+         This variable contains the name of a library, defined elsewhere with
+@@ -1510,7 +1521,7 @@ VARIABLES = {
+         with the host compiler.
+         """),
+ 
+-    'HOST_LIBRARY_NAME': (unicode, unicode,
++    'HOST_LIBRARY_NAME': (six.text_type, six.text_type,
+         """Name of target library generated when cross compiling.
+         """),
+ 
+@@ -1521,7 +1532,7 @@ VARIABLES = {
+         libraries that link into this library via FINAL_LIBRARY.
+         """),
+ 
+-    'LIBRARY_NAME': (unicode, unicode,
++    'LIBRARY_NAME': (six.text_type, six.text_type,
+         """The code name of the library generated for a directory.
+ 
+         By default STATIC_LIBRARY_NAME and SHARED_LIBRARY_NAME take this name.
+@@ -1533,20 +1544,20 @@ VARIABLES = {
+         ``example/components/xpcomsample.lib`` on Windows.
+         """),
+ 
+-    'SHARED_LIBRARY_NAME': (unicode, unicode,
++    'SHARED_LIBRARY_NAME': (six.text_type, six.text_type,
+         """The name of the static library generated for a directory, if it needs to
+         differ from the library code name.
+ 
+         Implies FORCE_SHARED_LIB.
+         """),
+ 
+-    'SHARED_LIBRARY_OUTPUT_CATEGORY': (unicode, unicode,
++    'SHARED_LIBRARY_OUTPUT_CATEGORY': (six.text_type, six.text_type,
+         """The output category for this context's shared library. If set this will
+         correspond to the build command that will build this shared library, and
+         the library will not be built as part of the default build.
+         """),
+ 
+-    'RUST_LIBRARY_OUTPUT_CATEGORY': (unicode, unicode,
++    'RUST_LIBRARY_OUTPUT_CATEGORY': (six.text_type, six.text_type,
+         """The output category for this context's rust library. If set this will
+         correspond to the build command that will build this rust library, and
+         the library will not be built as part of the default build.
+@@ -1559,7 +1570,7 @@ VARIABLES = {
+         Implies FORCE_SHARED_LIB.
+         """),
+ 
+-    'STATIC_LIBRARY_NAME': (unicode, unicode,
++    'STATIC_LIBRARY_NAME': (six.text_type, six.text_type,
+         """The name of the static library generated for a directory, if it needs to
+         differ from the library code name.
+ 
+@@ -1591,31 +1602,31 @@ VARIABLES = {
+ 
+         This variable contains a list of system libaries to link against.
+         """),
+-    'RCFILE': (unicode, unicode,
++    'RCFILE': (six.text_type, six.text_type,
+         """The program .rc file.
+ 
+         This variable can only be used on Windows.
+         """),
+ 
+-    'RESFILE': (unicode, unicode,
++    'RESFILE': (six.text_type, six.text_type,
+         """The program .res file.
+ 
+         This variable can only be used on Windows.
+         """),
+ 
+-    'RCINCLUDE': (unicode, unicode,
++    'RCINCLUDE': (six.text_type, six.text_type,
+         """The resource script file to be included in the default .res file.
+ 
+         This variable can only be used on Windows.
+         """),
+ 
+-    'DEFFILE': (Path, unicode,
++    'DEFFILE': (Path, six.text_type,
+         """The program .def (module definition) file.
+ 
+         This variable can only be used on Windows.
+         """),
+ 
+-    'SYMBOLS_FILE': (Path, unicode,
++    'SYMBOLS_FILE': (Path, six.text_type,
+         """A file containing a list of symbols to export from a shared library.
+ 
+         The given file contains a list of symbols to be exported, and is
+@@ -1636,7 +1647,7 @@ VARIABLES = {
+         ``BIN_SUFFIX``, the name will remain unchanged.
+         """),
+ 
+-    'SONAME': (unicode, unicode,
++    'SONAME': (six.text_type, six.text_type,
+         """The soname of the shared object currently being linked
+ 
+         soname is the "logical name" of a shared object, often used to provide
+@@ -1706,7 +1717,7 @@ VARIABLES = {
+         ``GENERATED_FILES``.
+         """),
+ 
+-    'PROGRAM' : (unicode, unicode,
++    'PROGRAM' : (six.text_type, six.text_type,
+         """Compiled executable name.
+ 
+         If the configuration token ``BIN_SUFFIX`` is set, its value will be
+@@ -1714,7 +1725,7 @@ VARIABLES = {
+         ``BIN_SUFFIX``, ``PROGRAM`` will remain unchanged.
+         """),
+ 
+-    'HOST_PROGRAM' : (unicode, unicode,
++    'HOST_PROGRAM' : (six.text_type, six.text_type,
+         """Compiled host executable name.
+ 
+         If the configuration token ``HOST_BIN_SUFFIX`` is set, its value will be
+@@ -1752,7 +1763,7 @@ VARIABLES = {
+         files.
+         """),
+ 
+-    'XPIDL_MODULE': (unicode, unicode,
++    'XPIDL_MODULE': (six.text_type, six.text_type,
+         """XPCOM Interface Definition Module Name.
+ 
+         This is the name of the ``.xpt`` file that is created by linking
+@@ -1910,14 +1921,14 @@ VARIABLES = {
+ 
+ 
+     # The following variables are used to control the target of installed files.
+-    'XPI_NAME': (unicode, unicode,
++    'XPI_NAME': (six.text_type, six.text_type,
+         """The name of an extension XPI to generate.
+ 
+         When this variable is present, the results of this directory will end up
+         being packaged into an extension instead of the main dist/bin results.
+         """),
+ 
+-    'DIST_SUBDIR': (unicode, unicode,
++    'DIST_SUBDIR': (six.text_type, six.text_type,
+         """The name of an alternate directory to install files to.
+ 
+         When this variable is present, the results of this directory will end up
+@@ -1925,7 +1936,7 @@ VARIABLES = {
+         otherwise be placed.
+         """),
+ 
+-    'FINAL_TARGET': (FinalTargetValue, unicode,
++    'FINAL_TARGET': (FinalTargetValue, six.text_type,
+         """The name of the directory to install targets to.
+ 
+         The directory is relative to the top of the object directory. The
+@@ -1945,7 +1956,7 @@ VARIABLES = {
+ 
+     'GYP_DIRS': (StrictOrderingOnAppendListWithFlagsFactory({
+             'variables': dict,
+-            'input': unicode,
++            'input': six.text_type,
+             'sandbox_vars': dict,
+             'no_chromium': bool,
+             'no_unified': bool,
+@@ -1990,7 +2001,7 @@ VARIABLES = {
+             'sandbox_vars': dict,
+             'non_unified_sources': StrictOrderingOnAppendList,
+             'mozilla_flags': list,
+-            'gn_target': unicode,
++            'gn_target': six.text_type,
+         }), list,
+         """List of dirs containing gn files describing targets to build. Attributes:
+             - variables, a dictionary containing variables and values to pass
+diff --git a/python/mozbuild/mozbuild/frontend/data.py b/python/mozbuild/mozbuild/frontend/data.py
+index ff317b02b..2be112809 100644
+--- a/python/mozbuild/mozbuild/frontend/data.py
++++ b/python/mozbuild/mozbuild/frontend/data.py
+@@ -29,6 +29,7 @@ from .context import FinalTargetValue
+ 
+ from collections import defaultdict, OrderedDict
+ import itertools
++import six
+ 
+ from ..util import (
+     group_unified_files,
+@@ -218,7 +219,7 @@ class BaseDefines(ContextDerived):
+         self.defines = defines
+ 
+     def get_defines(self):
+-        for define, value in self.defines.iteritems():
++        for define, value in six.iteritems(self.defines):
+             if value is True:
+                 yield('-D%s' % define)
+             elif value is False:
+diff --git a/python/mozbuild/mozbuild/frontend/emitter.py b/python/mozbuild/mozbuild/frontend/emitter.py
+index d897c1741..0bde4fdc6 100644
+--- a/python/mozbuild/mozbuild/frontend/emitter.py
++++ b/python/mozbuild/mozbuild/frontend/emitter.py
+@@ -8,6 +8,7 @@ import itertools
+ import logging
+ import os
+ import traceback
++import six
+ import sys
+ import time
+ 
+@@ -119,7 +120,7 @@ class TreeMetadataEmitter(LoggingMixin):
+         # rid ourselves of 2.6.
+         self.info = {}
+         for k, v in mozinfo.info.items():
+-            if isinstance(k, unicode):
++            if isinstance(k, six.text_type):
+                 k = k.encode('ascii')
+             self.info[k] = v
+ 
+@@ -429,6 +430,7 @@ class TreeMetadataEmitter(LoggingMixin):
+                     '%s in the tree' % (variable, name, name,
+                     self.LIBRARY_NAME_VAR[obj.KIND]), context)
+ 
++        candidates = list(candidates)
+         if not candidates:
+             raise SandboxValidationError(
+                 '%s contains "%s", which does not match any %s in the tree.'
+@@ -481,9 +483,9 @@ class TreeMetadataEmitter(LoggingMixin):
+ 
+     def _verify_deps(self, context, crate_dir, crate_name, dependencies, description='Dependency'):
+         """Verify that a crate's dependencies all specify local paths."""
+-        for dep_crate_name, values in dependencies.iteritems():
++        for dep_crate_name, values in six.iteritems(dependencies):
+             # A simple version number.
+-            if isinstance(values, (str, unicode)):
++            if isinstance(values, six.text_type):
+                 raise SandboxValidationError(
+                     '%s %s of crate %s does not list a path' % (description, dep_crate_name, crate_name),
+                     context)
+@@ -884,9 +886,9 @@ class TreeMetadataEmitter(LoggingMixin):
+         assert not gen_sources['UNIFIED_SOURCES']
+ 
+         no_pgo = context.get('NO_PGO')
+-        no_pgo_sources = [f for f, flags in all_flags.iteritems()
++        no_pgo_sources = [f for f, flags in six.iteritems(all_flags)
+                           if flags.no_pgo]
+-        pgo_gen_only_sources = set(f for f, flags in all_flags.iteritems()
++        pgo_gen_only_sources = set(f for f, flags in six.iteritems(all_flags)
+                                    if flags.pgo_generate_only)
+         if no_pgo:
+             if no_pgo_sources:
+@@ -913,7 +915,7 @@ class TreeMetadataEmitter(LoggingMixin):
+ 
+         # The inverse of the above, mapping suffixes to their canonical suffix.
+         canonicalized_suffix_map = {}
+-        for suffix, alternatives in suffix_map.iteritems():
++        for suffix, alternatives in six.iteritems(suffix_map):
+             alternatives.add(suffix)
+             for a in alternatives:
+                 canonicalized_suffix_map[a] = suffix
+@@ -985,7 +987,7 @@ class TreeMetadataEmitter(LoggingMixin):
+                 for suffix, srcs in ctxt_sources['HOST_SOURCES'].items():
+                     host_linkable.sources[suffix] += srcs
+ 
+-        for f, flags in all_flags.iteritems():
++        for f, flags in six.iteritems(all_flags):
+             if flags.flags:
+                 ext = mozpath.splitext(f)[1]
+                 yield PerSourceFlag(context, f, flags.flags)
+@@ -1423,7 +1425,7 @@ class TreeMetadataEmitter(LoggingMixin):
+             script = mozpath.join(mozpath.dirname(mozpath.dirname(__file__)),
+                                   'action', 'process_define_files.py')
+             yield GeneratedFile(context, script, 'process_define_file',
+-                                unicode(path),
++                                six.text_type(path),
+                                 [Path(context, path + '.in')])
+ 
+         generated_files = context.get('GENERATED_FILES') or []
+diff --git a/python/mozbuild/mozbuild/frontend/reader.py b/python/mozbuild/mozbuild/frontend/reader.py
+index 7eca98a0a..a55e1a3d2 100644
+--- a/python/mozbuild/mozbuild/frontend/reader.py
++++ b/python/mozbuild/mozbuild/frontend/reader.py
+@@ -22,6 +22,7 @@ import ast
+ import inspect
+ import logging
+ import os
++import six
+ import sys
+ import textwrap
+ import time
+@@ -292,7 +293,7 @@ class MozbuildSandbox(Sandbox):
+             raise Exception('`template` is a function decorator. You must '
+                 'use it as `@template` preceding a function declaration.')
+ 
+-        name = func.func_name
++        name = func.__name__
+ 
+         if name in self.templates:
+             raise KeyError(
+@@ -388,13 +389,14 @@ class MozbuildSandbox(Sandbox):
+ 
+ class TemplateFunction(object):
+     def __init__(self, func, sandbox):
+-        self.path = func.func_code.co_filename
+-        self.name = func.func_name
++        self.path = func.__code__.co_filename
++        self.name = func.__name__
+ 
+-        code = func.func_code
++        code = func.__code__
+         firstlineno = code.co_firstlineno
+         lines = sandbox._current_source.splitlines(True)
+         if lines:
++            lines = [six.ensure_text(l) for l in lines]
+             # Older versions of python 2.7 had a buggy inspect.getblock() that
+             # would ignore the last line if it didn't terminate with a newline.
+             if not lines[-1].endswith('\n'):
+@@ -416,7 +418,10 @@ class TemplateFunction(object):
+         # actually never calls __getitem__ and __setitem__, so we need to
+         # modify the AST so that accesses to globals are properly directed
+         # to a dict.
+-        self._global_name = b'_data' # AST wants str for this, not unicode
++        if six.PY2:
++            self._global_name = b'_data' # AST wants str for this, not unicode
++        else:
++            self._global_name = '_data'
+         # In case '_data' is a name used for a variable in the function code,
+         # prepend more underscores until we find an unused name.
+         while (self._global_name in code.co_names or
+@@ -435,8 +440,8 @@ class TemplateFunction(object):
+             compile(func_ast, self.path, 'exec'),
+             glob,
+             self.name,
+-            func.func_defaults,
+-            func.func_closure,
++            func.__defaults__,
++            func.__closure__,
+         )
+         func()
+ 
+@@ -450,11 +455,11 @@ class TemplateFunction(object):
+             '__builtins__': sandbox._builtins
+         }
+         func = types.FunctionType(
+-            self._func.func_code,
++            self._func.__code__,
+             glob,
+             self.name,
+-            self._func.func_defaults,
+-            self._func.func_closure
++            self._func.__defaults__,
++            self._func.__closure__
+         )
+         sandbox.exec_function(func, args, kwargs, self.path,
+                               becomes_current_path=False)
+@@ -470,7 +475,7 @@ class TemplateFunction(object):
+         def visit_Str(self, node):
+             # String nodes we got from the AST parser are str, but we want
+             # unicode literals everywhere, so transform them.
+-            node.s = unicode(node.s)
++            node.s = text_type(node.s)
+             return node
+ 
+         def visit_Name(self, node):
+@@ -603,7 +608,7 @@ class BuildReaderError(Exception):
+ 
+             for l in traceback.format_exception(type(self.other), self.other,
+                 self.trace):
+-                s.write(unicode(l))
++                s.write(text_type(l))
+ 
+         return s.getvalue()
+ 
+diff --git a/python/mozbuild/mozbuild/jar.py b/python/mozbuild/mozbuild/jar.py
+index 47a2eff63..867561bfd 100644
+--- a/python/mozbuild/mozbuild/jar.py
++++ b/python/mozbuild/mozbuild/jar.py
+@@ -15,9 +15,10 @@ import os
+ import errno
+ import re
+ import logging
++import six
+ from time import localtime
+ from MozZipFile import ZipFile
+-from cStringIO import StringIO
++from six import BytesIO
+ from collections import defaultdict
+ 
+ from mozbuild.preprocessor import Preprocessor
+@@ -42,7 +43,7 @@ class ZipEntry(object):
+     def __init__(self, name, zipfile):
+         self._zipfile = zipfile
+         self._name = name
+-        self._inner = StringIO()
++        self._inner = BytesIO()
+ 
+     def write(self, content):
+         '''Append the given content to this zip entry'''
+diff --git a/python/mozbuild/mozbuild/makeutil.py b/python/mozbuild/mozbuild/makeutil.py
+index fcd45bed2..53f18f1bd 100644
+--- a/python/mozbuild/mozbuild/makeutil.py
++++ b/python/mozbuild/mozbuild/makeutil.py
+@@ -6,7 +6,7 @@ from __future__ import absolute_import
+ 
+ import os
+ import re
+-from types import StringTypes
++import six
+ from collections import Iterable
+ 
+ 
+@@ -103,19 +103,19 @@ class Rule(object):
+ 
+     def add_targets(self, targets):
+         '''Add additional targets to the rule.'''
+-        assert isinstance(targets, Iterable) and not isinstance(targets, StringTypes)
++        assert isinstance(targets, Iterable) and not isinstance(targets, six.string_types)
+         self._targets.update(targets)
+         return self
+ 
+     def add_dependencies(self, deps):
+         '''Add dependencies to the rule.'''
+-        assert isinstance(deps, Iterable) and not isinstance(deps, StringTypes)
++        assert isinstance(deps, Iterable) and not isinstance(deps, six.string_types)
+         self._dependencies.update(deps)
+         return self
+ 
+     def add_commands(self, commands):
+         '''Add commands to the rule.'''
+-        assert isinstance(commands, Iterable) and not isinstance(commands, StringTypes)
++        assert isinstance(commands, Iterable) and not isinstance(commands, six.string_types)
+         self._commands.extend(commands)
+         return self
+ 
+@@ -139,12 +139,12 @@ class Rule(object):
+         '''
+         if not self._targets:
+             return
+-        fh.write('%s:' % ' '.join(self._targets))
++        fh.write(six.ensure_binary('%s:' % ' '.join(self._targets)))
+         if self._dependencies:
+-            fh.write(' %s' % ' '.join(self.dependencies()))
+-        fh.write('\n')
++            fh.write(six.ensure_binary(' %s' % ' '.join(self.dependencies())))
++        fh.write(six.ensure_binary('\n'))
+         for cmd in self._commands:
+-            fh.write('\t%s\n' % cmd)
++            fh.write(six.ensure_binary('\t%s\n' % cmd))
+ 
+ 
+ # colon followed by anything except a slash (Windows path detection)
+diff --git a/python/mozbuild/mozbuild/mozinfo.py b/python/mozbuild/mozbuild/mozinfo.py
+index e74eef261..7d8742f1d 100755
+--- a/python/mozbuild/mozbuild/mozinfo.py
++++ b/python/mozbuild/mozbuild/mozinfo.py
+@@ -9,6 +9,7 @@ from __future__ import absolute_import
+ 
+ import os
+ import re
++import six
+ import json
+ 
+ 
+@@ -144,7 +145,7 @@ def write_mozinfo(file, config, env=os.environ):
+     and what keys are produced.
+     """
+     build_conf = build_dict(config, env)
+-    if isinstance(file, basestring):
++    if isinstance(file, six.text_type):
+         file = open(file, 'wb')
+ 
+     json.dump(build_conf, file, sort_keys=True, indent=4)
+diff --git a/python/mozbuild/mozbuild/preprocessor.py b/python/mozbuild/mozbuild/preprocessor.py
+index 200651712..2411223a5 100644
+--- a/python/mozbuild/mozbuild/preprocessor.py
++++ b/python/mozbuild/mozbuild/preprocessor.py
+@@ -22,12 +22,13 @@ value :
+   | \w+  # string identifier or value;
+ """
+ 
++import six
+ import sys
+ import os
+ import re
+ from optparse import OptionParser
+ import errno
+-from makeutil import Makefile
++from mozbuild.makeutil import Makefile
+ 
+ # hack around win32 mangling our line endings
+ # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/65443
+@@ -45,6 +46,12 @@ __all__ = [
+ ]
+ 
+ 
++def _to_text(a):
++    if isinstance(a, (six.text_type, six.binary_type)):
++        return six.ensure_text(a)
++    return six.text_type(a)
++
++
+ def path_starts_with(path, prefix):
+     if os.altsep:
+         prefix = prefix.replace(os.altsep, os.sep)
+@@ -239,7 +246,7 @@ class Expression:
+         def __repr__(self):
+             return self.value.__repr__()
+ 
+-    class ParseError(StandardError):
++    class ParseError(Exception):
+         """
+         Error raised when parsing fails.
+         It has two members, offset and content, which give the offset of the
+@@ -285,9 +292,9 @@ class Preprocessor:
+ 
+     def __init__(self, defines=None, marker='#'):
+         self.context = Context()
+-        for k,v in {'FILE': '',
+-                    'LINE': 0,
+-                    'DIRECTORY': os.path.abspath('.')}.iteritems():
++        for k,v in six.iteritems({'FILE': '',
++                                  'LINE': 0,
++                                  'DIRECTORY': os.path.abspath('.')}):
+             self.context[k] = v
+         try:
+             # Can import globally because of bootstrapping issues.
+@@ -308,23 +315,23 @@ class Preprocessor:
+         self.checkLineNumbers = False
+         self.filters = []
+         self.cmds = {}
+-        for cmd, level in {'define': 0,
++        for cmd, level in six.iteritems({'define': 0,
+                            'undef': 0,
+-                           'if': sys.maxint,
+-                           'ifdef': sys.maxint,
+-                           'ifndef': sys.maxint,
++                           'if': sys.maxsize,
++                           'ifdef': sys.maxsize,
++                           'ifndef': sys.maxsize,
+                            'else': 1,
+                            'elif': 1,
+                            'elifdef': 1,
+                            'elifndef': 1,
+-                           'endif': sys.maxint,
++                           'endif': sys.maxsize,
+                            'expand': 0,
+                            'literal': 0,
+                            'filter': 0,
+                            'unfilter': 0,
+                            'include': 0,
+                            'includesubst': 0,
+-                           'error': 0}.iteritems():
++                           'error': 0}):
+             self.cmds[cmd] = (level, getattr(self, 'do_' + cmd))
+         self.out = sys.stdout
+         self.setMarker(marker)
+@@ -452,7 +459,7 @@ class Preprocessor:
+         filteredLine = self.applyFilters(aLine)
+         if filteredLine != aLine:
+             self.actionLevel = 2
+-        self.out.write(filteredLine)
++        self.out.write(six.ensure_binary(filteredLine))
+ 
+     def handleCommandLine(self, args, defaultToStdin = False):
+         """
+@@ -486,7 +493,7 @@ class Preprocessor:
+                 raise Preprocessor.Error(self, "--depend doesn't work with stdout",
+                                          None)
+             try:
+-                from makeutil import Makefile
++                from mozbuild.makeutil import Makefile
+             except:
+                 raise Preprocessor.Error(self, "--depend requires the "
+                                                "mozbuild.makeutil module", None)
+@@ -686,7 +693,7 @@ class Preprocessor:
+         do_replace = False
+         def vsubst(v):
+             if v in self.context:
+-                return str(self.context[v])
++                return _to_text(self.context[v])
+             return ''
+         for i in range(1, len(lst), 2):
+             lst[i] = vsubst(lst[i])
+@@ -701,7 +708,7 @@ class Preprocessor:
+         current = dict(self.filters)
+         for f in filters:
+             current[f] = getattr(self, 'filter_' + f)
+-        filterNames = current.keys()
++        filterNames = list(current.keys())
+         filterNames.sort()
+         self.filters = [(fn, current[fn]) for fn in filterNames]
+         return
+@@ -711,7 +718,7 @@ class Preprocessor:
+         for f in filters:
+             if f in current:
+                 del current[f]
+-        filterNames = current.keys()
++        filterNames = list(current.keys())
+         filterNames.sort()
+         self.filters = [(fn, current[fn]) for fn in filterNames]
+         return
+@@ -742,11 +749,11 @@ class Preprocessor:
+         def repl(matchobj):
+             varname = matchobj.group('VAR')
+             if varname in self.context:
+-                return str(self.context[varname])
++                return _to_text(self.context[varname])
+             if fatal:
+                 raise Preprocessor.Error(self, 'UNDEFINED_VAR', varname)
+             return matchobj.group(0)
+-        return self.varsubst.sub(repl, aLine)
++        return self.varsubst.sub(repl, _to_text(aLine))
+     def filter_attemptSubstitution(self, aLine):
+         return self.filter_substitution(aLine, fatal=False)
+     # File ops
+@@ -756,12 +763,12 @@ class Preprocessor:
+         args can either be a file name, or a file-like object.
+         Files should be opened, and will be closed after processing.
+         """
+-        isName = type(args) == str or type(args) == unicode
++        isName = isinstance(args, (six.text_type, six.binary_type))
+         oldCheckLineNumbers = self.checkLineNumbers
+         self.checkLineNumbers = False
+         if isName:
+             try:
+-                args = str(args)
++                args = _to_text(args)
+                 if filters:
+                     args = self.applyFilters(args)
+                 if not os.path.isabs(args):
+@@ -770,7 +777,7 @@ class Preprocessor:
+             except Preprocessor.Error:
+                 raise
+             except:
+-                raise Preprocessor.Error(self, 'FILE_NOT_FOUND', str(args))
++                raise Preprocessor.Error(self, 'FILE_NOT_FOUND', _to_text(args))
+         self.checkLineNumbers = bool(re.search('\.(js|jsm|java|webidl)(?:\.in)?$', args.name))
+         oldFile = self.context['FILE']
+         oldLine = self.context['LINE']
+@@ -810,7 +817,7 @@ class Preprocessor:
+         args = self.filter_substitution(args)
+         self.do_include(args)
+     def do_error(self, args):
+-        raise Preprocessor.Error(self, 'Error: ', str(args))
++        raise Preprocessor.Error(self, 'Error: ', _to_text(args))
+ 
+ 
+ def preprocess(includes=[sys.stdin], defines={},
+diff --git a/python/mozbuild/mozbuild/shellutil.py b/python/mozbuild/mozbuild/shellutil.py
+index eaa951060..67cbc1ca6 100644
+--- a/python/mozbuild/mozbuild/shellutil.py
++++ b/python/mozbuild/mozbuild/shellutil.py
+@@ -3,6 +3,7 @@
+ # You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ import re
++import six
+ 
+ 
+ def _tokens2re(**tokens):
+@@ -15,7 +16,7 @@ def _tokens2re(**tokens):
+     # which matches the pattern and captures it in a named match group.
+     # The group names and patterns are given as arguments.
+     all_tokens = '|'.join('(?P<%s>%s)' % (name, value)
+-                          for name, value in tokens.iteritems())
++                          for name, value in six.iteritems(tokens))
+     nonescaped = r'(?<!\\)(?:%s)' % all_tokens
+ 
+     # The final pattern matches either the above pattern, or an escaped
+diff --git a/python/mozbuild/mozbuild/testing.py b/python/mozbuild/mozbuild/testing.py
+index 2e5a6b6ef..84dd75817 100644
+--- a/python/mozbuild/mozbuild/testing.py
++++ b/python/mozbuild/mozbuild/testing.py
+@@ -4,10 +4,15 @@
+ 
+ from __future__ import absolute_import, unicode_literals
+ 
+-import cPickle as pickle
+ import os
+ import sys
+ 
++try:
++    import cPickle as pickle
++except ImportError:
++    import pickle
++
++
+ import mozpack.path as mozpath
+ 
+ from mozpack.copier import FileCopier
+diff --git a/python/mozbuild/mozbuild/util.py b/python/mozbuild/mozbuild/util.py
+index d60b57294..c0d0d4b20 100644
+--- a/python/mozbuild/mozbuild/util.py
++++ b/python/mozbuild/mozbuild/util.py
+@@ -16,8 +16,10 @@ import functools
+ import hashlib
+ import itertools
+ import os
++import pprint
+ import re
+ import stat
++import subprocess
+ import sys
+ import time
+ import types
+@@ -32,6 +34,7 @@ from io import (
+     BytesIO,
+ )
+ 
++import six
+ 
+ if sys.version_info[0] == 3:
+     str_type = str
+@@ -41,6 +44,9 @@ else:
+ if sys.platform == 'win32':
+     _kernel32 = ctypes.windll.kernel32
+     _FILE_ATTRIBUTE_NOT_CONTENT_INDEXED = 0x2000
++    system_encoding = 'mbcs'
++else:
++    system_encoding = 'utf-8'
+ 
+ 
+ def exec_(object, globals=None, locals=None):
+@@ -78,7 +84,7 @@ def hash_file(path, hasher=None):
+     return h.hexdigest()
+ 
+ 
+-class EmptyValue(unicode):
++class EmptyValue(six.text_type):
+     """A dummy type that behaves like an empty string and sequence.
+ 
+     This type exists in order to support
+@@ -92,7 +98,7 @@ class EmptyValue(unicode):
+ class ReadOnlyNamespace(object):
+     """A class for objects with immutable attributes set at initialization."""
+     def __init__(self, **kwargs):
+-        for k, v in kwargs.iteritems():
++        for k, v in six.iteritems(kwargs):
+             super(ReadOnlyNamespace, self).__setattr__(k, v)
+ 
+     def __delattr__(self, key):
+@@ -215,16 +221,17 @@ class FileAvoidWrite(BytesIO):
+     out, but reports whether the file was existing and would have been updated
+     still occur, as well as diff capture if requested.
+     """
+-    def __init__(self, filename, capture_diff=False, dry_run=False, mode='rU'):
++    def __init__(self, filename, capture_diff=False, dry_run=False, readmode='rU'):
+         BytesIO.__init__(self)
+         self.name = filename
+         self._capture_diff = capture_diff
+         self._write_to_file = not dry_run
+         self.diff = None
+-        self.mode = mode
++        self.mode = readmode
++        self._binary_mode = 'b' in readmode
+ 
+     def write(self, buf):
+-        if isinstance(buf, unicode):
++        if isinstance(buf, six.text_type):
+             buf = buf.encode('utf-8')
+         BytesIO.write(self, buf)
+ 
+@@ -242,7 +249,11 @@ class FileAvoidWrite(BytesIO):
+         underlying file was changed, ``.diff`` will be populated with the diff
+         of the result.
+         """
+-        buf = self.getvalue()
++        if self._binary_mode or six.PY2:
++            buf = self.getvalue()
++        else:
++            buf = self.getvalue().decode('utf-8')
++
+         BytesIO.close(self)
+         existed = False
+         old_content = None
+@@ -384,7 +395,7 @@ class ListMixin(object):
+     def __add__(self, other):
+         # Allow None and EmptyValue is a special case because it makes undefined
+         # variable references in moz.build behave better.
+-        other = [] if isinstance(other, (types.NoneType, EmptyValue)) else other
++        other = [] if isinstance(other, (type(None), EmptyValue)) else other
+         if not isinstance(other, list):
+             raise ValueError('Only lists can be appended to lists.')
+ 
+@@ -393,7 +404,7 @@ class ListMixin(object):
+         return new_list
+ 
+     def __iadd__(self, other):
+-        other = [] if isinstance(other, (types.NoneType, EmptyValue)) else other
++        other = [] if isinstance(other, (type(None), EmptyValue)) else other
+         if not isinstance(other, list):
+             raise ValueError('Only lists can be appended to lists.')
+ 
+@@ -571,7 +582,7 @@ def FlagsFactory(flags):
+         _flags = flags
+ 
+         def update(self, **kwargs):
+-            for k, v in kwargs.iteritems():
++            for k, v in six.iteritems(kwargs):
+                 setattr(self, k, v)
+ 
+         def __getattr__(self, name):
+@@ -1009,8 +1020,6 @@ def TypedNamedTuple(name, fields):
+                                     'got %s, expected %s' % (fname,
+                                     type(value), ftype))
+ 
+-            super(TypedTuple, self).__init__(*args, **kwargs)
+-
+     TypedTuple._fields = fields
+ 
+     return TypedTuple
+@@ -1102,14 +1111,14 @@ def group_unified_files(files, unified_prefix, unified_suffix,
+     # issue.  So we do a little dance to filter it out ourselves.
+     dummy_fill_value = ("dummy",)
+     def filter_out_dummy(iterable):
+-        return itertools.ifilter(lambda x: x != dummy_fill_value,
+-                                 iterable)
++        return six.moves.filter(lambda x: x != dummy_fill_value,
++                                iterable)
+ 
+     # From the itertools documentation, slightly modified:
+     def grouper(n, iterable):
+         "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+         args = [iter(iterable)] * n
+-        return itertools.izip_longest(fillvalue=dummy_fill_value, *args)
++        return six.moves.zip_longest(fillvalue=dummy_fill_value, *args)
+ 
+     for i, unified_group in enumerate(grouper(files_per_unified_file,
+                                               files)):
+@@ -1171,7 +1180,7 @@ class EnumStringComparisonError(Exception):
+     pass
+ 
+ 
+-class EnumString(unicode):
++class EnumString(six.text_type):
+     '''A string type that only can have a limited set of values, similarly to
+     an Enum, and can only be compared against that set of values.
+ 
+@@ -1195,6 +1204,9 @@ class EnumString(unicode):
+     def __ne__(self, other):
+         return not (self == other)
+ 
++    def __hash__(self):
++        return super(EnumString, self).__hash__()
++
+     @staticmethod
+     def subclass(*possible_values):
+         class EnumStringSubclass(EnumString):
+@@ -1207,19 +1219,40 @@ def _escape_char(c):
+     # quoting could be done with either ' or ".
+     if c == "'":
+         return "\\'"
+-    return unicode(c.encode('unicode_escape'))
+-
+-# Mapping table between raw characters below \x80 and their escaped
+-# counterpart, when they differ
+-_INDENTED_REPR_TABLE = {
+-    c: e
+-    for c, e in map(lambda x: (x, _escape_char(x)),
+-                    map(unichr, range(128)))
+-    if c != e
+-}
+-# Regexp matching all characters to escape.
+-_INDENTED_REPR_RE = re.compile(
+-    '([' + ''.join(_INDENTED_REPR_TABLE.values()) + ']+)')
++    return six.text_type(c.encode('unicode_escape'))
++# The default PrettyPrinter has some issues with UTF-8, so we need to override
++# some stuff here.
++class _PrettyPrinter(pprint.PrettyPrinter):
++    def format(self, object, context, maxlevels, level):
++        if not (isinstance(object, six.text_type) or
++                isinstance(object, six.binary_type)):
++            return super(_PrettyPrinter, self).format(
++                object, context, maxlevels, level)
++        # This is super hacky and weird, but the output of 'repr' actually
++        # varies based on the default I/O encoding of the process, which isn't
++        # necessarily utf-8. Instead we open a new shell and ask what the repr
++        # WOULD be assuming the default encoding is utf-8. If you can come up
++        # with a better way of doing this without simply re-implementing the
++        # logic of "repr", please replace this.
++        env = dict(os.environ)
++        env['PYTHONIOENCODING'] = 'utf-8'
++        ret = six.ensure_text(subprocess.check_output(
++            [sys.executable], input='print(repr(%s))' % repr(object),
++            universal_newlines=True, env=env, encoding='utf-8')).strip()
++        return (ret, True, False)
++
++if six.PY2:
++    # Mapping table between raw characters below \x80 and their escaped
++    # counterpart, when they differ
++    _INDENTED_REPR_TABLE = {
++        c: e
++        for c, e in map(lambda x: (x, _escape_char(x)),
++                        map(unichr, range(128)))
++        if c != e
++    }
++    # Regexp matching all characters to escape.
++    _INDENTED_REPR_RE = re.compile(
++        '([' + ''.join(_INDENTED_REPR_TABLE.values()) + ']+)')
+ 
+ 
+ def indented_repr(o, indent=4):
+@@ -1228,6 +1261,8 @@ def indented_repr(o, indent=4):
+     One notable difference with repr is that the returned representation
+     assumes `from __future__ import unicode_literals`.
+     '''
++    if six.PY3:
++        return _PrettyPrinter(indent=indent).pformat(o)
+     one_indent = ' ' * indent
+     def recurse_indented_repr(o, level):
+         if isinstance(o, dict):
+@@ -1245,7 +1280,7 @@ def indented_repr(o, indent=4):
+         elif isinstance(o, bytes):
+             yield 'b'
+             yield repr(o)
+-        elif isinstance(o, unicode):
++        elif isinstance(o, six.text_type):
+             yield "'"
+             # We want a readable string (non escaped unicode), but some
+             # special characters need escaping (e.g. \n, \t, etc.)
+@@ -1270,22 +1305,6 @@ def indented_repr(o, indent=4):
+     return ''.join(recurse_indented_repr(o, 0))
+ 
+ 
+-def encode(obj, encoding='utf-8'):
+-    '''Recursively encode unicode strings with the given encoding.'''
+-    if isinstance(obj, dict):
+-        return {
+-            encode(k, encoding): encode(v, encoding)
+-            for k, v in obj.iteritems()
+-        }
+-    if isinstance(obj, bytes):
+-        return obj
+-    if isinstance(obj, unicode):
+-        return obj.encode(encoding)
+-    if isinstance(obj, Iterable):
+-        return [encode(i, encoding) for i in obj]
+-    return obj
+-
+-
+ def patch_main():
+     '''This is a hack to work around the fact that Windows multiprocessing needs
+     to import the original main module, and assumes that it corresponds to a file
+@@ -1367,3 +1386,17 @@ def patch_main():
+             return cmdline
+         orig_command_line = forking.get_command_line
+         forking.get_command_line = my_get_command_line
++
++def ensure_bytes(value, encoding='utf-8'):
++    if isinstance(value, six.text_type):
++        return value.encode(encoding)
++    return value
++
++def ensure_unicode(value, encoding='utf-8'):
++    if isinstance(value, six.binary_type):
++        return value.decode(encoding)
++    return value
++
++def ensure_subprocess_env(env, encoding='utf-8'):
++    ensure = ensure_bytes if sys.version_info[0] < 3 else ensure_unicode
++    return {ensure(k, encoding): ensure(v, encoding) for k, v in six.iteritems(env)}
+diff --git a/python/mozbuild/mozbuild/virtualenv.py b/python/mozbuild/mozbuild/virtualenv.py
+index 765ad9ac4..35246398f 100644
+--- a/python/mozbuild/mozbuild/virtualenv.py
++++ b/python/mozbuild/mozbuild/virtualenv.py
+@@ -115,11 +115,16 @@ class VirtualenvManager(object):
+         on OS X our python path may end up being a different or modified
+         executable.
+         """
+-        ver = subprocess.check_output([python, '-c', 'import sys; print(sys.hexversion)']).rstrip()
++        ver = self.python_executable_hexversion(python)
+         with open(self.exe_info_path, 'w') as fh:
+             fh.write("%s\n" % ver)
+             fh.write("%s\n" % os.path.getsize(python))
+ 
++    def python_executable_hexversion(self, python):
++        program = 'import sys; print(sys.hexversion)'
++        out = subprocess.check_output([python, '-c', program]).rstrip()
++        return int(out)
++
+     def up_to_date(self, python=sys.executable):
+         """Returns whether the virtualenv is present and up to date."""
+ 
+@@ -141,9 +146,11 @@ class VirtualenvManager(object):
+         # python, or we have the Python version that was used to create the
+         # virtualenv. If this fails, it is likely system Python has been
+         # upgraded, and our virtualenv would not be usable.
++        orig_version, orig_size = self.get_exe_info()
+         python_size = os.path.getsize(python)
++        hexversion = self.python_executable_hexversion(python)
+         if ((python, python_size) != (self.python_path, os.path.getsize(self.python_path)) and
+-            (sys.hexversion, python_size) != self.get_exe_info()):
++            (sys.hexversion, python_size) != (orig_version, orig_size)):
+             return False
+ 
+         # recursively check sub packages.txt files
+diff --git a/python/mozbuild/mozpack/copier.py b/python/mozbuild/mozpack/copier.py
+index 7f3bc4668..4ce43648e 100644
+--- a/python/mozbuild/mozpack/copier.py
++++ b/python/mozbuild/mozpack/copier.py
+@@ -5,6 +5,7 @@
+ from __future__ import absolute_import
+ 
+ import os
++import six
+ import stat
+ import sys
+ 
+@@ -145,7 +146,7 @@ class FileRegistry(object):
+             for path, file in registry:
+                 (...)
+         '''
+-        return self._files.iteritems()
++        return six.iteritems(self._files)
+ 
+     def required_directories(self):
+         '''
+@@ -295,7 +296,7 @@ class FileCopier(FileRegistry):
+ 
+         Returns a FileCopyResult that details what changed.
+         '''
+-        assert isinstance(destination, basestring)
++        assert isinstance(destination, six.string_types)
+         assert not os.path.exists(destination) or os.path.isdir(destination)
+ 
+         result = FileCopyResult()
+@@ -564,7 +565,7 @@ class Jarrer(FileRegistry, BaseFile):
+             def exists(self):
+                 return self.deflater is not None
+ 
+-        if isinstance(dest, basestring):
++        if isinstance(dest, six.string_types):
+             dest = Dest(dest)
+         assert isinstance(dest, Dest)
+ 
+diff --git a/python/mozbuild/mozpack/files.py b/python/mozbuild/mozpack/files.py
+index aa540acf0..aae3be0dd 100644
+--- a/python/mozbuild/mozpack/files.py
++++ b/python/mozbuild/mozpack/files.py
+@@ -8,6 +8,7 @@ import errno
+ import inspect
+ import os
+ import platform
++import six
+ import shutil
+ import stat
+ import subprocess
+@@ -172,7 +173,7 @@ class BaseFile(object):
+         disabled when skip_if_older is False.
+         Returns whether a copy was actually performed (True) or not (False).
+         '''
+-        if isinstance(dest, basestring):
++        if isinstance(dest, six.string_types):
+             dest = Dest(dest)
+         else:
+             assert isinstance(dest, Dest)
+@@ -292,11 +293,11 @@ class ExecutableFile(File):
+ 
+     def copy(self, dest, skip_if_older=True):
+         real_dest = dest
+-        if not isinstance(dest, basestring):
++        if not isinstance(dest, six.string_types):
+             fd, dest = mkstemp()
+             os.close(fd)
+             os.remove(dest)
+-        assert isinstance(dest, basestring)
++        assert isinstance(dest, six.string_types)
+         # If File.copy didn't actually copy because dest is newer, check the
+         # file sizes. If dest is smaller, it means it is already stripped and
+         # elfhacked and xz_compressed, so we can skip.
+@@ -335,7 +336,7 @@ class AbsoluteSymlinkFile(File):
+         File.__init__(self, path)
+ 
+     def copy(self, dest, skip_if_older=True):
+-        assert isinstance(dest, basestring)
++        assert isinstance(dest, six.string_types)
+ 
+         # The logic in this function is complicated by the fact that symlinks
+         # aren't universally supported. So, where symlinks aren't supported, we
+@@ -426,7 +427,7 @@ class HardlinkFile(File):
+     '''
+ 
+     def copy(self, dest, skip_if_older=True):
+-        assert isinstance(dest, basestring)
++        assert isinstance(dest, six.string_types)
+ 
+         if not hasattr(os, 'link'):
+             return super(HardlinkFile, self).copy(
+@@ -488,7 +489,7 @@ class ExistingFile(BaseFile):
+         self.required = required
+ 
+     def copy(self, dest, skip_if_older=True):
+-        if isinstance(dest, basestring):
++        if isinstance(dest, six.string_types):
+             dest = Dest(dest)
+         else:
+             assert isinstance(dest, Dest)
+@@ -535,7 +536,7 @@ class PreprocessedFile(BaseFile):
+         '''
+         Invokes the preprocessor to create the destination file.
+         '''
+-        if isinstance(dest, basestring):
++        if isinstance(dest, six.string_types):
+             dest = Dest(dest)
+         else:
+             assert isinstance(dest, Dest)
+diff --git a/python/mozbuild/mozpack/manifests.py b/python/mozbuild/mozpack/manifests.py
+index 1bffcf180..d2999419c 100644
+--- a/python/mozbuild/mozpack/manifests.py
++++ b/python/mozbuild/mozpack/manifests.py
+@@ -6,6 +6,7 @@ from __future__ import absolute_import, unicode_literals
+ 
+ from contextlib import contextmanager
+ import json
++import six
+ 
+ from .files import (
+     AbsoluteSymlinkFile,
+@@ -121,13 +122,13 @@ class InstallManifest(object):
+                 self._load_from_fileobj(fh)
+ 
+     def _load_from_fileobj(self, fileobj):
+-        version = fileobj.readline().rstrip()
++        version = six.ensure_text(fileobj.readline().rstrip())
+         if version not in ('1', '2', '3', '4', '5'):
+             raise UnreadableInstallManifest('Unknown manifest version: %s' %
+                                             version)
+ 
+         for line in fileobj:
+-            line = line.rstrip()
++            line = six.ensure_text(line.rstrip())
+ 
+             fields = line.split(self.FIELD_SEPARATOR)
+ 
+@@ -229,7 +230,7 @@ class InstallManifest(object):
+         It is an error if both are specified.
+         """
+         with _auto_fileobj(path, fileobj, 'wb') as fh:
+-            fh.write('%d\n' % self.CURRENT_VERSION)
++            fh.write(six.ensure_binary('%d\n' % self.CURRENT_VERSION))
+ 
+             for dest in sorted(self._dests):
+                 entry = self._dests[dest]
+@@ -242,13 +243,15 @@ class InstallManifest(object):
+                     for path in paths:
+                         source = mozpath.join(base, path)
+                         parts = ['%d' % type, mozpath.join(dest, path), source]
+-                        fh.write('%s\n' % self.FIELD_SEPARATOR.join(
+-                            p.encode('utf-8') for p in parts))
++                        fh.write(six.ensure_binary(
++                            '%s\n' % self.FIELD_SEPARATOR.join(
++                                six.ensure_text(p) for p in parts)))
+                 else:
+                     parts = ['%d' % entry[0], dest]
+                     parts.extend(entry[1:])
+-                    fh.write('%s\n' % self.FIELD_SEPARATOR.join(
+-                        p.encode('utf-8') for p in parts))
++                    fh.write(six.ensure_binary(
++                        '%s\n' % self.FIELD_SEPARATOR.join(
++                            six.ensure_text(p) for p in parts)))
+ 
+     def add_link(self, source, dest):
+         """Add a link to this manifest.
+diff --git a/python/mozbuild/mozpack/mozjar.py b/python/mozbuild/mozpack/mozjar.py
+index 577c87d15..966f2d948 100644
+--- a/python/mozbuild/mozpack/mozjar.py
++++ b/python/mozbuild/mozpack/mozjar.py
+@@ -9,6 +9,7 @@ import struct
+ import subprocess
+ import zlib
+ import os
++import six
+ from zipfile import (
+     ZIP_STORED,
+     ZIP_DEFLATED,
+@@ -71,7 +72,7 @@ class JarStruct(object):
+         an instance with empty fields.
+         '''
+         assert self.MAGIC and isinstance(self.STRUCT, OrderedDict)
+-        self.size_fields = set(t for t in self.STRUCT.itervalues()
++        self.size_fields = set(t for t in six.itervalues(self.STRUCT)
+                                if t not in JarStruct.TYPE_MAPPING)
+         self._values = {}
+         if data:
+@@ -93,7 +94,7 @@ class JarStruct(object):
+         # For all fields used as other fields sizes, keep track of their value
+         # separately.
+         sizes = dict((t, 0) for t in self.size_fields)
+-        for name, t in self.STRUCT.iteritems():
++        for name, t in six.iteritems(self.STRUCT):
+             if t in JarStruct.TYPE_MAPPING:
+                 value, size = JarStruct.get_data(t, data[offset:])
+             else:
+@@ -112,7 +113,7 @@ class JarStruct(object):
+         Initialize an instance with empty fields.
+         '''
+         self.signature = self.MAGIC
+-        for name, t in self.STRUCT.iteritems():
++        for name, t in six.iteritems(self.STRUCT):
+             if name in self.size_fields:
+                 continue
+             self._values[name] = 0 if t in JarStruct.TYPE_MAPPING else ''
+@@ -137,9 +138,9 @@ class JarStruct(object):
+         from self.STRUCT.
+         '''
+         serialized = struct.pack('<I', self.signature)
+-        sizes = dict((t, name) for name, t in self.STRUCT.iteritems()
++        sizes = dict((t, name) for name, t in six.iteritems(self.STRUCT)
+                      if t not in JarStruct.TYPE_MAPPING)
+-        for name, t in self.STRUCT.iteritems():
++        for name, t in six.iteritems(self.STRUCT):
+             if t in JarStruct.TYPE_MAPPING:
+                 format, size = JarStruct.TYPE_MAPPING[t]
+                 if name in sizes:
+@@ -158,7 +159,7 @@ class JarStruct(object):
+         variable length fields.
+         '''
+         size = JarStruct.TYPE_MAPPING['uint32'][1]
+-        for name, type in self.STRUCT.iteritems():
++        for name, type in six.iteritems(self.STRUCT):
+             if type in JarStruct.TYPE_MAPPING:
+                 size += JarStruct.TYPE_MAPPING[type][1]
+             else:
+@@ -179,7 +180,7 @@ class JarStruct(object):
+         return key in self._values
+ 
+     def __iter__(self):
+-        return self._values.iteritems()
++        return six.iteritems(self._values)
+ 
+     def __repr__(self):
+         return "<%s %s>" % (self.__class__.__name__,
+diff --git a/testing/mozbase/manifestparser/manifestparser/ini.py b/testing/mozbase/manifestparser/manifestparser/ini.py
+index e5ba249c1..94b408102 100644
+--- a/testing/mozbase/manifestparser/manifestparser/ini.py
++++ b/testing/mozbase/manifestparser/manifestparser/ini.py
+@@ -5,6 +5,7 @@
+ from __future__ import absolute_import
+ 
+ import os
++import six
+ import sys
+ 
+ __all__ = ['read_ini', 'combine_fields']
+@@ -12,7 +13,7 @@ __all__ = ['read_ini', 'combine_fields']
+ 
+ class IniParseError(Exception):
+     def __init__(self, fp, linenum, msg):
+-        if isinstance(fp, basestring):
++        if isinstance(fp, six.string_types):
+             path = fp
+         elif hasattr(fp, 'name'):
+             path = fp.name
+@@ -43,12 +44,13 @@ def read_ini(fp, variables=None, default='DEFAULT', defaults_only=False,
+     sections = []
+     key = value = None
+     section_names = set()
+-    if isinstance(fp, basestring):
++    if isinstance(fp, six.string_types):
+         fp = file(fp)
+ 
+     # read the lines
+     for (linenum, line) in enumerate(fp.read().splitlines(), start=1):
+ 
++        line = six.ensure_text(line)
+         stripped = line.strip()
+ 
+         # ignore blank lines
+diff --git a/testing/mozbase/manifestparser/manifestparser/manifestparser.py b/testing/mozbase/manifestparser/manifestparser/manifestparser.py
+index 921369fd2..94c148875 100755
+--- a/testing/mozbase/manifestparser/manifestparser/manifestparser.py
++++ b/testing/mozbase/manifestparser/manifestparser/manifestparser.py
+@@ -4,7 +4,6 @@
+ 
+ from __future__ import absolute_import, print_function
+ 
+-from StringIO import StringIO
+ import json
+ import fnmatch
+ import os
+@@ -12,6 +11,8 @@ import shutil
+ import sys
+ import types
+ 
++from six import string_types, StringIO
++
+ from .ini import read_ini
+ from .filters import (
+     DEFAULT_FILTERS,
+@@ -23,7 +24,6 @@ from .filters import (
+ __all__ = ['ManifestParser', 'TestManifest', 'convert']
+ 
+ relpath = os.path.relpath
+-string = (basestring,)
+ 
+ 
+ # path normalization
+@@ -120,7 +120,7 @@ class ManifestParser(object):
+             return include_file
+ 
+         # get directory of this file if not file-like object
+-        if isinstance(filename, string):
++        if isinstance(filename, string_types):
+             # If we're using mercurial as our filesystem via a finder
+             # during manifest reading, the getcwd() calls that happen
+             # with abspath calls will not be meaningful, so absolute
+@@ -195,7 +195,7 @@ class ManifestParser(object):
+ 
+             # otherwise an item
+             # apply ancestor defaults, while maintaining current file priority
+-            data = dict(self._ancestor_defaults.items() + data.items())
++            data = dict(list(self._ancestor_defaults.items()) + list(data.items()))
+ 
+             test = data
+             test['name'] = section
+@@ -264,7 +264,7 @@ class ManifestParser(object):
+ 
+         # ensure all files exist
+         missing = [filename for filename in filenames
+-                   if isinstance(filename, string) and not self.path_exists(filename)]
++                   if isinstance(filename, string_types) and not self.path_exists(filename)]
+         if missing:
+             raise IOError('Missing files: %s' % ', '.join(missing))
+ 
+@@ -277,7 +277,7 @@ class ManifestParser(object):
+             # set the per file defaults
+             defaults = _defaults.copy()
+             here = None
+-            if isinstance(filename, string):
++            if isinstance(filename, string_types):
+                 here = os.path.dirname(os.path.abspath(filename))
+                 defaults['here'] = here  # directory of master .ini file
+ 
+@@ -409,7 +409,7 @@ class ManifestParser(object):
+         """
+ 
+         files = set([])
+-        if isinstance(directories, basestring):
++        if isinstance(directories, string_types):
+             directories = [directories]
+ 
+         # get files in directories
+@@ -446,7 +446,7 @@ class ManifestParser(object):
+ 
+         # open file if `fp` given as string
+         close = False
+-        if isinstance(fp, string):
++        if isinstance(fp, string_types):
+             fp = file(fp, 'w')
+             close = True
+ 
+@@ -602,7 +602,7 @@ class ManifestParser(object):
+         internal function to import directories
+         """
+ 
+-        if isinstance(pattern, basestring):
++        if isinstance(pattern, string_types):
+             patterns = [pattern]
+         else:
+             patterns = pattern
+@@ -725,7 +725,7 @@ class ManifestParser(object):
+         # determine output
+         opened_manifest_file = None  # name of opened manifest file
+         absolute = not relative_to  # whether to output absolute path names as names
+-        if isinstance(write, string):
++        if isinstance(write, string_types):
+             opened_manifest_file = write
+             write = file(write, 'w')
+         if write is None:
+diff --git a/testing/mozbase/mozinfo/mozinfo/mozinfo.py b/testing/mozbase/mozinfo/mozinfo/mozinfo.py
+index cc8f62da4..bdcd51a85 100755
+--- a/testing/mozbase/mozinfo/mozinfo/mozinfo.py
++++ b/testing/mozbase/mozinfo/mozinfo/mozinfo.py
+@@ -100,8 +100,11 @@ elif system.startswith(('MINGW', 'MSYS_NT')):
+ elif system == "Linux":
+     if hasattr(platform, "linux_distribution"):
+         (distro, os_version, codename) = platform.linux_distribution()
+-    else:
++    elif hasattr(platform, "dist"):
+         (distro, os_version, codename) = platform.dist()
++    else:
++        distro = "lfs"
++        os_version = version = "unknown"
+     if not processor:
+         processor = machine
+     version = "%s %s" % (distro, os_version)
+diff --git a/third_party/python/six/six.py b/third_party/python/six/six.py
+index 190c0239c..2ead68f3e 100644
+--- a/third_party/python/six/six.py
++++ b/third_party/python/six/six.py
+@@ -824,6 +824,23 @@ def add_metaclass(metaclass):
+         return metaclass(cls.__name__, cls.__bases__, orig_vars)
+     return wrapper
+ 
++def ensure_binary(s, encoding='utf-8', errors='strict'):
++    if isinstance(s, text_type):
++        return s.encode(encoding, errors)
++    elif isinstance(s, binary_type):
++        return s
++    else:
++        raise TypeError("not expecting type '%s'" % type(s))
++
++
++def ensure_text(s, encoding='utf-8', errors='strict'):
++    if isinstance(s, binary_type):
++        return s.decode(encoding, errors)
++    elif isinstance(s, text_type):
++        return s
++    else:
++        raise TypeError("not expecting type '%s'" % type(s))
++
+ 
+ def python_2_unicode_compatible(klass):
+     """
+diff --git a/third_party/python/which/which.py b/third_party/python/which/which.py
+index 9c7d10835..e64c923ac 100644
+--- a/third_party/python/which/which.py
++++ b/third_party/python/which/which.py
+@@ -244,7 +244,7 @@ def which(command, path=None, verbose=0, exts=None):
+     If no match is found for the command, a WhichError is raised.
+     """
+     try:
+-        match = whichgen(command, path, verbose, exts).next()
++        match = whichgen(command, path, verbose, exts).__next__()
+     except StopIteration:
+         raise WhichError("Could not find '%s' on the path." % command)
+     return match
+@@ -281,17 +281,17 @@ def main(argv):
+     try:
+         optlist, args = getopt.getopt(argv[1:], 'haVvqp:e:',
+             ['help', 'all', 'version', 'verbose', 'quiet', 'path=', 'exts='])
+-    except getopt.GetoptError, msg:
++    except getopt.GetoptError as msg:
+         sys.stderr.write("which: error: %s. Your invocation was: %s\n"\
+                          % (msg, argv))
+         sys.stderr.write("Try 'which --help'.\n")
+         return 1
+     for opt, optarg in optlist:
+         if opt in ('-h', '--help'):
+-            print _cmdlnUsage
++            print(_cmdlnUsage)
+             return 0
+         elif opt in ('-V', '--version'):
+-            print "which %s" % __version__
++            print("which %s" % __version__)
+             return 0
+         elif opt in ('-a', '--all'):
+             all = 1
+@@ -319,9 +319,9 @@ def main(argv):
+         nmatches = 0
+         for match in whichgen(arg, path=altpath, verbose=verbose, exts=exts):
+             if verbose:
+-                print "%s (%s)" % match
++                print("%s (%s)" % match)
+             else:
+-                print match
++                print(match)
+             nmatches += 1
+             if not all:
+                 break
+-- 
+2.25.1
+
