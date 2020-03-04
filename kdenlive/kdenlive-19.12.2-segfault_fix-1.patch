@@ -1,0 +1,57 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-02-03
+Initial Package Version: 19.12.2
+Origin:                  Upstream
+Description:             Fixes segmentation faults upon exiting in kdenlive,
+                         which causes corruption of the project file in use
+                         and any media files that are in that project.
+
+diff -Naurp kdenlive-19.12.2.orig/src/effects/effectlist/view/effectlistwidget.cpp kdenlive-19.12.2/src/effects/effectlist/view/effectlistwidget.cpp
+--- kdenlive-19.12.2.orig/src/effects/effectlist/view/effectlistwidget.cpp	2020-02-02 08:02:53.000000000 -0600
++++ kdenlive-19.12.2/src/effects/effectlist/view/effectlistwidget.cpp	2020-03-03 20:40:14.387861662 -0600
+@@ -60,7 +60,6 @@ void EffectListWidget::updateFavorite(co
+ 
+ EffectListWidget::~EffectListWidget()
+ {
+-    delete m_proxy;
+     qDebug() << " - - -Deleting effect list widget";
+ }
+ 
+diff -Naurp kdenlive-19.12.2.orig/src/timeline2/view/timelinetabs.cpp kdenlive-19.12.2/src/timeline2/view/timelinetabs.cpp
+--- kdenlive-19.12.2.orig/src/timeline2/view/timelinetabs.cpp	2020-02-02 08:02:53.000000000 -0600
++++ kdenlive-19.12.2/src/timeline2/view/timelinetabs.cpp	2020-03-03 20:41:03.264275726 -0600
+@@ -57,6 +57,12 @@ TimelineTabs::TimelineTabs(QWidget *pare
+     connect(pCore->monitorManager()->projectMonitor(), &Monitor::addEffect, m_mainTimeline->controller(), &TimelineController::addEffectToCurrentClip);
+ }
+ 
++TimelineTabs::~TimelineTabs()
++{
++   // Clear source
++   m_mainTimeline->setSource(QUrl());
++}
++
+ TimelineWidget *TimelineTabs::getMainTimeline() const
+ {
+     return m_mainTimeline;
+diff -Naurp kdenlive-19.12.2.orig/src/timeline2/view/timelinetabs.hpp kdenlive-19.12.2/src/timeline2/view/timelinetabs.hpp
+--- kdenlive-19.12.2.orig/src/timeline2/view/timelinetabs.hpp	2020-02-02 08:02:53.000000000 -0600
++++ kdenlive-19.12.2/src/timeline2/view/timelinetabs.hpp	2020-03-03 20:41:25.067460358 -0600
+@@ -50,6 +50,7 @@ public:
+     /* Construct the tabs as well as the widget for the main timeline */
+     TimelineTabs(QWidget *parent);
+ 
++    virtual ~TimelineTabs();
+     /* @brief Returns a pointer to the main timeline */
+     TimelineWidget *getMainTimeline() const;
+ 
+diff -Naurp kdenlive-19.12.2.orig/src/transitions/transitionlist/view/transitionlistwidget.cpp kdenlive-19.12.2/src/transitions/transitionlist/view/transitionlistwidget.cpp
+--- kdenlive-19.12.2.orig/src/transitions/transitionlist/view/transitionlistwidget.cpp	2020-02-02 08:02:53.000000000 -0600
++++ kdenlive-19.12.2/src/transitions/transitionlist/view/transitionlistwidget.cpp	2020-03-03 20:41:44.887628162 -0600
+@@ -53,7 +53,6 @@ TransitionListWidget::TransitionListWidg
+ 
+ TransitionListWidget::~TransitionListWidget()
+ {
+-    delete m_proxy;
+     qDebug() << " - - -Deleting transition list widget";
+ }
+ 
