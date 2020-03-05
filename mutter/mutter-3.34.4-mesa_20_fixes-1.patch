@@ -1,0 +1,57 @@
+Submitted By:             Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                     2020-03-05
+Original Package Version: 3.34.4
+Upstream Status:          Applied
+Origin:                   Upstream
+Description:              Fix some header includes in bundled cogl, to
+                          build with mesa 20.x and later.
+
+diff --git a/cogl/cogl/meson.build b/cogl/cogl/meson.build
+index 261955796671444f5ba3fde0f8511c8b63e1feae..b0e66bff3ab34ac858b514cd53749c429e39a733 100644
+--- a/cogl/cogl/meson.build
++++ b/cogl/cogl/meson.build
+@@ -48,7 +48,7 @@ cogl_gl_header_h = configure_file(
+ built_headers += [cogl_gl_header_h]
+ 
+ if have_egl
+-  cogl_egl_includes_string = '#include <EGL/egl.h>\n#include <EGL/eglext.h>'
++  cogl_egl_includes_string = '#include <EGL/egl.h>\n#include <EGL/eglext.h>\n#include <EGL/eglmesaext.h>'
+ else
+   cogl_egl_includes_string = ''
+ endif
+diff --git a/src/backends/meta-egl-ext.h b/src/backends/meta-egl-ext.h
+index 8705e7d5b3592a3880ad6450beb939f1ba46dcca..db0b74f7690a97995fb4b38dd1e58be322d7900a 100644
+--- a/src/backends/meta-egl-ext.h
++++ b/src/backends/meta-egl-ext.h
+@@ -29,6 +29,7 @@
+ 
+ #include <EGL/egl.h>
+ #include <EGL/eglext.h>
++#include <EGL/eglmesaext.h>
+ 
+ /*
+  * This is a little different to the tests shipped with EGL implementations,
+diff --git a/src/backends/meta-egl.c b/src/backends/meta-egl.c
+index 6554be93582c2f1f3069ed815b4c58d1605b4f1d..fdeff4f779978fd7d60d572bc19c0f777b55a5d9 100644
+--- a/src/backends/meta-egl.c
++++ b/src/backends/meta-egl.c
+@@ -27,6 +27,7 @@
+ 
+ #include <EGL/egl.h>
+ #include <EGL/eglext.h>
++#include <EGL/eglmesaext.h>
+ #include <gio/gio.h>
+ #include <glib.h>
+ #include <glib-object.h>
+diff --git a/src/backends/meta-egl.h b/src/backends/meta-egl.h
+index f2a8164456c471f4d2c9612d87aedd8dece4bab1..4591e7d8534ec17d994bddf7266b4015597f7321 100644
+--- a/src/backends/meta-egl.h
++++ b/src/backends/meta-egl.h
+@@ -28,6 +28,7 @@
+ 
+ #include <EGL/egl.h>
+ #include <EGL/eglext.h>
++#include <EGL/eglmesaext.h>
+ #include <glib-object.h>
+ 
+ #define META_EGL_ERROR meta_egl_error_quark ()
