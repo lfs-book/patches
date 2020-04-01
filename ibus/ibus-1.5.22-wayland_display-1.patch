@@ -1,0 +1,40 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-04-01
+Initial Package Version: 1.5.22
+Origin:                  Upstream (https://github.com/ibus/ibus/commit/8ce25208c3f4adfd290a032c6aa739d2b7580eb1.patch)
+Description:             Adapts IBus to understand the WAYLAND_DISPLAY variable
+                         if a Wayland-based desktop is in use.
+
+diff -Naurp ibus-1.5.22.orig/src/ibusshare.c ibus-1.5.22/src/ibusshare.c
+--- ibus-1.5.22.orig/src/ibusshare.c	2020-02-21 06:46:17.000000000 -0600
++++ ibus-1.5.22/src/ibusshare.c	2020-04-01 18:30:35.736115986 -0500
+@@ -100,6 +100,7 @@ ibus_get_socket_path (void)
+         gchar *display;
+         gchar *displaynumber = "0";
+         /* gchar *screennumber = "0"; */
++        gboolean is_wayland = FALSE;
+         gchar *p;
+ 
+         path = g_strdup (g_getenv ("IBUS_ADDRESS_FILE"));
+@@ -108,13 +109,19 @@ ibus_get_socket_path (void)
+         }
+ 
+         if (_display == NULL) {
+-            display = g_strdup (g_getenv ("DISPLAY"));
++            display = g_strdup (g_getenv ("WAYLAND_DISPLAY"));
++            if (display)
++               is_wayland = TRUE;
++            else
++               display = g_strdup (g_getenv ("DISPLAY"));
+         }
+         else {
+             display = g_strdup (_display);
+         }
+ 
+-        if (display) {
++        if (is_wayland) {
++            displaynumber = display;
++        } else if (display) {
+             p = display;
+             hostname = display;
+             for (; *p != ':' && *p != '\0'; p++);
