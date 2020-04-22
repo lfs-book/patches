@@ -1,0 +1,167 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-04-22
+Initial Package Version: 2.3.1
+Upstream Status:         Committed
+Origin:                  Upstream (https://gitlab.com/cryptsetup/cryptsetup/-/merge_requests/88)
+Description:             Adapts cryptsetup to API changes in JSON-C-0.14. Thanks
+                         go to Ryan Marsaw for reporting this problem.
+
+diff -Naurp cryptsetup-2.3.1.orig/lib/luks2/luks2_internal.h cryptsetup-2.3.1/lib/luks2/luks2_internal.h
+--- cryptsetup-2.3.1.orig/lib/luks2/luks2_internal.h	2020-03-08 04:53:44.000000000 -0500
++++ cryptsetup-2.3.1/lib/luks2/luks2_internal.h	2020-04-22 11:19:17.575119116 -0500
+@@ -58,9 +58,11 @@ json_object *LUKS2_get_segments_jobj(str
+ void hexprint_base64(struct crypt_device *cd, json_object *jobj,
+ 		     const char *sep, const char *line_sep);
+ 
++#if !(defined JSON_C_VERSION_NUM && JSON_C_VERSION_NUM >= ((13 << 8) | 99))
+ uint64_t json_object_get_uint64(json_object *jobj);
+-uint32_t json_object_get_uint32(json_object *jobj);
+ json_object *json_object_new_uint64(uint64_t value);
++#endif
++uint32_t json_object_get_uint32(json_object *jobj);
+ 
+ int json_object_object_add_by_uint(json_object *jobj, unsigned key, json_object *jobj_val);
+ void json_object_object_del_by_uint(json_object *jobj, unsigned key);
+diff -Naurp cryptsetup-2.3.1.orig/lib/luks2/luks2_json_metadata.c cryptsetup-2.3.1/lib/luks2/luks2_json_metadata.c
+--- cryptsetup-2.3.1.orig/lib/luks2/luks2_json_metadata.c	2020-03-02 05:59:29.000000000 -0600
++++ cryptsetup-2.3.1/lib/luks2/luks2_json_metadata.c	2020-04-22 11:25:00.969916379 -0500
+@@ -234,13 +234,14 @@ static json_bool json_str_to_uint64(json
+ 	tmp = strtoull(json_object_get_string(jobj), &endptr, 10);
+ 	if (*endptr || errno) {
+ 		*value = 0;
+-		return FALSE;
++		return 0;
+ 	}
+ 
+ 	*value = tmp;
+-	return TRUE;
++	return 1;
+ }
+ 
++#if !(defined JSON_C_VERSION_NUM && JSON_C_VERSION_NUM >= ((13 << 8) | 99))
+ uint64_t json_object_get_uint64(json_object *jobj)
+ {
+ 	uint64_t r;
+@@ -262,6 +263,7 @@ json_object *json_object_new_uint64(uint
+ 	jobj = json_object_new_string(num);
+ 	return jobj;
+ }
++#endif
+ 
+ /*
+  * Validate helpers
+@@ -273,9 +275,9 @@ static json_bool numbered(struct crypt_d
+ 	for (i = 0; key[i]; i++)
+ 		if (!isdigit(key[i])) {
+ 			log_dbg(cd, "%s \"%s\" is not in numbered form.", name, key);
+-			return FALSE;
++			return 0;
+ 		}
+-	return TRUE;
++	return 1;
+ }
+ 
+ json_object *json_contains(struct crypt_device *cd, json_object *jobj, const char *name,
+@@ -300,7 +302,7 @@ json_bool validate_json_uint32(json_obje
+ 	errno = 0;
+ 	tmp = json_object_get_int64(jobj);
+ 
+-	return (errno || tmp < 0 || tmp > UINT32_MAX) ? FALSE : TRUE;
++	return (errno || tmp < 0 || tmp > UINT32_MAX) ? 0 : 1;
+ }
+ 
+ static json_bool validate_keyslots_array(struct crypt_device *cd,
+@@ -313,17 +315,17 @@ static json_bool validate_keyslots_array
+ 		jobj = json_object_array_get_idx(jarr, i);
+ 		if (!json_object_is_type(jobj, json_type_string)) {
+ 			log_dbg(cd, "Illegal value type in keyslots array at index %d.", i);
+-			return FALSE;
++			return 0;
+ 		}
+ 
+ 		if (!json_contains(cd, jobj_keys, "", "Keyslots section",
+ 				   json_object_get_string(jobj), json_type_object))
+-			return FALSE;
++			return 0;
+ 
+ 		i++;
+ 	}
+ 
+-	return TRUE;
++	return 1;
+ }
+ 
+ static json_bool validate_segments_array(struct crypt_device *cd,
+@@ -336,17 +338,17 @@ static json_bool validate_segments_array
+ 		jobj = json_object_array_get_idx(jarr, i);
+ 		if (!json_object_is_type(jobj, json_type_string)) {
+ 			log_dbg(cd, "Illegal value type in segments array at index %d.", i);
+-			return FALSE;
++			return 0;
+ 		}
+ 
+ 		if (!json_contains(cd, jobj_segments, "", "Segments section",
+ 				   json_object_get_string(jobj), json_type_object))
+-			return FALSE;
++			return 0;
+ 
+ 		i++;
+ 	}
+ 
+-	return TRUE;
++	return 1;
+ }
+ 
+ static json_bool segment_has_digest(const char *segment_name, json_object *jobj_digests)
+@@ -357,10 +359,10 @@ static json_bool segment_has_digest(cons
+ 		UNUSED(key);
+ 		json_object_object_get_ex(val, "segments", &jobj_segments);
+ 		if (LUKS2_array_jobj(jobj_segments, segment_name))
+-			return TRUE;
++			return 1;
+ 	}
+ 
+-	return FALSE;
++	return 0;
+ }
+ 
+ static json_bool validate_intervals(struct crypt_device *cd,
+@@ -372,18 +374,18 @@ static json_bool validate_intervals(stru
+ 	while (i < length) {
+ 		if (ix[i].offset < 2 * metadata_size) {
+ 			log_dbg(cd, "Illegal area offset: %" PRIu64 ".", ix[i].offset);
+-			return FALSE;
++			return 0;
+ 		}
+ 
+ 		if (!ix[i].length) {
+ 			log_dbg(cd, "Area length must be greater than zero.");
+-			return FALSE;
++			return 0;
+ 		}
+ 
+ 		if ((ix[i].offset + ix[i].length) > keyslots_area_end) {
+ 			log_dbg(cd, "Area [%" PRIu64 ", %" PRIu64 "] overflows binary keyslots area (ends at offset: %" PRIu64 ").",
+ 				ix[i].offset, ix[i].offset + ix[i].length, keyslots_area_end);
+-			return FALSE;
++			return 0;
+ 		}
+ 
+ 		for (j = 0; j < length; j++) {
+@@ -393,14 +395,14 @@ static json_bool validate_intervals(stru
+ 				log_dbg(cd, "Overlapping areas [%" PRIu64 ",%" PRIu64 "] and [%" PRIu64 ",%" PRIu64 "].",
+ 					ix[i].offset, ix[i].offset + ix[i].length,
+ 					ix[j].offset, ix[j].offset + ix[j].length);
+-				return FALSE;
++				return 0;
+ 			}
+ 		}
+ 
+ 		i++;
+ 	}
+ 
+-	return TRUE;
++	return 1;
+ }
+ 
+ static int LUKS2_keyslot_validate(struct crypt_device *cd, json_object *hdr_jobj, json_object *hdr_keyslot, const char *key)
