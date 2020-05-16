@@ -1,0 +1,49 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2020-05-16
+Initial Package Version: 1_73_0
+Upstream Status:         Reviewing
+Origin:                  libreoffice team
+Description:             Fixes compiling libreoffice with GCC 10
+Some std::allocator names have been completely removed from the standard
+C++ library in C++17 and 20. Since GCC 10 defaults to C++17, this suppression
+has to be worked around in boost. The second change is in a PR for boost.
+The first change is libreoffice team's responsibility.
+
+diff -ur a/boost/bimap/detail/bimap_core.hpp b/boost/bimap/detail/bimap_core.hpp
+--- a/boost/bimap/detail/bimap_core.hpp	2020-04-22 15:34:51.000000000 +0200
++++ b/boost/bimap/detail/bimap_core.hpp	2020-05-15 11:19:16.929126617 +0200
+@@ -404,8 +404,8 @@
+     <
+         relation,
+         core_indices,
+-        BOOST_DEDUCED_TYPENAME parameters::allocator::
+-            BOOST_NESTED_TEMPLATE rebind<relation>::other
++        typename std::allocator_traits<BOOST_DEDUCED_TYPENAME parameters::allocator>::
++            BOOST_NESTED_TEMPLATE rebind_alloc<relation>
+ 
+     > core_type;
+ 
+diff -ur a/boost/format/alt_sstream_impl.hpp b/boost/format/alt_sstream_impl.hpp
+--- a/boost/format/alt_sstream_impl.hpp	2020-04-22 15:35:03.000000000 +0200
++++ b/boost/format/alt_sstream_impl.hpp	2020-05-15 11:20:31.737376067 +0200
+@@ -255,10 +255,20 @@
+                 if(0 < add_size) {
+                     new_size += add_size;
+ #ifdef _RWSTD_NO_CLASS_PARTIAL_SPEC
++  #ifdef BOOST_NO_CXX11_ALLOCATOR
+                     void *vdptr = alloc_.allocate(new_size, is_allocated_? oldptr : 0);
++  #else
++                    void *vdptr = std::allocator_traits<compat_allocator_type>::allocate(
++                        alloc_, new_size, is_allocated_? oldptr : 0);
++  #endif
+                     newptr = static_cast<Ch *>(vdptr);
+ #else
++  #ifdef BOOST_NO_CXX11_ALLOCATOR
+                     newptr = alloc_.allocate(new_size, is_allocated_? oldptr : 0);
++  #else
++                    newptr = std::allocator_traits<compat_allocator_type>::allocate(
++                        alloc_, new_size, is_allocated_? oldptr : 0);
++  #endif
+ #endif
+                 }
+ 
