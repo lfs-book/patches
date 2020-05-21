@@ -1,0 +1,117 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-05-20
+Initial Package Version: 0.10.47
+Origin:                  Upstream
+Upstream Status:         Applied
+Description:             Fixes a bug with the processing of some Gnumeric files,
+                         and resolves several GTK Critical Warnings.
+
+diff -Naurp goffice-0.10.47.orig/goffice/data/go-data.c goffice-0.10.47/goffice/data/go-data.c
+--- goffice-0.10.47.orig/goffice/data/go-data.c	2016-09-13 18:55:25.000000000 -0500
++++ goffice-0.10.47/goffice/data/go-data.c	2020-05-20 20:51:15.142017412 -0500
+@@ -268,6 +268,8 @@ go_data_unserialize (GOData *dat, char c
+ {
+ 	GODataClass const *klass = GO_DATA_GET_CLASS (dat);
+ 	g_return_val_if_fail (klass != NULL, FALSE);
++   /* an empty string is not valid. */
++   g_return_val_if_fail (str && *str, FALSE);
+ 	return (*klass->unserialize) (dat, str, user);
+ }
+ 
+diff -Naurp goffice-0.10.47.orig/goffice/graph/gog-object-xml.c goffice-0.10.47/goffice/graph/gog-object-xml.c
+--- goffice-0.10.47.orig/goffice/graph/gog-object-xml.c	2015-06-20 19:04:34.000000000 -0500
++++ goffice-0.10.47/goffice/graph/gog-object-xml.c	2020-05-20 20:52:04.759449507 -0500
+@@ -168,11 +168,14 @@ gog_dataset_sax_save (GogDataset const *
+ 		if (dat == NULL)
+ 			continue;
+ 
++      tmp = go_data_serialize (dat, user);
++      /* only save the data if there is some valid content */
++      if (tmp == NULL || *tmp == 0)
++         continue;
+ 		gsf_xml_out_start_element (output, "dimension");
+ 		gsf_xml_out_add_int (output, "id", i);
+ 		gsf_xml_out_add_cstr (output, "type",
+ 			G_OBJECT_TYPE_NAME (dat));
+-		tmp = go_data_serialize (dat, user);
+ 		gsf_xml_out_add_cstr (output, NULL, tmp);
+ 		g_free (tmp);
+ 		gsf_xml_out_end_element (output); /* </dimension> */
+diff -Naurp goffice-0.10.47.orig/goffice/gtk/go-font-sel.c goffice-0.10.47/goffice/gtk/go-font-sel.c
+--- goffice-0.10.47.orig/goffice/gtk/go-font-sel.c	2018-04-19 19:52:12.000000000 -0500
++++ goffice-0.10.47/goffice/gtk/go-font-sel.c	2020-05-20 20:57:04.739033741 -0500
+@@ -99,6 +99,11 @@ enum {
+ 	GFS_GTK_FONT_CHOOSER_PROP_FONT_DESC,
+ 	GFS_GTK_FONT_CHOOSER_PROP_PREVIEW_TEXT,
+ 	GFS_GTK_FONT_CHOOSER_PROP_SHOW_PREVIEW_ENTRY,
++#if GTK_CHECK_VERSION(3,24,0)
++   GFS_GTK_FONT_CHOOSER_PROP_LEVEL,
++   GFS_GTK_FONT_CHOOSER_PROP_LANGUAGE,
++   GFS_GTK_FONT_CHOOSER_PROP_FONT_FEATURES,
++#endif
+ 	GFS_GTK_FONT_CHOOSER_PROP_LAST
+ };
+ 
+@@ -1114,6 +1119,22 @@ gfs_get_property (GObject         *objec
+ 		g_value_set_boolean (value, gfs->show_preview_entry);
+ 		break;
+ 
++#if GTK_CHECK_VERSION(3,24,0)
++   case GFS_GTK_FONT_CHOOSER_PROP_LEVEL:
++      g_value_set_int (value, GTK_FONT_CHOOSER_LEVEL_FAMILY |
++                              GTK_FONT_CHOOSER_LEVEL_STYLE  |
++                              GTK_FONT_CHOOSER_LEVEL_SIZE);
++      break;
++
++   case GFS_GTK_FONT_CHOOSER_PROP_LANGUAGE:
++      g_value_set_string (value, "");
++      break;
++
++   case GFS_GTK_FONT_CHOOSER_PROP_FONT_FEATURES:
++      g_value_set_string (value, "");
++      break;
++#endif
++
+ 	default:
+ 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+ 		break;
+@@ -1189,6 +1210,21 @@ gfs_set_property (GObject         *objec
+ 		update_preview (gfs);
+ 		break;
+ 
++#if GTK_CHECK_VERSION(3,24,0)
++   case GFS_GTK_FONT_CHOOSER_PROP_LEVEL:
++      /* not supported, just to avoid criticals */
++
++      break;
++   case GFS_GTK_FONT_CHOOSER_PROP_LANGUAGE:
++      /* not supported, just to avoid criticals */
++
++      break;
++   case GFS_GTK_FONT_CHOOSER_PROP_FONT_FEATURES:
++      /* not supported, just to avoid criticals */
++
++      break;
++#endif
++
+ 	default:
+ 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+ 		break;
+@@ -1305,6 +1341,17 @@ gfs_class_init (GObjectClass *klass)
+ 	g_object_class_override_property (klass,
+ 					  GFS_GTK_FONT_CHOOSER_PROP_SHOW_PREVIEW_ENTRY,
+ 					  "show-preview-entry");
++#if GTK_CHECK_VERSION (3,24,0)
++   g_object_class_override_property (klass,
++                                     GFS_GTK_FONT_CHOOSER_PROP_LEVEL,
++                                     "level");
++   g_object_class_override_property (klass,
++                                     GFS_GTK_FONT_CHOOSER_PROP_LANGUAGE,
++                                     "language");
++   g_object_class_override_property (klass,
++                                     GFS_GTK_FONT_CHOOSER_PROP_FONT_FEATURES,
++                                     "font-features");
++#endif
+ 
+ 	gfs_signals[FONT_CHANGED] =
+ 		g_signal_new (
