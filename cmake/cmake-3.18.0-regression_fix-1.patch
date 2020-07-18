@@ -1,0 +1,38 @@
+Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date: 2020-07-18
+Initial Package Version: 3.18.0
+Upstream Status: Unknown
+Origin: https://gitlab.kitware.com/cmake/cmake/-/issues/20981
+Description: Fixes a segmentation fault in cmake-gui 
+
+diff -Naur cmake-3.18.0.sav/Source/QtDialog/QCMakeCacheView.cxx cmake-3.18.0/Source/QtDialog/QCMakeCacheView.cxx
+--- cmake-3.18.0.sav/Source/QtDialog/QCMakeCacheView.cxx	2020-07-15 06:19:20.000000000 -0500
++++ cmake-3.18.0/Source/QtDialog/QCMakeCacheView.cxx	2020-07-18 13:54:45.857377257 -0500
+@@ -217,27 +217,14 @@
+   QSet<QCMakeProperty> newProps2;
+ 
+   if (this->ShowNewProperties) {
+-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+     newProps = props.toSet();
+-#else
+-    newProps = QSet<QCMakeProperty>(props.begin(), props.end());
+-#endif
+     newProps2 = newProps;
+-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+     QSet<QCMakeProperty> oldProps = this->properties().toSet();
+-#else
+-    QSet<QCMakeProperty> oldProps = QSet<QCMakeProperty>(
+-      this->properties().begin(), this->properties().end());
+-#endif
+     oldProps.intersect(newProps);
+     newProps.subtract(oldProps);
+     newProps2.subtract(newProps);
+   } else {
+-#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+     newProps2 = props.toSet();
+-#else
+-    newProps2 = QSet<QCMakeProperty>(props.begin(), props.end());
+-#endif
+   }
+ 
+   bool b = this->blockSignals(true);
