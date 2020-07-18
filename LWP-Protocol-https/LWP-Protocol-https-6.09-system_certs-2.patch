@@ -1,0 +1,53 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2018-11-02
+Initial Package Version: 6.07
+Upstream Status: Unsuitable for CPAN
+Origin: Based on Arch, which is based on Debian, but adapted for BLFS.
+Description: Use system certificates instead of whatever happened to
+be at Mozilla when Mozilla::CA was last updated.  See
+https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=619059
+
+2020-07-18 : Updated version of Mozilla::CA in the line to be removed
+from Makefile.PL.
+
+diff -Naur a/lib/LWP/Protocol/https.pm b/lib/LWP/Protocol/https.pm
+--- a/lib/LWP/Protocol/https.pm	2020-07-16 14:33:07.000000000 +0100
++++ b/lib/LWP/Protocol/https.pm	2020-07-18 21:21:10.791195147 +0100
+@@ -24,25 +24,7 @@
+     }
+     if ($ssl_opts{SSL_verify_mode}) {
+ 	unless (exists $ssl_opts{SSL_ca_file} || exists $ssl_opts{SSL_ca_path}) {
+-	    eval {
+-		require Mozilla::CA;
+-	    };
+-	    if ($@) {
+-		if ($@ =~ /^Can't locate Mozilla\/CA\.pm/) {
+-		    $@ = <<'EOT';
+-Can't verify SSL peers without knowing which Certificate Authorities to trust
+-
+-This problem can be fixed by either setting the PERL_LWP_SSL_CA_FILE
+-environment variable or by installing the Mozilla::CA module.
+-
+-To disable verification of SSL peers set the PERL_LWP_SSL_VERIFY_HOSTNAME
+-environment variable to 0.  If you do this you can't be sure that you
+-communicate with the expected peer.
+-EOT
+-		}
+-		die $@;
+-	    }
+-	    $ssl_opts{SSL_ca_file} = Mozilla::CA::SSL_ca_file();
++	    $ssl_opts{SSL_ca_file} = '/etc/pki/tls/certs/ca-bundle.crt';
+ 	}
+     }
+     $self->{ssl_opts} = \%ssl_opts;
+diff -Naur a/Makefile.PL b/Makefile.PL
+--- a/Makefile.PL	2020-07-16 14:33:07.000000000 +0100
++++ b/Makefile.PL	2020-07-18 21:25:48.423724705 +0100
+@@ -22,7 +22,6 @@
+     "IO::Socket::SSL" => "1.54",
+     "LWP::Protocol::http" => 0,
+     "LWP::UserAgent" => "6.06",
+-    "Mozilla::CA" => 20180117,
+     "Net::HTTPS" => 6,
+     "base" => 0,
+     "strict" => 0
