@@ -1,0 +1,372 @@
+Submitted By:            Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date:                    2020-08-02
+Initial Package Version: 1.5.2
+Upstream Status:         Unknown
+Origin:                  Self
+Description:             This patch contains fixes to libpipeline-1.5.2 test
+                         programs intriduced by check-0.15.1.
+
+
+
+diff -Naur libpipeline-1.5.2.orig/tests/argstr.c libpipeline-1.5.2/tests/argstr.c
+--- libpipeline-1.5.2.orig/tests/argstr.c	2019-09-18 07:19:37.000000000 -0500
++++ libpipeline-1.5.2/tests/argstr.c	2020-08-02 17:37:07.106235200 -0500
+@@ -37,9 +37,9 @@
+ 	pipecmd *cmd;
+ 
+ 	cmd = pipecmd_new_argstr ("/bin/simple");
+-	fail_unless (!strcmp (cmd->name, "/bin/simple"));
+-	fail_unless (cmd->u.process.argc == 1);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "simple"));
++	fail_unless (!strcmp (cmd->name, "/bin/simple"), 0);
++	fail_unless (cmd->u.process.argc == 1, 0);
++	fail_unless (!strcmp (cmd->u.process.argv[0], "simple"), 0);
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+@@ -50,11 +50,11 @@
+ 
+ 	cmd = pipecmd_new_argstr
+ 		("x' \\' \\$\\'\\\"\" \\'\\$\\\"\\\\ \" \\\"");
+-	fail_unless (!strcmp (cmd->name, "x \\"));
+-	fail_unless (cmd->u.process.argc == 3);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "x \\"));
+-	fail_unless (!strcmp (cmd->u.process.argv[1], "$'\" \\'$\"\\ "));
+-	fail_unless (!strcmp (cmd->u.process.argv[2], "\""));
++	fail_unless (!strcmp (cmd->name, "x \\"), 0);
++	fail_unless (cmd->u.process.argc == 3, 0);
++	fail_unless (!strcmp (cmd->u.process.argv[0], "x \\"), 0);
++	fail_unless (!strcmp (cmd->u.process.argv[1], "$'\" \\'$\"\\ "), 0);
++	fail_unless (!strcmp (cmd->u.process.argv[2], "\""), 0);
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+@@ -64,10 +64,10 @@
+ 	pipecmd *cmd;
+ 
+ 	cmd = pipecmd_new_argstr ("exec /bin/foo bar");
+-	fail_unless (!strcmp (cmd->name, "/bin/foo"));
+-	fail_unless (cmd->u.process.argc == 2);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "foo"));
+-	fail_unless (!strcmp (cmd->u.process.argv[1], "bar"));
++	fail_unless (!strcmp (cmd->name, "/bin/foo"), 0);
++	fail_unless (cmd->u.process.argc == 2, 0);
++	fail_unless (!strcmp (cmd->u.process.argv[0], "foo"), 0);
++	fail_unless (!strcmp (cmd->u.process.argv[1], "bar"), 0);
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+diff -Naur libpipeline-1.5.2.orig/tests/basic.c libpipeline-1.5.2/tests/basic.c
+--- libpipeline-1.5.2.orig/tests/basic.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/basic.c	2020-08-02 17:33:07.179118321 -0500
+@@ -59,7 +59,7 @@
+ 		     "Number of arguments != 2");
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	fail_unless (!strcmp (line, "foo\n"),
+ 		     "Incorrect output from 'echo foo': '%s'", line);
+ 	fail_unless (pipeline_wait (p) == 0, "'echo foo' did not return 0");
+@@ -71,7 +71,7 @@
+ 		     "Number of arguments != 3");
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	fail_unless (!strcmp (line, "foo bar\n"),
+ 		     "Incorrect output from 'echo foo bar': '%s'", line);
+ 	fail_unless (pipeline_wait (p) == 0,
+@@ -91,7 +91,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	fail_unless (!strcmp (line, "bar\n"),
+ 		     "Incorrect output from 'echo foo | sed -e s/foo/bar/': "
+ 		     "'%s'", line);
+@@ -112,11 +112,11 @@
+ 	pipeline_command_args (p, SHELL, "-c", "exit 3", (void *) 0);
+ 	pipeline_command_args (p, "true", (void *) 0);
+ 	pipeline_start (p);
+-	fail_unless (pipeline_wait_all (p, &statuses, &n_statuses) == 127);
+-	fail_unless (n_statuses == 3);
+-	fail_unless (statuses[0] == 2 * 256);
+-	fail_unless (statuses[1] == 3 * 256);
+-	fail_unless (statuses[2] == 0);
++	fail_unless (pipeline_wait_all (p, &statuses, &n_statuses) == 127, 0);
++	fail_unless (n_statuses == 3, 0);
++	fail_unless (statuses[0] == 2 * 256, 0);
++	fail_unless (statuses[1] == 3 * 256, 0);
++	fail_unless (statuses[2] == 0, 0);
+ 	pipeline_free (p);
+ 	free (statuses);
+ }
+@@ -143,7 +143,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	fail_unless (!strcmp (line, "foo\n"),
+ 		     "control returned '%s', expected 'foo\n'", line);
+ 	pipeline_wait (p);
+@@ -154,7 +154,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	fail_unless (!strcmp (line, "\n"),
+ 		     "unsetenv failed: returned '%s', expected '\n'", line);
+ 	pipeline_wait (p);
+@@ -174,12 +174,12 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
++	fail_unless (line1 != NULL, 0);
+ 	fail_unless (!strcmp (line1, "foo\n"),
+ 		     "control returned first line '%s', expected 'foo\n'",
+ 		     line1);
+ 	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
++	fail_unless (line2 != NULL, 0);
+ 	fail_unless (!strcmp (line2, "\n"),
+ 		     "control returned second line '%s', expected '\n'",
+ 		     line2);
+@@ -188,12 +188,12 @@
+ 	pipecmd_clearenv (pipeline_get_command (p, 0));
+ 	pipeline_start (p);
+ 	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
++	fail_unless (line1 != NULL, 0);
+ 	fail_unless (!strcmp (line1, "\n"),
+ 		     "clearenv failed: returned first line '%s', expected '\n'",
+ 		     line1);
+ 	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
++	fail_unless (line2 != NULL, 0);
+ 	fail_unless (!strcmp (line2, "\n"),
+ 		     "clearenv returned second line '%s', expected '\n'",
+ 		     line2);
+@@ -202,12 +202,12 @@
+ 	pipecmd_setenv (pipeline_get_command (p, 0), "TEST4", "bar");
+ 	pipeline_start (p);
+ 	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
++	fail_unless (line1 != NULL, 0);
+ 	fail_unless (!strcmp (line1, "\n"),
+ 		     "clearenv+setenv failed: returned first line '%s', expected '\n'",
+ 		     line1);
+ 	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
++	fail_unless (line2 != NULL, 0);
+ 	fail_unless (!strcmp (line2, "bar\n"),
+ 		     "clearenv+setenv returned second line '%s', expected 'bar\n'",
+ 		     line2);
+@@ -218,12 +218,12 @@
+ 	pipeline_want_out (p2, -1);
+ 	pipeline_start (p2);
+ 	line1 = pipeline_readline (p2);
+-	fail_unless (line1 != NULL);
++	fail_unless (line1 != NULL, 0);
+ 	fail_unless (!strcmp (line1, "\n"),
+ 		     "clearenv+setenv+dup failed: returned first line '%s', expected '\n'",
+ 		     line1);
+ 	line2 = pipeline_readline (p2);
+-	fail_unless (line2 != NULL);
++	fail_unless (line2 != NULL, 0);
+ 	fail_unless (!strcmp (line2, "bar\n"),
+ 		     "clearenv+setenv+dup returned second line '%s', expected 'bar\n'",
+ 		     line2);
+@@ -245,7 +245,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	raw_line = xstrdup (pipeline_readline (p));
+-	fail_unless (raw_line != NULL);
++	fail_unless (raw_line != NULL, 0);
+ 	line = xstrdup (raw_line);
+ 	end = line + strlen (line);
+ 	if (end > line && *(end - 1) == '\n')
+@@ -273,12 +273,12 @@
+ 
+ 	p = pipeline_new_command_args ("pwd", (void *) 0);
+ 	temp_dir_fd = open (temp_dir, O_RDONLY | O_DIRECTORY);
+-	fail_unless (temp_dir_fd >= 0);
++	fail_unless (temp_dir_fd >= 0, 0);
+ 	pipecmd_fchdir (pipeline_get_command (p, 0), temp_dir_fd);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	raw_line = xstrdup (pipeline_readline (p));
+-	fail_unless (raw_line != NULL);
++	fail_unless (raw_line != NULL, 0);
+ 	line = xstrdup (raw_line);
+ 	end = line + strlen (line);
+ 	if (end > line && *(end - 1) == '\n')
+@@ -331,8 +331,8 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "foo bar baz\n"));
++	fail_unless (line != NULL, 0);
++	fail_unless (!strcmp (line, "foo bar baz\n"), 0);
+ 	pipeline_wait (p);
+ 	pipeline_free (p);
+ }
+diff -Naur libpipeline-1.5.2.orig/tests/exec.c libpipeline-1.5.2/tests/exec.c
+--- libpipeline-1.5.2.orig/tests/exec.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/exec.c	2020-08-02 17:38:36.579777375 -0500
+@@ -72,11 +72,11 @@
+ 			return;
+ 		}
+ 
+-		fail_unless (WIFEXITED (status));
++		fail_unless (WIFEXITED (status), 0);
+ 		if (i < 2)
+-			fail_unless (WEXITSTATUS (status) == i);
++			fail_unless (WEXITSTATUS (status) == i, 0);
+ 		else
+-			fail_if (WEXITSTATUS (status) == 0);
++			fail_if (WEXITSTATUS (status) == 0, 0);
+ 
+ 		pipecmd_free (cmd);
+ 	}
+@@ -115,8 +115,8 @@
+ 			return;
+ 		}
+ 
+-		fail_unless (WIFEXITED (status));
+-		fail_unless (WEXITSTATUS (status) == i);
++		fail_unless (WIFEXITED (status), 0);
++		fail_unless (WEXITSTATUS (status) == i, 0);
+ 
+ 		pipecmd_free (cmd);
+ 	}
+diff -Naur libpipeline-1.5.2.orig/tests/inspect.c libpipeline-1.5.2/tests/inspect.c
+--- libpipeline-1.5.2.orig/tests/inspect.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/inspect.c	2020-08-02 17:40:07.566349355 -0500
+@@ -43,14 +43,14 @@
+ 
+ 	cmd = pipecmd_new ("foo");
+ 	str = pipecmd_tostring (cmd);
+-	fail_unless (!strcmp (str, "foo"));
++	fail_unless (!strcmp (str, "foo"), 0);
+ 	free (str);
+ 	pipecmd_free (cmd);
+ 
+ 	cmd = pipecmd_new_args ("foo", "bar", "baz quux", (void *) 0);
+ 	str = pipecmd_tostring (cmd);
+ 	/* TODO: not ideal representation of commands with metacharacters */
+-	fail_unless (!strcmp (str, "foo bar baz quux"));
++	fail_unless (!strcmp (str, "foo bar baz quux"), 0);
+ 	free (str);
+ 	pipecmd_free (cmd);
+ }
+@@ -64,10 +64,10 @@
+ 	p = pipeline_new ();
+ 	pipeline_command_args (p, "foo", "bar", (void *) 0);
+ 	pipeline_command_args (p, "grep", "baz", "quux", (void *) 0);
+-	fail_unless (pipeline_get_ncommands (p) == 2);
++	fail_unless (pipeline_get_ncommands (p) == 2, 0);
+ 	pipecmd_setenv (pipeline_get_command (p, 1), "KEY", "value");
+ 	str = pipeline_tostring (p);
+-	fail_unless (!strcmp (str, "foo bar | KEY=value grep baz quux"));
++	fail_unless (!strcmp (str, "foo bar | KEY=value grep baz quux"), 0);
+ 	free (str);
+ 	pipeline_free (p);
+ }
+@@ -103,7 +103,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	fail_unless (line != NULL, 0);
+ 	pid = (pid_t) atol (line);
+ 	fail_unless (pid == pipeline_get_pid (p, 0), "pids match");
+ 	/* Note that this test may hang if pipeline_get_pid does not work.
+diff -Naur libpipeline-1.5.2.orig/tests/pump.c libpipeline-1.5.2/tests/pump.c
+--- libpipeline-1.5.2.orig/tests/pump.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/pump.c	2020-08-02 17:41:57.013245155 -0500
+@@ -42,7 +42,7 @@
+ 	pipeline *diff = pipeline_new_command_args
+ 		("diff", "-u", left, right, (void *) 0);
+ 	int ret = pipeline_run (diff);
+-	fail_unless (ret == 0);
++	fail_unless (ret == 0, 0);
+ }
+ 
+ START_TEST (test_pump_connect_attaches_correctly)
+@@ -52,17 +52,17 @@
+ 	pipeline *three = pipeline_new ();
+ 
+ 	pipeline_connect (one, two, three, (void *) 0);
+-	fail_unless (one->redirect_out == REDIRECT_FD);
+-	fail_unless (one->want_out < 0);
+-	fail_unless (one->want_outfile == NULL);
+-	fail_unless (two->source == one);
+-	fail_unless (two->redirect_in == REDIRECT_FD);
+-	fail_unless (two->want_in < 0);
+-	fail_unless (two->want_infile == NULL);
+-	fail_unless (three->source == one);
+-	fail_unless (three->redirect_in == REDIRECT_FD);
+-	fail_unless (three->want_in < 0);
+-	fail_unless (three->want_infile == NULL);
++	fail_unless (one->redirect_out == REDIRECT_FD, 0);
++	fail_unless (one->want_out < 0, 0);
++	fail_unless (one->want_outfile == NULL, 0);
++	fail_unless (two->source == one, 0);
++	fail_unless (two->redirect_in == REDIRECT_FD, 0);
++	fail_unless (two->want_in < 0, 0);
++	fail_unless (two->want_infile == NULL, 0);
++	fail_unless (three->source == one, 0);
++	fail_unless (three->redirect_in == REDIRECT_FD, 0);
++	fail_unless (three->want_in < 0, 0);
++	fail_unless (three->want_infile == NULL, 0);
+ 
+ 	pipeline_free (three);
+ 	pipeline_free (two);
+diff -Naur libpipeline-1.5.2.orig/tests/read.c libpipeline-1.5.2/tests/read.c
+--- libpipeline-1.5.2.orig/tests/read.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/read.c	2020-08-02 17:42:26.319753678 -0500
+@@ -141,7 +141,7 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (!strcmp (line, "a line\n"));
++	fail_unless (!strcmp (line, "a line\n"), 0);
+ 	pipeline_free (p);
+ }
+ END_TEST
+diff -Naur libpipeline-1.5.2.orig/tests/redirect.c libpipeline-1.5.2/tests/redirect.c
+--- libpipeline-1.5.2.orig/tests/redirect.c	2019-08-30 18:30:59.000000000 -0500
++++ libpipeline-1.5.2/tests/redirect.c	2020-08-02 17:43:29.206846121 -0500
+@@ -58,8 +58,8 @@
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "test data out\n"));
++	fail_unless (line != NULL, 0);
++	fail_unless (!strcmp (line, "test data out\n"), 0);
+ 
+ 	fclose (fh);
+ 	unlink (template);
+@@ -79,11 +79,11 @@
+ 	p = pipeline_new_command_args ("echo", "test", (void *) 0);
+ 	outfile = xasprintf ("%s/test", temp_dir);
+ 	pipeline_want_outfile (p, outfile);
+-	fail_unless (pipeline_run (p) == 0);
++	fail_unless (pipeline_run (p) == 0, 0);
+ 	fh = fopen (outfile, "r");
+-	fail_unless (fh != NULL);
+-	fail_unless (fgets (line, 5, fh) != NULL);
+-	fail_unless (!strcmp (line, "test"));
++	fail_unless (fh != NULL, 0);
++	fail_unless (fgets (line, 5, fh) != NULL, 0);
++	fail_unless (!strcmp (line, "test"), 0);
+ 
+ 	fclose (fh);
+ 	free (outfile);
