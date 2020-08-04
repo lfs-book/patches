@@ -1,0 +1,641 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2020-08-04
+Initial Package Version: 1.5.2
+Upstream Status:         Committed
+Origin:                  Upstream
+Description:             This patch contains fixes to libpipeline-1.5.2 test
+                         programs introduced by check-0.15.1.
+
+From 1be57f95c30cbaa6f64ae11a6d952fe4633e29f2 Mon Sep 17 00:00:00 2001
+From: Colin Watson <cjwatson@debian.org>
+Date: Mon, 3 Aug 2020 23:21:46 +0100
+Subject: Port tests to the modern Check API
+
+Fixes Savannah bug #58883.
+
+* configure.ac: Test for check >= 0.9.10.
+* tests/argstr.c, tests/basic.c, tests/exec.c, tests/inspect.c,
+tests/pump.c, tests/read.c, tests/redirect.c: Replace uses of
+fail_unless and fail_if with appropriate ck_assert_* calls.  In most
+cases these now use more specific equality etc. tests rather than just
+passing arbitrary predicates.
+* README: Document updated dependency.
+* NEWS: Document this.
+---
+ NEWS             |   2 +
+ README           |   2 +-
+ configure.ac     |   2 +-
+ tests/argstr.c   |  24 +++++-----
+ tests/basic.c    | 135 ++++++++++++++++++-------------------------------------
+ tests/exec.c     |  10 ++---
+ tests/inspect.c  |  16 +++----
+ tests/pump.c     |  37 +++++++--------
+ tests/read.c     |  10 ++---
+ tests/redirect.c |  13 +++---
+ 10 files changed, 98 insertions(+), 153 deletions(-)
+
+diff --git a/NEWS b/NEWS
+index fe2d262..a7141ff 100644
+--- a/NEWS
++++ b/NEWS
+@@ -3,6 +3,8 @@ libpipeline 1.5.3
+ 
+ Fix implementation-defined behaviour while handling read/write errors.
+ 
++Port tests to the modern Check API.
++
+ libpipeline 1.5.2 (1 January 2020)
+ ==================================
+ 
+diff --git a/README b/README
+index 5c95427..17880ab 100644
+--- a/README
++++ b/README
+@@ -19,7 +19,7 @@ need these separate packages installed before configuring libpipeline in
+ order to run its test suite:
+ 
+   pkg-config (http://www.freedesktop.org/wiki/Software/pkg-config)
+-  check (http://check.sourceforge.net/)
++  check >= 0.9.10 (http://check.sourceforge.net/)
+ 
+ See the INSTALL file for general installation instructions.
+ 
+diff --git a/configure.ac b/configure.ac
+index 2ea49c6..aee3657 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -55,7 +55,7 @@ AC_PROG_LN_S
+ AM_PROG_AR
+ LT_INIT([disable-static])
+ AC_DEFINE_UNQUOTED([SHELL], ["$SHELL"], [A POSIX shell interpreter.])
+-PKG_CHECK_MODULES([CHECK], [check >= 0.9.4], [run_tests=yes], [run_tests=no])
++PKG_CHECK_MODULES([CHECK], [check >= 0.9.10], [run_tests=yes], [run_tests=no])
+ AM_CONDITIONAL([RUN_TESTS], [test "x$run_tests" = xyes])
+ 
+ # Check for various header files and associated libraries.
+diff --git a/tests/argstr.c b/tests/argstr.c
+index 4dd912a..f64997f 100644
+--- a/tests/argstr.c
++++ b/tests/argstr.c
+@@ -37,9 +37,9 @@ START_TEST (test_argstr_trivial)
+ 	pipecmd *cmd;
+ 
+ 	cmd = pipecmd_new_argstr ("/bin/simple");
+-	fail_unless (!strcmp (cmd->name, "/bin/simple"));
+-	fail_unless (cmd->u.process.argc == 1);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "simple"));
++	ck_assert_str_eq (cmd->name, "/bin/simple");
++	ck_assert_int_eq (cmd->u.process.argc, 1);
++	ck_assert_str_eq (cmd->u.process.argv[0], "simple");
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+@@ -50,11 +50,11 @@ START_TEST (test_argstr_torture)
+ 
+ 	cmd = pipecmd_new_argstr
+ 		("x' \\' \\$\\'\\\"\" \\'\\$\\\"\\\\ \" \\\"");
+-	fail_unless (!strcmp (cmd->name, "x \\"));
+-	fail_unless (cmd->u.process.argc == 3);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "x \\"));
+-	fail_unless (!strcmp (cmd->u.process.argv[1], "$'\" \\'$\"\\ "));
+-	fail_unless (!strcmp (cmd->u.process.argv[2], "\""));
++	ck_assert_str_eq (cmd->name, "x \\");
++	ck_assert_int_eq (cmd->u.process.argc, 3);
++	ck_assert_str_eq (cmd->u.process.argv[0], "x \\");
++	ck_assert_str_eq (cmd->u.process.argv[1], "$'\" \\'$\"\\ ");
++	ck_assert_str_eq (cmd->u.process.argv[2], "\"");
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+@@ -64,10 +64,10 @@ START_TEST (test_argstr_exec)
+ 	pipecmd *cmd;
+ 
+ 	cmd = pipecmd_new_argstr ("exec /bin/foo bar");
+-	fail_unless (!strcmp (cmd->name, "/bin/foo"));
+-	fail_unless (cmd->u.process.argc == 2);
+-	fail_unless (!strcmp (cmd->u.process.argv[0], "foo"));
+-	fail_unless (!strcmp (cmd->u.process.argv[1], "bar"));
++	ck_assert_str_eq (cmd->name, "/bin/foo");
++	ck_assert_int_eq (cmd->u.process.argc, 2);
++	ck_assert_str_eq (cmd->u.process.argv[0], "foo");
++	ck_assert_str_eq (cmd->u.process.argv[1], "bar");
+ 	pipecmd_free (cmd);
+ }
+ END_TEST
+diff --git a/tests/basic.c b/tests/basic.c
+index 245933c..01a0e01 100644
+--- a/tests/basic.c
++++ b/tests/basic.c
+@@ -42,9 +42,9 @@ START_TEST (test_basic_status)
+ 	pipeline *p;
+ 
+ 	p = pipeline_new_command_args ("true", (void *) 0);
+-	fail_unless (pipeline_run (p) == 0, "true did not return 0");
++	ck_assert_msg (pipeline_run (p) == 0, "true did not return 0");
+ 	p = pipeline_new_command_args ("false", (void *) 0);
+-	fail_if (pipeline_run (p) == 0, "false returned 0");
++	ck_assert_msg (pipeline_run (p) != 0, "false returned 0");
+ }
+ END_TEST
+ 
+@@ -55,27 +55,27 @@ START_TEST (test_basic_args)
+ 
+ 	p = pipeline_new_command_args ("echo", "foo", (void *) 0);
+ 	pipeline_want_out (p, -1);
+-	fail_unless (pipecmd_get_nargs (pipeline_get_command (p, 0)) == 2,
+-		     "Number of arguments != 2");
++	ck_assert_msg (pipecmd_get_nargs (pipeline_get_command (p, 0)) == 2,
++		       "Number of arguments != 2");
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "foo\n"),
+-		     "Incorrect output from 'echo foo': '%s'", line);
+-	fail_unless (pipeline_wait (p) == 0, "'echo foo' did not return 0");
++	ck_assert_ptr_ne (line, NULL);
++	ck_assert_msg (!strcmp (line, "foo\n"),
++		       "Incorrect output from 'echo foo': '%s'", line);
++	ck_assert_msg (pipeline_wait (p) == 0, "'echo foo' did not return 0");
+ 	pipeline_free (p);
+ 
+ 	p = pipeline_new_command_args ("echo", "foo", "bar", (void *) 0);
+ 	pipeline_want_out (p, -1);
+-	fail_unless (pipecmd_get_nargs (pipeline_get_command (p, 0)) == 3,
+-		     "Number of arguments != 3");
++	ck_assert_msg (pipecmd_get_nargs (pipeline_get_command (p, 0)) == 3,
++		       "Number of arguments != 3");
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "foo bar\n"),
+-		     "Incorrect output from 'echo foo bar': '%s'", line);
+-	fail_unless (pipeline_wait (p) == 0,
+-		     "'echo foo bar' did not return 0");
++	ck_assert_ptr_ne (line, NULL);
++	ck_assert_msg (!strcmp (line, "foo bar\n"),
++		       "Incorrect output from 'echo foo bar': '%s'", line);
++	ck_assert_msg (pipeline_wait (p) == 0,
++		       "'echo foo bar' did not return 0");
+ 	pipeline_free (p);
+ }
+ END_TEST
+@@ -91,12 +91,12 @@ START_TEST (test_basic_pipeline)
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "bar\n"),
+-		     "Incorrect output from 'echo foo | sed -e s/foo/bar/': "
+-		     "'%s'", line);
+-	fail_unless (pipeline_wait (p) == 0,
+-		     "'echo foo | sed -e 's/foo/bar/' did not return 0");
++	ck_assert_ptr_ne (line, NULL);
++	ck_assert_msg (!strcmp (line, "bar\n"),
++		       "Incorrect output from 'echo foo | sed -e s/foo/bar/': "
++		       "'%s'", line);
++	ck_assert_msg (pipeline_wait (p) == 0,
++		       "'echo foo | sed -e 's/foo/bar/' did not return 0");
+ 	pipeline_free (p);
+ }
+ END_TEST
+@@ -112,11 +112,11 @@ START_TEST (test_basic_wait_all)
+ 	pipeline_command_args (p, SHELL, "-c", "exit 3", (void *) 0);
+ 	pipeline_command_args (p, "true", (void *) 0);
+ 	pipeline_start (p);
+-	fail_unless (pipeline_wait_all (p, &statuses, &n_statuses) == 127);
+-	fail_unless (n_statuses == 3);
+-	fail_unless (statuses[0] == 2 * 256);
+-	fail_unless (statuses[1] == 3 * 256);
+-	fail_unless (statuses[2] == 0);
++	ck_assert_int_eq (pipeline_wait_all (p, &statuses, &n_statuses), 127);
++	ck_assert_int_eq (n_statuses, 3);
++	ck_assert_int_eq (statuses[0], 2 * 256);
++	ck_assert_int_eq (statuses[1], 3 * 256);
++	ck_assert_int_eq (statuses[2], 0);
+ 	pipeline_free (p);
+ 	free (statuses);
+ }
+@@ -128,24 +128,20 @@ START_TEST (test_basic_setenv)
+ 
+ 	p = pipeline_new_command_args (SHELL, "-c", "exit $TEST1", (void *) 0);
+ 	pipecmd_setenv (pipeline_get_command (p, 0), "TEST1", "10");
+-	fail_unless (pipeline_run (p) == 10, "TEST1 not set properly");
++	ck_assert_int_eq (pipeline_run (p), 10);
+ }
+ END_TEST
+ 
+ START_TEST (test_basic_unsetenv)
+ {
+ 	pipeline *p;
+-	const char *line;
+ 
+ 	setenv ("TEST2", "foo", 1);
+ 
+ 	p = pipeline_new_command_args (SHELL, "-c", "echo $TEST2", (void *) 0);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "foo\n"),
+-		     "control returned '%s', expected 'foo\n'", line);
++	ck_assert_str_eq (pipeline_readline (p), "foo\n");
+ 	pipeline_wait (p);
+ 	pipeline_free (p);
+ 
+@@ -153,10 +149,7 @@ START_TEST (test_basic_unsetenv)
+ 	pipecmd_unsetenv (pipeline_get_command (p, 0), "TEST2");
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "\n"),
+-		     "unsetenv failed: returned '%s', expected '\n'", line);
++	ck_assert_str_eq (pipeline_readline (p), "\n");
+ 	pipeline_wait (p);
+ 	pipeline_free (p);
+ }
+@@ -165,7 +158,6 @@ END_TEST
+ START_TEST (test_basic_clearenv)
+ {
+ 	pipeline *p, *p2;
+-	const char *line1, *line2;
+ 
+ 	setenv ("TEST3", "foo", 1);
+ 
+@@ -173,60 +165,28 @@ START_TEST (test_basic_clearenv)
+ 				       (void *) 0);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
+-	fail_unless (!strcmp (line1, "foo\n"),
+-		     "control returned first line '%s', expected 'foo\n'",
+-		     line1);
+-	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
+-	fail_unless (!strcmp (line2, "\n"),
+-		     "control returned second line '%s', expected '\n'",
+-		     line2);
++	ck_assert_str_eq (pipeline_readline (p), "foo\n");
++	ck_assert_str_eq (pipeline_readline (p), "\n");
+ 	pipeline_wait (p);
+ 
+ 	pipecmd_clearenv (pipeline_get_command (p, 0));
+ 	pipeline_start (p);
+-	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
+-	fail_unless (!strcmp (line1, "\n"),
+-		     "clearenv failed: returned first line '%s', expected '\n'",
+-		     line1);
+-	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
+-	fail_unless (!strcmp (line2, "\n"),
+-		     "clearenv returned second line '%s', expected '\n'",
+-		     line2);
++	ck_assert_str_eq (pipeline_readline (p), "\n");
++	ck_assert_str_eq (pipeline_readline (p), "\n");
+ 	pipeline_wait (p);
+ 
+ 	pipecmd_setenv (pipeline_get_command (p, 0), "TEST4", "bar");
+ 	pipeline_start (p);
+-	line1 = pipeline_readline (p);
+-	fail_unless (line1 != NULL);
+-	fail_unless (!strcmp (line1, "\n"),
+-		     "clearenv+setenv failed: returned first line '%s', expected '\n'",
+-		     line1);
+-	line2 = pipeline_readline (p);
+-	fail_unless (line2 != NULL);
+-	fail_unless (!strcmp (line2, "bar\n"),
+-		     "clearenv+setenv returned second line '%s', expected 'bar\n'",
+-		     line2);
++	ck_assert_str_eq (pipeline_readline (p), "\n");
++	ck_assert_str_eq (pipeline_readline (p), "bar\n");
+ 	pipeline_wait (p);
+ 
+ 	p2 = pipeline_new ();
+ 	pipeline_command (p2, pipecmd_dup (pipeline_get_command (p, 0)));
+ 	pipeline_want_out (p2, -1);
+ 	pipeline_start (p2);
+-	line1 = pipeline_readline (p2);
+-	fail_unless (line1 != NULL);
+-	fail_unless (!strcmp (line1, "\n"),
+-		     "clearenv+setenv+dup failed: returned first line '%s', expected '\n'",
+-		     line1);
+-	line2 = pipeline_readline (p2);
+-	fail_unless (line2 != NULL);
+-	fail_unless (!strcmp (line2, "bar\n"),
+-		     "clearenv+setenv+dup returned second line '%s', expected 'bar\n'",
+-		     line2);
++	ck_assert_str_eq (pipeline_readline (p2), "\n");
++	ck_assert_str_eq (pipeline_readline (p2), "bar\n");
+ 	pipeline_wait (p2);
+ 	pipeline_free (p2);
+ 	pipeline_free (p);
+@@ -245,16 +205,14 @@ START_TEST (test_basic_chdir)
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	raw_line = xstrdup (pipeline_readline (p));
+-	fail_unless (raw_line != NULL);
++	ck_assert_ptr_ne (raw_line, NULL);
+ 	line = xstrdup (raw_line);
+ 	end = line + strlen (line);
+ 	if (end > line && *(end - 1) == '\n')
+ 		*(end - 1) = '\0';
+ 	child_base = base_name (line);
+ 	expected_base = base_name (temp_dir);
+-	fail_unless (!strcmp (child_base, expected_base),
+-		     "child base name was '%s', expected '%s'",
+-		     child_base, expected_base);
++	ck_assert_str_eq (child_base, expected_base);
+ 	free (expected_base);
+ 	free (child_base);
+ 	free (line);
+@@ -273,21 +231,19 @@ START_TEST (test_basic_fchdir)
+ 
+ 	p = pipeline_new_command_args ("pwd", (void *) 0);
+ 	temp_dir_fd = open (temp_dir, O_RDONLY | O_DIRECTORY);
+-	fail_unless (temp_dir_fd >= 0);
++	ck_assert_int_ge (temp_dir_fd, 0);
+ 	pipecmd_fchdir (pipeline_get_command (p, 0), temp_dir_fd);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	raw_line = xstrdup (pipeline_readline (p));
+-	fail_unless (raw_line != NULL);
++	ck_assert_ptr_ne (raw_line, NULL);
+ 	line = xstrdup (raw_line);
+ 	end = line + strlen (line);
+ 	if (end > line && *(end - 1) == '\n')
+ 		*(end - 1) = '\0';
+ 	child_base = base_name (line);
+ 	expected_base = base_name (temp_dir);
+-	fail_unless (!strcmp (child_base, expected_base),
+-		     "child base name was '%s', expected '%s'",
+-		     child_base, expected_base);
++	ck_assert_str_eq (child_base, expected_base);
+ 	free (expected_base);
+ 	free (child_base);
+ 	free (line);
+@@ -311,7 +267,7 @@ START_TEST (test_basic_pre_exec)
+ 
+ 	p = pipeline_new_command_args (SHELL, "-c", "exit $TEST1", (void *) 0);
+ 	pipecmd_pre_exec (pipeline_get_command (p, 0), pre_exec, NULL, NULL);
+-	fail_unless (pipeline_run (p) == 10, "TEST1 not set properly");
++	ck_assert_msg (pipeline_run (p) == 10, "TEST1 not set properly");
+ }
+ END_TEST
+ 
+@@ -319,7 +275,6 @@ START_TEST (test_basic_sequence)
+ {
+ 	pipeline *p;
+ 	pipecmd *cmd1, *cmd2, *cmd3, *seq;
+-	const char *line;
+ 
+ 	p = pipeline_new ();
+ 	cmd1 = pipecmd_new_args ("echo", "foo", (void *) 0);
+@@ -330,9 +285,7 @@ START_TEST (test_basic_sequence)
+ 	pipeline_command_args (p, "xargs", (void *) 0);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "foo bar baz\n"));
++	ck_assert_str_eq (pipeline_readline (p), "foo bar baz\n");
+ 	pipeline_wait (p);
+ 	pipeline_free (p);
+ }
+diff --git a/tests/exec.c b/tests/exec.c
+index 00563b8..3407e52 100644
+--- a/tests/exec.c
++++ b/tests/exec.c
+@@ -72,11 +72,11 @@ START_TEST (test_exec_process)
+ 			return;
+ 		}
+ 
+-		fail_unless (WIFEXITED (status));
++		ck_assert_int_ne (WIFEXITED (status), 0);
+ 		if (i < 2)
+-			fail_unless (WEXITSTATUS (status) == i);
++			ck_assert_int_eq (WEXITSTATUS (status), i);
+ 		else
+-			fail_if (WEXITSTATUS (status) == 0);
++			ck_assert_int_ne (WEXITSTATUS (status), 0);
+ 
+ 		pipecmd_free (cmd);
+ 	}
+@@ -115,8 +115,8 @@ START_TEST (test_exec_function)
+ 			return;
+ 		}
+ 
+-		fail_unless (WIFEXITED (status));
+-		fail_unless (WEXITSTATUS (status) == i);
++		ck_assert_int_ne (WIFEXITED (status), 0);
++		ck_assert_int_eq (WEXITSTATUS (status), i);
+ 
+ 		pipecmd_free (cmd);
+ 	}
+diff --git a/tests/inspect.c b/tests/inspect.c
+index 2826475..68f0ae6 100644
+--- a/tests/inspect.c
++++ b/tests/inspect.c
+@@ -43,14 +43,14 @@ START_TEST (test_inspect_command)
+ 
+ 	cmd = pipecmd_new ("foo");
+ 	str = pipecmd_tostring (cmd);
+-	fail_unless (!strcmp (str, "foo"));
++	ck_assert_str_eq (str, "foo");
+ 	free (str);
+ 	pipecmd_free (cmd);
+ 
+ 	cmd = pipecmd_new_args ("foo", "bar", "baz quux", (void *) 0);
+ 	str = pipecmd_tostring (cmd);
+ 	/* TODO: not ideal representation of commands with metacharacters */
+-	fail_unless (!strcmp (str, "foo bar baz quux"));
++	ck_assert_str_eq (str, "foo bar baz quux");
+ 	free (str);
+ 	pipecmd_free (cmd);
+ }
+@@ -64,10 +64,10 @@ START_TEST (test_inspect_pipeline)
+ 	p = pipeline_new ();
+ 	pipeline_command_args (p, "foo", "bar", (void *) 0);
+ 	pipeline_command_args (p, "grep", "baz", "quux", (void *) 0);
+-	fail_unless (pipeline_get_ncommands (p) == 2);
++	ck_assert_int_eq (pipeline_get_ncommands (p), 2);
+ 	pipecmd_setenv (pipeline_get_command (p, 1), "KEY", "value");
+ 	str = pipeline_tostring (p);
+-	fail_unless (!strcmp (str, "foo bar | KEY=value grep baz quux"));
++	ck_assert_str_eq (str, "foo bar | KEY=value grep baz quux");
+ 	free (str);
+ 	pipeline_free (p);
+ }
+@@ -103,9 +103,9 @@ START_TEST (test_inspect_pid)
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+ 	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
++	ck_assert_ptr_ne (line, NULL);
+ 	pid = (pid_t) atol (line);
+-	fail_unless (pid == pipeline_get_pid (p, 0), "pids match");
++	ck_assert_msg (pid == pipeline_get_pid (p, 0), "pids match");
+ 	/* Note that this test may hang if pipeline_get_pid does not work.
+ 	 * We might be able to fix this by calling setsid at the start of
+ 	 * the test and then killing the process group, but I'm not sure if
+@@ -119,8 +119,8 @@ START_TEST (test_inspect_pid)
+ 		kill (pid, SIGTERM);
+ 		status = pipeline_wait (p);
+ 
+-		fail_unless (status == 128 + SIGTERM,
+-			     "pid_helper did not indicate SIGTERM");
++		ck_assert_msg (status == 128 + SIGTERM,
++			       "pid_helper did not indicate SIGTERM");
+ 	}
+ 	pipeline_free (p);
+ }
+diff --git a/tests/pump.c b/tests/pump.c
+index 0cb7c3e..62f39f3 100644
+--- a/tests/pump.c
++++ b/tests/pump.c
+@@ -37,12 +37,11 @@
+ 
+ const char *program_name = "pump";
+ 
+-static void fail_unless_files_equal (const char *left, const char *right)
++static void assert_files_equal (const char *left, const char *right)
+ {
+ 	pipeline *diff = pipeline_new_command_args
+ 		("diff", "-u", left, right, (void *) 0);
+-	int ret = pipeline_run (diff);
+-	fail_unless (ret == 0);
++	ck_assert_int_eq (pipeline_run (diff), 0);
+ }
+ 
+ START_TEST (test_pump_connect_attaches_correctly)
+@@ -52,17 +51,17 @@ START_TEST (test_pump_connect_attaches_correctly)
+ 	pipeline *three = pipeline_new ();
+ 
+ 	pipeline_connect (one, two, three, (void *) 0);
+-	fail_unless (one->redirect_out == REDIRECT_FD);
+-	fail_unless (one->want_out < 0);
+-	fail_unless (one->want_outfile == NULL);
+-	fail_unless (two->source == one);
+-	fail_unless (two->redirect_in == REDIRECT_FD);
+-	fail_unless (two->want_in < 0);
+-	fail_unless (two->want_infile == NULL);
+-	fail_unless (three->source == one);
+-	fail_unless (three->redirect_in == REDIRECT_FD);
+-	fail_unless (three->want_in < 0);
+-	fail_unless (three->want_infile == NULL);
++	ck_assert_int_eq (one->redirect_out, REDIRECT_FD);
++	ck_assert_int_le (one->want_out, 0);
++	ck_assert_ptr_eq (one->want_outfile, NULL);
++	ck_assert_ptr_eq (two->source, one);
++	ck_assert_int_eq (two->redirect_in, REDIRECT_FD);
++	ck_assert_int_le (two->want_in, 0);
++	ck_assert_ptr_eq (two->want_infile, NULL);
++	ck_assert_ptr_eq (three->source, one);
++	ck_assert_int_eq (three->redirect_in, REDIRECT_FD);
++	ck_assert_int_le (three->want_in, 0);
++	ck_assert_ptr_eq (three->want_infile, NULL);
+ 
+ 	pipeline_free (three);
+ 	pipeline_free (two);
+@@ -100,12 +99,10 @@ START_TEST (test_pump_tee)
+ 	pipeline_want_outfile (sink_function, function_outfile);
+ 	pipeline_connect (source, sink_process, sink_function, (void *) 0);
+ 	pipeline_pump (source, sink_process, sink_function, (void *) 0);
+-	fail_unless (pipeline_wait (source) == 0, "source did not return 0");
+-	fail_unless (pipeline_wait (sink_process) == 0,
+-		     "process sink did not return 0");
+-	fail_unless (pipeline_wait (sink_function) == 0,
+-		     "function sink did not return 0");
+-	fail_unless_files_equal (process_outfile, function_outfile);
++	ck_assert_int_eq (pipeline_wait (source), 0);
++	ck_assert_int_eq (pipeline_wait (sink_process), 0);
++	ck_assert_int_eq (pipeline_wait (sink_function), 0);
++	assert_files_equal (process_outfile, function_outfile);
+ 
+ 	free (function_outfile);
+ 	free (process_outfile);
+diff --git a/tests/read.c b/tests/read.c
+index 79186d3..85327ed 100644
+--- a/tests/read.c
++++ b/tests/read.c
+@@ -83,8 +83,7 @@ START_TEST (test_read_long_line)
+ 		}
+ 	}
+ 	pipeline_free (p);
+-	fail_unless (!strcmp (read_result, expected_output),
+-		"Returned string doesn't match the input.");
++	ck_assert_str_eq (read_result, expected_output);
+ 
+ 	free (read_result);
+ 	read_result = NULL;
+@@ -103,8 +102,7 @@ START_TEST (test_read_long_line)
+ 		}
+ 	}
+ 	pipeline_free (p);
+-	fail_unless (!strcmp (read_result, expected_output),
+-		"Returned string doesn't match the input.");
++	ck_assert_str_eq (read_result, expected_output);
+ 
+ 	free (testfile);
+ 	free (expected_output);
+@@ -132,7 +130,6 @@ START_TEST (test_read_readline_slow)
+ {
+ 	pipeline *p;
+ 	pipecmd *cmd;
+-	const char *line;
+ 
+ 	p = pipeline_new ();
+ 	cmd = pipecmd_new_function ("slow_line_helper", slow_line_helper,
+@@ -140,8 +137,7 @@ START_TEST (test_read_readline_slow)
+ 	pipeline_command (p, cmd);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line = pipeline_readline (p);
+-	fail_unless (!strcmp (line, "a line\n"));
++	ck_assert_str_eq (pipeline_readline (p), "a line\n");
+ 	pipeline_free (p);
+ }
+ END_TEST
+diff --git a/tests/redirect.c b/tests/redirect.c
+index d01a462..940b086 100644
+--- a/tests/redirect.c
++++ b/tests/redirect.c
+@@ -42,7 +42,6 @@ START_TEST (test_redirect_files)
+ 	int fd;
+ 	FILE *fh;
+ 	pipeline *p;
+-	const char *line;
+ 
+ 	fd = mkstemp (template);
+ 	if (fd < 0) {
+@@ -57,9 +56,7 @@ START_TEST (test_redirect_files)
+ 	pipeline_want_infile (p, template);
+ 	pipeline_want_out (p, -1);
+ 	pipeline_start (p);
+-	line = pipeline_readline (p);
+-	fail_unless (line != NULL);
+-	fail_unless (!strcmp (line, "test data out\n"));
++	ck_assert_str_eq (pipeline_readline (p), "test data out\n");
+ 
+ 	fclose (fh);
+ 	unlink (template);
+@@ -79,11 +76,11 @@ START_TEST (test_redirect_outfile)
+ 	p = pipeline_new_command_args ("echo", "test", (void *) 0);
+ 	outfile = xasprintf ("%s/test", temp_dir);
+ 	pipeline_want_outfile (p, outfile);
+-	fail_unless (pipeline_run (p) == 0);
++	ck_assert_int_eq (pipeline_run (p), 0);
+ 	fh = fopen (outfile, "r");
+-	fail_unless (fh != NULL);
+-	fail_unless (fgets (line, 5, fh) != NULL);
+-	fail_unless (!strcmp (line, "test"));
++	ck_assert_ptr_ne (fh, NULL);
++	ck_assert_ptr_ne (fgets (line, 5, fh), NULL);
++	ck_assert_str_eq (line, "test");
+ 
+ 	fclose (fh);
+ 	free (outfile);
+-- 
+cgit v1.2.1
+
