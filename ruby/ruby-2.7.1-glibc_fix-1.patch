@@ -1,0 +1,96 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-08-17
+Initial Package Version: 2.7.1
+Upstream Status:         Partially applied
+Origin:                  Upstream, with modifications
+Description:             Fixes a problem introduced by the lchmod() wrapper in
+                         glibc-2.32. The problem identifies itself as an
+                         EOPNOTSUPP in the test suite, which then carries over
+                         to other applications that might generate symbolic
+                         links using Ruby.
+
+diff -Naurp ruby-2.7.1.orig/lib/fileutils.rb ruby-2.7.1/lib/fileutils.rb
+--- ruby-2.7.1.orig/lib/fileutils.rb	2020-03-31 05:44:55.000000000 -0500
++++ ruby-2.7.1/lib/fileutils.rb	2020-08-17 14:21:52.467366868 -0500
+@@ -1345,6 +1345,7 @@ module FileUtils
+       else
+         File.chmod mode, path()
+       end
++    rescue Errno::EOPNOTSUPP
+     end
+ 
+     def chown(uid, gid)
+@@ -1439,7 +1440,7 @@ module FileUtils
+       if st.symlink?
+         begin
+           File.lchmod mode, path
+-        rescue NotImplementedError
++        rescue NotImplementedError, Errno::EOPNOTSUPP
+         end
+       else
+         File.chmod mode, path
+diff -Naurp ruby-2.7.1.orig/spec/ruby/core/file/lchmod_spec.rb ruby-2.7.1/spec/ruby/core/file/lchmod_spec.rb
+--- ruby-2.7.1.orig/spec/ruby/core/file/lchmod_spec.rb	2020-03-31 05:44:55.000000000 -0500
++++ ruby-2.7.1/spec/ruby/core/file/lchmod_spec.rb	2020-08-17 14:25:06.509360016 -0500
+@@ -32,11 +32,11 @@ describe "File.lchmod" do
+ 
+   platform_is :linux, :openbsd, :aix do
+     it "returns false from #respond_to?" do
+-      File.respond_to?(:lchmod).should be_false
++      File.respond_to?(:lchmod).should be_true
+     end
+ 
+-    it "raises a NotImplementedError when called" do
+-      -> { File.lchmod 0 }.should raise_error(NotImplementedError)
+-    end
++    #it "raises a NotImplementedError when called" do
++    #  -> { File.lchmod 0 }.should raise_error(NotImplementedError)
++    #end
+   end
+ end
+diff -Naurp ruby-2.7.1.orig/test/pathname/test_pathname.rb ruby-2.7.1/test/pathname/test_pathname.rb
+--- ruby-2.7.1.orig/test/pathname/test_pathname.rb	2020-03-31 05:44:55.000000000 -0500
++++ ruby-2.7.1/test/pathname/test_pathname.rb	2020-08-17 14:22:17.537365982 -0500
+@@ -818,7 +818,7 @@ class TestPathname < Test::Unit::TestCas
+       old = path.lstat.mode
+       begin
+         path.lchmod(0444)
+-      rescue NotImplementedError
++      rescue NotImplementedError, Errno::EOPNOTSUPP
+         next
+       end
+       assert_equal(0444, path.lstat.mode & 0777)
+diff -Naurp ruby-2.7.1.orig/test/ruby/test_notimp.rb ruby-2.7.1/test/ruby/test_notimp.rb
+--- ruby-2.7.1.orig/test/ruby/test_notimp.rb	2020-03-31 05:44:55.000000000 -0500
++++ ruby-2.7.1/test/ruby/test_notimp.rb	2020-08-17 14:24:32.653361211 -0500
+@@ -13,10 +13,8 @@ class TestNotImplement < Test::Unit::Tes
+ 
+   def test_respond_to_lchmod
+     assert_include(File.methods, :lchmod)
+-    if /linux/ =~ RUBY_PLATFORM
+-      assert_equal(false, File.respond_to?(:lchmod))
+-    end
+-    if /freebsd/ =~ RUBY_PLATFORM
++    case RUBY_PLATFORM
++    when /freebsd/, /linux-musl/, /linux/
+       assert_equal(true, File.respond_to?(:lchmod))
+     end
+   end
+@@ -57,9 +55,14 @@ class TestNotImplement < Test::Unit::Tes
+         File.open(f, "w") {}
+         File.symlink f, g
+         newmode = 0444
+-        File.lchmod newmode, "#{d}/g"
+-        snew = File.lstat(g)
+-        assert_equal(newmode, snew.mode & 0777)
++        begin
++          File.lchmod newmode, "#{d}/g"
++        rescue Errno::EOPNOTSUPP
++          skip $!
++        else
++          snew = File.lstat(g)
++          assert_equal(newmode, snew.mode & 0777)
++        end
+       }
+     end
+   end
