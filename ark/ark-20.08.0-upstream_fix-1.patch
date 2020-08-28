@@ -1,7 +1,7 @@
 Submitted By: Bruce Dubbs (bdubbs at linuxfromscratch dot org)
 Date: 2020-08-28
 Initial Package Version: ark-20.08.0
-Origin: http://ftp.kernel.org/pub/linux/daemons/autofs/v4/
+Origin: https://invent.kde.org/utilities/ark/-/commit/8bf8c5ef07b0ac5e914d752681e470dea403a5bd
 Upstream Status: Committed
 Description: A maliciously crafted TAR archive with symlinks can 
              install files outside the extraction directory.
