@@ -1,7 +1,7 @@
 Submitted By:            Pierre Labastie <pierre_dot_labastie_AT_neuf_DOT_fr>
 Date:                    2020-10-06
 Initial Package Version: 0.10.0
-Upstream Status:         Not applicable.
+Upstream Status:         Not applied
 Origin:                  https://sourceforge.net/p/lxde/bugs/773
 Description:             This patch fixes the panel layout when
                          the pager applet is in use with GTK+-3.
