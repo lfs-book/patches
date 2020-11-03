@@ -1,0 +1,896 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-11-03
+Initial Package Version: 0.24.1
+Origin:                  Upstream + Self
+Upstream Status:         Applied
+Description:             Ports the examples and tools to python3, fixes the
+                         test suite to work with glib-2.46 and later,
+                         updates the build machinery to work with the latest
+                         gtk-doc, and fixes several memory leaks.
+
+diff -Naurp telepathy-glib-0.24.1.orig/autogen.sh telepathy-glib-0.24.1/autogen.sh
+--- telepathy-glib-0.24.1.orig/autogen.sh	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/autogen.sh	2020-11-03 13:14:56.062460996 -0600
+@@ -1,7 +1,8 @@
+ #!/bin/sh
+ set -e
+ 
+-gtkdocize
++test -n "$srcdir" || srcdir=`dirname "$0"`
++test -n "$srcdir" || srcdir=.
+ 
+ if test -n "$AUTOMAKE"; then
+     : # don't override an explicit user request
+@@ -16,7 +17,11 @@ elif automake-1.11 --version >/dev/null
+     export ACLOCAL
+ fi
+ 
+-autoreconf -i -f
++(
++   cd "$srcdir"
++   gtkdocize
++   autoreconf -i -f
++)
+ 
+ # Honor NOCONFIGURE for compatibility with gnome-autogen.sh
+ if test x"$NOCONFIGURE" = x; then
+@@ -35,5 +40,5 @@ else
+ fi
+ 
+ if test $run_configure = true; then
+-    ./configure "$@"
++    "$srcdir/configure" "$@"
+ fi
+diff -Naurp telepathy-glib-0.24.1.orig/configure.ac telepathy-glib-0.24.1/configure.ac
+--- telepathy-glib-0.24.1.orig/configure.ac	2014-08-25 07:25:19.000000000 -0500
++++ telepathy-glib-0.24.1/configure.ac	2020-11-03 14:21:38.861416901 -0600
+@@ -46,7 +46,7 @@ AC_CONFIG_AUX_DIR([build-aux])
+ AM_INIT_AUTOMAKE([1.11 -Wno-portability subdir-objects])
+ AC_CONFIG_HEADERS(config.h)
+ 
+-AM_SILENT_RULES
++m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+ 
+ dnl check for tools
+ AC_PROG_CC
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/contact-list.py telepathy-glib-0.24.1/examples/client/python/contact-list.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/contact-list.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/contact-list.py	2020-11-03 14:10:51.433424033 -0600
+@@ -21,7 +21,7 @@ def manager_prepared_cb(manager, result,
+            connection.get_contact_list_state() == Tp.ContactListState.SUCCESS:
+             contacts = connection.dup_contact_list()
+             for contact in contacts:
+-                print "%s (%s)" % (contact.get_identifier(), contact.get_contact_groups())
++                print("%s (%s)" % (contact.get_identifier(), contact.get_contact_groups()))
+     loop.quit()
+ 
+ if __name__ == '__main__':
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/ensure-channel.py telepathy-glib-0.24.1/examples/client/python/ensure-channel.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/ensure-channel.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/ensure-channel.py	2020-11-03 14:11:32.306423582 -0600
+@@ -10,9 +10,9 @@ gi.require_version('TelepathyGLib', '0.1
+ from gi.repository import TelepathyGLib
+ 
+ def usage():
+-    print "%s ACCOUNT [text|audio|video] CONTACT" % sys.argv[0]
+-    print "ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts"
+-    print "CONTACT is a contact id such as badger@gmail.com"
++    print("%s ACCOUNT [text|audio|video] CONTACT" % sys.argv[0])
++    print("ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts")
++    print("CONTACT is a contact id such as badger@gmail.com")
+ 
+     sys.exit(1)
+ 
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/file-transfer.py telepathy-glib-0.24.1/examples/client/python/file-transfer.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/file-transfer.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/file-transfer.py	2020-11-03 14:12:51.947422705 -0600
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python
++from __future__ import print_function
+ import sys
+ import os
+ import mimetypes
+@@ -13,21 +14,21 @@ gi.require_version('TelepathyGLib', '0.1
+ from gi.repository import TelepathyGLib
+ 
+ def usage():
+-    print "%s ACCOUNT CONTACT FILE" % sys.argv[0]
+-    print "ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts"
+-    print "CONTACT is a contact id such as badger@nyan.cat"
+-    print "FILE is a path to the local file you want sent"
++    print("%s ACCOUNT CONTACT FILE" % sys.argv[0])
++    print("ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts")
++    print("CONTACT is a contact id such as badger@nyan.cat")
++    print("FILE is a path to the local file you want sent")
+ 
+     sys.exit(1)
+ 
+ def provide_file_cb(channel, result, data):
+     if not channel.provide_file_finish(result):
+-        print 'failed to provide'
++        print('failed to provide')
+ 
+ def state_changed_cb(channel, pspec, data):
+     main_loop, file_path = data
+     state, _ = channel.get_state()
+-    print 'state is now', state
++    print('state is now', state)
+ 
+     if state == TelepathyGLib.FileTransferState.ACCEPTED:
+         file = Gio.File.new_for_path(file_path)
+@@ -38,8 +39,8 @@ def create_channel_cb(request, result, d
+         (chan, context) = request.create_and_handle_channel_finish(result)
+ 
+         chan.connect('notify::state', state_changed_cb, data)
+-    except GObject.GError, e:
+-        print "Failed to create channel: %s" % e
++    except GObject.GError as e:
++        print("Failed to create channel: %s" % e)
+         sys.exit(1)
+ 
+ if __name__ == '__main__':
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/ft-handler.py telepathy-glib-0.24.1/examples/client/python/ft-handler.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/ft-handler.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/ft-handler.py	2020-11-03 14:14:02.438421929 -0600
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python
++from __future__ import print_function
+ import sys
+ 
+ import gi
+@@ -11,18 +12,18 @@ gi.require_version('TelepathyGLib', '0.1
+ from gi.repository import TelepathyGLib
+ 
+ def usage():
+-    print "%s FILE" % sys.argv[0]
+-    print "FILE is a path to the location you want the file saved to"
++    print("%s FILE" % sys.argv[0])
++    print("FILE is a path to the location you want the file saved to")
+ 
+     sys.exit(1)
+ 
+ def state_changed_cb(channel, pspec, data):
+     state, _ = channel.get_state()
+-    print 'State is now:', state
++    print('State is now:', state)
+ 
+ def accept_cb(channel, result, data):
+     if not channel.accept_file_finish(result):
+-        print 'Failed to accept file'
++        print('Failed to accept file')
+ 
+ def handle_channels_cb(handler, account, connection, channels, requests,
+                        user_action_time, context, filename):
+@@ -33,7 +34,7 @@ def handle_channels_cb(handler, account,
+ 
+         chan.connect('notify::state', state_changed_cb, None)
+ 
+-        print 'Handling FileTransfer channel:', chan.get_identifier()
++        print('Handling FileTransfer channel:', chan.get_identifier())
+ 
+         file = Gio.File.new_for_path(filename)
+         chan.accept_file_async(file, 0, accept_cb, None)
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/stream-tube-accepter.py telepathy-glib-0.24.1/examples/client/python/stream-tube-accepter.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/stream-tube-accepter.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/stream-tube-accepter.py	2020-11-03 14:15:14.621421133 -0600
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env python
+ 
++from __future__ import print_function
+ import os
+ 
+ import gi
+@@ -8,20 +9,20 @@ gi.require_version('TelepathyGLib', '0.1
+ from gi.repository import TelepathyGLib as Tp
+ 
+ def tube_conn_closed(tube, error):
+-    print "Tube connection has been closed", error.message
++    print("Tube connection has been closed", error.message)
+ 
+ def tube_accept_cb(tube, result, loop):
+     try:
+         tube_conn = tube.accept_finish(result)
+-    except GObject.GError, e:
+-        print "Failed to accept tube: %s" % e
++    except GObject.GError as e:
++        print("Failed to accept tube: %s" % e)
+         sys.exit(1)
+ 
+     tube_conn.connect('closed', tube_conn_closed)
+ 
+     contact = tube_conn.get_contact();
+ 
+-    print "Got IOStream to", contact.get_identifier()
++    print("Got IOStream to", contact.get_identifier())
+ 
+     conn = tube_conn.get_socket_connection();
+ 
+@@ -30,14 +31,14 @@ def tube_accept_cb(tube, result, loop):
+     in_stream = Gio.DataInputStream (base_stream=conn.get_input_stream())
+     out_stream = conn.get_output_stream()
+ 
+-    print "Sending: Ping"
++    print("Sending: Ping")
+     out_stream.write("Ping\n", None)
+ 
+     buf, len = in_stream.read_line_utf8(None)
+-    print "Received:", buf
++    print("Received:", buf)
+ 
+ def tube_invalidated_cb(tube, domain, code, message, loop):
+-    print "tube has been invalidated:", message
++    print("tube has been invalidated:", message)
+     loop.quit()
+ 
+ def handle_channels_cb(handler, account, connection, channels, requests,
+@@ -46,7 +47,7 @@ def handle_channels_cb(handler, account,
+         if not isinstance(channel, Tp.StreamTubeChannel):
+             continue
+ 
+-        print "Accepting tube"
++        print("Accepting tube")
+ 
+         channel.connect('invalidated', tube_invalidated_cb, loop)
+ 
+@@ -71,5 +72,5 @@ if __name__ == '__main__':
+ 
+     handler.register()
+ 
+-    print "Waiting for tube offer"
++    print("Waiting for tube offer")
+     loop.run()
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/stream-tube-offerer.py telepathy-glib-0.24.1/examples/client/python/stream-tube-offerer.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/stream-tube-offerer.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/stream-tube-offerer.py	2020-11-03 14:17:38.140419552 -0600
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env python
+ 
++from __future__ import print_function
+ import sys
+ import os
+ 
+@@ -9,31 +10,31 @@ gi.require_version('TelepathyGLib', '0.1
+ from gi.repository import TelepathyGLib as Tp
+ 
+ def usage():
+-    print "%s ACCOUNT CONTACT" % sys.argv[0]
+-    print "ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts"
+-    print "CONTACT is a contact id such as badger@nyan.cat"
++    print("%s ACCOUNT CONTACT" % sys.argv[0])
++    print("ACCOUNT is a Telepathy account name, use 'mc-tool list' to list all your accounts")
++    print("CONTACT is a contact id such as badger@nyan.cat")
+ 
+     sys.exit(1)
+ 
+ def offer_channel_cb(tube, result, loop):
+     try:
+         tube.offer_finish(result)
+-        print "tube offered"
++        print("tube offered")
+ 
+-    except GObject.GError, e:
+-        print "Failed to offer tube: %s" % e
++    except GObject.GError as e:
++        print("Failed to offer tube: %s" % e)
+         sys.exit(1)
+ 
+ def tube_conn_closed(tube, error):
+-    print "Tube connection has been closed", error.message
++    print("Tube connection has been closed", error.message)
+ 
+ def channel_close_cb(tube, result, loop):
+     try:
+         tube.close_finish(result)
+-        print "tube channel closed"
++        print("tube channel closed")
+ 
+-    except GObject.GError, e:
+-        print "Failed to close tube channel: %s" % e
++    except GObject.GError as e:
++        print("Failed to close tube channel: %s" % e)
+         sys.exit(1)
+ 
+ def tube_incoming_cb(tube, tube_conn, loop):
+@@ -41,7 +42,7 @@ def tube_incoming_cb(tube, tube_conn, lo
+ 
+     contact = tube_conn.get_contact();
+ 
+-    print "Got IOStream from", contact.get_identifier()
++    print("Got IOStream from", contact.get_identifier())
+ 
+     conn = tube_conn.get_socket_connection();
+ 
+@@ -51,15 +52,15 @@ def tube_incoming_cb(tube, tube_conn, lo
+     out_stream = conn.get_output_stream()
+ 
+     buf, len = in_stream.read_line_utf8(None)
+-    print "Received:", buf
++    print("Received:", buf)
+ 
+-    print "Sending: Pong"
++    print("Sending: Pong")
+     out_stream.write("Pong\n", None)
+ 
+     tube.close_async(channel_close_cb, contact)
+ 
+ def tube_invalidated_cb(tube, domain, code, message, loop):
+-    print "tube has been invalidated:", message
++    print("tube has been invalidated:", message)
+     loop.quit()
+ 
+ def create_channel_cb(request, result, loop):
+@@ -71,8 +72,8 @@ def create_channel_cb(request, result, l
+ 
+         chan.offer_async({}, offer_channel_cb, loop)
+ 
+-    except GObject.GError, e:
+-        print "Failed to create channel: %s" % e
++    except GObject.GError as e:
++        print("Failed to create channel: %s" % e)
+         sys.exit(1)
+ 
+ if __name__ == '__main__':
+diff -Naurp telepathy-glib-0.24.1.orig/examples/client/python/text-handler.py telepathy-glib-0.24.1/examples/client/python/text-handler.py
+--- telepathy-glib-0.24.1.orig/examples/client/python/text-handler.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/examples/client/python/text-handler.py	2020-11-03 14:18:24.781419039 -0600
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env python
+ 
++from __future__ import print_function
+ import gi
+ 
+ from gi.repository import GObject
+@@ -12,9 +13,9 @@ def echo_message(channel, msg, pending):
+     text, flags = msg.to_text()
+ 
+     if pending:
+-        print "pending: %s" % (text)
++        print("pending: %s" % (text))
+     else:
+-        print "received: %s" % (text)
++        print("received: %s" % (text))
+ 
+     reply = TelepathyGLib.ClientMessage.new_text(
+         TelepathyGLib.ChannelTextMessageType.NORMAL, text.upper())
+@@ -42,7 +43,7 @@ def handle_channels_cb(handler, account,
+         if not isinstance(channel, TelepathyGLib.TextChannel):
+             continue
+ 
+-        print "Handling text channel with", channel.get_identifier()
++        print("Handling text channel with", channel.get_identifier())
+ 
+         channel.connect('message-received', message_received_cb)
+ 
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/base-password-channel.c telepathy-glib-0.24.1/telepathy-glib/base-password-channel.c
+--- telepathy-glib-0.24.1.orig/telepathy-glib/base-password-channel.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/base-password-channel.c	2020-11-03 13:32:31.033449374 -0600
+@@ -387,11 +387,12 @@ tp_base_password_channel_class_init (TpB
+ 
+   /**
+    * TpBasePasswordChannel::finished:
++   * @self: the #TpBasePasswordChannel
+    * @password: the password provided by the user, or %NULL if the
+    * authentication has been aborted
+    * @domain: domain of a #GError indicating why the authentication has been
+    * aborted, or 0
+-   * @code: error code of a GError indicating why the authentication has been
++   * @code: error code of a #GError indicating why the authentication has been
+    * aborted, or 0
+    * @message: a message associated with the error, or %NULL
+    *
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/call-channel.c telepathy-glib-0.24.1/telepathy-glib/call-channel.c
+--- telepathy-glib-0.24.1.orig/telepathy-glib/call-channel.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/call-channel.c	2020-11-03 13:29:40.851451249 -0600
+@@ -525,6 +525,8 @@ update_call_members (TpCallChannel *self
+ 
+   _tp_channel_contacts_queue_prepare_async ((TpChannel *) self,
+       contacts, update_call_members_prepared_cb, data);
++
++  g_ptr_array_unref (contacts);
+ }
+ 
+ static void
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/debug-sender.c telepathy-glib-0.24.1/telepathy-glib/debug-sender.c
+--- telepathy-glib-0.24.1.orig/telepathy-glib/debug-sender.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/debug-sender.c	2020-11-03 13:31:54.012449782 -0600
+@@ -82,6 +82,7 @@ struct _TpDebugSenderPrivate
+   gboolean enabled;
+   gboolean timestamps;
+   GQueue *messages;
++  GMutex messages_lock;
+ };
+ 
+ typedef struct {
+@@ -192,7 +193,9 @@ tp_debug_sender_finalize (GObject *objec
+ {
+   TpDebugSender *self = TP_DEBUG_SENDER (object);
+ 
++  g_mutex_lock (&self->priv->messages_lock);
+   g_queue_foreach (self->priv->messages, (GFunc) debug_message_free, NULL);
++  g_mutex_unlock (&self->priv->messages_lock);
+   g_queue_free (self->priv->messages);
+   self->priv->messages = NULL;
+ 
+@@ -288,6 +291,7 @@ get_messages (TpSvcDebug *self,
+   GList *i;
+   guint j;
+ 
++  g_mutex_lock (&dbg->priv->messages_lock);
+   messages = g_ptr_array_sized_new (g_queue_get_length (dbg->priv->messages));
+ 
+   for (i = dbg->priv->messages->head; i; i = i->next)
+@@ -306,6 +310,7 @@ get_messages (TpSvcDebug *self,
+           G_MAXUINT);
+       g_ptr_array_add (messages, g_value_get_boxed (&gvalue));
+     }
++  g_mutex_unlock (&dbg->priv->messages_lock);
+ 
+   tp_svc_debug_return_from_get_messages (context, messages);
+ 
+@@ -360,6 +365,7 @@ _tp_debug_sender_take (TpDebugSender *se
+     DebugMessage *new_msg)
+ {
+ #ifdef ENABLE_DEBUG_CACHE
++  g_mutex_lock (&self->priv->messages_lock);
+   if (g_queue_get_length (self->priv->messages) >= DEBUG_MESSAGE_LIMIT)
+     {
+       DebugMessage *old_head =
+@@ -369,6 +375,7 @@ _tp_debug_sender_take (TpDebugSender *se
+     }
+ 
+   g_queue_push_tail (self->priv->messages, new_msg);
++  g_mutex_unlock (&self->priv->messages_lock);
+ #endif
+ 
+   if (self->priv->enabled)
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/Makefile.am telepathy-glib-0.24.1/telepathy-glib/Makefile.am
+--- telepathy-glib-0.24.1.orig/telepathy-glib/Makefile.am	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/Makefile.am	2020-11-03 13:09:48.952464379 -0600
+@@ -144,7 +144,7 @@ our_headers = \
+ 
+ tpginclude_HEADERS = \
+     $(our_headers) \
+-    verify.h
++    $(NULL)
+ 
+ BUILT_SOURCES = $(codegen_sources)
+ 
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/protocol.c telepathy-glib-0.24.1/telepathy-glib/protocol.c
+--- telepathy-glib-0.24.1.orig/telepathy-glib/protocol.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/protocol.c	2020-11-03 13:38:43.576445270 -0600
+@@ -1791,7 +1791,7 @@ _tp_protocol_parse_manager_file (GKeyFil
+         i++;
+     }
+ 
+-  param_specs = g_ptr_array_sized_new (i);
++  param_specs = g_ptr_array_new_full(i, tp_value_array_free);
+ 
+   for (key = keys; key != NULL && *key != NULL; key++)
+     {
+@@ -1886,6 +1886,8 @@ _tp_protocol_parse_manager_file (GKeyFil
+       TP_PROP_PROTOCOL_PARAMETERS, TP_ARRAY_TYPE_PARAM_SPEC_LIST, param_specs,
+       NULL);
+ 
++  g_ptr_array_unref(param_specs);
++
+   tp_asv_take_boxed (immutables, TP_PROP_PROTOCOL_INTERFACES, G_TYPE_STRV,
+       g_key_file_get_string_list (file, group, "Interfaces", NULL, NULL));
+   tp_asv_take_boxed (immutables, TP_PROP_PROTOCOL_CONNECTION_INTERFACES,
+diff -Naurp telepathy-glib-0.24.1.orig/telepathy-glib/util.h telepathy-glib-0.24.1/telepathy-glib/util.h
+--- telepathy-glib-0.24.1.orig/telepathy-glib/util.h	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/telepathy-glib/util.h	2020-11-03 13:10:45.627463754 -0600
+@@ -30,9 +30,10 @@
+ #include <gio/gio.h>
+ 
+ #include <telepathy-glib/defs.h>
+-#include <telepathy-glib/verify.h>
+ 
+-#define tp_verify_statement(R) ((void) tp_verify_true (R))
++#define tp_verify_statement(R) ((void) G_STATIC_ASSERT_EXPR (R))
++#define tp_verify_true(R)      (((void) G_STATIC_ASSERT_EXPR (R)), 1)
++#define tp_verify(R)           G_STATIC_ASSERT (R)
+ 
+ G_BEGIN_DECLS
+ 
+diff -Naurp telepathy-glib-0.24.1.orig/tests/all-errors-documented.py telepathy-glib-0.24.1/tests/all-errors-documented.py
+--- telepathy-glib-0.24.1.orig/tests/all-errors-documented.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/all-errors-documented.py	2020-11-03 13:37:51.505445844 -0600
+@@ -24,7 +24,7 @@ def check_all_errors_documented(abs_top_
+                 error.getAttribute('name').replace('.', '_').replace(' ', '_').upper())
+ 
+         if '%s\n' % name not in sections:
+-            print "'%s' is missing in %s" % (name, sections_path)
++            print("'%s' is missing in %s" % (name, sections_path))
+             sys.exit(1)
+ 
+ if __name__ == '__main__':
+diff -Naurp telepathy-glib-0.24.1.orig/tests/dbus/account.c telepathy-glib-0.24.1/tests/dbus/account.c
+--- telepathy-glib-0.24.1.orig/tests/dbus/account.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/dbus/account.c	2020-11-03 13:02:34.965469159 -0600
+@@ -980,7 +980,7 @@ main (int argc,
+ 
+   g_test_add ("/account/reconnect", Test, NULL, setup_service, test_reconnect,
+       teardown_service);
+-  g_test_add ("/account/reconnect", Test, "vardict", setup_service,
++  g_test_add ("/account/reconnect/vardict", Test, "vardict", setup_service,
+       test_reconnect, teardown_service);
+ 
+   g_test_add ("/account/prepare/success", Test, NULL, setup_service,
+@@ -989,17 +989,17 @@ main (int argc,
+   g_test_add ("/account/connection", Test, NULL, setup_service,
+               test_connection, teardown_service);
+ 
+-  g_test_add ("/account/storage", Test, "first", setup_service, test_storage,
++  g_test_add ("/account/storage/first", Test, "first", setup_service, test_storage,
+       teardown_service);
+-  g_test_add ("/account/storage", Test, "later", setup_service, test_storage,
++  g_test_add ("/account/storage/later", Test, "later", setup_service, test_storage,
+       teardown_service);
+ 
+   g_test_add ("/account/avatar", Test, NULL, setup_service, test_avatar,
+       teardown_service);
+ 
+-  g_test_add ("/account/addressing", Test, "first", setup_service,
++  g_test_add ("/account/addressing-first", Test, "first", setup_service,
+       test_addressing, teardown_service);
+-  g_test_add ("/account/addressing", Test, "later", setup_service,
++  g_test_add ("/account/addressing-later", Test, "later", setup_service,
+       test_addressing, teardown_service);
+ 
+   return tp_tests_run_with_bus ();
+diff -Naurp telepathy-glib-0.24.1.orig/tests/dbus/cm.c telepathy-glib-0.24.1/tests/dbus/cm.c
+--- telepathy-glib-0.24.1.orig/tests/dbus/cm.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/dbus/cm.c	2020-11-03 13:02:56.452468923 -0600
+@@ -1187,7 +1187,7 @@ main (int argc,
+ 
+   g_test_add ("/cm/list", Test, GINT_TO_POINTER (0),
+       setup, test_list, teardown);
+-  g_test_add ("/cm/list", Test, GINT_TO_POINTER (USE_OLD_LIST),
++  g_test_add ("/cm/list/use-old-list", Test, GINT_TO_POINTER (USE_OLD_LIST),
+       setup, test_list, teardown);
+ 
+   return tp_tests_run_with_bus ();
+diff -Naurp telepathy-glib-0.24.1.orig/tests/dbus/contact-list-client.c telepathy-glib-0.24.1/tests/dbus/contact-list-client.c
+--- telepathy-glib-0.24.1.orig/tests/dbus/contact-list-client.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/dbus/contact-list-client.c	2020-11-03 13:03:57.170468254 -0600
+@@ -505,7 +505,7 @@ test_is_blocked (Test *test,
+ 
+ static void
+ test_contact_list_properties (Test *test,
+-    gconstpointer data G_GNUC_UNUSED)
++    gconstpointer data)
+ {
+   gboolean props_only = GPOINTER_TO_UINT (data);
+   GQuark conn_features[] = { 0, 0 };
+@@ -577,7 +577,7 @@ main (int argc,
+ 
+   g_test_add ("/contact-list-client/contact-list/properties", Test,
+       GUINT_TO_POINTER (FALSE), setup, test_contact_list_properties, teardown);
+-  g_test_add ("/contact-list-client/contact-list/properties", Test,
++  g_test_add ("/contact-list-client/contact-list/properties/props-only", Test,
+       GUINT_TO_POINTER (TRUE), setup, test_contact_list_properties, teardown);
+ 
+   return tp_tests_run_with_bus ();
+diff -Naurp telepathy-glib-0.24.1.orig/tests/dbus/contact-lists.c telepathy-glib-0.24.1/tests/dbus/contact-lists.c
+--- telepathy-glib-0.24.1.orig/tests/dbus/contact-lists.c	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/dbus/contact-lists.c	2020-11-03 13:03:31.842468533 -0600
+@@ -2788,7 +2788,7 @@ main (int argc,
+ 
+   g_test_add ("/contact-lists/cancelled-publish-request",
+       Test, NULL, setup, test_cancelled_publish_request, teardown);
+-  g_test_add ("/contact-lists/cancelled-publish-request",
++  g_test_add ("/contact-lists/cancelled-publish-request/remove-after",
+       Test, "remove-after", setup, test_cancelled_publish_request, teardown);
+ 
+   g_test_add ("/contact-lists/add-to-stored",
+diff -Naurp telepathy-glib-0.24.1.orig/tests/dbus/Makefile.am telepathy-glib-0.24.1/tests/dbus/Makefile.am
+--- telepathy-glib-0.24.1.orig/tests/dbus/Makefile.am	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tests/dbus/Makefile.am	2020-11-03 13:12:42.144462471 -0600
+@@ -342,7 +342,7 @@ run-test.sh: run-test.sh.in
+ 		$< > $@
+ 	@chmod +x $@
+ 
+-service_files = services/dbus-1/spurious.service
++service_files = dbus-1/services/spurious.service
+ 
+ if ENABLE_INSTALLED_TESTS
+ dbusservicedir = @tpglibtestsdir@/dbus-1/services
+diff -Naurp telepathy-glib-0.24.1.orig/tests/tools/expected-gtypes-body.h telepathy-glib-0.24.1/tests/tools/expected-gtypes-body.h
+--- telepathy-glib-0.24.1.orig/tests/tools/expected-gtypes-body.h	2012-09-26 08:54:10.000000000 -0500
++++ telepathy-glib-0.24.1/tests/tools/expected-gtypes-body.h	2020-11-03 14:26:00.345414020 -0600
+@@ -5,12 +5,12 @@
+  */
+ 
+ GType
+-the_prefix_type_dbus_hash_ss (void)
++the_prefix_type_dbus_hash_saa_7bsv_7d (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_STRING);
++    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, (dbus_g_type_get_collection ("GPtrArray", (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE)))));
+   return t;
+ }
+ 
+@@ -25,22 +25,22 @@ the_prefix_type_dbus_hash_sa_7bsv_7d (vo
+ }
+ 
+ GType
+-the_prefix_type_dbus_hash_sv (void)
++the_prefix_type_dbus_hash_ss (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE);
++    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_STRING);
+   return t;
+ }
+ 
+ GType
+-the_prefix_type_dbus_hash_saa_7bsv_7d (void)
++the_prefix_type_dbus_hash_sv (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, (dbus_g_type_get_collection ("GPtrArray", (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE)))));
++    t = dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE);
+   return t;
+ }
+ 
+@@ -69,32 +69,32 @@ the_prefix_type_dbus_array_isu (void)
+ }
+ 
+ GType
+-the_prefix_type_dbus_array_of_a_7bsa_7bsv_7d_7d (void)
++the_prefix_type_dbus_array_of_a_7bsaa_7bsv_7d_7d (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_sa_7bsv_7d ());
++    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_saa_7bsv_7d ());
+   return t;
+ }
+ 
+ GType
+-the_prefix_type_dbus_array_of_a_7bsv_7d (void)
++the_prefix_type_dbus_array_of_a_7bsa_7bsv_7d_7d (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_sv ());
++    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_sa_7bsv_7d ());
+   return t;
+ }
+ 
+ GType
+-the_prefix_type_dbus_array_of_a_7bsaa_7bsv_7d_7d (void)
++the_prefix_type_dbus_array_of_a_7bsv_7d (void)
+ {
+   static GType t = 0;
+ 
+   if (G_UNLIKELY (t == 0))
+-    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_saa_7bsv_7d ());
++    t = dbus_g_type_get_collection ("GPtrArray", the_prefix_type_dbus_hash_sv ());
+   return t;
+ }
+ 
+diff -Naurp telepathy-glib-0.24.1.orig/tests/tools/expected-gtypes.h telepathy-glib-0.24.1/tests/tools/expected-gtypes.h
+--- telepathy-glib-0.24.1.orig/tests/tools/expected-gtypes.h	2012-09-26 08:54:10.000000000 -0500
++++ telepathy-glib-0.24.1/tests/tools/expected-gtypes.h	2020-11-03 13:37:06.417446340 -0600
+@@ -18,13 +18,13 @@
+ 
+ #define THE_PREFIX_ARRAY_TYPE_STRING_VARIANT_MAP_LIST_MAP_LIST (the_prefix_type_dbus_array_of_a_7bsaa_7bsv_7d_7d ())
+ 
+-GType the_prefix_type_dbus_hash_ss (void);
++GType the_prefix_type_dbus_hash_saa_7bsv_7d (void);
+ 
+ GType the_prefix_type_dbus_hash_sa_7bsv_7d (void);
+ 
+-GType the_prefix_type_dbus_hash_sv (void);
++GType the_prefix_type_dbus_hash_ss (void);
+ 
+-GType the_prefix_type_dbus_hash_saa_7bsv_7d (void);
++GType the_prefix_type_dbus_hash_sv (void);
+ 
+ #define THE_PREFIX_STRUCT_TYPE_STRUCT (the_prefix_type_dbus_struct_isu ())
+ 
+@@ -34,9 +34,9 @@ GType the_prefix_type_dbus_struct_isu (v
+ 
+ GType the_prefix_type_dbus_array_isu (void);
+ 
++GType the_prefix_type_dbus_array_of_a_7bsaa_7bsv_7d_7d (void);
++
+ GType the_prefix_type_dbus_array_of_a_7bsa_7bsv_7d_7d (void);
+ 
+ GType the_prefix_type_dbus_array_of_a_7bsv_7d (void);
+ 
+-GType the_prefix_type_dbus_array_of_a_7bsaa_7bsv_7d_7d (void);
+-
+diff -Naurp telepathy-glib-0.24.1.orig/tools/glib-gtypes-generator.py telepathy-glib-0.24.1/tools/glib-gtypes-generator.py
+--- telepathy-glib-0.24.1.orig/tools/glib-gtypes-generator.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tools/glib-gtypes-generator.py	2020-11-03 13:37:25.098446135 -0600
+@@ -213,7 +213,7 @@ class GTypesGenerator(object):
+         for mapping in mappings:
+             self.do_mapping_header(mapping)
+ 
+-        for sig in self.need_mappings:
++        for sig in sorted(self.need_mappings):
+             self.h('GType %stype_dbus_hash_%s (void);\n\n' %
+                               (self.prefix_, self.need_mappings[sig]))
+             self.c('GType\n%stype_dbus_hash_%s (void)\n{\n' %
+@@ -231,7 +231,7 @@ class GTypesGenerator(object):
+         for struct in structs:
+             self.do_struct_header(struct)
+ 
+-        for sig in self.need_structs:
++        for sig in sorted(self.need_structs):
+             self.h('GType %stype_dbus_struct_%s (void);\n\n' %
+                               (self.prefix_, self.need_structs[sig]))
+             self.c('GType\n%stype_dbus_struct_%s (void)\n{\n' %
+@@ -247,7 +247,7 @@ class GTypesGenerator(object):
+             self.c('  return t;\n')
+             self.c('}\n\n')
+ 
+-        for sig in self.need_struct_arrays:
++        for sig in sorted(self.need_struct_arrays):
+             self.h('GType %stype_dbus_array_%s (void);\n\n' %
+                               (self.prefix_, self.need_struct_arrays[sig]))
+             self.c('GType\n%stype_dbus_array_%s (void)\n{\n' %
+@@ -260,7 +260,7 @@ class GTypesGenerator(object):
+             self.c('  return t;\n')
+             self.c('}\n\n')
+ 
+-        for sig in self.need_other_arrays:
++        for sig in sorted(self.need_other_arrays):
+             self.h('GType %stype_dbus_array_of_%s (void);\n\n' %
+                               (self.prefix_, self.need_other_arrays[sig]))
+             self.c('GType\n%stype_dbus_array_of_%s (void)\n{\n' %
+diff -Naurp telepathy-glib-0.24.1.orig/tools/make-release-mail.py telepathy-glib-0.24.1/tools/make-release-mail.py
+--- telepathy-glib-0.24.1.orig/tools/make-release-mail.py	2012-06-20 03:49:04.000000000 -0500
++++ telepathy-glib-0.24.1/tools/make-release-mail.py	2020-11-03 13:17:05.771459567 -0600
+@@ -28,8 +28,8 @@ def extract_description(package, version
+                 break
+ 
+         # Skip the ====== line, and the first blank line
+-        lines.next()
+-        lines.next()
++        next(lines)
++        next(lines)
+ 
+         got_release_name = False
+ 
+@@ -59,7 +59,7 @@ GIT_URL = 'http://cgit.freedesktop.org/t
+ def main(package, version, news_path):
+     release_name, details = extract_description(package, version, news_path)
+ 
+-    print """
++    print("""
+ %(release_name)s
+ 
+ tarball: %(base_url)s/%(package)s/%(package)s-%(version)s.tar.gz
+@@ -73,14 +73,14 @@ git: %(git_url)s/%(package)s
+         'version': version,
+         'release_name': release_name,
+         'details': details,
+-    }
++    })
+ 
+ if __name__ == '__main__':
+     try:
+         package, version, news_path = sys.argv[1:]
+ 
+         main(package, version, news_path)
+-    except ValueError, e:
++    except ValueError as e:
+         sys.stderr.write(
+             'Usage: %s package-name package.version.number path/to/NEWS\n' %
+             sys.argv[0])
+diff -Naurp telepathy-glib-0.24.1.orig/tools/manager-file.py telepathy-glib-0.24.1/tools/manager-file.py
+--- telepathy-glib-0.24.1.orig/tools/manager-file.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tools/manager-file.py	2020-11-03 13:22:45.361455826 -0600
+@@ -25,6 +25,7 @@
+ 
+ import re
+ import sys
++import os
+ 
+ _NOT_C_STR = re.compile(r'[^A-Za-z0-9_-]')
+ 
+@@ -87,18 +88,18 @@ gflags = {
+ 
+ def write_manager(f, manager, protos):
+     # pointless backwards compat section
+-    print >> f, '[ConnectionManager]'
+-    print >> f, 'BusName=org.freedesktop.Telepathy.ConnectionManager.' + manager
+-    print >> f, 'ObjectPath=/org/freedesktop/Telepathy/ConnectionManager/' + manager
++    print('[ConnectionManager]', file=f)
++    print('BusName=org.freedesktop.Telepathy.ConnectionManager.' + manager, file=f)
++    print('ObjectPath=/org/freedesktop/Telepathy/ConnectionManager/' + manager, file=f)
+ 
+     # protocols
+-    for proto, params in protos.iteritems():
+-        print >> f
+-        print >> f, '[Protocol %s]' % proto
++    for proto, params in protos.items():
++        print(file=f)
++        print('[Protocol %s]' % proto, file=f)
+ 
+         defaults = {}
+ 
+-        for param, info in params.iteritems():
++        for param, info in params.items():
+             dtype = info['dtype']
+             flags = info.get('flags', '').split()
+             struct_field = info.get('struct_field', param.replace('-', '_'))
+@@ -115,15 +116,15 @@ def write_manager(f, manager, protos):
+             else:
+                 flags = ''
+ 
+-            print >> f, 'param-%s=%s%s' % (param, desktop_string(dtype), flags)
++            print('param-%s=%s%s' % (param, desktop_string(dtype), flags), file=f)
+ 
+-        for param, default in defaults.iteritems():
+-            print >> f, 'default-%s=%s' % (param, default)
++        for param, default in defaults.items():
++            print('default-%s=%s' % (param, default), file=f)
+ 
+ def write_c_params(f, manager, proto, struct, params):
+-    print >> f, "static const TpCMParamSpec %s_%s_params[] = {" % (manager, proto)
++    print("static const TpCMParamSpec %s_%s_params[] = {" % (manager, proto), file=f)
+ 
+-    for param, info in params.iteritems():
++    for param, info in params.items():
+         dtype = info['dtype']
+         flags = info.get('flags', '').split()
+         struct_field = info.get('struct_field', param.replace('-', '_'))
+@@ -146,7 +147,7 @@ def write_c_params(f, manager, proto, st
+         else:
+             struct_offset = 'G_STRUCT_OFFSET (%s, %s)' % (struct, struct_field)
+ 
+-        print >> f, ('''  { %s, %s, %s,
++        print((''' { %s, %s, %s,
+     %s,
+     %s, /* default */
+     %s, /* struct offset */
+@@ -154,14 +155,14 @@ def write_c_params(f, manager, proto, st
+     %s, /* filter data */
+     %s /* setter data */ },''' %
+                 (c_string(param), c_string(dtype), gtypes[dtype], flags,
+-                    default, struct_offset, filter, filter_data, setter_data))
++                    default, struct_offset, filter, filter_data, setter_data)), file=f)
+ 
+-    print >> f, "  { NULL }"
+-    print >> f, "};"
++    print("   { NULL }", file=f)
++    print("};", file=f)
+ 
+ if __name__ == '__main__':
+     environment = {}
+-    execfile(sys.argv[1], environment)
++    exec(compile(open(sys.argv[1], "rb").read(), sys.argv[1], 'exec'), environment)
+ 
+     filename = '%s/%s.manager' % (sys.argv[2], environment['MANAGER'])
+     try:
+diff -Naurp telepathy-glib-0.24.1.orig/tools/xincludator.py telepathy-glib-0.24.1/tools/xincludator.py
+--- telepathy-glib-0.24.1.orig/tools/xincludator.py	2014-08-25 07:23:51.000000000 -0500
++++ telepathy-glib-0.24.1/tools/xincludator.py	2020-11-03 13:16:08.765460195 -0600
+@@ -38,9 +38,10 @@ if __name__ == '__main__':
+     xincludate(dom, argv[0])
+ 
+     if sys.version_info[0] >= 3:
+-        xml = dom.toxml(encoding=None)
++        xml = dom.toxml('utf-8')
++        stdout.buffer.write(xml)
++        stdout.buffer.write(b'\n')
+     else:
+         xml = dom.toxml()
+-
+-    stdout.write(xml)
+-    stdout.write('\n')
++        stdout.write(xml)
++        stdout.write('\n')
