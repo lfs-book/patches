@@ -3,11 +3,11 @@ Date: 2020-11-02
 Initial Package Version: 5.15.1
 Upstream Status: Unknown
 Origin: self
-Description: Allows qtwebengine to build against system ICU_68.1 hich has
+Description: Allows qtwebengine to build against system ICU_68.1 which has
 dropped the TRUE and FALSE macros.
 Comment by Ken: This code actually comes from chromium, but they only take
-bugs against their latest release, which I do not have. I have attmepted
-to raise a bug at qt, but I think their backend is down.
+bugs against their latest release, which I do not have. I have attempted
+to raise a bug at qt.
 
 diff -Naur qtwebengine-5.15.1.orig/src/3rdparty/chromium/base/i18n/string_compare.cc qtwebengine-5.15.1/src/3rdparty/chromium/base/i18n/string_compare.cc
 --- qtwebengine-5.15.1.orig/src/3rdparty/chromium/base/i18n/string_compare.cc	2020-09-01 07:02:34.000000000 -0400
