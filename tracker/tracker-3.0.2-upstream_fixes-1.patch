@@ -1,0 +1,37 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2020-12-11
+Initial Package Version: 3.0.1
+Origin:                  Upstream
+Upstream Status:         Applied (PR #353)
+Description:             Fixes an incompatibility between tracker3 and
+                         sqlite-3.34.0.
+
+diff -Naurp tracker-3.0.2.orig/src/libtracker-data/tracker-data-update.c tracker-3.0.2/src/libtracker-data/tracker-data-update.c
+--- tracker-3.0.2.orig/src/libtracker-data/tracker-data-update.c	2020-12-08 17:01:22.526259700 -0600
++++ tracker-3.0.2/src/libtracker-data/tracker-data-update.c	2020-12-11 19:45:50.183034856 -0600
+@@ -1869,6 +1869,7 @@ cache_delete_resource_type_full (Tracker
+ 		if (strcmp (tracker_class_get_uri (class), TRACKER_PREFIX_RDFS "Resource") == 0 &&
+ 		    g_hash_table_size (data->resource_buffer->tables) == 0) {
+ 			tracker_db_interface_sqlite_fts_delete_id (iface, database, data->resource_buffer->id);
++         data->resource_buffer->fts_updated = TRUE;
+ 			/* skip subclass query when deleting whole resource
+ 			   to improve performance */
+ 
+diff -Naurp tracker-3.0.2.orig/src/libtracker-data/tracker-db-interface-sqlite.c tracker-3.0.2/src/libtracker-data/tracker-db-interface-sqlite.c
+--- tracker-3.0.2.orig/src/libtracker-data/tracker-db-interface-sqlite.c	2020-12-08 17:01:22.532259700 -0600
++++ tracker-3.0.2/src/libtracker-data/tracker-db-interface-sqlite.c	2020-12-11 19:46:43.515034269 -0600
+@@ -2315,11 +2315,12 @@ tracker_db_interface_sqlite_fts_create_d
+ 	g_string_append_printf (insert_str,
+ 	                        "INSERT INTO \"%s\".fts5 (fts5, rowid %s) "
+ 	                        "SELECT 'delete', rowid %s FROM \"%s\".fts_view "
+-	                        "WHERE rowid = ?",
++	                        "WHERE rowid = ? AND COALESCE(NULL %s) IS NOT NULL",
+ 				database,
+ 	                        db_interface->fts_properties,
+ 	                        db_interface->fts_properties,
+-	                        database);
++	                        database,
++                           db_interface->fts_properties);
+ 	return g_string_free (insert_str, FALSE);
+ }
+ 
