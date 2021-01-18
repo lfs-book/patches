@@ -1,0 +1,26 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2021-01-18
+Initial Package Version: 2.0.4
+Upstream Status: Applied
+Origin: https://gitlab.com/muttmua/mutt/-/commit/4a2becbdb4422aaffe3ce314991b9d670b7adf17
+Description: Fixes a memory leak, pending the 2.0.5 release.
+https://gitlab.com/muttmua/mutt/-/issues/323
+
+diff --git a/rfc822.c b/rfc822.c
+index 7ff4eaa354cc5e8a2729eb50e99ccead51c9d5c3..ced619f2e9a51e784f84faf902733f4b4597cea8 100644
+--- a/rfc822.c
++++ b/rfc822.c
+@@ -587,11 +587,10 @@ ADDRESS *rfc822_parse_adrlist (ADDRESS *top, const char *s)
+ #endif
+ 
+       /* add group terminator */
+-      cur = rfc822_new_address ();
+       if (last)
+       {
+-	last->next = cur;
+-	last = cur;
++	last->next = rfc822_new_address ();
++	last = last->next;
+       }
+ 
+       phraselen = 0;
