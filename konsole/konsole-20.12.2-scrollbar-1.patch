@@ -1,1 +1,40 @@
-konsole-20.12.0-scrollbar-1.patch
+Submitted By:            Bruce Dubbs <bdubbs_at_linuxfromscratch_dot_org>
+Date:                    2019-08-28
+Initial Package Version: 19.08.0
+Upstream Status:         Not submitted
+Origin:                  Self
+Description:             Optional patch to change the color of the konsole
+                         scroll bar and its handle.  Customizing the colors
+                         requires editing the patch.
+Update:                  Rediff for version 20-12-2
+
+
+--- konsole-20.12.2/src/terminalDisplay/TerminalDisplay.cpp.orig	2019-02-24 13:51:30.814774887 -0600
++++ konsole-20.12.2/src/terminalDisplay/TerminalDisplay.cpp	2019-02-24 13:55:23.819802401 -0600
+@@ -181,15 +181,23 @@
+     } else {
+         buttonColor = buttonColor.darker();
+     }
++
+     p.setColor(QPalette::Button, buttonColor);
+     p.setColor(QPalette::Window, backgroundColor);
+     p.setColor(QPalette::Base, backgroundColor);
+     p.setColor(QPalette::WindowText, buttonTextColor);
+     p.setColor(QPalette::ButtonText, buttonTextColor);
+
+-    setPalette(p);
++    //setPalette(p);
++
++    //_scrollBar->setPalette(p);
+
+-    _scrollBar->setPalette(p);
++    _scrollBar->setStyleSheet( QLatin1String(
++      "QScrollBar:vertical {"
++          "background: #ccc; border-left: 2px solid white}"
++      "QScrollBar::handle:vertical {"
++          "background: #888; min-height: 30px; margin: 15px;}"
++    ) );
+
+     update();
+ }
+
