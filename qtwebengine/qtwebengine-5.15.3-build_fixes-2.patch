@@ -1,0 +1,373 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Updated by: Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date: 2021-03-18
+Updated Date: 2021-03-23 (see later in the file)
+Initial Package Version: 5.15.3 from git 5.15 branch
+Upstream Status: Varies
+Origin: upstream via gentoo, gentoo, Arch (originally from fedora), and self
+Description: Allows this to build and work on BLFS-10.1
+
+Four separate items -
+
+Gentoo's qtwebengine-5.15.2_p20210224-fix-crash-w-app-locales.patch
+fixes use in certain locales.  Taken from the 5.15/5.15.4 branches.
+
+Gentoo's qtwebengine-5.15.2_p20210224-disable-git.patch means that
+git is not required for the build using a snapshot.
+
+Arch's qt5-webengine-glibc-2.33.patch is a version of the original
+ex-fedora glibc-2.33 patch to fix blank pages in e.g. falkon when
+running on glibc-2.33.
+
+Douglas R. Reno's  modification to the built-in libxml2 for systems where
+system ICU is desired, but libxml2 is built without the optional ICU support
+built in. 'stdbool.h' was included in encoding.c, and modifications were made
+to replace 'TRUE' with 'true', fixing the build with system ICU (68.x) and
+the internal version of libxml2.
+
+First, the upstream fix for some locales.
+
+From 199ea00a9eea13315a652c62778738629185b059 Mon Sep 17 00:00:00 2001
+From: Allan Sandfeld Jensen <allan.jensen@qt.io>
+Date: Wed, 10 Mar 2021 17:14:27 +0100
+Subject: Fix normalization of app locales
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Use the internal Chromium routine to get the app locale Chromium
+expects.
+
+Fixes: QTBUG-91715
+Change-Id: I5042eb066cb6879ad69628959912f2841867b4e8
+Reviewed-by: Michael Brüning <michael.bruning@qt.io>
+---
+ src/core/content_browser_client_qt.cpp             |  7 ++++++-
+ src/core/content_browser_client_qt.h               |  2 ++
+ src/core/web_engine_library_info.cpp               | 18 ++++++++--------
+ .../widgets/qwebengineview/tst_qwebengineview.cpp  | 24 ++++++++++++++++++++++
+ 4 files changed, 40 insertions(+), 11 deletions(-)
+
+diff --git a/src/core/content_browser_client_qt.cpp b/src/core/content_browser_client_qt.cpp
+index e13ecd8d1..c2c78ff8b 100644
+--- a/src/core/content_browser_client_qt.cpp
++++ b/src/core/content_browser_client_qt.cpp
+@@ -471,7 +471,12 @@ std::unique_ptr<net::ClientCertStore> ContentBrowserClientQt::CreateClientCertSt
+ 
+ std::string ContentBrowserClientQt::GetApplicationLocale()
+ {
+-    return WebEngineLibraryInfo::getApplicationLocale();
++    std::string bcp47Name = QLocale().bcp47Name().toStdString();
++    if (m_cachedQtLocale != bcp47Name) {
++        m_cachedQtLocale = bcp47Name;
++        m_appLocale = WebEngineLibraryInfo::getApplicationLocale();
++    }
++    return m_appLocale;
+ }
+ 
+ std::string ContentBrowserClientQt::GetAcceptLangs(content::BrowserContext *context)
+diff --git a/src/core/content_browser_client_qt.h b/src/core/content_browser_client_qt.h
+index 7c8aa3ac9..1ccd2926d 100644
+--- a/src/core/content_browser_client_qt.h
++++ b/src/core/content_browser_client_qt.h
+@@ -269,6 +269,8 @@ public:
+ 
+ private:
+     scoped_refptr<ShareGroupQtQuick> m_shareGroupQtQuick;
++    std::string m_appLocale;
++    std::string m_cachedQtLocale;
+ };
+ 
+ } // namespace QtWebEngineCore
+diff --git a/src/core/web_engine_library_info.cpp b/src/core/web_engine_library_info.cpp
+index 2ad5b7565..09a4141b0 100644
+--- a/src/core/web_engine_library_info.cpp
++++ b/src/core/web_engine_library_info.cpp
+@@ -46,6 +46,7 @@
+ #include "components/spellcheck/spellcheck_buildflags.h"
+ #include "content/public/common/content_paths.h"
+ #include "sandbox/policy/switches.h"
++#include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/ui_base_paths.h"
+ #include "ui/base/ui_base_switches.h"
+ 
+@@ -353,18 +354,15 @@ base::string16 WebEngineLibraryInfo::getApplicationName()
+ std::string WebEngineLibraryInfo::getApplicationLocale()
+ {
+     base::CommandLine *parsedCommandLine = base::CommandLine::ForCurrentProcess();
+-    if (!parsedCommandLine->HasSwitch(switches::kLang)) {
++    if (parsedCommandLine->HasSwitch(switches::kLang)) {
++        return parsedCommandLine->GetSwitchValueASCII(switches::kLang);
++    } else {
+         const QString &locale = QLocale().bcp47Name();
+-
+-        // QLocale::bcp47Name returns "en" for American English locale. Chromium requires the "US" suffix
+-        // to clarify the dialect and ignores the shorter version.
+-        if (locale == "en")
+-            return "en-US";
+-
+-        return locale.toStdString();
++        std::string resolvedLocale;
++        if (l10n_util::CheckAndResolveLocale(locale.toStdString(), &resolvedLocale))
++            return resolvedLocale;
+     }
+-
+-    return parsedCommandLine->GetSwitchValueASCII(switches::kLang);
++    return "en-US";
+ }
+ 
+ #if defined(OS_WIN)
+diff --git a/tests/auto/widgets/qwebengineview/tst_qwebengineview.cpp b/tests/auto/widgets/qwebengineview/tst_qwebengineview.cpp
+index 021986381..bf2c28ae6 100644
+--- a/tests/auto/widgets/qwebengineview/tst_qwebengineview.cpp
++++ b/tests/auto/widgets/qwebengineview/tst_qwebengineview.cpp
+@@ -123,6 +123,7 @@ private Q_SLOTS:
+     void doNotBreakLayout();
+ 
+     void changeLocale();
++    void mixLangLocale();
+     void inputMethodsTextFormat_data();
+     void inputMethodsTextFormat();
+     void keyboardEvents();
+@@ -1210,6 +1211,29 @@ void tst_QWebEngineView::changeLocale()
+     QCOMPARE(errorLines.first().toUtf8(), QByteArrayLiteral("Die Website ist nicht erreichbar"));
+ }
+ 
++void tst_QWebEngineView::mixLangLocale()
++{
++    for (QString locale : { "en_DK", "de_CH", "eu_ES" }) {
++        QLocale::setDefault(locale);
++        QWebEngineView view;
++        QSignalSpy loadSpy(&view, &QWebEngineView::loadFinished);
++
++        bool terminated = false;
++        auto sc = connect(view.page(), &QWebEnginePage::renderProcessTerminated, [&] () { terminated = true; });
++
++        view.load(QUrl("qrc:///resources/dummy.html"));
++        QTRY_VERIFY(terminated || loadSpy.count() == 1);
++
++        QVERIFY2(!terminated,
++            qPrintable(QString("Locale [%1] terminated: %2, loaded: %3").arg(locale).arg(terminated).arg(loadSpy.count())));
++        QVERIFY(loadSpy.first().first().toBool());
++
++        QString content = toPlainTextSync(view.page());
++        QVERIFY2(!content.isEmpty() && content.contains("test content"), qPrintable(content));
++    }
++    QLocale::setDefault(QLocale("en"));
++}
++
+ void tst_QWebEngineView::inputMethodsTextFormat_data()
+ {
+     QTest::addColumn<QString>("string");
+-- 
+cgit v1.2.1
+
+
+Second, the gentoo fix to avoid the build fro ma git version requiring
+git, although the .git directories are still required.
+
+generate_gni.sh: update_readme() runs git at the end of process, prevent it.
+
+Thanks-to: Georgy Yakovlev <gyakovlev@gentoo.org>
+
+--- a/src/3rdparty/chromium/third_party/libvpx/generate_gni.sh	2021-02-07 12:51:49.438514897 +0100
++++ b/src/3rdparty/chromium/third_party/libvpx/generate_gni.sh	2021-02-21 16:23:38.375724515 +0100
+@@ -519,8 +519,3 @@
+ 
+ gn format --in-place $BASE_DIR/BUILD.gn
+ gn format --in-place $BASE_DIR/libvpx_srcs.gni
+-
+-cd $BASE_DIR/$LIBVPX_SRC_DIR
+-update_readme
+-
+-cd $BASE_DIR
+
+Third, an updated version of the glibc-2.33 patch.
+
+# Patch made by Kevin Kofler <Kevin@tigcc.ticalc.org>
+# https://bugzilla.redhat.com/show_bug.cgi?id=1904652
+
+diff -ur qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc
+--- qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc	2020-11-07 02:22:36.000000000 +0100
++++ qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/baseline_policy.cc	2021-01-20 02:14:53.066223906 +0100
+@@ -257,6 +257,18 @@
+     return RestrictKillTarget(current_pid, sysno);
+   }
+ 
++#if defined(__NR_newfstatat)
++  if (sysno == __NR_newfstatat) {
++    return RewriteFstatatSIGSYS();
++  }
++#endif
++
++#if defined(__NR_fstatat64)
++  if (sysno == __NR_fstatat64) {
++    return RewriteFstatatSIGSYS();
++  }
++#endif
++
+   if (SyscallSets::IsFileSystem(sysno) ||
+       SyscallSets::IsCurrentDirectory(sysno)) {
+     return Error(fs_denied_errno);
+diff -ur qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc
+--- qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc	2020-11-07 02:22:36.000000000 +0100
++++ qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc	2021-01-22 19:02:55.651668257 +0100
+@@ -6,6 +6,8 @@
+ 
+ #include "sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h"
+ 
++#include <errno.h>
++#include <fcntl.h>
+ #include <stddef.h>
+ #include <stdint.h>
+ #include <string.h>
+@@ -355,6 +357,35 @@
+   return -ENOSYS;
+ }
+ 
++intptr_t SIGSYSFstatatHandler(const struct arch_seccomp_data& args,
++                            void* aux) {
++  switch (args.nr) {
++#if defined(__NR_newfstatat)
++    case __NR_newfstatat:
++#endif
++#if defined(__NR_fstatat64)
++    case __NR_fstatat64:
++#endif
++#if defined(__NR_newfstatat) || defined(__NR_fstatat64)
++      if (*reinterpret_cast<const char *>(args.args[1]) == '\0'
++          && args.args[3] == static_cast<uint64_t>(AT_EMPTY_PATH)) {
++        return sandbox::sys_fstat64(static_cast<int>(args.args[0]),
++                                    reinterpret_cast<struct stat64 *>(args.args[2]));
++      } else {
++        errno = EACCES;
++        return -1;
++      }
++      break;
++#endif
++  }
++
++  CrashSIGSYS_Handler(args, aux);
++
++  // Should never be reached.
++  RAW_CHECK(false);
++  return -ENOSYS;
++}
++
+ bpf_dsl::ResultExpr CrashSIGSYS() {
+   return bpf_dsl::Trap(CrashSIGSYS_Handler, NULL);
+ }
+@@ -387,6 +418,10 @@
+   return bpf_dsl::Trap(SIGSYSSchedHandler, NULL);
+ }
+ 
++bpf_dsl::ResultExpr RewriteFstatatSIGSYS() {
++  return bpf_dsl::Trap(SIGSYSFstatatHandler, NULL);
++}
++
+ void AllocateCrashKeys() {
+ #if !defined(OS_NACL_NONSFI)
+   if (seccomp_crash_key)
+diff -ur qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h
+--- qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h	2020-11-07 02:22:36.000000000 +0100
++++ qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h	2021-01-20 02:11:04.583714199 +0100
+@@ -62,6 +62,10 @@
+ // sched_setparam(), sched_setscheduler()
+ SANDBOX_EXPORT intptr_t SIGSYSSchedHandler(const arch_seccomp_data& args,
+                                            void* aux);
++// If the fstatat syscall is actually a disguised fstat, calls the regular fstat
++// syscall, otherwise, crashes in the same way as CrashSIGSYS_Handler.
++SANDBOX_EXPORT intptr_t SIGSYSFstatatHandler(const struct arch_seccomp_data& args, 
++                                             void* aux);
+ 
+ // Variants of the above functions for use with bpf_dsl.
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYS();
+@@ -72,6 +76,7 @@
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSFutex();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSPtrace();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr RewriteSchedSIGSYS();
++SANDBOX_EXPORT bpf_dsl::ResultExpr RewriteFstatatSIGSYS();
+ 
+ // Allocates a crash key so that Seccomp information can be recorded.
+ void AllocateCrashKeys();
+diff -ur qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.cc qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.cc
+--- qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.cc	2020-11-07 02:22:36.000000000 +0100
++++ qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.cc	2021-01-20 02:41:12.033133269 +0100
+@@ -261,4 +261,13 @@
+ 
+ #endif  // defined(MEMORY_SANITIZER)
+ 
++SANDBOX_EXPORT int sys_fstat64(int fd, struct stat64 *buf)
++{
++#if defined(__NR_fstat64)
++    return syscall(__NR_fstat64, fd, buf);
++#else
++    return syscall(__NR_fstat, fd, buf);
++#endif
++}
++
+ }  // namespace sandbox
+diff -ur qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.h qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.h
+--- qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.h	2020-11-07 02:22:36.000000000 +0100
++++ qtwebengine-everywhere-src-5.15.2-#1904652/src/3rdparty/chromium/sandbox/linux/services/syscall_wrappers.h	2021-01-20 02:40:26.499827829 +0100
+@@ -17,6 +17,7 @@
+ struct rlimit64;
+ struct cap_hdr;
+ struct cap_data;
++struct stat64;
+ 
+ namespace sandbox {
+ 
+@@ -84,6 +85,9 @@
+                                  const struct sigaction* act,
+                                  struct sigaction* oldact);
+ 
++// Recent glibc rewrites fstat to fstatat.
++SANDBOX_EXPORT int sys_fstat64(int fd, struct stat64 *buf);
++
+ }  // namespace sandbox
+ 
+ #endif  // SANDBOX_LINUX_SERVICES_SYSCALL_WRAPPERS_H_
+
+Addition by Douglas R. Reno (renodr at linuxfromscratch dot org) - 3/23/21:
+When building qtwebengine where libxml2 has been built before ICU has been 
+installed, a build failure will occur because QtWebEngine will attempt to use
+it's internal version of libxml2, which *was not* patched against API changes
+in ICU-68.1+. These changes involved removing the TRUE and FALSE macros, and
+the official documentation states that developers should use 'true' and 'false'
+instead, of course making sure that 'stdbool.h' is included so that the compiler
+can actually find those boolean values. Since Chromium's internal version of ICU
+is older than ours, it's not a problem when building with the internal version 
+of ICU. Users who have installed ICU before libxml2 are exempt from running into
+this issue. 
+
+diff -Naurp qtwebengine-everywhere-src-5.15.2.orig/src/3rdparty/chromium/third_party/libxml/src/encoding.c qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/third_party/libxml/src/encoding.c
+--- qtwebengine-everywhere-src-5.15.2.orig/src/3rdparty/chromium/third_party/libxml/src/encoding.c 2020-11-06 19:22:36.000000000 -0600
++++ qtwebengine-everywhere-src-5.15.2/src/3rdparty/chromium/third_party/libxml/src/encoding.c 2020-12-08 19:39:00.607894718 -0600
+@@ -44,7 +44,7 @@
+ #endif
+ #include <libxml/globals.h>
+ #include <libxml/xmlerror.h>
+-
++#include <stdbool.h>
+ #include "buf.h"
+ #include "enc.h"
+
+@@ -1893,7 +1893,7 @@ xmlUconvWrapper(uconv_t *cd, int toUnico
+     *inlen = ucv_in - (const char*) in;
+     *outlen = ucv_out - (char *) out;
+     if (U_SUCCESS(err)) {
+-        /* reset pivot buf if this is the last call for input (flush==TRUE) */
++        /* reset pivot buf if this is the last call for input (flush==true) */
+         if (flush)
+             cd->pivot_source = cd->pivot_target = cd->pivot_buf;
+         return 0;
+@@ -1958,7 +1958,7 @@ xmlEncOutputChunk(xmlCharEncodingHandler
+ #ifdef LIBXML_ICU_ENABLED
+     else if (handler->uconv_out != NULL) {
+         ret = xmlUconvWrapper(handler->uconv_out, 0, out, outlen, in, inlen,
+-                              TRUE);
++                              true);
+     }
+ #endif /* LIBXML_ICU_ENABLED */
+     else { 
