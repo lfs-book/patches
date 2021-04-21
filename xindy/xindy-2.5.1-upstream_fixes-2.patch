@@ -1,0 +1,257 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2021-04-21
+Initial Package Version: 2.5.1
+Upstream Status: Applied
+Origin: Upstream
+Description: Selected fixes up to svn r41315, omitting changes for spaces in
+pathnames and other changes to align with miktex, plus changes to add support
+for \hyperindexformat (svn r55314-6).
+
+diff -Naur a/doc/faq-4.html b/doc/faq-4.html
+--- a/doc/faq-4.html	2004-05-24 22:45:09.000000000 +0100
++++ b/doc/faq-4.html	2021-04-20 19:58:38.053031724 +0100
+@@ -460,11 +460,12 @@
+ the form
+ <P>
+ <PRE>
+-  (define-location-class ... :min-range-length none)
++  (define-location-class ... :min-range-length 100000)
+ </PRE>
+-<P>The argument <CODE>:min-range-length none</CODE> avoids forming of ranges.
+-Arbitrary numbers instead of <CODE>none</CODE> define the minimum length of a
+-sequence of location references that are needed to form a range.
++<P>Arbitrary numbers define the minimum length of a sequence of location references that are needed to form a range.
++The use of a sufficiently large number (such as <CODE>:min-range-length 100000</CODE>) avoids forming of ranges
++(unless your document has more than 100.000 pages and an index entry spans all of them; in this unlikely case, just increase
++the number sufficiently).
+ <SF>xindy</SF>s default value is&nbsp;2.
+ <P>
+ <P>
+diff -Naur a/doc/manual-3.html b/doc/manual-3.html
+--- a/doc/manual-3.html	2004-05-24 22:45:09.000000000 +0100
++++ b/doc/manual-3.html	2021-04-20 20:09:57.954864052 +0100
+@@ -185,8 +185,8 @@
+ keyword argument <CODE>:sep</CODE>. If the keyword <CODE>:min-range-length</CODE> is
+ specified we define the <EM>minimum range length</EM> to be used when
+ building ranges. The argument <CODE>num</CODE> must be a positive integer
+-number or the keyword <CODE>none</CODE> in which case the building of ranges
+-is disallowed. If the switch <CODE>:var</CODE> is specified the declared class
++number. Use a sufficiently large number (such as 10000) to disallow the building of ranges.
++If the switch <CODE>:var</CODE> is specified the declared class
+ is of type <EM>variable</EM>, i.e. it is a <EM>var-location-class</EM>. Since
+ building of ranges is currently only allowed for standard classes
+ <CODE>:var</CODE> and <CODE>:min-range-length</CODE> must not be used together. The
+@@ -198,7 +198,7 @@
+ <P>
+ <PRE>
+   (define-location-class "page-numbers" ("arabic-numbers")
+-                         :minimum-range-length 3)
++                         :min-range-length 3)
+ </PRE>
+ <P>Defines the location class <CODE>page-numbers</CODE> consisting of one layer
+ which is the alphabet <CODE>arabic-numbers</CODE>. Since the minimum
+@@ -927,17 +927,16 @@
+ <PRE>
+ (markup-range [:open string] [:close string] [:sep string]
+               [:class locref-class]
++              [:attr attribute]
+               [:length num] [:ignore-end])
+ </PRE>
+ </CODE></BLOCKQUOTE>
+ <P>A range consists of two location references. Markup can be specified
+ with the <CODE>:open</CODE> and <CODE>:close</CODE> arguments and one separator given
+ by the argument <CODE>:sep</CODE>.
+-<P>Since both location references are tagged with markup defined by the
+-command <CODE>markup-locref</CODE> a specialization on attributes or depth is
+-not necessary. Specialization is allowed on the class they belong to,
+-because the separator between two location refences may be different
+-for each location class. Argument <CODE>:length</CODE> can be used to define
++<P>The markup of the separator can be specified attributes via
++the<CODE>:attr</CODE> tag.
++<P>Argument <CODE>:length</CODE> can be used to define
+ different markup for different lengths. In conjunction with
+ <CODE>:length</CODE> is may be useful not to print the second location
+ reference at all. For example, one wishes to markup ranges of length 1
+diff -Naur a/modules/base/makeindex.xdy b/modules/base/makeindex.xdy
+--- a/modules/base/makeindex.xdy	2006-08-31 00:35:43.000000000 +0100
++++ b/modules/base/makeindex.xdy	2021-04-20 20:06:37.731895187 +0100
+@@ -17,6 +17,11 @@
+ (define-crossref-class "seealso")
+ (markup-crossref-list :class "seealso" :open "\seealso{" :sep "; " :close "}{}")
+ 
++;; \hyperindexformat is a wrapper to \see and \seealso added by hyperref.
++;; We treat it like \see and \seealso
++(define-crossref-class "hyperindexformat" :unverified)
++(markup-crossref-list :class "hyperindexformat" :open "\hyperindexformat{" :sep "; " :close "}{}")
++
+ ;; Subentries in cross references are seperated by comma for all
+ ;; crossref classes.
+ (markup-crossref-layer-list :sep ", ")
+diff -Naur a/src/markup.lsp b/src/markup.lsp
+--- a/src/markup.lsp	2009-03-29 16:07:32.000000000 +0100
++++ b/src/markup.lsp	2021-04-20 20:09:57.954864052 +0100
+@@ -409,7 +409,7 @@
+     (do-markup-list (get-members attribute-group)
+       :identifier LOCREF
+       :open-body  (do-markup-locref-list-open  loccls 0)
+-      :elt-body   (do-markup-locref     LOCREF loccls 0)
++      :elt-body   (do-markup-locref (get-catattr LOCREF) LOCREF loccls 0)
+       :sep-body   (do-markup-locref-list-sep   loccls 0)
+       :close-body (do-markup-locref-list-close loccls 0))
+ 
+@@ -429,7 +429,8 @@
+           (do-markup-default "LOCREF-LIST:CLOSE" (get-name loccls) depth))
+   :sep   ((do-markup-default "LOCREF-LIST:SEP"   (get-name loccls) depth)))
+ ;; line 808 "markup.nw"
+-(defmethod do-markup-locref ((locref location-reference)
++(defmethod do-markup-locref ((attr   category-attribute)
++                             (locref location-reference)
+                              (loccls layered-location-class)
+                              (depth  number))
+   #+ASSERT! (assert! (and (typep locref 'layered-location-reference)
+@@ -455,7 +456,7 @@
+          (do-markup-list subrefs
+            :identifier LOCREF
+            :open-body  (do-markup-locref-list-open  loccls new-depth)
+-           :elt-body   (do-markup-locref     LOCREF loccls new-depth)
++           :elt-body   (do-markup-locref attr LOCREF loccls new-depth)
+            :sep-body   (do-markup-locref-list-sep   loccls new-depth)
+            :close-body (do-markup-locref-list-close loccls new-depth)))
+ 
+@@ -506,23 +507,24 @@
+           (do-markup-default "LOCREF:CLOSE"
+             (get-name attr) (get-name loccls) depth)))
+ ;; line 955 "markup.nw"
+-(defmethod do-markup-locref ((range location-range)
++(defmethod do-markup-locref ((attr  category-attribute)
++                             (range location-range)
+                              (loccls layered-location-class)
+                              (depth number))
+   (let ((length (get-length range)))
+-    (do-markup-range-open  loccls length)
+-    (do-markup-locref (get-first range) loccls depth)
+-    (do-markup-range-sep   loccls length)
++    (do-markup-range-open attr loccls length)
++    (do-markup-locref attr (get-first range) loccls depth)
++    (do-markup-range-sep attr loccls length)
+     (when (markup-range-print-end-p loccls length)
+-      (do-markup-locref (get-last range)  loccls depth))
+-    (do-markup-range-close loccls length)))
++      (do-markup-locref attr (get-last range)  loccls depth))
++    (do-markup-range-close attr loccls length)))
+ 
+ (define-list-environment-methods do-markup-range
+-    ((loccls layered-location-class) (length number))
+-  :open  ((do-markup-default "RANGE:OPEN"  (get-name loccls) length)
++    ((attr category-attribute) (loccls layered-location-class) (length number))
++  :open  ((do-markup-default "RANGE:OPEN" (get-name attr) (get-name loccls) length)
+           (do-markup-indent))
+   :close ((do-markup-outdent)
+-          (do-markup-default "RANGE:CLOSE" (get-name loccls) length))
++          (do-markup-default "RANGE:CLOSE" (get-name attr) (get-name loccls) length))
+   :sep   ((do-markup-default "RANGE:SEP" (get-name loccls) length)))
+ 
+ (defmethod markup-range-print-end-p ((loccls layered-location-class)
+@@ -947,7 +949,7 @@
+ ;; line 1002 "markup.nw"
+ (defmacro markup-range (&whole whole &rest args)
+   (destructuring-switch-bind (&key
+-                              open close sep class length
++                              open close sep class attr length
+                               &switch ignore-end)
+       args
+     (cond
+@@ -965,13 +967,20 @@
+ ((and class (progn (setq class (stringify class))
+                    (not (lookup-locref-class *indexstyle* class))))
+  (nraw "parameter `~S' is not a location-reference class! (ignored)~%" class))
++;; line 294 "markup.nw"
++((and attr (progn (setq attr (stringify attr))
++                   (not (lookup-catattr *indexstyle* attr))))
++ (nraw "parameter `~S' is not an attribute! (ignored)~%" attr))
+ ;; line 1009 "markup.nw"
+           ((and length (not (numberp length)))
+              (nraw "parameter `~S' is not a number! (ignored)~%" length))
+           (t `(let ()
+                (markup::define-list-environment-methods
+                    DO-MARKUP-RANGE
+-                   (,(if class
++                   (,(if attr
++                         `(attr (EQL ',(lookup-catattr *indexstyle* attr)))
++                         '(attr category-attribute))
++                   ,(if class
+                          `(locrefcls (EQL ',(cdr (lookup-locref-class
+                                                   *indexstyle* class))))
+                          '(locrefcls layered-location-class))
+@@ -989,7 +998,7 @@
+                     ,(if length
+                          `(length (EQL ,length))
+                          '(length number)))
+-                 :declare ((declare (ignore locrefcls length)))
++                 :declare ((declare (ignore attr locrefcls length)))
+                  :body    (,(not ignore-end))))))))
+ ;; line 1064 "markup.nw"
+ (defmacro markup-crossref-list (&key open sep close class)
+diff -Naur a/user-commands/texindy.in b/user-commands/texindy.in
+--- a/user-commands/texindy.in	2014-05-11 14:45:44.000000000 +0100
++++ b/user-commands/texindy.in	2021-04-20 20:06:37.731895187 +0100
+@@ -308,14 +308,8 @@
+ 
+ For more complex usage, when C<bbb> is not an identifier, no such
+ compatibility definitions exist and may also not been created with
+-current B<xindy>. In particular, this means that by default the LaTeX
+-package C<hyperref> will create raw index files that cannot be
+-processed with B<xindy>. This is not a bug, this is the unfortunate
+-result of an intented incompatibility. It is currently not possible to
+-get both hyperref's index links and use B<xindy>.
+-
+-A similar situation is reported to exist for the C<memoir> LaTeX
+-class.
++current B<xindy>. Such a situation is reported to exist for the
++C<memoir> LaTeX class.
+ 
+ Programmers who know Common Lisp and Lex and want to work on a remedy
+ should please contact the author.
+diff -Naur a/user-commands/xindy.in b/user-commands/xindy.in
+--- a/user-commands/xindy.in	2014-05-11 14:45:44.000000000 +0100
++++ b/user-commands/xindy.in	2021-04-20 20:06:37.731895187 +0100
+@@ -260,14 +260,8 @@
+ 
+ For more complex usage, when C<bbb> is not an identifier, no such
+ compatibility definitions exist and may also not been created with
+-current B<xindy>. In particular, this means that by default the LaTeX
+-package C<hyperref> will create raw index files that cannot be
+-processed with B<xindy>. This is not a bug, this is the unfortunate
+-result of an intented incompatibility. It is currently not possible to
+-get both hyperref's index links and use B<xindy>.
+-
+-A similar situation is reported to exist for the C<memoir> LaTeX
+-class.
++current B<xindy>. Such a situation is reported to exist for the
++C<memoir> LaTeX class.
+ 
+ Programmers who know Common Lisp and Lex and want to work on a remedy
+ should please contact the author.
+@@ -353,6 +347,7 @@
+ 
+ use Cwd;
+ use File::Basename;
++use File::Glob qw(bsd_glob);
+ use File::Spec;
+ use File::Temp qw(tempfile tmpnam);
+ use Getopt::Long qw(:config bundling);
+@@ -790,7 +785,13 @@
+ 	push (@temp_files, $style_file);
+ 	$style_file=quotify($style_file);
+ 	foreach my $module ( @modules ) {
+-	    print $sf "(require \"$module\")\n";
++	    my $fnmodule=`kpsewhich -progname=xindy -format=othertext $module`;
++	    if ($fnmodule) {
++		chomp($fnmodule);
++		print $sf "(require \"$fnmodule\")\n";
++	    } else {
++		print $sf "(require \"$module\")\n";
++	    }
+ 	}
+ 	close ($sf);
+     }
