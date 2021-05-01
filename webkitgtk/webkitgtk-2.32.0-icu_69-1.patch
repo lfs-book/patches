@@ -1,0 +1,32 @@
+Submitted By:            Xi Ruoyao <xry111 AT mengyan1223 DOT wang>
+Date:                    2021-05-01
+Initial Package Version: 2.32.0
+Upstream Status:         Not applied, they are using a more complicated patch
+                         for backword compatibility
+Origin:                  Self
+Description:             Fixes build with ICU-69.1.
+
+diff --color -uNar webkitgtk-2.32.0/Source/JavaScriptCore/runtime/IntlSegmenter.cpp webkitgtk-2.32.0-patched/Source/JavaScriptCore/runtime/IntlSegmenter.cpp
+--- webkitgtk-2.32.0/Source/JavaScriptCore/runtime/IntlSegmenter.cpp	2021-02-26 17:57:05.000000000 +0800
++++ webkitgtk-2.32.0-patched/Source/JavaScriptCore/runtime/IntlSegmenter.cpp	2021-05-01 18:13:01.944370466 +0800
+@@ -125,7 +125,7 @@
+     auto upconvertedCharacters = Box<Vector<UChar>>::create(string.charactersWithoutNullTermination());
+ 
+     UErrorCode status = U_ZERO_ERROR;
+-    auto segmenter = std::unique_ptr<UBreakIterator, UBreakIteratorDeleter>(ubrk_safeClone(m_segmenter.get(), nullptr, nullptr, &status));
++    auto segmenter = std::unique_ptr<UBreakIterator, UBreakIteratorDeleter>(ubrk_clone(m_segmenter.get(), &status));
+     if (U_FAILURE(status)) {
+         throwTypeError(globalObject, scope, "failed to initialize Segments"_s);
+         return { };
+diff --color -uNar webkitgtk-2.32.0/Source/JavaScriptCore/runtime/IntlSegments.cpp webkitgtk-2.32.0-patched/Source/JavaScriptCore/runtime/IntlSegments.cpp
+--- webkitgtk-2.32.0/Source/JavaScriptCore/runtime/IntlSegments.cpp	2021-02-26 17:57:05.000000000 +0800
++++ webkitgtk-2.32.0-patched/Source/JavaScriptCore/runtime/IntlSegments.cpp	2021-05-01 18:12:42.216370542 +0800
+@@ -100,7 +100,7 @@
+     auto scope = DECLARE_THROW_SCOPE(vm);
+ 
+     UErrorCode status = U_ZERO_ERROR;
+-    auto segmenter = std::unique_ptr<UBreakIterator, UBreakIteratorDeleter>(ubrk_safeClone(m_segmenter.get(), nullptr, nullptr, &status));
++    auto segmenter = std::unique_ptr<UBreakIterator, UBreakIteratorDeleter>(ubrk_clone(m_segmenter.get(), &status));
+     if (U_FAILURE(status)) {
+         throwTypeError(globalObject, scope, "failed to initialize SegmentIterator"_s);
+         return nullptr;
