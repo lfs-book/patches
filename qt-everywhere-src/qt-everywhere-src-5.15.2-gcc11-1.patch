@@ -1,0 +1,222 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2021-05-05
+Initial Package Version: 5.15.2
+Upstream Status: Unknown
+Origin: Found at gentoo, some of this originally comes from fedora
+Description: Allows qt-5.15.2 (omitting webengine) to build with gcc-11.
+
+diff -Naur a/qtbase/src/corelib/codecs/qtextcodec.cpp b/qtbase/src/corelib/codecs/qtextcodec.cpp
+--- a/qtbase/src/corelib/codecs/qtextcodec.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/codecs/qtextcodec.cpp	2021-05-05 02:45:00.229084882 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qplatformdefs.h"
+ 
+ #include "qtextcodec.h"
+diff -Naur a/qtbase/src/corelib/codecs/qutfcodec.cpp b/qtbase/src/corelib/codecs/qutfcodec.cpp
+--- a/qtbase/src/corelib/codecs/qutfcodec.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/codecs/qutfcodec.cpp	2021-05-05 02:45:00.229084882 +0100
+@@ -38,6 +38,8 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
++
+ #include "qutfcodec_p.h"
+ #include "qlist.h"
+ #include "qendian.h"
+diff -Naur a/qtbase/src/corelib/global/qendian.cpp b/qtbase/src/corelib/global/qendian.cpp
+--- a/qtbase/src/corelib/global/qendian.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/global/qendian.cpp	2021-05-05 02:45:00.229084882 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qendian.h"
+ 
+ #include "qalgorithms.h"
+diff -Naur a/qtbase/src/corelib/global/qendian.h b/qtbase/src/corelib/global/qendian.h
+--- a/qtbase/src/corelib/global/qendian.h	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/global/qendian.h	2021-05-05 02:48:21.342435995 +0100
+@@ -44,6 +44,8 @@
+ #include <QtCore/qfloat16.h>
+ #include <QtCore/qglobal.h>
+ 
++#include <limits>
++
+ // include stdlib.h and hope that it defines __GLIBC__ for glibc-based systems
+ #include <stdlib.h>
+ #include <string.h>
+diff -Naur a/qtbase/src/corelib/global/qfloat16.cpp b/qtbase/src/corelib/global/qfloat16.cpp
+--- a/qtbase/src/corelib/global/qfloat16.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/global/qfloat16.cpp	2021-05-05 02:45:00.229084882 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qfloat16.h"
+ #include "private/qsimd_p.h"
+ #include <cmath> // for fpclassify()'s return values
+diff -Naur a/qtbase/src/corelib/global/qfloat16.h b/qtbase/src/corelib/global/qfloat16.h
+--- a/qtbase/src/corelib/global/qfloat16.h	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/global/qfloat16.h	2021-05-05 02:48:21.342435995 +0100
+@@ -43,6 +43,7 @@
+ 
+ #include <QtCore/qglobal.h>
+ #include <QtCore/qmetatype.h>
++#include <limits>
+ #include <string.h>
+ 
+ #if defined(QT_COMPILER_SUPPORTS_F16C) && defined(__AVX2__) && !defined(__F16C__)
+diff -Naur a/qtbase/src/corelib/global/qrandom.cpp b/qtbase/src/corelib/global/qrandom.cpp
+--- a/qtbase/src/corelib/global/qrandom.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/global/qrandom.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -40,6 +40,7 @@
+ // for rand_s
+ #define _CRT_RAND_S
+ 
++#include <limits>
+ #include "qrandom.h"
+ #include "qrandom_p.h"
+ #include <qobjectdefs.h>
+diff -Naur a/qtbase/src/corelib/plugin/qelfparser_p.cpp b/qtbase/src/corelib/plugin/qelfparser_p.cpp
+--- a/qtbase/src/corelib/plugin/qelfparser_p.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/plugin/qelfparser_p.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -37,6 +37,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qelfparser_p.h"
+ 
+ #if defined (Q_OF_ELF) && defined(Q_CC_GNU)
+diff -Naur a/qtbase/src/corelib/plugin/qmachparser.cpp b/qtbase/src/corelib/plugin/qmachparser.cpp
+--- a/qtbase/src/corelib/plugin/qmachparser.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/plugin/qmachparser.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -37,6 +37,8 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
++
+ #include "qmachparser_p.h"
+ 
+ #if defined(Q_OF_MACH_O)
+diff -Naur a/qtbase/src/corelib/plugin/quuid.cpp b/qtbase/src/corelib/plugin/quuid.cpp
+--- a/qtbase/src/corelib/plugin/quuid.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/plugin/quuid.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "quuid.h"
+ 
+ #include "qcryptographichash.h"
+diff -Naur a/qtbase/src/corelib/serialization/qdatastream.cpp b/qtbase/src/corelib/serialization/qdatastream.cpp
+--- a/qtbase/src/corelib/serialization/qdatastream.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/serialization/qdatastream.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -40,6 +40,8 @@
+ #include "qdatastream.h"
+ #include "qdatastream_p.h"
+ 
++#include <limits>
++
+ #if !defined(QT_NO_DATASTREAM) || defined(QT_BOOTSTRAPPED)
+ #include "qbuffer.h"
+ #include "qfloat16.h"
+diff -Naur a/qtbase/src/corelib/text/qbytearray.cpp b/qtbase/src/corelib/text/qbytearray.cpp
+--- a/qtbase/src/corelib/text/qbytearray.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/text/qbytearray.cpp	2021-05-05 02:45:00.230085730 +0100
+@@ -39,6 +39,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qbytearray.h"
+ #include "qbytearraymatcher.h"
+ #include "private/qtools_p.h"
+diff -Naur a/qtbase/src/corelib/text/qbytearraymatcher.cpp b/qtbase/src/corelib/text/qbytearraymatcher.cpp
+--- a/qtbase/src/corelib/text/qbytearraymatcher.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/text/qbytearraymatcher.cpp	2021-05-05 02:45:00.231086578 +0100
+@@ -37,6 +37,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qbytearraymatcher.h"
+ 
+ #include <limits.h>
+diff -Naur a/qtbase/src/corelib/text/qbytearraymatcher.h b/qtbase/src/corelib/text/qbytearraymatcher.h
+--- a/qtbase/src/corelib/text/qbytearraymatcher.h	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/text/qbytearraymatcher.h	2021-05-05 02:48:21.342435995 +0100
+@@ -42,6 +42,8 @@
+ 
+ #include <QtCore/qbytearray.h>
+ 
++#include <limits>
++
+ QT_BEGIN_NAMESPACE
+ 
+ 
+diff -Naur a/qtbase/src/corelib/tools/qbitarray.cpp b/qtbase/src/corelib/tools/qbitarray.cpp
+--- a/qtbase/src/corelib/tools/qbitarray.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/tools/qbitarray.cpp	2021-05-05 02:45:00.231086578 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qbitarray.h"
+ #include <qalgorithms.h>
+ #include <qdatastream.h>
+diff -Naur a/qtbase/src/corelib/tools/qcryptographichash.cpp b/qtbase/src/corelib/tools/qcryptographichash.cpp
+--- a/qtbase/src/corelib/tools/qcryptographichash.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/corelib/tools/qcryptographichash.cpp	2021-05-05 02:45:00.231086578 +0100
+@@ -38,6 +38,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include <qcryptographichash.h>
+ #include <qiodevice.h>
+ 
+diff -Naur a/qtbase/src/gui/text/qfontengine_qpf2.cpp b/qtbase/src/gui/text/qfontengine_qpf2.cpp
+--- a/qtbase/src/gui/text/qfontengine_qpf2.cpp	2020-10-27 08:02:11.000000000 +0000
++++ b/qtbase/src/gui/text/qfontengine_qpf2.cpp	2021-05-05 02:45:00.231086578 +0100
+@@ -37,6 +37,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qfontengine_qpf2_p.h"
+ 
+ #include <QtCore/QFile>
+diff -Naur a/qtdeclarative/src/qml/jsruntime/qv4regexp.cpp b/qtdeclarative/src/qml/jsruntime/qv4regexp.cpp
+--- a/qtdeclarative/src/qml/jsruntime/qv4regexp.cpp	2020-10-27 08:02:12.000000000 +0000
++++ b/qtdeclarative/src/qml/jsruntime/qv4regexp.cpp	2021-05-05 03:21:43.635846296 +0100
+@@ -37,6 +37,7 @@
+ **
+ ****************************************************************************/
+ 
++#include <limits>
+ #include "qv4regexp_p.h"
+ #include "qv4engine_p.h"
+ #include "qv4scopedvalue_p.h"
+diff -Naur a/qtdeclarative/src/qmldebug/qqmlprofilerevent_p.h b/qtdeclarative/src/qmldebug/qqmlprofilerevent_p.h
+--- a/qtdeclarative/src/qmldebug/qqmlprofilerevent_p.h	2020-10-27 08:02:12.000000000 +0000
++++ b/qtdeclarative/src/qmldebug/qqmlprofilerevent_p.h	2021-05-05 03:21:43.635846296 +0100
+@@ -40,6 +40,8 @@
+ #ifndef QQMLPROFILEREVENT_P_H
+ #define QQMLPROFILEREVENT_P_H
+ 
++#include <limits>
++
+ #include "qqmlprofilerclientdefinitions_p.h"
+ 
+ #include <QtCore/qstring.h>
