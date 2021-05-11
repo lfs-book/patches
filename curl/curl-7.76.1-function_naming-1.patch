@@ -1,0 +1,165 @@
+Submitted By:            Thomas Trepl <thomas@linuxfromscratch.org>
+Initial Package Version: 7.76.1
+Origin:                  Upstream
+                         https://github.com/curl/curl/commit/8bdde6b14ce3b5fd71c772a578fcbd4b6fa6df19
+Upstream Status:         Applied
+Description:             Fixes a naming issue with new openldap series (v2.5.x).
+
+diff -Naur curl-7.76.1.orig/lib/openldap.c curl-7.76.1/lib/openldap.c
+--- curl-7.76.1.orig/lib/openldap.c	2021-04-12 09:31:13.000000000 +0200
++++ curl-7.76.1/lib/openldap.c	2021-05-11 13:45:10.325923022 +0200
+@@ -76,16 +76,16 @@
+                         LDAP **ld);
+ #endif
+ 
+-static CURLcode ldap_setup_connection(struct Curl_easy *data,
+-                                      struct connectdata *conn);
+-static CURLcode ldap_do(struct Curl_easy *data, bool *done);
+-static CURLcode ldap_done(struct Curl_easy *data, CURLcode, bool);
+-static CURLcode ldap_connect(struct Curl_easy *data, bool *done);
+-static CURLcode ldap_connecting(struct Curl_easy *data, bool *done);
+-static CURLcode ldap_disconnect(struct Curl_easy *data,
+-                                struct connectdata *conn, bool dead);
++static CURLcode oldap_setup_connection(struct Curl_easy *data,
++                                       struct connectdata *conn);
++static CURLcode oldap_do(struct Curl_easy *data, bool *done);
++static CURLcode oldap_done(struct Curl_easy *data, CURLcode, bool);
++static CURLcode oldap_connect(struct Curl_easy *data, bool *done);
++static CURLcode oldap_connecting(struct Curl_easy *data, bool *done);
++static CURLcode oldap_disconnect(struct Curl_easy *data,
++                                 struct connectdata *conn, bool dead);
+ 
+-static Curl_recv ldap_recv;
++static Curl_recv oldap_recv;
+ 
+ /*
+  * LDAP protocol handler.
+@@ -93,18 +93,18 @@
+ 
+ const struct Curl_handler Curl_handler_ldap = {
+   "LDAP",                               /* scheme */
+-  ldap_setup_connection,                /* setup_connection */
+-  ldap_do,                              /* do_it */
+-  ldap_done,                            /* done */
++  oldap_setup_connection,               /* setup_connection */
++  oldap_do,                             /* do_it */
++  oldap_done,                           /* done */
+   ZERO_NULL,                            /* do_more */
+-  ldap_connect,                         /* connect_it */
+-  ldap_connecting,                      /* connecting */
++  oldap_connect,                        /* connect_it */
++  oldap_connecting,                     /* connecting */
+   ZERO_NULL,                            /* doing */
+   ZERO_NULL,                            /* proto_getsock */
+   ZERO_NULL,                            /* doing_getsock */
+   ZERO_NULL,                            /* domore_getsock */
+   ZERO_NULL,                            /* perform_getsock */
+-  ldap_disconnect,                      /* disconnect */
++  oldap_disconnect,                     /* disconnect */
+   ZERO_NULL,                            /* readwrite */
+   ZERO_NULL,                            /* connection_check */
+   PORT_LDAP,                            /* defport */
+@@ -120,18 +120,18 @@
+ 
+ const struct Curl_handler Curl_handler_ldaps = {
+   "LDAPS",                              /* scheme */
+-  ldap_setup_connection,                /* setup_connection */
+-  ldap_do,                              /* do_it */
+-  ldap_done,                            /* done */
++  oldap_setup_connection,               /* setup_connection */
++  oldap_do,                             /* do_it */
++  oldap_done,                           /* done */
+   ZERO_NULL,                            /* do_more */
+-  ldap_connect,                         /* connect_it */
+-  ldap_connecting,                      /* connecting */
++  oldap_connect,                        /* connect_it */
++  oldap_connecting,                     /* connecting */
+   ZERO_NULL,                            /* doing */
+   ZERO_NULL,                            /* proto_getsock */
+   ZERO_NULL,                            /* doing_getsock */
+   ZERO_NULL,                            /* domore_getsock */
+   ZERO_NULL,                            /* perform_getsock */
+-  ldap_disconnect,                      /* disconnect */
++  oldap_disconnect,                     /* disconnect */
+   ZERO_NULL,                            /* readwrite */
+   ZERO_NULL,                            /* connection_check */
+   PORT_LDAPS,                           /* defport */
+@@ -171,8 +171,8 @@
+   int nument;
+ };
+ 
+-static CURLcode ldap_setup_connection(struct Curl_easy *data,
+-                                      struct connectdata *conn)
++static CURLcode oldap_setup_connection(struct Curl_easy *data,
++                                       struct connectdata *conn)
+ {
+   struct ldapconninfo *li;
+   LDAPURLDesc *lud;
+@@ -207,7 +207,7 @@
+ static Sockbuf_IO ldapsb_tls;
+ #endif
+ 
+-static CURLcode ldap_connect(struct Curl_easy *data, bool *done)
++static CURLcode oldap_connect(struct Curl_easy *data, bool *done)
+ {
+   struct connectdata *conn = data->conn;
+   struct ldapconninfo *li = conn->proto.ldapc;
+@@ -255,7 +255,7 @@
+   return CURLE_OK;
+ }
+ 
+-static CURLcode ldap_connecting(struct Curl_easy *data, bool *done)
++static CURLcode oldap_connecting(struct Curl_easy *data, bool *done)
+ {
+   struct connectdata *conn = data->conn;
+   struct ldapconninfo *li = conn->proto.ldapc;
+@@ -354,14 +354,15 @@
+ 
+   if(info)
+     ldap_memfree(info);
+-  conn->recv[FIRSTSOCKET] = ldap_recv;
++  conn->recv[FIRSTSOCKET] = oldap_recv;
+   *done = TRUE;
+ 
+   return CURLE_OK;
+ }
+ 
+-static CURLcode ldap_disconnect(struct Curl_easy *data,
+-                                struct connectdata *conn, bool dead_connection)
++static CURLcode oldap_disconnect(struct Curl_easy *data,
++                                 struct connectdata *conn,
++                                 bool dead_connection)
+ {
+   struct ldapconninfo *li = conn->proto.ldapc;
+   (void) dead_connection;
+@@ -382,7 +383,7 @@
+   return CURLE_OK;
+ }
+ 
+-static CURLcode ldap_do(struct Curl_easy *data, bool *done)
++static CURLcode oldap_do(struct Curl_easy *data, bool *done)
+ {
+   struct connectdata *conn = data->conn;
+   struct ldapconninfo *li = conn->proto.ldapc;
+@@ -427,8 +428,8 @@
+   return CURLE_OK;
+ }
+ 
+-static CURLcode ldap_done(struct Curl_easy *data, CURLcode res,
+-                          bool premature)
++static CURLcode oldap_done(struct Curl_easy *data, CURLcode res,
++                           bool premature)
+ {
+   struct connectdata *conn = data->conn;
+   struct ldapreqinfo *lr = data->req.p.ldap;
+@@ -450,8 +451,8 @@
+   return CURLE_OK;
+ }
+ 
+-static ssize_t ldap_recv(struct Curl_easy *data, int sockindex, char *buf,
+-                         size_t len, CURLcode *err)
++static ssize_t oldap_recv(struct Curl_easy *data, int sockindex, char *buf,
++                          size_t len, CURLcode *err)
+ {
+   struct connectdata *conn = data->conn;
+   struct ldapconninfo *li = conn->proto.ldapc;
