@@ -1,0 +1,78 @@
+Submitted By: Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date: 2021-05-12
+Initial Package Version: 78.10.1.
+Upstream Status: Not yet backported to esr.
+Origin: gentoo - firefox-esr-78-patches-11.tar.xz. rediff'ed because there
+        are two patches
+Description: Prevents firefox-78.10.x to crash when opening HTML videos
+             if compiled with rustc-1.52.0.  Unneeded with rustc-1.47.0
+             but does no harm is used with that.
+
+diff -ur a/security/sandbox/linux/gtest/TestBroker.cpp b/security/sandbox/linux/gtest/TestBroker.cpp
+--- a/security/sandbox/linux/gtest/TestBroker.cpp	2021-05-03 18:53:15.000000000 +0200
++++ b/security/sandbox/linux/gtest/TestBroker.cpp	2021-05-12 11:32:18.702303566 +0200
+@@ -217,6 +217,18 @@
+   EXPECT_EQ(realStat.st_ino, brokeredStat.st_ino);
+   EXPECT_EQ(realStat.st_rdev, brokeredStat.st_rdev);
+ 
++#if defined(__clang__) || defined(__GNUC__)
++#  pragma GCC diagnostic push
++#  pragma GCC diagnostic ignored "-Wnonnull"
++#endif
++  EXPECT_EQ(-1, statsyscall(nullptr, &realStat));
++  EXPECT_EQ(errno, EFAULT);
++
++  EXPECT_EQ(-EFAULT, Stat(nullptr, &brokeredStat));
++#if defined(__clang__) || defined(__GNUC__)
++#  pragma GCC diagnostic pop
++#endif
++
+   EXPECT_EQ(-ENOENT, Stat("/var/empty/qwertyuiop", &brokeredStat));
+   EXPECT_EQ(-EACCES, Stat("/dev", &brokeredStat));
+ 
+diff -ur a/security/sandbox/linux/SandboxBrokerClient.cpp b/security/sandbox/linux/SandboxBrokerClient.cpp
+--- a/security/sandbox/linux/SandboxBrokerClient.cpp	2021-05-03 18:53:19.000000000 +0200
++++ b/security/sandbox/linux/SandboxBrokerClient.cpp	2021-05-12 11:32:11.898383004 +0200
+@@ -159,11 +159,19 @@
+ }
+ 
+ int SandboxBrokerClient::Stat(const char* aPath, statstruct* aStat) {
++  if (!aPath || !aStat) {
++    return -EFAULT;
++  }
++
+   Request req = {SANDBOX_FILE_STAT, 0, sizeof(statstruct)};
+   return DoCall(&req, aPath, nullptr, (void*)aStat, false);
+ }
+ 
+ int SandboxBrokerClient::LStat(const char* aPath, statstruct* aStat) {
++  if (!aPath || !aStat) {
++    return -EFAULT;
++  }
++
+   Request req = {SANDBOX_FILE_STAT, O_NOFOLLOW, sizeof(statstruct)};
+   return DoCall(&req, aPath, nullptr, (void*)aStat, false);
+ }
+diff -ur a/security/sandbox/linux/SandboxFilter.cpp b/security/sandbox/linux/SandboxFilter.cpp
+--- a/security/sandbox/linux/SandboxFilter.cpp	2021-05-03 18:53:15.000000000 +0200
++++ b/security/sandbox/linux/SandboxFilter.cpp	2021-05-12 11:32:11.898383004 +0200
+@@ -244,8 +244,8 @@
+     auto buf = reinterpret_cast<statstruct*>(aArgs.args[2]);
+     auto flags = static_cast<int>(aArgs.args[3]);
+ 
+-    if (fd != AT_FDCWD && (flags & AT_EMPTY_PATH) != 0 &&
+-        strcmp(path, "") == 0) {
++    if (fd != AT_FDCWD && (flags & AT_EMPTY_PATH) && path &&
++        !strcmp(path, "")) {
+ #ifdef __NR_fstat64
+       return DoSyscall(__NR_fstat64, fd, buf);
+ #else
+@@ -257,7 +257,7 @@
+       return BlockedSyscallTrap(aArgs, nullptr);
+     }
+ 
+-    if (fd != AT_FDCWD && path[0] != '/') {
++    if (fd != AT_FDCWD && path && path[0] != '/') {
+       SANDBOX_LOG_ERROR("unsupported fd-relative fstatat(%d, \"%s\", %p, %d)",
+                         fd, path, buf, flags);
+       return BlockedSyscallTrap(aArgs, nullptr);
