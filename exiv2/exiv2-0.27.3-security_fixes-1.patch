@@ -1,0 +1,180 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2021-05-17
+Initial Package Version: 0.27.3
+Upstream Status: Applied
+Origin: Found at fedora.
+Description: Fixes for CVE-2021-3482, CVE-2021-29458, CVE-2021-29457,
+CVE-2021-29470, CVE-2021-29473.
+
+From 22ea582c6b74ada30bec3a6b15de3c3e52f2b4da Mon Sep 17 00:00:00 2001
+From: Robin Mills <robin@clanmills.com>
+Date: Mon, 5 Apr 2021 20:33:25 +0100
+Subject: [PATCH] fix_1522_jp2image_exif_asan
+
+---
+ src/jp2image.cpp | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/src/jp2image.cpp b/src/jp2image.cpp
+index eb31cea4a..88ab9b2d6 100644
+--- a/src/jp2image.cpp
++++ b/src/jp2image.cpp
+@@ -28,6 +28,7 @@
+ #include "image.hpp"
+ #include "image_int.hpp"
+ #include "basicio.hpp"
++#include "enforce.hpp"
+ #include "error.hpp"
+ #include "futils.hpp"
+ #include "types.hpp"
+@@ -353,7 +354,7 @@ static void boxes_check(size_t b,size_t m)
+                             if (io_->error()) throw Error(kerFailedToReadImageData);
+                             if (bufRead != rawData.size_) throw Error(kerInputDataReadFailed);
+ 
+-                            if (rawData.size_ > 0)
++                            if (rawData.size_ > 8) // "II*\0long"
+                             {
+                                 // Find the position of Exif header in bytes array.
+                                 long pos = (     (rawData.pData_[0]      == rawData.pData_[1])
+@@ -497,6 +498,7 @@ static void boxes_check(size_t b,size_t m)
+                 position   = io_->tell();
+                 box.length = getLong((byte*)&box.length, bigEndian);
+                 box.type = getLong((byte*)&box.type, bigEndian);
++                enforce(box.length <= io_->size()-io_->tell() , Exiv2::kerCorruptedMetadata);
+ 
+                 if (bPrint) {
+                     out << Internal::stringFormat("%8ld | %8ld | ", (size_t)(position - sizeof(box)),
+@@ -581,12 +583,13 @@ static void boxes_check(size_t b,size_t m)
+                                 throw Error(kerInputDataReadFailed);
+ 
+                             if (bPrint) {
+-                                out << Internal::binaryToString(makeSlice(rawData, 0, 40));
++                                out << Internal::binaryToString(
++                                        makeSlice(rawData, 0, rawData.size_>40?40:rawData.size_));
+                                 out.flush();
+                             }
+                             lf(out, bLF);
+ 
+-                            if (bIsExif && bRecursive && rawData.size_ > 0) {
++                            if (bIsExif && bRecursive && rawData.size_ > 8) { // "II*\0long"
+                                 if ((rawData.pData_[0] == rawData.pData_[1]) &&
+                                     (rawData.pData_[0] == 'I' || rawData.pData_[0] == 'M')) {
+                                     BasicIo::AutoPtr p = BasicIo::AutoPtr(new MemIo(rawData.pData_, rawData.size_));
+ 
+From 0a91b56616404f7b29ca28deb01ce18b767d1871 Mon Sep 17 00:00:00 2001
+From: Kevin Backhouse <kevinbackhouse@github.com>
+Date: Fri, 9 Apr 2021 13:26:23 +0100
+Subject: [PATCH 1/5] Fix incorrect delete.
+
+---
+ src/crwimage_int.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/crwimage_int.cpp b/src/crwimage_int.cpp
+index a44a67e2c..6f89fa8b8 100644
+--- a/src/crwimage_int.cpp
++++ b/src/crwimage_int.cpp
+@@ -579,7 +579,7 @@ namespace Exiv2 {
+     void CiffComponent::setValue(DataBuf buf)
+     {
+         if (isAllocated_) {
+-            delete pData_;
++            delete[] pData_;
+             pData_ = 0;
+             size_ = 0;
+         }
+
+From 9b7a19f957af53304655ed1efe32253a1b11a8d0 Mon Sep 17 00:00:00 2001
+From: Kevin Backhouse <kevinbackhouse@github.com>
+Date: Fri, 9 Apr 2021 13:37:48 +0100
+Subject: [PATCH 3/5] Fix integer overflow.
+
+---
+ src/crwimage_int.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/crwimage_int.cpp b/src/crwimage_int.cpp
+index 6f89fa8b8..7b958c26f 100644
+--- a/src/crwimage_int.cpp
++++ b/src/crwimage_int.cpp
+@@ -1187,7 +1187,11 @@ namespace Exiv2 {
+                                                  pCrwMapping->crwDir_);
+         if (edX != edEnd || edY != edEnd || edO != edEnd) {
+             uint32_t size = 28;
+-            if (cc && cc->size() > size) size = cc->size();
++            if (cc) {
++              if (cc->size() < size)
++                throw Error(kerCorruptedMetadata);
++              size = cc->size();
++            }
+             DataBuf buf(size);
+             std::memset(buf.pData_, 0x0, buf.size_);
+             if (cc) std::memcpy(buf.pData_ + 8, cc->pData() + 8, cc->size() - 8);
+From 13e5a3e02339b746abcaee6408893ca2fd8e289d Mon Sep 17 00:00:00 2001
+From: Pydera <pydera@mailbox.org>
+Date: Thu, 8 Apr 2021 17:36:16 +0200
+Subject: [PATCH] Fix out of buffer access in #1529
+
+---
+ src/jp2image.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/jp2image.cpp b/src/jp2image.cpp
+index 88ab9b2d6..12025f966 100644
+--- a/src/jp2image.cpp
++++ b/src/jp2image.cpp
+@@ -776,9 +776,10 @@ static void boxes_check(size_t b,size_t m)
+ #endif
+                 box.length = (uint32_t) (io_->size() - io_->tell() + 8);
+             }
+-            if (box.length == 1)
++            if (box.length < 8)
+             {
+-                // FIXME. Special case. the real box size is given in another place.
++                // box is broken, so there is nothing we can do here
++                throw Error(kerCorruptedMetadata);
+             }
+
+             // Read whole box : Box header + Box data (not fixed size - can be null).
+diff --git a/src/jp2image.cpp b/src/jp2image.cpp
+index 0de088d..6310c08 100644
+--- a/src/jp2image.cpp
++++ b/src/jp2image.cpp
+@@ -645,13 +645,16 @@ static void boxes_check(size_t b,size_t m)
+         DataBuf output(boxBuf.size_ + iccProfile_.size_ + 100); // allocate sufficient space
+         int     outlen = sizeof(Jp2BoxHeader) ; // now many bytes have we written to output?
+         int      inlen = sizeof(Jp2BoxHeader) ; // how many bytes have we read from boxBuf?
++        enforce(sizeof(Jp2BoxHeader) <= static_cast<size_t>(output.size_), Exiv2::kerCorruptedMetadata);
+         Jp2BoxHeader* pBox   = (Jp2BoxHeader*) boxBuf.pData_;
+         int32_t       length = getLong((byte*)&pBox->length, bigEndian);
++        enforce(length <= static_cast<size_t>(output.size_), Exiv2::kerCorruptedMetadata);
+         int32_t       count  = sizeof (Jp2BoxHeader);
+         char*         p      = (char*) boxBuf.pData_;
+         bool          bWroteColor = false ;
+ 
+         while ( count < length || !bWroteColor ) {
++            enforce(sizeof(Jp2BoxHeader) <= length - count, Exiv2::kerCorruptedMetadata);
+             Jp2BoxHeader* pSubBox = (Jp2BoxHeader*) (p+count) ;
+ 
+             // copy data.  pointer could be into a memory mapped file which we will decode!
+From e6a0982f7cd9282052b6e3485a458d60629ffa0b Mon Sep 17 00:00:00 2001
+From: Kevin Backhouse <kevinbackhouse@github.com>
+Date: Fri, 23 Apr 2021 11:44:44 +0100
+Subject: [PATCH 2/2] Add bounds check in Jp2Image::doWriteMetadata().
+
+---
+ src/jp2image.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/jp2image.cpp b/src/jp2image.cpp
+index 1694fed27..ca8c9ddbb 100644
+--- a/src/jp2image.cpp
++++ b/src/jp2image.cpp
+@@ -908,6 +908,7 @@ static void boxes_check(size_t b,size_t m)
+
+                 case kJp2BoxTypeUuid:
+                 {
++                    enforce(boxBuf.size_ >= 24, Exiv2::kerCorruptedMetadata);
+                     if(memcmp(boxBuf.pData_ + 8, kJp2UuidExif, 16) == 0)
+                     {
+ #ifdef EXIV2_DEBUG_MESSAGES
