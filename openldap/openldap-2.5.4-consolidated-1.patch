@@ -14,7 +14,7 @@ Comment:                 Rediffed by Fernando de Oliveira <famobr at yahoo dot
                          the test by Douglas R. Reno - 2020-08-13
                          Rediffed by Tim Tassonis <stuff at decentral.ch> to
                          remove now integrated symbol versioning stuff and
-                         remove changes to now non-existent slapd-bdb.5 file
+                         remove changes to now non-existent slapd-bdb.5 file - 2021-05-03
 Description:             Consolidate earlier patches to:
  1. Update various installation options, such as ldap database path,
     configuration file options, slapd install location, etc.
