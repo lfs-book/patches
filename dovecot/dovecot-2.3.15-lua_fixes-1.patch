@@ -1,0 +1,33 @@
+diff -Naurp dovecot-2.3.15.orig/src/lib-lua/dlua-dovecot.c dovecot-2.3.15/src/lib-lua/dlua-dovecot.c
+--- dovecot-2.3.15.orig/src/lib-lua/dlua-dovecot.c	2021-06-14 08:40:37.000000000 -0500
++++ dovecot-2.3.15/src/lib-lua/dlua-dovecot.c	2021-06-25 11:56:57.792455236 -0500
+@@ -268,7 +268,7 @@ void dlua_push_event(lua_State *L, struc
+ 	luaL_setmetatable(L, DLUA_EVENT);
+ 
+ 	/* we need to attach gc to userdata to support older lua*/
+-	struct event **ptr = lua_newuserdata(L, sizeof(struct event*));
++	struct event **ptr = lua_newuserdatauv(L, sizeof(struct event*), 0);
+ 	*ptr = event;
+ 	lua_createtable(L, 0, 1);
+ 	lua_pushcfunction(L, dlua_event_gc);
+diff -Naurp dovecot-2.3.15.orig/src/lib-lua/dlua-resume.c dovecot-2.3.15/src/lib-lua/dlua-resume.c
+--- dovecot-2.3.15.orig/src/lib-lua/dlua-resume.c	2021-06-14 08:40:37.000000000 -0500
++++ dovecot-2.3.15/src/lib-lua/dlua-resume.c	2021-06-25 11:52:23.313925270 -0500
+@@ -117,7 +117,7 @@ static void dlua_pcall_yieldable_continu
+ 	dlua_tls_clear(L, RESUME_TIMEOUT);
+ 	dlua_tls_clear(L, RESUME_NARGS);
+ 
+-	ret = lua_resume(L, L, nargs);
++	ret = lua_resume(L, L, nargs, NULL);
+ 	if (ret == LUA_YIELD) {
+ 		/*
+ 		 * thread yielded - nothing to do
+@@ -180,7 +180,7 @@ int dlua_pcall_yieldable(lua_State *L, c
+ 	lua_insert(L, -(nargs + 1));
+ 
+ 	/* stack: func, args (top) */
+-	ret = lua_resume(L, L, nargs);
++	ret = lua_resume(L, L, nargs, NULL);
+ 	if (ret == LUA_YIELD) {
+ 		/*
+ 		 * thread yielded - nothing to do
