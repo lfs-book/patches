@@ -1,0 +1,273 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2021-07-08
+Modified On:             2021-07-22
+Initial Package Version: 246
+Origin:                  Manual Backport w/ buildfix
+Upstream Status:         Applied in 249 (https://github.com/systemd/systemd/pull/20002/) and
+                         https://github.com/systemd/systemd/pull/20256/
+Description:             This patch backports the fix for CVE-2020-13529 and
+                         a relevant buildfix (including fd-util.h so that file
+                         descriptor's can be closed properly via safe_close()).
+                         CVE-2020-13529 can allow for a remote attacker to
+                         reconfigure the network with a specially crafted
+                         packet, with no user interaction required.
+                         Due to the changes coming in LFS 11.0, advising an
+                         upgrade to systemd-249 is impossible. The vulnerability
+                         affects systems back to systemd-245. LFS 9.1 had 244,
+                         but LFS 10.0 had systemd-246, and LFS 10.1 had
+                         systemd-247. This patch applies cleanly and works
+                         well on an LFS 10.0 system (tested on i686, but should
+                         work well on x86_64 as well).
+
+                         On 2021-07-22, this patch was modified (and tested) to
+                         include the fix for CVE-2021-33910, which causes
+                         systemd to crash upon trying to process a filesystem
+                         mount with an extremely long path over FUSE. A newer
+                         version of the kernel (preferably 5.10.52 in the case
+                         of Linux From Scratch 10.0) is required since the patch
+                         for CVE-2021-33909 in the kernel is needed as well.
+
+
+diff -Naurp systemd-246.orig/src/basic/unit-name.c systemd-246/src/basic/unit-name.c
+--- systemd-246.orig/src/basic/unit-name.c	2020-07-30 14:02:36.000000000 -0500
++++ systemd-246/src/basic/unit-name.c	2021-07-22 14:27:39.228109803 -0500
+@@ -378,12 +378,13 @@ int unit_name_unescape(const char *f, ch
+ }
+ 
+ int unit_name_path_escape(const char *f, char **ret) {
+-        char *p, *s;
++        _cleanup_free_ char *p = NULL;
++        char *s;
+ 
+         assert(f);
+         assert(ret);
+ 
+-        p = strdupa(f);
++        p = strdup(f);
+         if (!p)
+                 return -ENOMEM;
+ 
+@@ -395,13 +396,10 @@ int unit_name_path_escape(const char *f,
+                 if (!path_is_normalized(p))
+                         return -EINVAL;
+ 
+-                /* Truncate trailing slashes */
++                /* Truncate trailing slashes and skip leading slashes*/
+                 delete_trailing_chars(p, "/");
+ 
+-                /* Truncate leading slashes */
+-                p = skip_leading_chars(p, "/");
+-
+-                s = unit_name_escape(p);
++                s = unit_name_escape(skip_leading_chars(p, "/"));
+         }
+         if (!s)
+                 return -ENOMEM;
+diff -Naurp systemd-246.orig/src/libsystemd-network/sd-dhcp-client.c systemd-246/src/libsystemd-network/sd-dhcp-client.c
+--- systemd-246.orig/src/libsystemd-network/sd-dhcp-client.c	2020-07-30 14:02:36.000000000 -0500
++++ systemd-246/src/libsystemd-network/sd-dhcp-client.c	2021-07-22 14:26:24.644027506 -0500
+@@ -29,6 +29,7 @@
+ #include "strv.h"
+ #include "utf8.h"
+ #include "web-util.h"
++#include "fd-util.h"
+ 
+ #define MAX_CLIENT_ID_LEN (sizeof(uint32_t) + MAX_DUID_LEN)  /* Arbitrary limit */
+ #define MAX_MAC_ADDR_LEN CONST_MAX(INFINIBAND_ALEN, ETH_ALEN)
+@@ -1513,9 +1514,17 @@ static int client_handle_forcerenew(sd_d
+         if (r != DHCP_FORCERENEW)
+                 return -ENOMSG;
+ 
++#if 0
+         log_dhcp_client(client, "FORCERENEW");
+ 
+         return 0;
++#else
++        // FIXME: Ignore FORCERENEW requests until we implement RFC3118 (Authentication for DHCP
++        // Messages) and/or RFC6704 (Forcerenew Nonce Authentication), as unauthenticated FORCERENEW
++        // requests cause a security issue (CVE-2020-13529)
++        log_dhcp_client(client, "Received FORCERENEW, ignoring.");
++        return -ENOMSG;
++#endif
+ }
+ 
+ static bool lease_equal(const sd_dhcp_lease *a, const sd_dhcp_lease *b) {
+@@ -1737,7 +1746,7 @@ static int client_set_lease_timeouts(sd_
+ static int client_handle_message(sd_dhcp_client *client, DHCPMessage *message, int len) {
+         DHCP_CLIENT_DONT_DESTROY(client);
+         char time_string[FORMAT_TIMESPAN_MAX];
+-        int r = 0, notify_event = 0;
++        int r, notify_event;
+ 
+         assert(client);
+         assert(client->event);
+@@ -1747,21 +1756,19 @@ static int client_handle_message(sd_dhcp
+         case DHCP_STATE_SELECTING:
+ 
+                 r = client_handle_offer(client, message, len);
+-                if (r >= 0) {
++                if (r == -ENOMSG)
++                   return 0; // invalid message, let's ignore it
++                if (r < 0)
++                   goto error;
+ 
+-                        client->state = DHCP_STATE_REQUESTING;
+-                        client->attempt = 0;
++                   client->state = DHCP_STATE_REQUESTING;
++                   client->attempt = 0;
+ 
+-                        r = event_reset_time(client->event, &client->timeout_resend,
+-                                             clock_boottime_or_monotonic(),
+-                                             0, 0,
+-                                             client_timeout_resend, client,
+-                                             client->event_priority, "dhcp4-resend-timer", true);
+-                        if (r < 0)
+-                                goto error;
+-                } else if (r == -ENOMSG)
+-                        /* invalid message, let's ignore it */
+-                        return 0;
++                   r = event_reset_time(client->event, &client->timeout_resend,
++                                        clock_boottime_or_monotonic(),
++                                        0, 0,
++                                        client_timeout_resend, client,
++                                        client->event_priority, "dhcp4-resend-timer", true);
+ 
+                 break;
+ 
+@@ -1771,47 +1778,9 @@ static int client_handle_message(sd_dhcp
+         case DHCP_STATE_REBINDING:
+ 
+                 r = client_handle_ack(client, message, len);
+-                if (r >= 0) {
+-                        client->start_delay = 0;
+-                        (void) event_source_disable(client->timeout_resend);
+-                        client->receive_message =
+-                                sd_event_source_unref(client->receive_message);
+-                        client->fd = asynchronous_close(client->fd);
+-
+-                        if (IN_SET(client->state, DHCP_STATE_REQUESTING,
+-                                   DHCP_STATE_REBOOTING))
+-                                notify_event = SD_DHCP_CLIENT_EVENT_IP_ACQUIRE;
+-                        else if (r != SD_DHCP_CLIENT_EVENT_IP_ACQUIRE)
+-                                notify_event = r;
+-
+-                        client->state = DHCP_STATE_BOUND;
+-                        client->attempt = 0;
+-
+-                        client->last_addr = client->lease->address;
+-
+-                        r = client_set_lease_timeouts(client);
+-                        if (r < 0) {
+-                                log_dhcp_client(client, "could not set lease timeouts");
+-                                goto error;
+-                        }
+-
+-                        r = dhcp_network_bind_udp_socket(client->ifindex, client->lease->address, client->port, client->ip_service_type);
+-                        if (r < 0) {
+-                                log_dhcp_client(client, "could not bind UDP socket");
+-                                goto error;
+-                        }
+-
+-                        client->fd = r;
+-
+-                        client_initialize_io_events(client, client_receive_message_udp);
+-
+-                        if (notify_event) {
+-                                client_notify(client, notify_event);
+-                                if (client->state == DHCP_STATE_STOPPED)
+-                                        return 0;
+-                        }
+-
+-                } else if (r == -EADDRNOTAVAIL) {
++                if (r == -ENOMSG)
++                   return 0; // INGALID message, so let's ignore it.
++                if (r == -EADDRNOTAVAIL) {
+                         /* got a NAK, let's restart the client */
+                         client_notify(client, SD_DHCP_CLIENT_EVENT_EXPIRED);
+ 
+@@ -1828,34 +1797,74 @@ static int client_handle_message(sd_dhcp
+ 
+                         client->start_delay = CLAMP(client->start_delay * 2,
+                                                     RESTART_AFTER_NAK_MIN_USEC, RESTART_AFTER_NAK_MAX_USEC);
+-
+-                        return 0;
+-                } else if (r == -ENOMSG)
+-                        /* invalid message, let's ignore it */
+                         return 0;
++                }
++                if (r < 0)
++                   goto error;
++
++                if (IN_SET(client->state, DHCP_STATE_REQUESTING, DHCP_STATE_REBOOTING))
++                   notify_event = SD_DHCP_CLIENT_EVENT_IP_ACQUIRE;
++                else
++                   notify_event = r;
++
++                client->start_delay = 0;
++                (void) event_source_disable(client->timeout_resend);
++                client->receive_message = sd_event_source_unref(client->receive_message);
++                client->fd = safe_close(client->fd);
++
++                client->state = DHCP_STATE_BOUND;
++                client->attempt = 0;
++
++                client->last_addr = client->lease->address;
++
++                r = client_set_lease_timeouts(client);
++                if (r < 0) {
++                   log_dhcp_client(client, "could not set lease timeouts");
++                   goto error;
++                }
++
++                r = dhcp_network_bind_udp_socket(client->ifindex, client->lease->address, client->port, client->ip_service_type);
++                if (r < 0) {
++                   log_dhcp_client(client, "could not bind UDP socket");
++                   goto error;
++                }
++
++                client->fd = r;
++
++                client_initialize_io_events(client, client_receive_message_udp);
++
++                if (IN_SET(client->state, DHCP_STATE_RENEWING, DHCP_STATE_REBINDING) &&
++                      notify_event == SD_DHCP_CLIENT_EVENT_IP_ACQUIRE)
++                   // FIXME: Hmm, maybe this is a bug...
++                   log_dhcp_client(client, "client_handle_ack() returned SD_DHCP_CLIENT_EVENT_IP_ACQUIRE while DHCP client is %s the address, skipping callback.",
++                                   client->state == DHCP_STATE_RENEWING ? "renewing" : "rebinding");
++                else
++                   client_notify(client, notify_event);
+ 
+                 break;
+ 
+         case DHCP_STATE_BOUND:
+                 r = client_handle_forcerenew(client, message, len);
+-                if (r >= 0) {
+-                        r = client_timeout_t1(NULL, 0, client);
+-                        if (r < 0)
+-                                goto error;
+-                } else if (r == -ENOMSG)
+-                        /* invalid message, let's ignore it */
+-                        return 0;
++                if (r == -ENOMSG)
++                   return 0; // Invalid message, let's ignore it.
++                if (r < 0)
++                   goto error;
++
++                r = client_timeout_t1(NULL, 0, client);
+ 
+                 break;
+ 
+         case DHCP_STATE_INIT:
+         case DHCP_STATE_INIT_REBOOT:
+ 
++                r = 0;
+                 break;
+ 
+         case DHCP_STATE_STOPPED:
+                 r = -EINVAL;
+                 goto error;
++        default:
++                assert_not_reached("invalid state");
+         }
+ 
+ error:
