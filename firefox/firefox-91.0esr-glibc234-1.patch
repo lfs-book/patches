@@ -1,6 +1,6 @@
 Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
 Date: 2021-08-09
-Initial Package Version: 1.6.4
+Initial Package Version: 91.0, 91.0esr
 Upstream Status: Unknown
 Origin: fedora
 Description: Allows firefox to build with glibc-2.34, avoiding:
