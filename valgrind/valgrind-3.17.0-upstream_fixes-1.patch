@@ -1,0 +1,2452 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2021-08-17
+Initial Package Version: 3.17.0
+Upstream Status:         Applied
+Origin:                  Upstream (12 GIT commits)
+Description:             Fixes several runtime issues in Valgrind caused by
+                         glibc-2.34. A good chunk of these are due to the
+                         system-wide supplement files no longer knowing how
+                         to access libc/libpthread/nptl. Another chunk of the
+                         issues are due to new system calls that were made
+                         available in glibc-2.34. When running tests with this
+                         patch, failures are down to 9 (documented). However,
+                         without the patch, over 100 failures are expected (out
+                         of 700), and entire test suites fail to execute without
+                         segmentation faults. 
+
+diff -Naurp valgrind-3.17.0.orig/callgrind/fn.c valgrind-3.17.0/callgrind/fn.c
+--- valgrind-3.17.0.orig/callgrind/fn.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/callgrind/fn.c	2021-08-17 12:07:07.525466287 -0500
+@@ -665,7 +665,7 @@ fn_node* CLG_(get_fn_node)(BB* bb)
+       if (bb->sect_kind == Vg_SectPLT)	
+ 	fn->skip = CLG_(clo).skip_plt;
+ 
+-      if (VG_(strcmp)(fn->name, "_dl_runtime_resolve")==0) {
++      if (VG_(strncmp)(fn->name, "_dl_runtime_resolve", 19)==0) {
+ 	  fn->pop_on_jump = True;
+ 
+ 	  if (VG_(clo_verbosity) > 1)
+diff -Naurp valgrind-3.17.0.orig/configure.ac valgrind-3.17.0/configure.ac
+--- valgrind-3.17.0.orig/configure.ac	2021-03-19 03:12:23.000000000 -0500
++++ valgrind-3.17.0/configure.ac	2021-08-17 15:01:06.697417024 -0500
+@@ -115,7 +115,7 @@ rm $tmpfile
+ 
+ # Make sure we can compile in C99 mode.
+ AC_PROG_CC_C99
+-if test "$ac_cv_prog_cc_c99" == "no"; then
++if test "$ac_cv_prog_cc_c99" = "no"; then
+     AC_MSG_ERROR([Valgrind relies on a C compiler supporting C99])
+ fi
+ 
+@@ -1090,6 +1090,31 @@ if test x$GLIBC_VERSION = x; then
+     fi
+ fi
+ 
++# If this is glibc then figure out the generic (in file) libc.so and
++# libpthread.so file paths to use in supressions. Before 2.34 libpthread
++# was a separate library, afterwards it was merged into libc.so and
++# the library is called libc.so.6 (before it was libc-2.[0-9]+.so).
++# Use this fact to set GLIBC_LIBC_PATH and GLIBC_LIBPTHREAD_PATH.
++case ${GLIBC_VERSION} in
++   2*)
++      AC_MSG_CHECKING([whether pthread_create needs libpthread])
++      AC_LINK_IFELSE([AC_LANG_CALL([], [pthread_create])],
++      [
++        AC_MSG_RESULT([no])
++        GLIBC_LIBC_PATH="*/lib*/libc.so.6"
++        GLIBC_LIBPTHREAD_PATH="$GLIBC_LIBC_PATH"
++      ], [
++        AC_MSG_RESULT([yes])
++        GLIBC_LIBC_PATH="*/lib*/libc-2.*so*"
++        GLIBC_LIBPTHREAD_PATH="*/lib*/libpthread-2.*so*"
++      ])
++      ;;
++   *)
++      AC_MSG_CHECKING([not glibc...])
++      AC_MSG_RESULT([${GLIBC_VERSION}])
++      ;;
++esac
++
+ AC_MSG_CHECKING([the glibc version])
+ 
+ case "${GLIBC_VERSION}" in
+@@ -1102,13 +1127,13 @@ case "${GLIBC_VERSION}" in
+      2.[[3-6]])
+ 	AC_MSG_RESULT(${GLIBC_VERSION} family)
+ 	DEFAULT_SUPP="glibc-${GLIBC_VERSION}.supp ${DEFAULT_SUPP}"
+-	DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
++	DEFAULT_SUPP="glibc-2.X-helgrind.supp ${DEFAULT_SUPP}"
+ 	DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
+ 	;;
+      2.[[7-9]])
+ 	AC_MSG_RESULT(${GLIBC_VERSION} family)
+ 	DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
+-	DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
++	DEFAULT_SUPP="glibc-2.X-helgrind.supp ${DEFAULT_SUPP}"
+ 	DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
+ 	;;
+      2.10|2.11)
+@@ -1116,7 +1141,7 @@ case "${GLIBC_VERSION}" in
+ 	AC_DEFINE([GLIBC_MANDATORY_STRLEN_REDIRECT], 1,
+ 		  [Define to 1 if strlen() has been optimized heavily (amd64 glibc >= 2.10)])
+ 	DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
+-	DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
++	DEFAULT_SUPP="glibc-2.X-helgrind.supp ${DEFAULT_SUPP}"
+ 	DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
+ 	;;
+      2.*)
+@@ -1126,7 +1151,7 @@ case "${GLIBC_VERSION}" in
+ 	AC_DEFINE([GLIBC_MANDATORY_INDEX_AND_STRLEN_REDIRECT], 1,
+ 		  [Define to 1 if index() and strlen() have been optimized heavily (x86 glibc >= 2.12)])
+ 	DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
+-	DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
++	DEFAULT_SUPP="glibc-2.X-helgrind.supp ${DEFAULT_SUPP}"
+ 	DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
+ 	;;
+      darwin)
+@@ -1157,7 +1182,8 @@ case "${GLIBC_VERSION}" in
+ esac
+ 
+ AC_SUBST(GLIBC_VERSION)
+-
++AC_SUBST(GLIBC_LIBC_PATH)
++AC_SUBST(GLIBC_LIBPTHREAD_PATH)
+ 
+ if test "$VGCONF_OS" != "solaris"; then
+     # Add default suppressions for the X client libraries.  Make no
+@@ -4376,6 +4402,7 @@ AC_CHECK_LIB([rt], [clock_gettime])
+ 
+ AC_CHECK_FUNCS([     \
+         clock_gettime\
++        copy_file_range \
+         epoll_create \
+         epoll_pwait  \
+         klogctl      \
+@@ -4386,16 +4413,23 @@ AC_CHECK_FUNCS([     \
+         mkdir        \
+         mremap       \
+         ppoll        \
++        preadv       \
++        preadv2      \
++        process_vm_readv \
++        process_vm_writev \
+         pthread_barrier_init       \
+         pthread_condattr_setclock  \
+         pthread_mutex_timedlock    \
+         pthread_rwlock_timedrdlock \
+         pthread_rwlock_timedwrlock \
++        pthread_setname_np         \
+         pthread_spin_lock          \
+         pthread_yield              \
+-        pthread_setname_np         \
++        pwritev      \
++        pwritev2     \
+         readlinkat   \
+         semtimedop   \
++        setcontext   \
+         signalfd     \
+         sigwaitinfo  \
+         strchr       \
+@@ -4403,15 +4437,9 @@ AC_CHECK_FUNCS([     \
+         strpbrk      \
+         strrchr      \
+         strstr       \
++        swapcontext  \
+         syscall      \
+         utimensat    \
+-        process_vm_readv  \
+-        process_vm_writev \
+-        copy_file_range \
+-        preadv \
+-        pwritev \
+-        preadv2 \
+-        pwritev2 \
+         ])
+ 
+ # AC_CHECK_LIB adds any library found to the variable LIBS, and links these
+@@ -4433,6 +4461,8 @@ AM_CONDITIONAL([HAVE_PREADV_PWRITEV],
+                [test x$ac_cv_func_preadv = xyes && test x$ac_cv_func_pwritev = xyes])
+ AM_CONDITIONAL([HAVE_PREADV2_PWRITEV2],
+                [test x$ac_cv_func_preadv2 = xyes && test x$ac_cv_func_pwritev2 = xyes])
++AM_CONDITIONAL([HAVE_SETCONTEXT], [test x$ac_cv_func_setcontext = xyes])
++AM_CONDITIONAL([HAVE_SWAPCONTEXT], [test x$ac_cv_func_swapcontext = xyes])
+ AM_CONDITIONAL([HAVE_MEMFD_CREATE],
+                [test x$ac_cv_func_memfd_create = xyes])
+ 
+@@ -4909,6 +4939,8 @@ AC_CONFIG_FILES([
+    valgrind.spec
+    valgrind.pc
+    glibc-2.X.supp
++   glibc-2.X-helgrind.supp
++   glibc-2.X-drd.supp
+    docs/Makefile 
+    tests/Makefile 
+    tests/vg_regtest 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_debuginfo/debuginfo.c valgrind-3.17.0/coregrind/m_debuginfo/debuginfo.c
+--- valgrind-3.17.0.orig/coregrind/m_debuginfo/debuginfo.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_debuginfo/debuginfo.c	2021-08-17 15:20:05.109051206 -0500
+@@ -2289,6 +2289,7 @@ Vg_FnNameKind VG_(get_fnname_kind) ( con
+        VG_STREQN(18, "__libc_start_main.", name) || // gcc optimization
+        VG_STREQ("generic_start_main", name) ||  // Yellow Dog doggedness
+        VG_STREQN(19, "generic_start_main.", name) || // gcc optimization
++       VG_STREQ("_start", name) ||
+ #      elif defined(VGO_darwin)
+        // See readmacho.c for an explanation of this.
+        VG_STREQ("start_according_to_valgrind", name) ||  // Darwin, darling
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_debuginfo/image.c valgrind-3.17.0/coregrind/m_debuginfo/image.c
+--- valgrind-3.17.0.orig/coregrind/m_debuginfo/image.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_debuginfo/image.c	2021-08-17 12:12:01.786585528 -0500
+@@ -523,14 +523,24 @@ static void realloc_CEnt ( DiImage* img,
+    to make space. */
+ static void move_CEnt_to_top ( DiImage* img, UInt entNo )
+ {
+-   vg_assert(img->ces_used <= CACHE_N_ENTRIES);
+-   vg_assert(entNo > 0 && entNo < img->ces_used);
+-   CEnt* tmp = img->ces[entNo];
+-   while (entNo > 0) {
++   vg_assert(entNo < img->ces_used);
++   if (LIKELY(entNo == 1)) {
++      CEnt* tmp = img->ces[1];
++      img->ces[entNo] = img->ces[0];
++      img->ces[0] = tmp;
++   } else {
++      vg_assert(entNo > 1); // a.k.k >= 2
++      CEnt* tmp = img->ces[entNo];
+       img->ces[entNo] = img->ces[entNo-1];
+       entNo--;
++      img->ces[entNo] = img->ces[entNo-1];
++      entNo--;
++      while (entNo > 0) {
++         img->ces[entNo] = img->ces[entNo-1];
++         entNo--;
++      }
++      img->ces[0] = tmp;
+    }
+-   img->ces[0] = tmp;
+ }
+ 
+ /* Set the given entry so that it has a chunk of the file containing
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_debuginfo/readelf.c valgrind-3.17.0/coregrind/m_debuginfo/readelf.c
+--- valgrind-3.17.0.orig/coregrind/m_debuginfo/readelf.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_debuginfo/readelf.c	2021-08-17 11:57:55.456964959 -0500
+@@ -2879,13 +2879,15 @@ Bool ML_(read_elf_debug_info) ( struct _
+       /* Look for a build-id */
+       HChar* buildid = find_buildid(mimg, False, False);
+ 
+-      /* Look for a debug image that matches either the build-id or
++      /* If we don't have a .debug_info section in the main image then
++       * look for a debug image that matches either the build-id or
+          the debuglink-CRC32 in the main image.  If the main image
+          doesn't contain either of those then this won't even bother
+          to try looking.  This looks in all known places, including
+          the --extra-debuginfo-path if specified and on the
+          --debuginfo-server if specified. */
+-      if (buildid != NULL || debuglink_escn.img != NULL) {
++      if (debug_info_escn.img == NULL && 
++          (buildid != NULL || debuglink_escn.img != NULL)) {
+          /* Do have a debuglink section? */
+          if (debuglink_escn.img != NULL) {
+             UInt crc_offset 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-amd64-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-amd64-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-amd64-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-amd64-linux.c	2021-08-17 15:05:41.807214964 -0500
+@@ -874,6 +874,8 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
++
+    LINX_(__NR_faccessat2,	 sys_faccessat2),        // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-arm64-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-arm64-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-arm64-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-arm64-linux.c	2021-08-17 15:06:26.416854313 -0500
+@@ -830,6 +830,8 @@ static SyscallTableEntry syscall_main_ta
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
++
+    LINX_(__NR_faccessat2,        sys_faccessat2),        // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-arm-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-arm-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-arm-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-arm-linux.c	2021-08-17 15:06:12.901963658 -0500
+@@ -1051,6 +1051,8 @@ static SyscallTableEntry syscall_main_ta
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
++
+    LINX_(__NR_faccessat2,    sys_faccessat2),           // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-linux.c	2021-08-17 11:58:44.204658582 -0500
+@@ -940,7 +940,7 @@ PRE(sys_clone)
+          ("Valgrind does not support general clone().");
+    }
+ 
+-   if (SUCCESS) {
++   if (SUCCESS && RES != 0) {
+       if (ARG_FLAGS & (VKI_CLONE_PARENT_SETTID | VKI_CLONE_PIDFD))
+          POST_MEM_WRITE(ARG3, sizeof(Int));
+       if (ARG_FLAGS & (VKI_CLONE_CHILD_SETTID | VKI_CLONE_CHILD_CLEARTID))
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-mips32-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-mips32-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-mips32-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-mips32-linux.c	2021-08-17 15:06:52.869640093 -0500
+@@ -1136,6 +1136,8 @@ static SyscallTableEntry syscall_main_ta
+    LINXY(__NR_io_uring_enter,          sys_io_uring_enter),          // 426
+    LINXY(__NR_io_uring_register,       sys_io_uring_register),       // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
++
+    LINX_ (__NR_faccessat2,             sys_faccessat2),              // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-mips64-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-mips64-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-mips64-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-mips64-linux.c	2021-08-17 15:07:17.421441036 -0500
+@@ -815,6 +815,7 @@ static SyscallTableEntry syscall_main_ta
+    LINXY (__NR_io_uring_setup, sys_io_uring_setup),
+    LINXY (__NR_io_uring_enter, sys_io_uring_enter),
+    LINXY (__NR_io_uring_register, sys_io_uring_register),
++   GENX_ (__NR_clone3,            sys_ni_syscall),
+    LINX_ (__NR_faccessat2, sys_faccessat2),
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-nanomips-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-nanomips-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-nanomips-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-nanomips-linux.c	2021-08-17 15:07:44.890218047 -0500
+@@ -824,6 +824,7 @@ static SyscallTableEntry syscall_main_ta
+    LINXY (__NR_io_uring_setup,         sys_io_uring_setup),
+    LINXY (__NR_io_uring_enter,         sys_io_uring_enter),
+    LINXY (__NR_io_uring_register,      sys_io_uring_register),
++   GENX_ (__NR_clone3,                 sys_ni_syscall),        // 435
+    LINX_ (__NR_faccessat2,             sys_faccessat2),
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-ppc32-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-ppc32-linux.c	2021-08-17 15:08:13.124988583 -0500
+@@ -1054,6 +1054,7 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
+    LINX_(__NR_faccessat2,        sys_faccessat2),       // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-ppc64-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-ppc64-linux.c	2021-08-17 15:10:02.338098747 -0500
+@@ -900,8 +900,8 @@ static SyscallTableEntry syscall_table[]
+ 
+    LINXY(__NR_tgkill,            sys_tgkill),             // 250
+ // _____(__NR_utimes,            sys_utimes),             // 251
+-// _____(__NR_statfs64,          sys_statfs64),           // 252
+-// _____(__NR_fstatfs64,         sys_fstatfs64),          // 253
++   GENXY(__NR_statfs64,          sys_statfs64),           // 252
++   GENXY(__NR_fstatfs64,         sys_fstatfs64),          // 253
+ // /* #define __NR_fadvise64_64    254     32bit only */
+ 
+ // _____(__NR_rtas,              sys_rtas),               // 255
+@@ -1023,6 +1023,7 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
+    LINX_(__NR_faccessat2,        sys_faccessat2),       // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-s390x-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-s390x-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-s390x-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-s390x-linux.c	2021-08-17 15:08:37.525790077 -0500
+@@ -864,6 +864,7 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_io_uring_enter, sys_io_uring_enter),                    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register),              // 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
+    LINX_(__NR_faccessat2,  sys_faccessat2),                           // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-x86-linux.c valgrind-3.17.0/coregrind/m_syswrap/syswrap-x86-linux.c
+--- valgrind-3.17.0.orig/coregrind/m_syswrap/syswrap-x86-linux.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/coregrind/m_syswrap/syswrap-x86-linux.c	2021-08-17 15:08:49.586691890 -0500
+@@ -1645,6 +1645,7 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),   // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register),// 427
+ 
++   GENX_(__NR_clone3,            sys_ni_syscall),        // 435
+    LINX_(__NR_faccessat2,	 sys_faccessat2),       // 439
+ };
+ 
+diff -Naurp valgrind-3.17.0.orig/drd/tests/Makefile.am valgrind-3.17.0/drd/tests/Makefile.am
+--- valgrind-3.17.0.orig/drd/tests/Makefile.am	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/drd/tests/Makefile.am	2021-08-17 12:00:26.609012950 -0500
+@@ -408,7 +408,6 @@ check_PROGRAMS =      \
+   sem_as_mutex        \
+   sem_open            \
+   sigalrm             \
+-  swapcontext         \
+   threaded-fork       \
+   trylock             \
+   unit_bitmap         \
+@@ -470,6 +469,10 @@ if HAVE_PTHREAD_SPINLOCK
+ check_PROGRAMS += pth_spinlock
+ endif
+ 
++if HAVE_SWAPCONTEXT
++check_PROGRAMS += swapcontext
++endif
++
+ if !VGCONF_OS_IS_DARWIN
+ check_PROGRAMS += sem_wait
+ endif
+diff -Naurp valgrind-3.17.0.orig/drd/tests/swapcontext.c valgrind-3.17.0/drd/tests/swapcontext.c
+--- valgrind-3.17.0.orig/drd/tests/swapcontext.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/drd/tests/swapcontext.c	2021-08-17 12:08:04.244104321 -0500
+@@ -25,6 +25,10 @@ typedef struct thread_local {
+   size_t nrsw;
+ } thread_local_t;
+ 
++static void sig_alrm_handler(int signo) {
++   _exit(1);
++}
++
+ static void f(void *data, int n)
+ {
+   enum { NR_SWITCHES = 200000 };
+@@ -76,6 +80,7 @@ int main(int argc, char *argv[])
+   pthread_attr_t attr;
+   int i, res;
+ 
++  signal(SIGALRM, sig_alrm_handler);
+   memset(tlocal, 0, sizeof(tlocal));
+ 
+   pthread_attr_init(&attr);
+diff -Naurp valgrind-3.17.0.orig/drd/tests/swapcontext.stderr.exp valgrind-3.17.0/drd/tests/swapcontext.stderr.exp
+--- valgrind-3.17.0.orig/drd/tests/swapcontext.stderr.exp	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/drd/tests/swapcontext.stderr.exp	2021-08-17 12:08:29.720941634 -0500
+@@ -1,7 +1,3 @@
+ 
+ 
+-Process terminating with default action of signal 14 (SIGALRM)
+-   at 0x........: swapcontext (in /...libc...)
+-   by 0x........: f (swapcontext.c:?)
+-
+ ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+diff -Naurp valgrind-3.17.0.orig/gdbserver_tests/filter_gdb valgrind-3.17.0/gdbserver_tests/filter_gdb
+--- valgrind-3.17.0.orig/gdbserver_tests/filter_gdb	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/gdbserver_tests/filter_gdb	2021-08-17 14:51:44.113698399 -0500
+@@ -111,6 +111,7 @@ s/\(0x........\) in ?? ()$/\1 in syscall
+ #         If select.c sources are present, we can also get a line containing:
+ #              return SYSCALL_CANCEL....
+ s/in __select .*/in syscall .../
++s/in __select$/in syscall .../
+ /exceptfds/d
+ /sysv\/linux\/select\.c/d
+ /return SYSCALL_CANCEL /d
+diff -Naurp valgrind-3.17.0.orig/gdbserver_tests/filter_vgdb valgrind-3.17.0/gdbserver_tests/filter_vgdb
+--- valgrind-3.17.0.orig/gdbserver_tests/filter_vgdb	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/gdbserver_tests/filter_vgdb	2021-08-17 14:52:21.981425494 -0500
+@@ -18,6 +18,7 @@ sed -e '/relaying data between gdb and p
+     
+ # filter some debuginfo problems with ld.so and SLES11
+ sed -e '/^1	rtld.c: No such file or directory\./d' |
++sed -e '/rtld.c: Inappropriate ioctl for device\./d' |
+ 
+ # and filter out any remaining empty lines
+ sed -e '/^$/d'
+diff -Naurp valgrind-3.17.0.orig/glibc-2.34567-NPTL-helgrind.supp valgrind-3.17.0/glibc-2.34567-NPTL-helgrind.supp
+--- valgrind-3.17.0.orig/glibc-2.34567-NPTL-helgrind.supp	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/glibc-2.34567-NPTL-helgrind.supp	1969-12-31 18:00:00.000000000 -0600
+@@ -1,301 +0,0 @@
+-
+-# FIXME 22 Jan 09: helgrind-glibc2X-005 overlaps with a lot of
+-# other stuff.  They should be removed.
+-
+-##----------------------------------------------------------------------##
+-# Suppressions for the Helgrind tool when using 
+-# a glibc-2.{3,4,5,6,7,8,9} system
+-
+-####################################################
+-# glibc-2.X specific
+-# These are generic cover-alls which catch a lot of stuff
+-# in various combinations of ld, libc and libpthread
+-#
+-# Note this is heavyhanded and not very clever:
+-#
+-# - suppress anything that has its top frame in ld.so
+-#   That's fine, since it's mostly dynamic linking stuff,
+-#   which has various deliberate (harmless) races
+-#
+-# - suppress anything that has its top frame in libc.so.
+-#   This really isn't clever, since it could hide some 
+-#   legitimate races.  But the problem is, if we don't do
+-#   this, then loads of errors to do with stdio are reported, because
+-#   H fails to see glibc's internal locking/unlocking of FILE*s
+-#   as required by POSIX.  A better solution is needed.
+-#
+-# - some of the stdio functions in newer glibc manipulate stdio
+-#   FILE*s state through mempcpy, which we intercept, so we also need
+-#   to suppress such manipulations.
+-
+-#{
+-#   helgrind-glibc2X-001
+-#   Helgrind:Race
+-#   obj:*/lib*/ld-2.*so*
+-#}
+-
+-# helgrind-glibc2X-002 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-003 was merged into helgrind-glibc2X-001
+-
+-{
+-   helgrind-glibc2X-004
+-   Helgrind:Race
+-   obj:*/lib*/libc-2.*so*
+-}
+-
+-{
+-   helgrind-glibc-io-xsputn-mempcpy
+-   Helgrind:Race
+-   fun:__GI_mempcpy
+-   fun:_IO_*xsputn*
+-   obj:*/lib*/libc-2.*so*
+-}
+-
+-{
+-   helgrind-glibc2X-005
+-   Helgrind:Race
+-   obj:*/lib*/libpthread-2.*so*
+-}
+-
+-# helgrind-glibc2X-006 was merged into helgrind-glibc2X-005
+-
+-# helgrind-glibc2X-007 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-008 was merged into helgrind-glibc2X-004
+-
+-# helgrind-glibc2X-009 was merged into helgrind-glibc2X-004
+-
+-# helgrind-glibc2X-010 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-011 was merged into helgrind-glibc2X-004
+-
+-# helgrind-glibc2X-012 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-013 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-014 was merged into helgrind-glibc2X-001
+-
+-# helgrind-glibc2X-015 was merged into helgrind-glibc2X-004
+-
+-# helgrind-glibc2X-016 was merged into helgrind-glibc2X-004
+-
+-# These are very ugly.  They are needed to suppress errors inside (eg)
+-# NPTL's pthread_cond_signal.  Why only one stack frame -- at least we
+-# should see the wrapper calling the real functions, right?
+-# Unfortunately, no: the real functions are handwritten assembly (in
+-# the glibc-2.5 sources) and does not create a proper stack frame.
+-# Therefore it's only one level of unwinding before we're back out in
+-# user code rather than the 2 levels you'd expect.
+-{
+-   helgrind-glibc2X-101
+-   Helgrind:Race
+-   obj:*/lib*/libpthread-2.*so*
+-   fun:pthread_*
+-}
+-{
+-   helgrind-glibc2X-102
+-   Helgrind:Race
+-   fun:mythread_wrapper
+-   obj:*/lib*/libpthread-2.*so*
+-}
+-{
+-   helgrind-glibc2X-103
+-   Helgrind:Race
+-   fun:pthread_cond_*@@GLIBC_2.*
+-}
+-{
+-   helgrind-glibc2X-104
+-   Helgrind:Race
+-   fun:__lll_mutex_*
+-}
+-{
+-   helgrind-glibc2X-105
+-   Helgrind:Race
+-   fun:pthread_rwlock_*lock*
+-}
+-{
+-   helgrind-glibc2X-106
+-   Helgrind:Race
+-   fun:__lll_lock_wait
+-}
+-{
+-   helgrind-glibc2X-107
+-   Helgrind:Race
+-   obj:*/lib*/libpthread-2.*so*
+-   fun:sem_*
+-}
+-{
+-   helgrind-glibc2X-108
+-   Helgrind:Race
+-   fun:clone
+-}
+-{
+-   helgrind-glibc2X-109
+-   Helgrind:Race
+-   fun:start_thread
+-}
+-{
+-   helgrind-glibc2X-110
+-   Helgrind:Race
+-   obj:*/lib*/libc-2.*so*
+-   fun:pthread_*
+-}
+-{
+-   helgrind-glibc2X-111
+-   Helgrind:Race
+-   fun:__lll_*lock_*
+-}
+-{
+-   helgrind-glibc2X-113
+-   Helgrind:Race
+-   fun:pthread_barrier_wait*
+-}
+-
+-
+-####################################################
+-# qt4 specific (GNU mangling)
+-#
+-{
+-   helgrind-qt4---QMutex::lock()-QMutex::lock()
+-   Helgrind:Race
+-   ...
+-   fun:_ZN6QMutex4lockEv
+-   fun:_ZN6QMutex4lockEv
+-}
+-
+-{                                                               
+-   helgrind-qt4---QMutex::unlock()-QMutex::unlock()
+-   Helgrind:Race                                                
+-   ...
+-   fun:_ZN6QMutex6unlockEv                                      
+-   fun:_ZN6QMutex6unlockEv
+-}
+-
+-{
+-   helgrind-qt4---pthread_setspecific-QThreadPrivate::start(void*)
+-   Helgrind:Race
+-   fun:pthread_setspecific
+-   fun:_ZN14QThreadPrivate5startEPv
+-}
+-
+-
+-####################################################
+-# Other stuff.
+-#
+-# pthread_exit apparently calls some kind of unwind
+-# mechanism - maybe to remove some number of frames
+-# from the thread's stack, so as to get back to the 
+-# outermost frame for the thread?  Anyway..
+-
+-{
+-   helgrind---*Unwind*-...-pthread_exit
+-   Helgrind:Race
+-   fun:*Unwind*
+-   ...
+-   fun:pthread_exit
+-}
+-
+-{
+-   helgrind---...-*Unwind*-*pthread_unwind*
+-   Helgrind:Race
+-   ...
+-   fun:*Unwind*
+-   fun:*pthread_unwind*
+-}
+-
+-{
+-   helgrind---...-*Unwind*-*pthread_unwind*
+-   Helgrind:Race
+-   ...
+-   fun:_Unwind*
+-   ...
+-   fun:_Unwind_Backtrace
+-}
+-
+-
+-
+-
+-####################################################
+-# To do with thread stack allocation and deallocation?
+-#
+-{
+-   helgrind---free_stacks-__deallocate_stack
+-   Helgrind:Race
+-   fun:free_stacks
+-   fun:__deallocate_stack
+-}
+-
+-{
+-   helgrind---__deallocate_stack-start_thread-clone
+-   Helgrind:Race
+-   fun:__deallocate_stack
+-   fun:start_thread
+-   fun:clone
+-}
+-
+-
+-####################################################
+-# To do with pthread_{set,get}specific
+-#
+-{
+-   helgrind---pthread_setspecific
+-   Helgrind:Race
+-   fun:pthread_setspecific
+-}
+-
+-{
+-   helgrind---pthread_getspecific
+-   Helgrind:Race
+-   fun:pthread_getspecific
+-}
+-
+-
+-####################################################
+-# To do with dynamic linking
+-#
+-# helgrind---ld.so-...-dlsym was merged into helgrind-glibc2X-001
+-
+-{
+-   helgrind---_dl_allocate_tls 
+-   Helgrind:Race
+-   fun:mempcpy
+-   fun:_dl_allocate_tls_init
+-   ...
+-   fun:pthread_create@@GLIBC_2.2*
+-   fun:pthread_create_WRK
+-   fun:pthread_create@*
+-}
+-
+-{
+-   helgrind---_dl_allocate_tls2
+-   Helgrind:Race
+-   fun:memcpy
+-   fun:__mempcpy_inline
+-   fun:_dl_allocate_tls_init
+-   ...
+-   fun:pthread_create@@GLIBC_2.2*
+-   fun:pthread_create_WRK
+-   fun:pthread_create@*
+-}
+-
+-####################################################
+-# To do with GNU libgomp
+-#
+-{
+-   helgrind---libgomp43-1
+-   Helgrind:Race
+-   fun:gomp_ordered_sync
+-}
+-
+-{
+-   helgrind---libgomp43-1
+-   Helgrind:Race
+-   fun:gomp_ordered_next
+-}
+-
+-{
+-   helgrind---libgomp43-1
+-   Helgrind:Race
+-   fun:gomp_ordered_last
+-}
+diff -Naurp valgrind-3.17.0.orig/glibc-2.X-drd.supp valgrind-3.17.0/glibc-2.X-drd.supp
+--- valgrind-3.17.0.orig/glibc-2.X-drd.supp	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/glibc-2.X-drd.supp	1969-12-31 18:00:00.000000000 -0600
+@@ -1,330 +0,0 @@
+-#
+-# Suppression patterns for ld, the dynamic loader.
+-#
+-
+-# Suppress all data races triggered by ld.
+-{
+-   drd-ld
+-   drd:ConflictingAccess
+-   obj:*/lib*/ld-*.so
+-}
+-
+-#
+-# Suppression patterns for libc.
+-#
+-
+-# Suppress all data races where the topmost frame is inside libc.so. Although
+-# this could hide some real data races, unfortunately this is the only way to
+-# not report any false positives on stdio functions. The glibc functions
+-# manipulating FILE objects use locking primitives that cannot be intercepted
+-# easily. See also the definitions of _IO_lock_lock() etc. in the file
+-# nptl/sysdeps/pthread/bits/stdio-lock.h in the glibc source tree.
+-{
+-   drd-libc-stdio
+-   drd:ConflictingAccess
+-   obj:*/lib*/libc-*
+-}
+-{
+-   drd-libc-thread-cancellation-test
+-   drd:ConflictingAccess
+-   fun:write
+-}
+-{
+-   drd-libc-random
+-   drd:ConflictingAccess
+-   fun:random_r
+-   fun:random
+-}
+-
+-#
+-# Suppression patterns for libstdc++, the implementation of the standard C++
+-# library included with the gcc compiler.
+-#
+-# Note: several versions of the libstdc++ library (4.2.2, 4.3.2, 4.4.0, 4.5.0
+-# and their predecessors) contain an implementation of the std::string class
+-# that triggers conflicting memory accesses. See also
+-# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=40518
+-#
+-
+-# {
+-#    drd-libstdc++-std::string::string()
+-#    drd:ConflictingAccess
+-#    fun:_ZNSsC1ERKSs
+-# }
+-
+-{
+-   drd-libstdc++-cxa_guard_release
+-   drd:CondErr
+-   fun:pthread_cond_broadcast@*
+-   fun:__cxa_guard_release
+-}
+-{
+-   drd-libstdc++-std::__ostream_insert()
+-   drd:ConflictingAccess
+-   fun:_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l
+-   fun:_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc
+-}
+-{
+-   drd-libstdc++-std::ostream::_M_insert<long>()
+-   drd:ConflictingAccess
+-   ...
+-   fun:_ZNSo9_M_insertIlEERSoT_
+-}
+-
+-
+-#
+-# Suppression patterns for libpthread.
+-#
+-
+-{
+-   drd-libpthread-pthread_create
+-   drd:ConflictingAccess
+-   ...
+-   fun:pthread_create*
+-}
+-{
+-   drd-libpthread-pthread_join
+-   drd:ConflictingAccess
+-   fun:pthread_join
+-   fun:pthread_join
+-}
+-{
+-   drd-libpthread-__deallocate_stack
+-   drd:ConflictingAccess
+-   ...
+-   fun:__deallocate_stack
+-}
+-{
+-   drd-libpthread-__free_stacks
+-   drd:ConflictingAccess
+-   fun:__free_stacks
+-}
+-{
+-   drd-libpthread-__free_tcb
+-   drd:ConflictingAccess
+-   ...
+-   fun:__free_tcb
+-}
+-{
+-   drd-libpthread-__nptl_deallocate_tsd
+-   drd:ConflictingAccess
+-   fun:__nptl_deallocate_tsd
+-}
+-{
+-   drd-libpthread-pthread_detach
+-   drd:ConflictingAccess
+-   fun:pthread_detach
+-   fun:pthread_detach
+-}
+-{
+-   drd-libpthread-pthread_once
+-   drd:ConflictingAccess
+-   fun:pthread_once
+-}
+-{
+-   drd-libpthread-pthread_cancel_init
+-   drd:ConflictingAccess
+-   fun:pthread_cancel_init
+-}
+-{
+-   drd-libpthread-pthread_cancel
+-   drd:ConflictingAccess
+-   fun:pthread_cancel
+-   fun:pthread_cancel_intercept
+-}
+-{
+-   drd-libpthread-_Unwind_ForcedUnwind
+-   drd:ConflictingAccess
+-   ...
+-   fun:_Unwind_ForcedUnwind
+-}
+-{
+-   drd-libpthread-_Unwind_GetCFA
+-   drd:ConflictingAccess
+-   fun:_Unwind_GetCFA
+-}
+-{
+-   drd-libpthread-_Unwind_Resume
+-   drd:ConflictingAccess
+-   ...
+-   fun:_Unwind_Resume
+-}
+-{
+-   drd-libpthread-?
+-   drd:ConflictingAccess
+-   obj:*/lib/libgcc_s.so.1
+-}
+-{
+-   drd-libpthread-nanosleep
+-   drd:ConflictingAccess
+-   fun:nanosleep
+-}
+-
+-#
+-# Suppression patterns for libgomp.
+-#
+-
+-# Unfortunately many statements in libgomp trigger conflicting accesses. It is
+-# not clear to me which of these are safe and which ones not. See also
+-# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=40362
+-{
+-   drd-libgomp
+-   drd:ConflictingAccess
+-   obj:/usr/lib*/libgomp.so*
+-}
+-
+-#
+-# Suppression patterns for libX11.
+-#
+-
+-{
+-   drd-libX11-XCreateFontSet
+-   drd:CondErr
+-   fun:pthread_cond_init*
+-   fun:_XReply
+-   fun:XListFontsWithInfo
+-   obj:/usr/lib*/libX11.so*
+-   fun:XCreateOC
+-   fun:XCreateFontSet
+-}
+-
+-#
+-# Suppression patterns for libxcb.
+-#
+-
+-{
+-   drd-libxcb-xcb_wait_for_reply
+-   drd:CondErr
+-   ...
+-   fun:pthread_cond_destroy*
+-   fun:xcb_wait_for_reply
+-}
+-
+-#
+-# Suppression patterns for libglib.
+-#
+-
+-{
+-   drd-libglib-access-g_threads_got_initialized
+-   drd:ConflictingAccess
+-   ...
+-   fun:g_slice_alloc
+-   fun:g_ptr_array_sized_new
+-}
+-{
+-   drd-libglib-access-g_threads_got_initialized
+-   drd:ConflictingAccess
+-   ...
+-   fun:_ZN27QEventDispatcherGlibPrivateC1EP13_GMainContext
+-   fun:_ZN20QEventDispatcherGlibC1EP7QObject
+-   obj:/usr/lib*/libQtCore.so.4.*
+-   obj:/usr/lib*/libQtCore.so.4.*
+-}
+-{
+-   drd-libglib-access-g_mem_initialized
+-   drd:ConflictingAccess
+-   fun:g_malloc0
+-}
+-{
+-   drd-libglib-g_private_get_posix_impl
+-   drd:ConflictingAccess
+-   fun:g_private_get_posix_impl
+-}
+-{
+-   drd-libglib-g_private_set_posix_impl
+-   drd:ConflictingAccess
+-   fun:g_private_set_posix_impl
+-}
+-{
+-   drd-libglib-g_get_language_names
+-   drd:ConflictingAccess
+-   fun:g_slice_free_chain_with_offset
+-}
+-{
+-   drd-libglib-g_main_context_new
+-   drd:ConflictingAccess
+-   fun:fcntl
+-   obj:/usr/lib*/libglib-*.so*
+-   fun:g_main_context_new
+-}
+-
+-#
+-# Suppression patterns for libQtCore.
+-#
+-
+-{
+-   drd-libQtCore-deref-that-calls-QThreadData-destructor
+-   drd:ConflictingAccess
+-   fun:_ZN11QThreadDataD1Ev
+-   obj:/usr/lib*/libQtCore.so.4.*
+-}
+-{
+-   drd-libQtCore-4.0/4.1-Q_GLOBAL_STATIC-connectionList
+-   drd:ConflictingAccess
+-   obj:/usr/lib*/libQtCore.so.4.*
+-   fun:_ZN11QMetaObject8activateEP7QObjectiiPPv
+-   fun:_ZN11QMetaObject8activateEP7QObjectPKS_iPPv
+-}
+-{
+-   drd-libQtCore-QObjectPrivate::clearGuards(QObject*)
+-   drd:ConflictingAccess
+-   fun:_ZN14QReadWriteLock12lockForWriteEv
+-   fun:_ZN14QObjectPrivate11clearGuardsEP7QObject
+-   fun:_ZN7QObjectD2Ev
+-}
+-{
+-   drd-libQtCore-QObjectPrivate::clearGuards(QObject*)
+-   drd:ConflictingAccess
+-   fun:_ZN14QReadWriteLock12lockForWriteEv
+-   fun:_ZN12QWriteLocker6relockEv
+-   fun:_ZN12QWriteLockerC1EP14QReadWriteLock
+-   fun:_ZN14QObjectPrivate11clearGuardsEP7QObject
+-   fun:_ZN7QObjectD2Ev
+-   fun:_ZN24QAbstractEventDispatcherD2Ev
+-   fun:_ZN20QEventDispatcherGlibD0Ev
+-}
+-{
+-   drd-libQtCore-QMutexPool::get(void const*)
+-   drd:ConflictingAccess
+-   fun:_ZN10QMutexPool3getEPKv
+-}
+-{
+-   drd-libQtCore-qt_gettime_is_monotonic()
+-   drd:ConflictingAccess
+-   fun:_Z23qt_gettime_is_monotonicv
+-}
+-
+-#
+-# Suppression patterns for libboost.
+-#
+-
+-# Suppress the races on boost::once_flag::epoch and on
+-# boost::detail::this_thread_epoch. See also the source file
+-# boost/thread/pthread/once.hpp in the Boost source tree
+-# (https://svn.boost.org/trac/boost/browser/trunk/boost/thread/pthread/once.hpp).
+-{
+-   drd-libboost-boost::call_once<void (*)()>(boost::once_flag&, void (*)())
+-   drd:ConflictingAccess
+-   ...
+-   fun:_ZN5boost9call_onceIPFvvEEEvRNS_9once_flagET_
+-}
+-{
+-   drd-libboost-boost::detail::get_once_per_thread_epoch()
+-   drd:ConflictingAccess
+-   fun:_ZN5boost6detail25get_once_per_thread_epochEv
+-}
+-# Suppress the race reports on boost::detail::current_thread_tls_key. See also
+-# https://svn.boost.org/trac/boost/ticket/3526 for more information about why
+-# the access pattern of current_thread_tls_key is safe.
+-{
+-   drd-libboost-boost::detail::get_current_thread_data()
+-   drd:ConflictingAccess
+-   ...
+-   fun:_ZN5boost6detail23get_current_thread_dataEv
+-}
+-{
+-   drd-libboost-boost::detail::set_current_thread_data(boost::detail::thread_data_base*)
+-   drd:ConflictingAccess
+-   ...
+-   fun:_ZN5boost6detail23set_current_thread_dataEPNS0_16thread_data_baseE
+-}
+diff -Naurp valgrind-3.17.0.orig/glibc-2.X-drd.supp.in valgrind-3.17.0/glibc-2.X-drd.supp.in
+--- valgrind-3.17.0.orig/glibc-2.X-drd.supp.in	1969-12-31 18:00:00.000000000 -0600
++++ valgrind-3.17.0/glibc-2.X-drd.supp.in	2021-08-17 15:02:22.470814953 -0500
+@@ -0,0 +1,330 @@
++#
++# Suppression patterns for ld, the dynamic loader.
++#
++
++# Suppress all data races triggered by ld.
++{
++   drd-ld
++   drd:ConflictingAccess
++   obj:*/lib*/ld*.so*
++}
++
++#
++# Suppression patterns for libc.
++#
++
++# Suppress all data races where the topmost frame is inside libc.so. Although
++# this could hide some real data races, unfortunately this is the only way to
++# not report any false positives on stdio functions. The glibc functions
++# manipulating FILE objects use locking primitives that cannot be intercepted
++# easily. See also the definitions of _IO_lock_lock() etc. in the file
++# nptl/sysdeps/pthread/bits/stdio-lock.h in the glibc source tree.
++{
++   drd-libc-stdio
++   drd:ConflictingAccess
++   obj:@GLIBC_LIBC_PATH@
++}
++{
++   drd-libc-thread-cancellation-test
++   drd:ConflictingAccess
++   fun:write
++}
++{
++   drd-libc-random
++   drd:ConflictingAccess
++   fun:random_r
++   fun:random
++}
++
++#
++# Suppression patterns for libstdc++, the implementation of the standard C++
++# library included with the gcc compiler.
++#
++# Note: several versions of the libstdc++ library (4.2.2, 4.3.2, 4.4.0, 4.5.0
++# and their predecessors) contain an implementation of the std::string class
++# that triggers conflicting memory accesses. See also
++# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=40518
++#
++
++# {
++#    drd-libstdc++-std::string::string()
++#    drd:ConflictingAccess
++#    fun:_ZNSsC1ERKSs
++# }
++
++{
++   drd-libstdc++-cxa_guard_release
++   drd:CondErr
++   fun:pthread_cond_broadcast@*
++   fun:__cxa_guard_release
++}
++{
++   drd-libstdc++-std::__ostream_insert()
++   drd:ConflictingAccess
++   fun:_ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l
++   fun:_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc
++}
++{
++   drd-libstdc++-std::ostream::_M_insert<long>()
++   drd:ConflictingAccess
++   ...
++   fun:_ZNSo9_M_insertIlEERSoT_
++}
++
++
++#
++# Suppression patterns for libpthread.
++#
++
++{
++   drd-libpthread-pthread_create
++   drd:ConflictingAccess
++   ...
++   fun:pthread_create*
++}
++{
++   drd-libpthread-pthread_join
++   drd:ConflictingAccess
++   fun:pthread_join
++   fun:pthread_join
++}
++{
++   drd-libpthread-__deallocate_stack
++   drd:ConflictingAccess
++   ...
++   fun:__deallocate_stack
++}
++{
++   drd-libpthread-__free_stacks
++   drd:ConflictingAccess
++   fun:__free_stacks
++}
++{
++   drd-libpthread-__free_tcb
++   drd:ConflictingAccess
++   ...
++   fun:__free_tcb
++}
++{
++   drd-libpthread-__nptl_deallocate_tsd
++   drd:ConflictingAccess
++   fun:__nptl_deallocate_tsd
++}
++{
++   drd-libpthread-pthread_detach
++   drd:ConflictingAccess
++   fun:pthread_detach
++   fun:pthread_detach
++}
++{
++   drd-libpthread-pthread_once
++   drd:ConflictingAccess
++   fun:pthread_once
++}
++{
++   drd-libpthread-pthread_cancel_init
++   drd:ConflictingAccess
++   fun:pthread_cancel_init
++}
++{
++   drd-libpthread-pthread_cancel
++   drd:ConflictingAccess
++   fun:pthread_cancel
++   fun:pthread_cancel_intercept
++}
++{
++   drd-libpthread-_Unwind_ForcedUnwind
++   drd:ConflictingAccess
++   ...
++   fun:_Unwind_ForcedUnwind
++}
++{
++   drd-libpthread-_Unwind_GetCFA
++   drd:ConflictingAccess
++   fun:_Unwind_GetCFA
++}
++{
++   drd-libpthread-_Unwind_Resume
++   drd:ConflictingAccess
++   ...
++   fun:_Unwind_Resume
++}
++{
++   drd-libpthread-?
++   drd:ConflictingAccess
++   obj:*/lib/libgcc_s.so.1
++}
++{
++   drd-libpthread-nanosleep
++   drd:ConflictingAccess
++   fun:nanosleep
++}
++
++#
++# Suppression patterns for libgomp.
++#
++
++# Unfortunately many statements in libgomp trigger conflicting accesses. It is
++# not clear to me which of these are safe and which ones not. See also
++# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=40362
++{
++   drd-libgomp
++   drd:ConflictingAccess
++   obj:/usr/lib*/libgomp.so*
++}
++
++#
++# Suppression patterns for libX11.
++#
++
++{
++   drd-libX11-XCreateFontSet
++   drd:CondErr
++   fun:pthread_cond_init*
++   fun:_XReply
++   fun:XListFontsWithInfo
++   obj:/usr/lib*/libX11.so*
++   fun:XCreateOC
++   fun:XCreateFontSet
++}
++
++#
++# Suppression patterns for libxcb.
++#
++
++{
++   drd-libxcb-xcb_wait_for_reply
++   drd:CondErr
++   ...
++   fun:pthread_cond_destroy*
++   fun:xcb_wait_for_reply
++}
++
++#
++# Suppression patterns for libglib.
++#
++
++{
++   drd-libglib-access-g_threads_got_initialized
++   drd:ConflictingAccess
++   ...
++   fun:g_slice_alloc
++   fun:g_ptr_array_sized_new
++}
++{
++   drd-libglib-access-g_threads_got_initialized
++   drd:ConflictingAccess
++   ...
++   fun:_ZN27QEventDispatcherGlibPrivateC1EP13_GMainContext
++   fun:_ZN20QEventDispatcherGlibC1EP7QObject
++   obj:/usr/lib*/libQtCore.so.4.*
++   obj:/usr/lib*/libQtCore.so.4.*
++}
++{
++   drd-libglib-access-g_mem_initialized
++   drd:ConflictingAccess
++   fun:g_malloc0
++}
++{
++   drd-libglib-g_private_get_posix_impl
++   drd:ConflictingAccess
++   fun:g_private_get_posix_impl
++}
++{
++   drd-libglib-g_private_set_posix_impl
++   drd:ConflictingAccess
++   fun:g_private_set_posix_impl
++}
++{
++   drd-libglib-g_get_language_names
++   drd:ConflictingAccess
++   fun:g_slice_free_chain_with_offset
++}
++{
++   drd-libglib-g_main_context_new
++   drd:ConflictingAccess
++   fun:fcntl
++   obj:/usr/lib*/libglib-*.so*
++   fun:g_main_context_new
++}
++
++#
++# Suppression patterns for libQtCore.
++#
++
++{
++   drd-libQtCore-deref-that-calls-QThreadData-destructor
++   drd:ConflictingAccess
++   fun:_ZN11QThreadDataD1Ev
++   obj:/usr/lib*/libQtCore.so.4.*
++}
++{
++   drd-libQtCore-4.0/4.1-Q_GLOBAL_STATIC-connectionList
++   drd:ConflictingAccess
++   obj:/usr/lib*/libQtCore.so.4.*
++   fun:_ZN11QMetaObject8activateEP7QObjectiiPPv
++   fun:_ZN11QMetaObject8activateEP7QObjectPKS_iPPv
++}
++{
++   drd-libQtCore-QObjectPrivate::clearGuards(QObject*)
++   drd:ConflictingAccess
++   fun:_ZN14QReadWriteLock12lockForWriteEv
++   fun:_ZN14QObjectPrivate11clearGuardsEP7QObject
++   fun:_ZN7QObjectD2Ev
++}
++{
++   drd-libQtCore-QObjectPrivate::clearGuards(QObject*)
++   drd:ConflictingAccess
++   fun:_ZN14QReadWriteLock12lockForWriteEv
++   fun:_ZN12QWriteLocker6relockEv
++   fun:_ZN12QWriteLockerC1EP14QReadWriteLock
++   fun:_ZN14QObjectPrivate11clearGuardsEP7QObject
++   fun:_ZN7QObjectD2Ev
++   fun:_ZN24QAbstractEventDispatcherD2Ev
++   fun:_ZN20QEventDispatcherGlibD0Ev
++}
++{
++   drd-libQtCore-QMutexPool::get(void const*)
++   drd:ConflictingAccess
++   fun:_ZN10QMutexPool3getEPKv
++}
++{
++   drd-libQtCore-qt_gettime_is_monotonic()
++   drd:ConflictingAccess
++   fun:_Z23qt_gettime_is_monotonicv
++}
++
++#
++# Suppression patterns for libboost.
++#
++
++# Suppress the races on boost::once_flag::epoch and on
++# boost::detail::this_thread_epoch. See also the source file
++# boost/thread/pthread/once.hpp in the Boost source tree
++# (https://svn.boost.org/trac/boost/browser/trunk/boost/thread/pthread/once.hpp).
++{
++   drd-libboost-boost::call_once<void (*)()>(boost::once_flag&, void (*)())
++   drd:ConflictingAccess
++   ...
++   fun:_ZN5boost9call_onceIPFvvEEEvRNS_9once_flagET_
++}
++{
++   drd-libboost-boost::detail::get_once_per_thread_epoch()
++   drd:ConflictingAccess
++   fun:_ZN5boost6detail25get_once_per_thread_epochEv
++}
++# Suppress the race reports on boost::detail::current_thread_tls_key. See also
++# https://svn.boost.org/trac/boost/ticket/3526 for more information about why
++# the access pattern of current_thread_tls_key is safe.
++{
++   drd-libboost-boost::detail::get_current_thread_data()
++   drd:ConflictingAccess
++   ...
++   fun:_ZN5boost6detail23get_current_thread_dataEv
++}
++{
++   drd-libboost-boost::detail::set_current_thread_data(boost::detail::thread_data_base*)
++   drd:ConflictingAccess
++   ...
++   fun:_ZN5boost6detail23set_current_thread_dataEPNS0_16thread_data_baseE
++}
+diff -Naurp valgrind-3.17.0.orig/glibc-2.X-helgrind.supp.in valgrind-3.17.0/glibc-2.X-helgrind.supp.in
+--- valgrind-3.17.0.orig/glibc-2.X-helgrind.supp.in	1969-12-31 18:00:00.000000000 -0600
++++ valgrind-3.17.0/glibc-2.X-helgrind.supp.in	2021-08-17 15:04:55.538588137 -0500
+@@ -0,0 +1,301 @@
++
++# FIXME 22 Jan 09: helgrind-glibc2X-005 overlaps with a lot of
++# other stuff.  They should be removed.
++
++##----------------------------------------------------------------------##
++# Suppressions for the Helgrind tool when using 
++# a glibc-2.{3,4,5,6,7,8,9} system
++
++####################################################
++# glibc-2.X specific
++# These are generic cover-alls which catch a lot of stuff
++# in various combinations of ld, libc and libpthread
++#
++# Note this is heavyhanded and not very clever:
++#
++# - suppress anything that has its top frame in ld.so
++#   That's fine, since it's mostly dynamic linking stuff,
++#   which has various deliberate (harmless) races
++#
++# - suppress anything that has its top frame in libc.so.
++#   This really isn't clever, since it could hide some 
++#   legitimate races.  But the problem is, if we don't do
++#   this, then loads of errors to do with stdio are reported, because
++#   H fails to see glibc's internal locking/unlocking of FILE*s
++#   as required by POSIX.  A better solution is needed.
++#
++# - some of the stdio functions in newer glibc manipulate stdio
++#   FILE*s state through mempcpy, which we intercept, so we also need
++#   to suppress such manipulations.
++
++#{
++#   helgrind-glibc2X-001
++#   Helgrind:Race
++#   obj:*/lib*/ld-2.*so*
++#}
++
++# helgrind-glibc2X-002 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-003 was merged into helgrind-glibc2X-001
++
++{
++   helgrind-glibc2X-004
++   Helgrind:Race
++   obj:@GLIBC_LIBC_PATH@
++}
++
++{
++   helgrind-glibc-io-xsputn-mempcpy
++   Helgrind:Race
++   fun:__GI_mempcpy
++   fun:_IO_*xsputn*
++   obj:@GLIBC_LIBC_PATH@
++}
++
++{
++   helgrind-glibc2X-005
++   Helgrind:Race
++   obj:@GLIBC_LIBPTHREAD_PATH@
++}
++
++# helgrind-glibc2X-006 was merged into helgrind-glibc2X-005
++
++# helgrind-glibc2X-007 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-008 was merged into helgrind-glibc2X-004
++
++# helgrind-glibc2X-009 was merged into helgrind-glibc2X-004
++
++# helgrind-glibc2X-010 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-011 was merged into helgrind-glibc2X-004
++
++# helgrind-glibc2X-012 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-013 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-014 was merged into helgrind-glibc2X-001
++
++# helgrind-glibc2X-015 was merged into helgrind-glibc2X-004
++
++# helgrind-glibc2X-016 was merged into helgrind-glibc2X-004
++
++# These are very ugly.  They are needed to suppress errors inside (eg)
++# NPTL's pthread_cond_signal.  Why only one stack frame -- at least we
++# should see the wrapper calling the real functions, right?
++# Unfortunately, no: the real functions are handwritten assembly (in
++# the glibc-2.5 sources) and does not create a proper stack frame.
++# Therefore it's only one level of unwinding before we're back out in
++# user code rather than the 2 levels you'd expect.
++{
++   helgrind-glibc2X-101
++   Helgrind:Race
++   obj:@GLIBC_LIBPTHREAD_PATH@
++   fun:pthread_*
++}
++{
++   helgrind-glibc2X-102
++   Helgrind:Race
++   fun:mythread_wrapper
++   obj:@GLIBC_LIBPTHREAD_PATH@
++}
++{
++   helgrind-glibc2X-103
++   Helgrind:Race
++   fun:pthread_cond_*@@GLIBC_2.*
++}
++{
++   helgrind-glibc2X-104
++   Helgrind:Race
++   fun:__lll_mutex_*
++}
++{
++   helgrind-glibc2X-105
++   Helgrind:Race
++   fun:pthread_rwlock_*lock*
++}
++{
++   helgrind-glibc2X-106
++   Helgrind:Race
++   fun:__lll_lock_wait
++}
++{
++   helgrind-glibc2X-107
++   Helgrind:Race
++   obj:@GLIBC_LIBPTHREAD_PATH@
++   fun:sem_*
++}
++{
++   helgrind-glibc2X-108
++   Helgrind:Race
++   fun:clone
++}
++{
++   helgrind-glibc2X-109
++   Helgrind:Race
++   fun:start_thread
++}
++{
++   helgrind-glibc2X-110
++   Helgrind:Race
++   obj:@GLIBC_LIBC_PATH@
++   fun:pthread_*
++}
++{
++   helgrind-glibc2X-111
++   Helgrind:Race
++   fun:__lll_*lock_*
++}
++{
++   helgrind-glibc2X-113
++   Helgrind:Race
++   fun:pthread_barrier_wait*
++}
++
++
++####################################################
++# qt4 specific (GNU mangling)
++#
++{
++   helgrind-qt4---QMutex::lock()-QMutex::lock()
++   Helgrind:Race
++   ...
++   fun:_ZN6QMutex4lockEv
++   fun:_ZN6QMutex4lockEv
++}
++
++{                                                               
++   helgrind-qt4---QMutex::unlock()-QMutex::unlock()
++   Helgrind:Race                                                
++   ...
++   fun:_ZN6QMutex6unlockEv                                      
++   fun:_ZN6QMutex6unlockEv
++}
++
++{
++   helgrind-qt4---pthread_setspecific-QThreadPrivate::start(void*)
++   Helgrind:Race
++   fun:pthread_setspecific
++   fun:_ZN14QThreadPrivate5startEPv
++}
++
++
++####################################################
++# Other stuff.
++#
++# pthread_exit apparently calls some kind of unwind
++# mechanism - maybe to remove some number of frames
++# from the thread's stack, so as to get back to the 
++# outermost frame for the thread?  Anyway..
++
++{
++   helgrind---*Unwind*-...-pthread_exit
++   Helgrind:Race
++   fun:*Unwind*
++   ...
++   fun:pthread_exit
++}
++
++{
++   helgrind---...-*Unwind*-*pthread_unwind*
++   Helgrind:Race
++   ...
++   fun:*Unwind*
++   fun:*pthread_unwind*
++}
++
++{
++   helgrind---...-*Unwind*-*pthread_unwind*
++   Helgrind:Race
++   ...
++   fun:_Unwind*
++   ...
++   fun:_Unwind_Backtrace
++}
++
++
++
++
++####################################################
++# To do with thread stack allocation and deallocation?
++#
++{
++   helgrind---free_stacks-__deallocate_stack
++   Helgrind:Race
++   fun:free_stacks
++   fun:__deallocate_stack
++}
++
++{
++   helgrind---__deallocate_stack-start_thread-clone
++   Helgrind:Race
++   fun:__deallocate_stack
++   fun:start_thread
++   fun:clone
++}
++
++
++####################################################
++# To do with pthread_{set,get}specific
++#
++{
++   helgrind---pthread_setspecific
++   Helgrind:Race
++   fun:pthread_setspecific
++}
++
++{
++   helgrind---pthread_getspecific
++   Helgrind:Race
++   fun:pthread_getspecific
++}
++
++
++####################################################
++# To do with dynamic linking
++#
++# helgrind---ld.so-...-dlsym was merged into helgrind-glibc2X-001
++
++{
++   helgrind---_dl_allocate_tls 
++   Helgrind:Race
++   fun:mempcpy
++   fun:_dl_allocate_tls_init
++   ...
++   fun:pthread_create@@GLIBC_2.2*
++   fun:pthread_create_WRK
++   fun:pthread_create@*
++}
++
++{
++   helgrind---_dl_allocate_tls2
++   Helgrind:Race
++   fun:memcpy
++   fun:__mempcpy_inline
++   fun:_dl_allocate_tls_init
++   ...
++   fun:pthread_create@@GLIBC_2.2*
++   fun:pthread_create_WRK
++   fun:pthread_create@*
++}
++
++####################################################
++# To do with GNU libgomp
++#
++{
++   helgrind---libgomp43-1
++   Helgrind:Race
++   fun:gomp_ordered_sync
++}
++
++{
++   helgrind---libgomp43-1
++   Helgrind:Race
++   fun:gomp_ordered_next
++}
++
++{
++   helgrind---libgomp43-1
++   Helgrind:Race
++   fun:gomp_ordered_last
++}
+diff -Naurp valgrind-3.17.0.orig/include/vki/vki-scnums-shared-linux.h valgrind-3.17.0/include/vki/vki-scnums-shared-linux.h
+--- valgrind-3.17.0.orig/include/vki/vki-scnums-shared-linux.h	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/include/vki/vki-scnums-shared-linux.h	2021-08-17 15:09:09.446530119 -0500
+@@ -39,6 +39,8 @@
+ #define __NR_fsmount		432
+ #define __NR_fspick		433
+ 
++#define __NR_clone3     435
++
+ #define __NR_faccessat2		439
+ 
+ #endif
+diff -Naurp valgrind-3.17.0.orig/Makefile.am valgrind-3.17.0/Makefile.am
+--- valgrind-3.17.0.orig/Makefile.am	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/Makefile.am	2021-08-17 14:54:08.613641866 -0500
+@@ -41,7 +41,7 @@ SUPP_FILES = \
+ 	glibc-2.2.supp glibc-2.3.supp glibc-2.4.supp glibc-2.5.supp \
+ 	glibc-2.6.supp glibc-2.7.supp glibc-2.X.supp.in \
+ 	xfree-3.supp xfree-4.supp \
+-	glibc-2.34567-NPTL-helgrind.supp \
++	glibc-2.X-helgrind.supp \
+ 	glibc-2.2-LinuxThreads-helgrind.supp \
+ 	glibc-2.X-drd.supp \
+ 	darwin9.supp darwin9-drd.supp \
+diff -Naurp valgrind-3.17.0.orig/memcheck/tests/linux/Makefile.am valgrind-3.17.0/memcheck/tests/linux/Makefile.am
+--- valgrind-3.17.0.orig/memcheck/tests/linux/Makefile.am	2021-03-17 01:56:32.000000000 -0500
++++ valgrind-3.17.0/memcheck/tests/linux/Makefile.am	2021-08-17 12:05:37.727038684 -0500
+@@ -47,7 +47,6 @@ check_PROGRAMS = \
+ 	lsframe2 \
+ 	rfcomm \
+ 	sigqueue \
+-	stack_changes \
+ 	stack_switch \
+ 	syscalls-2007 \
+ 	syslog-syscall \
+@@ -78,6 +77,10 @@ if HAVE_PREADV2_PWRITEV2
+         check_PROGRAMS += sys-preadv2_pwritev2
+ endif
+ 
++if HAVE_SETCONTEXT
++        check_PROGRAMS += stack_changes
++endif
++
+ AM_CFLAGS   += $(AM_FLAG_M3264_PRI)
+ AM_CXXFLAGS += $(AM_FLAG_M3264_PRI)
+ 
+diff -Naurp valgrind-3.17.0.orig/memcheck/tests/linux/stack_changes.vgtest valgrind-3.17.0/memcheck/tests/linux/stack_changes.vgtest
+--- valgrind-3.17.0.orig/memcheck/tests/linux/stack_changes.vgtest	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/memcheck/tests/linux/stack_changes.vgtest	2021-08-17 12:05:58.172908440 -0500
+@@ -1,2 +1,3 @@
++prereq: test -e stack_changes
+ prog: stack_changes
+ vgopts: -q
+diff -Naurp valgrind-3.17.0.orig/VEX/priv/guest_amd64_helpers.c valgrind-3.17.0/VEX/priv/guest_amd64_helpers.c
+--- valgrind-3.17.0.orig/VEX/priv/guest_amd64_helpers.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/VEX/priv/guest_amd64_helpers.c	2021-08-17 15:14:33.541876923 -0500
+@@ -1681,6 +1681,22 @@ IRExpr* guest_amd64_spechelper ( const H
+                            mkU32(0)));
+       }
+ 
++      if (isU64(cc_op, AMD64G_CC_OP_LOGICW) && isU64(cond, AMD64CondS)) {
++         /* word and/or/xor, then S --> (ULong)result[15] */
++         return binop(Iop_And64,
++                      binop(Iop_Shr64, cc_dep1, mkU8(15)),
++                      mkU64(1));
++      }
++      if (isU64(cc_op, AMD64G_CC_OP_LOGICW) && isU64(cond, AMD64CondNS)) {
++         /* word and/or/xor, then S --> (ULong) ~ result[15] */
++         return binop(Iop_And64,
++                      binop(Iop_And64,
++                            binop(Iop_Shr64, cc_dep1, mkU8(15)),
++                            mkU64(1)),
++                      mkU64(1));
++      }
++                        
++
+       /*---------------- LOGICB ----------------*/
+ 
+       if (isU64(cc_op, AMD64G_CC_OP_LOGICB) && isU64(cond, AMD64CondZ)) {
+@@ -1798,18 +1814,32 @@ IRExpr* guest_amd64_spechelper ( const H
+                       binop(Iop_Shr64, cc_dep1, mkU8(31)),
+                       mkU64(1));
+       }
+-      // The following looks correct to me, but never seems to happen because
+-      // the front end converts jns to js by switching the fallthrough vs
+-      // taken addresses.  See jcc_01().  But then why do other conditions
+-      // considered by this function show up in both variants (xx and Nxx) ?
+-      //if (isU64(cc_op, AMD64G_CC_OP_SHRL) && isU64(cond, AMD64CondNS)) {
+-      //   /* SHRL/SARL, then NS --> (ULong) ~ result[31] */
+-      //   vassert(0);
+-      //   return binop(Iop_Xor64,
+-      //                binop(Iop_And64,
+-      //                      binop(Iop_Shr64, cc_dep1, mkU8(31)),
+-      //                      mkU64(1)),
+-      //                mkU64(1));
++      if (isU64(cc_op, AMD64G_CC_OP_SHRL) && isU64(cond, AMD64CondNS)) {
++         /* SHRL/SARL, then NS --> (ULong) ~ result[31] */
++         return binop(Iop_Xor64,
++                      binop(Iop_And64,
++                            binop(Iop_Shr64, cc_dep1, mkU8(31)),
++                            mkU64(1)),
++                      mkU64(1));
++      }
++
++      /*---------------- SHRW ----------------*/
++
++      if (isU64(cc_op, AMD64G_CC_OP_SHRW) && isU64(cond, AMD64CondZ)) {
++         /* SHRW, then Z --> test dep1 == 0 */
++         return unop(Iop_1Uto64,
++                     binop(Iop_CmpEQ32,
++                           unop(Iop_16Uto32, unop(Iop_64to16, cc_dep1)),
++                           mkU32(0)));
++      }
++
++      // No known test case for this, hence disabled:
++      // if (isU64(cc_op, AMD64G_CC_OP_SHRW) && isU64(cond, AMD64CondNZ)) {
++      //    /* SHRW, then NZ --> test dep1 == 0 */
++      //    return unop(Iop_1Uto64,
++      //                binop(Iop_CmpNE32,
++      //                      unop(Iop_16Uto32, unop(Iop_64to16, cc_dep1))
++      //                      mkU32(0)));
+       //}
+ 
+       /*---------------- COPY ----------------*/
+@@ -1902,6 +1932,18 @@ IRExpr* guest_amd64_spechelper ( const H
+             );
+       }
+ 
++#     if 0
++      if (cond->tag == Iex_Const && cc_op->tag == Iex_Const) {
++         vex_printf("spec request failed: ");
++         vex_printf("   %s  ", function_name);
++         for (i = 0; i < 2/*arity*/; i++) {
++            vex_printf("   ");
++            ppIRExpr(args[i]);
++         }
++         vex_Printf("\n");
++      }
++#     endif
++
+       return NULL;
+    }
+ 
+@@ -1930,6 +1972,13 @@ IRExpr* guest_amd64_spechelper ( const H
+                            unop(Iop_64to32, cc_dep1), 
+                            unop(Iop_64to32, cc_dep2)));
+       }
++      if (isU64(cc_op, AMD64G_CC_OP_SUBW)) {
++         /* C after sub denotes unsigned less than */
++         return unop(Iop_1Uto64,
++                     binop(Iop_CmpLT64U,
++                           binop(Iop_And64, cc_dep1, mkU64(0xFFFF)),
++                           binop(Iop_And64, cc_dep2, mkU64(0xFFFF))));
++      }
+       if (isU64(cc_op, AMD64G_CC_OP_SUBB)) {
+          /* C after sub denotes unsigned less than */
+          return unop(Iop_1Uto64,
+@@ -1958,8 +2007,10 @@ IRExpr* guest_amd64_spechelper ( const H
+          /* cflag after logic is zero */
+          return mkU64(0);
+       }
+-      if (isU64(cc_op, AMD64G_CC_OP_DECL) || isU64(cc_op, AMD64G_CC_OP_INCL)
+-          || isU64(cc_op, AMD64G_CC_OP_DECQ) || isU64(cc_op, AMD64G_CC_OP_INCQ)) {
++      if (isU64(cc_op, AMD64G_CC_OP_DECL)
++          || isU64(cc_op, AMD64G_CC_OP_INCL)
++          || isU64(cc_op, AMD64G_CC_OP_DECQ)
++          || isU64(cc_op, AMD64G_CC_OP_INCQ)) {
+          /* If the thunk is dec or inc, the cflag is supplied as CC_NDEP. */
+          return cc_ndep;
+       }
+@@ -1970,6 +2021,18 @@ IRExpr* guest_amd64_spechelper ( const H
+       }
+ #     endif
+ 
++#     if 0
++      if (cc_op->tag == Iex_Const) {
++         vex_printf("spec request failed: ");
++         vex_printf("   %s  ", function_name);
++         for (i = 0; i < 2/*arity*/; i++) {
++            vex_printf("   ");
++            ppIRExpr(args[i]);
++         }
++         vex_printf("\n");
++      }
++#     endif
++
+       return NULL;
+    }
+ 
+diff -Naurp valgrind-3.17.0.orig/VEX/priv/guest_amd64_toIR.c valgrind-3.17.0/VEX/priv/guest_amd64_toIR.c
+--- valgrind-3.17.0.orig/VEX/priv/guest_amd64_toIR.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/VEX/priv/guest_amd64_toIR.c	2021-08-17 15:16:50.820747589 -0500
+@@ -912,7 +912,8 @@ static Int integerGuestReg64Offset ( UIn
+ /* Produce the name of an integer register, for printing purposes.
+    reg is a number in the range 0 .. 15 that has been generated from a
+    3-bit reg-field number and a REX extension bit.  irregular denotes
+-   the case where sz==1 and no REX byte is present. */
++   the case where sz==1 and no REX byte is present and where the denoted
++   subregister is bits 15:8 of the containing 64-bit register. */
+ 
+ static 
+ const HChar* nameIReg ( Int sz, UInt reg, Bool irregular )
+@@ -929,8 +930,8 @@ const HChar* nameIReg ( Int sz, UInt reg
+    static const HChar* ireg8_names[16]
+      = { "%al",  "%cl",  "%dl",  "%bl",  "%spl", "%bpl", "%sil", "%dil",
+          "%r8b", "%r9b", "%r10b","%r11b","%r12b","%r13b","%r14b","%r15b" };
+-   static const HChar* ireg8_irregular[8] 
+-     = { "%al", "%cl", "%dl", "%bl", "%ah", "%ch", "%dh", "%bh" };
++   static const HChar* ireg8_irregular[4] 
++     = { "%ah", "%ch", "%dh", "%bh" };
+ 
+    vassert(reg < 16);
+    if (sz == 1) {
+@@ -945,7 +946,8 @@ const HChar* nameIReg ( Int sz, UInt reg
+       case 4: return ireg32_names[reg];
+       case 2: return ireg16_names[reg];
+       case 1: if (irregular) {
+-                 return ireg8_irregular[reg];
++                 vassert(reg >= 4 && reg < 8);
++                 return ireg8_irregular[reg - 4];
+               } else {
+                  return ireg8_names[reg];
+               }
+@@ -962,7 +964,7 @@ Int offsetIReg ( Int sz, UInt reg, Bool
+    vassert(reg < 16);
+    if (sz == 1) {
+       if (irregular)
+-         vassert(reg < 8);
++         vassert(reg >= 4 && reg < 8);
+    } else {
+       vassert(irregular == False);
+    }
+@@ -988,7 +990,7 @@ Int offsetIReg ( Int sz, UInt reg, Bool
+ static IRExpr* getIRegCL ( void )
+ {
+    vassert(host_endness == VexEndnessLE);
+-   return IRExpr_Get( OFFB_RCX, Ity_I8 );
++   return unop(Iop_64to8, IRExpr_Get( OFFB_RCX, Ity_I64 ));
+ }
+ 
+ 
+@@ -1020,8 +1022,8 @@ static IRExpr* getIRegRAX ( Int sz )
+ {
+    vassert(host_endness == VexEndnessLE);
+    switch (sz) {
+-      case 1: return IRExpr_Get( OFFB_RAX, Ity_I8 );
+-      case 2: return IRExpr_Get( OFFB_RAX, Ity_I16 );
++      case 1: return unop(Iop_64to8,  IRExpr_Get( OFFB_RAX, Ity_I64 ));
++      case 2: return unop(Iop_64to16, IRExpr_Get( OFFB_RAX, Ity_I64 ));
+       case 4: return unop(Iop_64to32, IRExpr_Get( OFFB_RAX, Ity_I64 ));
+       case 8: return IRExpr_Get( OFFB_RAX, Ity_I64 );
+       default: vpanic("getIRegRAX(amd64)");
+@@ -1068,8 +1070,8 @@ static IRExpr* getIRegRDX ( Int sz )
+ {
+    vassert(host_endness == VexEndnessLE);
+    switch (sz) {
+-      case 1: return IRExpr_Get( OFFB_RDX, Ity_I8 );
+-      case 2: return IRExpr_Get( OFFB_RDX, Ity_I16 );
++      case 1: return unop(Iop_64to8,  IRExpr_Get( OFFB_RDX, Ity_I64 ));
++      case 2: return unop(Iop_64to16, IRExpr_Get( OFFB_RDX, Ity_I64 ));
+       case 4: return unop(Iop_64to32, IRExpr_Get( OFFB_RDX, Ity_I64 ));
+       case 8: return IRExpr_Get( OFFB_RDX, Ity_I64 );
+       default: vpanic("getIRegRDX(amd64)");
+@@ -1145,8 +1147,9 @@ static const HChar* nameIReg32 ( UInt re
+ static IRExpr* getIReg16 ( UInt regno )
+ {
+    vassert(host_endness == VexEndnessLE);
+-   return IRExpr_Get( integerGuestReg64Offset(regno),
+-                      Ity_I16 );
++   return unop(Iop_64to16,
++               IRExpr_Get( integerGuestReg64Offset(regno),
++                           Ity_I64  ));
+ }
+ 
+ static void putIReg16 ( UInt regno, IRExpr* e )
+@@ -1193,22 +1196,46 @@ static IRExpr* getIRegRexB ( Int sz, Pre
+ {
+    vassert(lo3bits < 8);
+    vassert(IS_VALID_PFX(pfx));
+-   vassert(sz == 8 || sz == 4 || sz == 2 || sz == 1);
+-   if (sz == 4) {
+-      sz = 8;
+-      return unop(Iop_64to32,
+-                  IRExpr_Get(
+-                     offsetIReg( sz, lo3bits | (getRexB(pfx) << 3), 
+-                                     False/*!irregular*/ ),
+-                     szToITy(sz)
+-                 )
+-             );
+-   } else {
+-      return IRExpr_Get(
+-                offsetIReg( sz, lo3bits | (getRexB(pfx) << 3), 
+-                                toBool(sz==1 && !haveREX(pfx)) ),
+-                szToITy(sz)
+-             );
++   UInt regNo = (getRexB(pfx) << 3) | lo3bits;
++   switch (sz) {
++      case 8: {
++         return IRExpr_Get(
++                   offsetIReg( 8, regNo, False /*!irregular*/ ),
++                   Ity_I64
++                ); 
++      }
++      case 4: {
++         return unop(Iop_64to32,
++                     IRExpr_Get(
++                        offsetIReg( 8, regNo, False/*!irregular*/ ),
++                        Ity_I64
++                     ));
++      }
++      case 2:  {
++         return unop(Iop_64to16,
++                     IRExpr_Get(
++                        offsetIReg( 8, regNo, False/*!irregular*/ ),
++                        Ity_I64
++                     ));
++      }
++      case 1: {
++        Bool irregular = !haveREX(pfx) && regNo >= 4 && regNo < 8;
++        if (irregular) {
++           return IRExpr_Get(
++                     offsetIReg( 1, regNo, True/*irrregular*/ ),
++                     Ity_I8
++                  );
++        } else {
++           return unop(Iop_64to8,
++                       IRExpr_Get(
++                          offsetIReg( 8, regNo, False/*!irregular*/ ),
++                          Ity_I64
++                      ));
++        }
++      }
++      default: {
++       vpanic("getIRegRexB");  
++      }
+    }
+ }
+ 
+@@ -1218,9 +1245,9 @@ static void putIRegRexB ( Int sz, Prefix
+    vassert(IS_VALID_PFX(pfx));
+    vassert(sz == 8 || sz == 4 || sz == 2 || sz == 1);
+    vassert(typeOfIRExpr(irsb->tyenv, e) == szToITy(sz));
++   Bool irregular = sz == 1 && !haveREX(pfx) && lo3bits >= 4 && lo3bits < 8;
+    stmt( IRStmt_Put( 
+-            offsetIReg( sz, lo3bits | (getRexB(pfx) << 3), 
+-                            toBool(sz==1 && !haveREX(pfx)) ),
++            offsetIReg( sz, lo3bits | (getRexB(pfx) << 3), irregular ),
+             sz==4 ? unop(Iop_32Uto64,e) : e
+    ));
+ }
+@@ -1269,20 +1296,39 @@ static UInt offsetIRegG ( Int sz, Prefix
+    vassert(IS_VALID_PFX(pfx));
+    vassert(sz == 8 || sz == 4 || sz == 2 || sz == 1);
+    reg = gregOfRexRM( pfx, mod_reg_rm );
+-   return offsetIReg( sz, reg, toBool(sz == 1 && !haveREX(pfx)) );
++   Bool irregular = sz == 1 && !haveREX(pfx) && reg >= 4 && reg < 8;
++   return offsetIReg( sz, reg, irregular );
+ }
+ 
+ static 
+ IRExpr* getIRegG ( Int sz, Prefix pfx, UChar mod_reg_rm )
+ {
+-   if (sz == 4) {
+-      sz = 8;
+-      return unop(Iop_64to32,
+-                  IRExpr_Get( offsetIRegG( sz, pfx, mod_reg_rm ),
+-                              szToITy(sz) ));
+-   } else {
+-      return IRExpr_Get( offsetIRegG( sz, pfx, mod_reg_rm ),
+-                         szToITy(sz) );
++   switch (sz) {
++      case 8:  {
++         return IRExpr_Get( offsetIRegG( 8, pfx, mod_reg_rm ), Ity_I64 );
++      }
++      case 4:  {
++         return unop(Iop_64to32,
++                     IRExpr_Get( offsetIRegG( 8, pfx, mod_reg_rm ), Ity_I64 ));
++      }
++      case 2:  {
++         return unop(Iop_64to16,
++                     IRExpr_Get( offsetIRegG( 8, pfx, mod_reg_rm ), Ity_I64 ));
++      }
++      case 1:  {
++         UInt regNo = gregOfRexRM( pfx, mod_reg_rm );
++         Bool irregular = !haveREX(pfx) && regNo >= 4 && regNo < 8;
++         if (irregular) {
++            return IRExpr_Get( offsetIRegG( 1, pfx, mod_reg_rm ), Ity_I8 );
++         } else {
++            return unop(Iop_64to8,
++                        IRExpr_Get( offsetIRegG( 8, pfx, mod_reg_rm ),
++                        Ity_I64 ));
++         }
++      }
++      default: {
++        vpanic("getIRegG");
++      }
+    }
+ }
+ 
+@@ -1299,19 +1345,24 @@ void putIRegG ( Int sz, Prefix pfx, UCha
+ static
+ const HChar* nameIRegG ( Int sz, Prefix pfx, UChar mod_reg_rm )
+ {
+-   return nameIReg( sz, gregOfRexRM(pfx,mod_reg_rm),
+-                        toBool(sz==1 && !haveREX(pfx)) );
++   UInt regNo = gregOfRexRM( pfx, mod_reg_rm );
++   Bool irregular = sz == 1 && !haveREX(pfx) && regNo >= 4 && regNo < 8;
++   return nameIReg( sz, gregOfRexRM(pfx, mod_reg_rm), irregular );
+ }
+ 
+ 
+ static
+ IRExpr* getIRegV ( Int sz, Prefix pfx )
+ {
++   vassert(sz == 8 || sz == 4);
+    if (sz == 4) {
+-      sz = 8;
+       return unop(Iop_64to32,
+-                  IRExpr_Get( offsetIReg( sz, getVexNvvvv(pfx), False ),
+-                              szToITy(sz) ));
++                  IRExpr_Get( offsetIReg( 8, getVexNvvvv(pfx), False ),
++                              Ity_I64 ));
++   } else if (sz == 2) {
++      return unop(Iop_64to16,
++                  IRExpr_Get( offsetIReg( 8, getVexNvvvv(pfx), False ),
++                              Ity_I64 ));
+    } else {
+       return IRExpr_Get( offsetIReg( sz, getVexNvvvv(pfx), False ),
+                          szToITy(sz) );
+@@ -1321,6 +1372,7 @@ IRExpr* getIRegV ( Int sz, Prefix pfx )
+ static
+ void putIRegV ( Int sz, Prefix pfx, IRExpr* e )
+ {
++   vassert(sz == 8 || sz == 4);
+    vassert(typeOfIRExpr(irsb->tyenv,e) == szToITy(sz));
+    if (sz == 4) {
+       e = unop(Iop_32Uto64,e);
+@@ -1331,6 +1383,7 @@ void putIRegV ( Int sz, Prefix pfx, IREx
+ static
+ const HChar* nameIRegV ( Int sz, Prefix pfx )
+ {
++   vassert(sz == 8 || sz == 4);
+    return nameIReg( sz, getVexNvvvv(pfx), False );
+ }
+ 
+@@ -1348,20 +1401,39 @@ static UInt offsetIRegE ( Int sz, Prefix
+    vassert(IS_VALID_PFX(pfx));
+    vassert(sz == 8 || sz == 4 || sz == 2 || sz == 1);
+    reg = eregOfRexRM( pfx, mod_reg_rm );
+-   return offsetIReg( sz, reg, toBool(sz == 1 && !haveREX(pfx)) );
++   Bool irregular = sz == 1 && !haveREX(pfx) && (reg >= 4 && reg < 8);
++   return offsetIReg( sz, reg, irregular );
+ }
+ 
+-static 
++static
+ IRExpr* getIRegE ( Int sz, Prefix pfx, UChar mod_reg_rm )
+ {
+-   if (sz == 4) {
+-      sz = 8;
+-      return unop(Iop_64to32,
+-                  IRExpr_Get( offsetIRegE( sz, pfx, mod_reg_rm ),
+-                              szToITy(sz) ));
+-   } else {
+-      return IRExpr_Get( offsetIRegE( sz, pfx, mod_reg_rm ),
+-                         szToITy(sz) );
++   switch (sz) {
++      case 8: {
++         return IRExpr_Get( offsetIRegE( 8, pfx, mod_reg_rm ), Ity_I64 );
++      }
++      case 4: {
++         return unop(Iop_64to32,
++                     IRExpr_Get( offsetIRegE( 8, pfx, mod_reg_rm ), Ity_I64 ));
++      }
++      case 2: {
++         return unop(Iop_64to16,
++                     IRExpr_Get( offsetIRegE( 8, pfx, mod_reg_rm ), Ity_I64 ));
++      }
++      case 1: {
++         UInt regNo = eregOfRexRM( pfx, mod_reg_rm );
++         Bool irregular = !haveREX(pfx) && regNo >= 4 && regNo < 8;
++         if (irregular) {
++            return IRExpr_Get( offsetIRegE( 1, pfx, mod_reg_rm ), Ity_I8 );
++         } else {
++            return unop(Iop_64to8,
++                        IRExpr_Get( offsetIRegE( 8, pfx, mod_reg_rm ),
++                        Ity_I64 ));
++         }
++      }
++      default: {
++         vpanic("getIRegE");
++      }
+    }
+ }
+ 
+@@ -1378,8 +1450,9 @@ void putIRegE ( Int sz, Prefix pfx, UCha
+ static
+ const HChar* nameIRegE ( Int sz, Prefix pfx, UChar mod_reg_rm )
+ {
+-   return nameIReg( sz, eregOfRexRM(pfx,mod_reg_rm),
+-                        toBool(sz==1 && !haveREX(pfx)) );
++   UInt regNo = eregOfRexRM( pfx, mod_reg_rm );
++   Bool irregular = sz == 1 && !haveREX(pfx) && regNo >= 4 && regNo < 8;
++   return nameIReg( sz, eregOfRexRM(pfx, mod_reg_rm), irregular);
+ }
+ 
+ 
+@@ -1814,6 +1887,7 @@ void setFlags_DEP1_DEP2 ( IROp op8, IRTe
+    stmt( IRStmt_Put( OFFB_CC_OP,   mkU64(ccOp)) );
+    stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dep1))) );
+    stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(dep2))) );
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)    ));
+ }
+ 
+ 
+@@ -1840,6 +1914,7 @@ void setFlags_DEP1 ( IROp op8, IRTemp de
+    stmt( IRStmt_Put( OFFB_CC_OP,   mkU64(ccOp)) );
+    stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dep1))) );
+    stmt( IRStmt_Put( OFFB_CC_DEP2, mkU64(0)) );
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0) ));
+ }
+ 
+ 
+@@ -1891,6 +1966,8 @@ static void setFlags_DEP1_DEP2_shift ( I
+                      IRExpr_ITE( mkexpr(guardB),
+                                  widenUto64(mkexpr(resUS)),
+                                  IRExpr_Get(OFFB_CC_DEP2,Ity_I64) ) ));
++   stmt(  IRStmt_Put( OFFB_CC_NDEP,
++                      mkU64(0) ));
+ }
+ 
+ 
+@@ -1943,6 +2020,7 @@ void setFlags_MUL ( IRType ty, IRTemp ar
+    }
+    stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(arg1)) ));
+    stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(arg2)) ));
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+ }
+ 
+ 
+@@ -5486,6 +5564,7 @@ static void fp_do_ucomi_ST0_STi ( UInt i
+                          binop(Iop_CmpF64, get_ST(0), get_ST(i))),
+                    mkU64(0x45)
+         )));
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+    if (pop_after)
+       fp_pop();
+ }
+@@ -10260,6 +10339,7 @@ static Long dis_COMISD ( const VexAbiInf
+                          binop(Iop_CmpF64, mkexpr(argL), mkexpr(argR)) ),
+                    mkU64(0x45)
+        )));
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+    return delta;
+ }
+ 
+@@ -10305,6 +10385,7 @@ static Long dis_COMISS ( const VexAbiInf
+                                unop(Iop_F32toF64,mkexpr(argR)))),
+                    mkU64(0x45)
+        )));
++   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+    return delta;
+ }
+ 
+@@ -13883,7 +13964,8 @@ Long dis_ESC_0F__SSE2 ( Bool* decode_OK,
+          }
+          goto decode_success;
+       }
+-      if (haveF3no66noF2(pfx) && sz == 4) {
++      if (haveF3no66noF2(pfx) && 
++          (sz == 4 || /* ignore redundant REX.w */ sz == 8)) {
+          /* F3 0F 6F = MOVDQU -- move from E (mem or xmm) to G (xmm). */
+          modrm = getUChar(delta);
+          if (epartIsReg(modrm)) {
+@@ -14144,7 +14226,8 @@ Long dis_ESC_0F__SSE2 ( Bool* decode_OK,
+ 
+    case 0x7F:
+       /* F3 0F 7F = MOVDQU -- move from G (xmm) to E (mem or xmm). */
+-      if (haveF3no66noF2(pfx) && sz == 4) {
++      if (haveF3no66noF2(pfx) 
++          && (sz == 4 || /* ignore redundant REX.w */ sz == 8)) {
+          modrm = getUChar(delta);
+          if (epartIsReg(modrm)) {
+             goto decode_failure; /* awaiting test case */
+@@ -20606,6 +20689,7 @@ Long dis_ESC_NONE (
+                              )
+                        )
+           );
++      stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+ 
+       /* Also need to set the D flag, which is held in bit 10 of t1.
+          If zero, put 1 in OFFB_DFLAG, else -1 in OFFB_DFLAG. */
+@@ -29898,6 +29982,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_ANDN32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, mkU64(0)) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)) );
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+@@ -29935,6 +30020,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_BLSI32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(src))) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+@@ -29969,6 +30055,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_BLSMSK32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(src))) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+@@ -30003,6 +30090,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_BLSR32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(src))) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+@@ -30072,6 +30160,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_BLSR32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, widenUto64(mkexpr(cond))) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0)  ));
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+@@ -30280,6 +30369,7 @@ Long dis_ESC_0F38__VEX (
+                                                : AMD64G_CC_OP_ANDN32)) );
+          stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto64(mkexpr(dst))) );
+          stmt( IRStmt_Put( OFFB_CC_DEP2, mkU64(0)) );
++         stmt( IRStmt_Put( OFFB_CC_NDEP, mkU64(0) ));
+          *uses_vvvv = True;
+          goto decode_success;
+       }
+diff -Naurp valgrind-3.17.0.orig/VEX/priv/host_arm64_isel.c valgrind-3.17.0/VEX/priv/host_arm64_isel.c
+--- valgrind-3.17.0.orig/VEX/priv/host_arm64_isel.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/VEX/priv/host_arm64_isel.c	2021-08-17 14:50:43.367129495 -0500
+@@ -2169,6 +2169,7 @@ static HReg iselIntExpr_R_wrk ( ISelEnv*
+          case Iop_64to32:
+          case Iop_64to16:
+          case Iop_64to8:
++         case Iop_32to16:
+             /* These are no-ops. */
+             return iselIntExpr_R(env, e->Iex.Unop.arg);
+ 
+diff -Naurp valgrind-3.17.0.orig/VEX/priv/host_generic_simd128.c valgrind-3.17.0/VEX/priv/host_generic_simd128.c
+--- valgrind-3.17.0.orig/VEX/priv/host_generic_simd128.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/VEX/priv/host_generic_simd128.c	2021-08-17 11:55:07.593014019 -0500
+@@ -383,23 +383,20 @@ void VEX_REGPARM(3)
+ UInt /*not-regparm*/
+      h_generic_calc_GetMSBs8x16 ( ULong w64hi, ULong w64lo )
+ {
+-   UInt r = 0;
+-   if (w64hi & (1ULL << (64-1))) r |= (1<<15);
+-   if (w64hi & (1ULL << (56-1))) r |= (1<<14);
+-   if (w64hi & (1ULL << (48-1))) r |= (1<<13);
+-   if (w64hi & (1ULL << (40-1))) r |= (1<<12);
+-   if (w64hi & (1ULL << (32-1))) r |= (1<<11);
+-   if (w64hi & (1ULL << (24-1))) r |= (1<<10);
+-   if (w64hi & (1ULL << (16-1))) r |= (1<<9);
+-   if (w64hi & (1ULL << ( 8-1))) r |= (1<<8);
+-   if (w64lo & (1ULL << (64-1))) r |= (1<<7);
+-   if (w64lo & (1ULL << (56-1))) r |= (1<<6);
+-   if (w64lo & (1ULL << (48-1))) r |= (1<<5);
+-   if (w64lo & (1ULL << (40-1))) r |= (1<<4);
+-   if (w64lo & (1ULL << (32-1))) r |= (1<<3);
+-   if (w64lo & (1ULL << (24-1))) r |= (1<<2);
+-   if (w64lo & (1ULL << (16-1))) r |= (1<<1);
+-   if (w64lo & (1ULL << ( 8-1))) r |= (1<<0);
++   /* Some serious bit twiddling going on here. Mostly we can do it in
++    * parallel for the upper and lower 64 bits, assuming the processor offers
++    * a suitably high level of ILP. */
++   w64hi &= 0x8080808080808080ULL;
++   w64lo &= 0x8080808080808080ULL;
++   w64hi >>= 7;
++   w64lo >>= 7;
++   w64hi |= (w64hi >> 7);
++   w64lo |= (w64lo >> 7);
++   w64hi |= (w64hi >> 14);
++   w64lo |= (w64lo >> 14);
++   w64hi |= (w64hi >> 28);
++   w64lo |= (w64lo >> 28);
++   UInt r = ((w64hi & 0xFF) << 8) | (w64lo & 0xFF);
+    return r;
+ }
+ 
+diff -Naurp valgrind-3.17.0.orig/VEX/priv/ir_opt.c valgrind-3.17.0/VEX/priv/ir_opt.c
+--- valgrind-3.17.0.orig/VEX/priv/ir_opt.c	2021-03-13 13:02:55.000000000 -0600
++++ valgrind-3.17.0/VEX/priv/ir_opt.c	2021-08-17 14:50:07.673378578 -0500
+@@ -5480,6 +5480,15 @@ static IRExpr* fold_IRExpr_Unop ( IROp o
+       if (is_Unop(aa, Iop_8Uto64))
+          return IRExpr_Unop(Iop_8Uto32, aa->Iex.Unop.arg);
+       break;
++   
++   case Iop_64to16:
++      /* 64to16( 16Uto64 ( x )) --> x */
++      if (is_Unop(aa, Iop_16Uto64))
++         return aa->Iex.Unop.arg;
++      /* 64to16( 32Uto64 ( x )) --> 32to16(x) */
++      if (is_Unop(aa, Iop_32Uto64))
++         return IRExpr_Unop(Iop_32to16, aa->Iex.Unop.arg);
++      break;
+ 
+    case Iop_32Uto64:
+       /* 32Uto64( 8Uto32( x )) --> 8Uto64(x) */
