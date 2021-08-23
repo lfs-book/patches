@@ -1,0 +1,51 @@
+Submitted By: Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date: 2021-08-23
+Initial Package Version: 7.2.0.4
+Upstream Status: Unknown
+Origin: Marty Jack
+Description: Corrects automatically downloaded skia package for current freetype
+
+diff -Naur libreoffice-7.2.0.4.orig/external/skia/freetype_2.11.patch libreoffice-7.2.0.4/external/skia/freetype_2.11.patch
+--- libreoffice-7.2.0.4.orig/external/skia/freetype_2.11.patch	1969-12-31 18:00:00.000000000 -0600
++++ libreoffice-7.2.0.4/external/skia/freetype_2.11.patch	2021-08-23 10:28:43.646193278 -0500
+@@ -0,0 +1,29 @@
++diff -Naur skia.orig/src/ports/SkFontHost_FreeType_common.cpp skia/src/ports/SkFontHost_FreeType_common.cpp
++--- skia.orig/src/ports/SkFontHost_FreeType_common.cpp	2021-03-01 09:53:09.178606791 -0500
+++++ skia/src/ports/SkFontHost_FreeType_common.cpp	2021-08-19 10:41:10.974582934 -0400
++@@ -665,8 +665,8 @@
++             canvas->drawPaint(paint);
++             break;
++         }
++-        case FT_COLR_PAINTFORMAT_TRANSFORMED: {
++-            SkMatrix transform = ToSkMatrix(colrv1_paint.u.transformed.affine);
+++        case FT_COLR_PAINTFORMAT_TRANSFORM: {
+++            SkMatrix transform = ToSkMatrix(colrv1_paint.u.transform.affine);
++ 
++             canvas->concat(transform);
++             break;
++@@ -760,12 +760,12 @@
++             traverse_result = colrv1_start_glyph(canvas, palette, face, paint.u.colr_glyph.glyphID,
++                                                  FT_COLOR_NO_ROOT_TRANSFORM);
++             break;
++-        case FT_COLR_PAINTFORMAT_TRANSFORMED:
+++        case FT_COLR_PAINTFORMAT_TRANSFORM:
++             canvas->saveLayer(nullptr, nullptr);
++             // Traverse / draw operation will apply transform.
++             colrv1_draw_paint(canvas, palette, face, paint);
++             traverse_result =
++-                    colrv1_traverse_paint(canvas, palette, face, paint.u.transformed.paint);
+++                    colrv1_traverse_paint(canvas, palette, face, paint.u.transform.paint);
++             canvas->restore();
++             break;
++       case FT_COLR_PAINTFORMAT_ROTATE:
+diff -Naur libreoffice-7.2.0.4.orig/external/skia/UnpackedTarball_skia.mk libreoffice-7.2.0.4/external/skia/UnpackedTarball_skia.mk
+--- libreoffice-7.2.0.4.orig/external/skia/UnpackedTarball_skia.mk	2021-08-16 14:56:28.000000000 -0500
++++ libreoffice-7.2.0.4/external/skia/UnpackedTarball_skia.mk	2021-08-23 10:26:46.418807295 -0500
+@@ -14,6 +14,7 @@
+ # * c++20.patch.0 has been reported upstream at
+ #   <https://groups.google.com/forum/#!topic/skia-discuss/pYZQq_sLnv8> "C++20 operator== issue":
+ skia_patches := \
++    freetype_2.11.patch \
+     fix-pch.patch.1 \
+     fix-ddi.patch \
+     make-api-visible.patch.1 \
