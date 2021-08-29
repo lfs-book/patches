@@ -1,0 +1,31 @@
+Submitted By:            Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date:                    2021-08-28
+Initial Package Version: 1.2.5.1
+Upstream Status:         Fixed upstream
+Origin:                  https://git.alsa-project.org/?p=alsa-lib.git;a=commitdiff;h=f4f29d42be8b8ad60ea4c5697374adad4bfe6868;hp=7ba3f888d07cafbad04391b915db23408c663dad
+Description:             Make --disable-ucm work
+
+--- a/include/local.h
++++ b/include/local.h
+@@ -374,6 +374,8 @@ int _snd_config_load_with_include(snd_config_t *config, snd_input_t *in,
+ void *INTERNAL(snd_dlopen)(const char *name, int mode, char *errbuf, size_t errbuflen);
+ #endif
+ 
++#ifdef BUILD_UCM
++
+ const char *uc_mgr_alibcfg_by_device(snd_config_t **config, const char *name);
+ 
+ static inline int _snd_is_ucm_device(const char *name)
+@@ -381,4 +383,12 @@ static inline int _snd_is_ucm_device(const char *name)
+        return name && name[0] == '_' && name[1] == 'u' && name[2] == 'c' && name[3] == 'm';
+ }
+ 
++#else
++
++static inline const char *uc_mgr_alibcfg_by_device(snd_config_t **config, const char *name) { return NULL; }
++static inline int _snd_is_ucm_device(const char *name) { return 0; }
++
++
++#endif
++
+ #endif
