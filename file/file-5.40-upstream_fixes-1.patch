@@ -1,0 +1,62 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2021-09-07
+Initial Package Version: 5.40
+Origin:                  Upstream + Arch Linux
+Upstream Status:         Applied
+Description:             Fixes a problem with detection of XZ files as well as
+                         several issues where a text file may be read as binary
+                         instead of being judged by it's contents. This is to
+                         fix Subversion and Mercurial.
+
+diff -Naurp file-5.40.orig/magic/Magdir/compress file-5.40/magic/Magdir/compress
+--- file-5.40.orig/magic/Magdir/compress	2021-09-07 12:06:42.208952362 -0500
++++ file-5.40/magic/Magdir/compress	2021-09-07 12:07:47.217366489 -0500
+@@ -265,14 +265,13 @@
+ 
+ # http://tukaani.org/xz/xz-file-format.txt
+ 0	ustring		\xFD7zXZ\x00		XZ compressed data, checksum
++!:strength * 2
++!:mime   application/x-xz
+ >7	byte&0xf	0x0			NONE
+ >7	byte&0xf	0x1			CRC32
+ >7	byte&0xf	0x4			CRC64
+ >7	byte&0xf	0xa			SHA-256
+ 
+-!:strength * 2
+-!:mime	application/x-xz
+-
+ # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
+ 0	string		LRZI			LRZIP compressed data
+ >4	byte		x			- version %d
+diff -Naurp file-5.40.orig/src/encoding.c file-5.40/src/encoding.c
+--- file-5.40.orig/src/encoding.c	2021-09-07 12:06:42.205952389 -0500
++++ file-5.40/src/encoding.c	2021-09-07 12:12:51.652664645 -0500
+@@ -265,9 +265,7 @@ private int \
+ looks_ ## NAME(const unsigned char *buf, size_t nbytes, file_unichar_t *ubuf, \
+     size_t *ulen) \
+ { \
+-	size_t i, u; \
+-	unsigned char dist[256]; \
+-	memset(dist, 0, sizeof(dist)); \
++	size_t i; \
+ \
+ 	*ulen = 0; \
+ \
+@@ -278,16 +276,7 @@ looks_ ## NAME(const unsigned char *buf,
+ 			return 0; \
+ \
+ 		ubuf[(*ulen)++] = buf[i]; \
+-		dist[buf[i]]++; \
+-	} \
+-	u = 0; \
+-	for (i = 0; i < __arraycount(dist); i++) { \
+-		if (dist[i]) \
+-			u++; \
+-	} \
+-	if (u < 3) \
+-		return 0; \
+-\
++   } \
+ 	return 1; \
+ }
+ 
