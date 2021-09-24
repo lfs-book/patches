@@ -1,0 +1,81 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2021-09-24
+Initial Package Version: 2.14.7
+Upstream Status:         Under review
+Origin:                  https://reviews.imfreedom.org/r/931/diff/1/
+Description:             Fix str to time conversion in libpurple
+                         fix test suite too.
+
+diff --git a/libpurple/tests/test_util.c b/libpurple/tests/test_util.c
+--- a/libpurple/tests/test_util.c
++++ b/libpurple/tests/test_util.c
+@@ -160,6 +160,7 @@
+ 	long tz_off;
+ 	const char *rest;
+ 	time_t timestamp;
++	const gchar *oldtz = g_getenv("TZ");
+ 
+ 	fail_unless(377182200 == purple_str_to_time("19811214T12:50:00", TRUE, NULL, NULL, NULL));
+ 	fail_unless(377203800 == purple_str_to_time("19811214T12:50:00-06", FALSE, NULL, NULL, NULL));
+@@ -167,7 +168,13 @@
+ 	fail_unless(1282941722 == purple_str_to_time("2010-08-27.204202", TRUE, NULL, NULL, NULL));
+ 	fail_unless(1175919261 == purple_str_to_time("20070407T04:14:21.3234", TRUE, NULL, NULL, NULL));
+ 	fail_unless(1175919261 == purple_str_to_time("20070407T04:14:21Z", TRUE, NULL, NULL, NULL));
+-	fail_unless(1631512800 == purple_str_to_time("09-13-2021", TRUE, NULL, NULL, NULL));
++	fail_unless(1631491200 == purple_str_to_time("09-13-2021", TRUE, NULL, NULL, NULL));
++
++	g_setenv("TZ", "Europe/London", TRUE);
++	fail_unless(1569742881 == purple_str_to_time("2019-09-29T08:41:21.401000+00:00", FALSE, NULL, NULL, NULL));
++	if(oldtz != NULL) {
++		g_setenv("TZ", oldtz, TRUE);
++	}
+ 
+ 	timestamp = purple_str_to_time("2010-08-27.134202-0700PDT", FALSE, &tm, &tz_off, &rest);
+ 	fail_unless(1282941722 == timestamp);
+@@ -175,7 +182,7 @@
+ 	assert_string_equal("PDT", rest);
+ 
+ 	timestamp = purple_str_to_time("09/13/202115:34:34", TRUE, NULL, NULL, &rest);
+-	fail_unless(1631512800 == timestamp);
++	fail_unless(1631491200 == timestamp);
+ 	assert_string_equal("15:34:34", rest);
+ }
+ END_TEST
+diff --git a/libpurple/util.c b/libpurple/util.c
+--- a/libpurple/util.c
++++ b/libpurple/util.c
+@@ -841,8 +841,10 @@
+ 	/* check if this is utc time */
+ 	match = g_match_info_fetch_named(info, "utc");
+ 	if(match != NULL && *match != '\0') {
++		g_free(match);
++
+ 		tzoff = 0;
+-		g_free(match);
++		mktime_with_utc = TRUE;
+ 	} else {
+ 		/* free match if it was just an empty string */
+ 		g_free(match);
+@@ -883,15 +885,13 @@
+ 	}
+ 
+ 	/* If we have a time, figure out if we need to adjust our tz offset. */
+-	if(t.tm_hour > 0 || t.tm_min > 0 || t.tm_sec > 0) {
+-		if(!mktime_with_utc) {
+-			if(utc) {
+-				mktime_with_utc = TRUE;
+-				tzoff = 0;
+-			} else {
+-				/* Local Time */
+-				t.tm_isdst = -1;
+-			}
++	if(!mktime_with_utc) {
++		if(utc || tzoff == 0) {
++			mktime_with_utc = TRUE;
++			tzoff = 0;
++		} else {
++			/* Local Time */
++			t.tm_isdst = -1; /* -1 means dst info is not available */
+ 		}
+ 	}
+ 
