@@ -1,0 +1,195 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2021-12-28
+Initial Package Version: 2.9
+Origin:                  Fedora Rawhide (https://src.fedoraproject.org/rpms/wpa_supplicant/tree/rawhide)
+Upstream Status:         Applied
+Description:             Fixes several runtime issues with OpenSSL-3.0.0. These
+                         include the inability to connect to networks and for
+                         connections to crash at random whenever the wireless
+                         access point changes its cipher. Also fixes issues with
+                         EAP-TLS/MSCHAPv2 and deprecation warnings.
+                         The inability to connect to networks is caused by a 
+                         change in behavior in DES_key_schedule. 
+
+diff -Naurp wpa_supplicant-2.9.orig/src/crypto/crypto_openssl.c wpa_supplicant-2.9/src/crypto/crypto_openssl.c
+--- wpa_supplicant-2.9.orig/src/crypto/crypto_openssl.c	2019-08-07 08:25:25.000000000 -0500
++++ wpa_supplicant-2.9/src/crypto/crypto_openssl.c	2021-12-28 11:39:43.145966953 -0600
+@@ -195,8 +195,8 @@ int md4_vector(size_t num_elem, const u8
+ int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
+ {
+ 	u8 pkey[8], next, tmp;
+-	int i;
+-	DES_key_schedule ks;
++	int i, plen, ret = -1;
++	EVP_CIPHER_CTX *ctx;
+ 
+ 	/* Add parity bits to the key */
+ 	next = 0;
+@@ -207,10 +207,19 @@ int des_encrypt(const u8 *clear, const u
+ 	}
+ 	pkey[i] = next | 1;
+ 
+-	DES_set_key((DES_cblock *) &pkey, &ks);
+-	DES_ecb_encrypt((DES_cblock *) clear, (DES_cblock *) cypher, &ks,
+-			DES_ENCRYPT);
+-	return 0;
++	ctx = EVP_CIPHER_CTX_new();
++   if (ctx &&
++       EVP_EncryptInit_ex(ctx, EVP_des_ecb(), NULL, pkey, NULL) == 1 &&
++       EVP_CIPHER_CTX_set_padding(ctx, 0) == 1 &&
++       EVP_EncryptUpdate(ctx, cypher, &plen, clear, 8) == 1 &&
++       EVP_EncryptFinal_ex(ctx, &cypher[plen], &plen) == 1)
++      ret = 0;
++   else
++      wpa_printf(MSG_ERROR, "OpenSSL: DES encrypt failed");
++
++   if (ctx)
++      EVP_CIPHER_CTX_free(ctx);
++   return ret;
+ }
+ 
+ 
+@@ -228,8 +237,8 @@ int rc4_skip(const u8 *key, size_t keyle
+ 
+ 	ctx = EVP_CIPHER_CTX_new();
+ 	if (!ctx ||
+-	    !EVP_CIPHER_CTX_set_padding(ctx, 0) ||
+ 	    !EVP_CipherInit_ex(ctx, EVP_rc4(), NULL, NULL, NULL, 1) ||
++       !EVP_CIPHER_CTX_set_padding(ctx, 0) ||
+ 	    !EVP_CIPHER_CTX_set_key_length(ctx, keylen) ||
+ 	    !EVP_CipherInit_ex(ctx, NULL, NULL, key, NULL, 1))
+ 		goto out;
+@@ -688,9 +697,9 @@ struct crypto_cipher * crypto_cipher_ini
+ 		return NULL;
+ 	}
+ 
+-	if (!(ctx->enc = EVP_CIPHER_CTX_new()) ||
+-	    !EVP_CIPHER_CTX_set_padding(ctx->enc, 0) ||
++	if (!(ctx->enc = EVP_CIPHER_CTX_new()) || 
+ 	    !EVP_EncryptInit_ex(ctx->enc, cipher, NULL, NULL, NULL) ||
++       !EVP_CIPHER_CTX_set_padding(ctx->enc, 0) ||
+ 	    !EVP_CIPHER_CTX_set_key_length(ctx->enc, key_len) ||
+ 	    !EVP_EncryptInit_ex(ctx->enc, NULL, NULL, key, iv)) {
+ 		if (ctx->enc)
+@@ -700,8 +709,8 @@ struct crypto_cipher * crypto_cipher_ini
+ 	}
+ 
+ 	if (!(ctx->dec = EVP_CIPHER_CTX_new()) ||
+-	    !EVP_CIPHER_CTX_set_padding(ctx->dec, 0) ||
+ 	    !EVP_DecryptInit_ex(ctx->dec, cipher, NULL, NULL, NULL) ||
++       !EVP_CIPHER_CTX_set_padding(ctx->dec, 0) ||
+ 	    !EVP_CIPHER_CTX_set_key_length(ctx->dec, key_len) ||
+ 	    !EVP_DecryptInit_ex(ctx->dec, NULL, NULL, key, iv)) {
+ 		EVP_CIPHER_CTX_free(ctx->enc);
+diff -Naurp wpa_supplicant-2.9.orig/src/crypto/tls_openssl.c wpa_supplicant-2.9/src/crypto/tls_openssl.c
+--- wpa_supplicant-2.9.orig/src/crypto/tls_openssl.c	2019-08-07 08:25:25.000000000 -0500
++++ wpa_supplicant-2.9/src/crypto/tls_openssl.c	2021-12-28 11:30:26.624779224 -0600
+@@ -1044,6 +1044,8 @@ void * tls_init(const struct tls_config
+ 	SSL_CTX_set_options(ssl, SSL_OP_NO_SSLv2);
+ 	SSL_CTX_set_options(ssl, SSL_OP_NO_SSLv3);
+ 
++   SSL_CTX_set_mode(ssl, SSL_MODE_AUTO_RETRY);
++
+ #ifdef SSL_MODE_NO_AUTO_CHAIN
+ 	/* Number of deployed use cases assume the default OpenSSL behavior of
+ 	 * auto chaining the local certificate is in use. BoringSSL removed this
+@@ -2951,16 +2953,12 @@ static int tls_set_conn_flags(struct tls
+ 
+ 		/* Explicit request to enable TLS versions even if needing to
+ 		 * override systemwide policies. */
+-		if (flags & TLS_CONN_ENABLE_TLSv1_0) {
++		if (flags & TLS_CONN_ENABLE_TLSv1_0) 
+ 			version = TLS1_VERSION;
+-		} else if (flags & TLS_CONN_ENABLE_TLSv1_1) {
+-			if (!(flags & TLS_CONN_DISABLE_TLSv1_0))
+-				version = TLS1_1_VERSION;
+-		} else if (flags & TLS_CONN_ENABLE_TLSv1_2) {
+-			if (!(flags & (TLS_CONN_DISABLE_TLSv1_0 |
+-				       TLS_CONN_DISABLE_TLSv1_1)))
+-				version = TLS1_2_VERSION;
+-		}
++		else if (flags & TLS_CONN_ENABLE_TLSv1_1)
++         version = TLS1_1_VERSION;
++      else if (flags & TLS_CONN_ENABLE_TLSv1_2)
++         version = TLS1_2_VERSION;
+ 		if (!version) {
+ 			wpa_printf(MSG_DEBUG,
+ 				   "OpenSSL: Invalid TLS version configuration");
+@@ -2974,6 +2972,18 @@ static int tls_set_conn_flags(struct tls
+ 		}
+ 	}
+ #endif /* >= 1.1.0 */
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
++   !defined(LIBRESSL_VERSION_NUMBER) && \
++   !defined (OPENSSL_IS_BORINGSSL)
++   if ((flags & (TLS_CONN_ENABLE_TLSv1_0 | TLS_CONN_ENABLE_TLSv1_1)) &&
++         SSL_get_security_level(ssl) >= 2) {
++      /*
++       * Need to drop to security level 1 to allow TLS versions older
++       * than 1.2 to be used when explicitly enabled in configuration.
++       */
++      SSL_set_security_level(conn->ssl, 1);
++   }
++#endif
+ 
+ #ifdef CONFIG_SUITEB
+ #ifdef OPENSSL_IS_BORINGSSL
+@@ -4431,10 +4441,18 @@ struct wpabuf * tls_connection_decrypt(v
+ 		return NULL;
+ 	res = SSL_read(conn->ssl, wpabuf_mhead(buf), wpabuf_size(buf));
+ 	if (res < 0) {
+-		tls_show_errors(MSG_INFO, __func__,
+-				"Decryption failed - SSL_read");
+-		wpabuf_free(buf);
+-		return NULL;
++		int err = SSL_get_error(conn->ssl, res);
++
++      if (err == SSL_ERROR_WANT_READ) {
++         wpa_printf(MSG_DEBUG,
++                    "SSL: SSL_connect - want more data");
++         res = 0;
++      } else {
++         tls_show_errors(MSG_INFO, __func__,
++                         "Decryption failed - SSL_read");
++         wpabuf_free(buf);
++         return NULL;
++      }
+ 	}
+ 	wpabuf_put(buf, res);
+ 
+diff -Naurp wpa_supplicant-2.9.orig/src/eap_peer/eap_peap.c wpa_supplicant-2.9/src/eap_peer/eap_peap.c
+--- wpa_supplicant-2.9.orig/src/eap_peer/eap_peap.c	2019-08-07 08:25:25.000000000 -0500
++++ wpa_supplicant-2.9/src/eap_peer/eap_peap.c	2021-12-28 11:31:16.609525465 -0600
+@@ -787,6 +787,10 @@ static int eap_peap_decrypt(struct eap_s
+ 	res = eap_peer_tls_decrypt(sm, &data->ssl, in_data, &in_decrypted);
+ 	if (res)
+ 		return res;
++   if (wpabuf_len(in_decrypted) == 0) {
++      wpabuf_free(in_decrypted);
++      return 1;
++   }
+ 
+ continue_req:
+ 	wpa_hexdump_buf(MSG_DEBUG, "EAP-PEAP: Decrypted Phase 2 EAP",
+diff -Naurp wpa_supplicant-2.9.orig/src/eap_peer/eap_ttls.c wpa_supplicant-2.9/src/eap_peer/eap_ttls.c
+--- wpa_supplicant-2.9.orig/src/eap_peer/eap_ttls.c	2019-08-07 08:25:25.000000000 -0500
++++ wpa_supplicant-2.9/src/eap_peer/eap_ttls.c	2021-12-28 11:32:28.553160721 -0600
+@@ -1424,6 +1424,7 @@ static int eap_ttls_decrypt(struct eap_s
+ 
+ 	if ((in_data == NULL || wpabuf_len(in_data) == 0) &&
+ 	    data->phase2_start) {
++start:
+ 		return eap_ttls_phase2_start(sm, data, ret, identifier,
+ 					     out_data);
+ 	}
+@@ -1438,6 +1439,10 @@ static int eap_ttls_decrypt(struct eap_s
+ 	retval = eap_peer_tls_decrypt(sm, &data->ssl, in_data, &in_decrypted);
+ 	if (retval)
+ 		goto done;
++   if (wpabuf_len(in_decrypted) == 0) {
++      wpabuf_free(in_decrypted);
++      goto start;
++   }
+ 
+ continue_req:
+ 	data->phase2_start = 0;
