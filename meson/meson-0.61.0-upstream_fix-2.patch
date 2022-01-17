@@ -1,0 +1,148 @@
+Submitted By: Xi Ruoyao <xry111 at linuxfromscratch dot org>
+Date: 2022-01-13
+Initial Package Version: 0.61.0
+Upstream Status: Applied
+Origin: https://github.com/mesonbuild/meson/commit/bda11fe
+Description: With unpatched 0.61.0, the behavior of `gnome.gdbus_codegen`
+does not matches the documentation, causing gdm-41.3 FTBFS.
+
+Date: 2022-01-17
+Description: Added a fix to correct a typo
+
+---
+Notes on the initial patch version:
+
+From 104b945a33397c920dfb96b2f25dd5607f7bd762 Mon Sep 17 00:00:00 2001
+From: Eli Schwartz <eschwartz@archlinux.org>
+Date: Wed, 12 Jan 2022 18:42:44 -0500
+Subject: [PATCH] gnome.gdbus_codegen: fix annotations argument for multiple
+ annotations, harder
+
+The original attempted fix only allowed configuration to succeed, but
+not building. It was modeled based on the gdbus-codegen documentation,
+which states:
+
+  --annotate WHAT KEY VALUE WHAT KEY VALUE WHAT KEY VALUE
+                        Add annotation (may be used several times)
+
+which clearly indicates that gdbus-codegen accepts an --annotate flag
+that is followed by a multiple of 3 values, despite this not actually
+working.
+
+The manpage actually contradicts the --help text:
+
+   --annotate ELEMENT KEY VALUE
+       Used to inject D-Bus annotations into the given XML files. []
+
+... and gives examples that use multiple --annotate flags each with 3
+arguments.
+
+To better understand what meson is supposed to do here, we should look
+at ef52e60936665c982cd17a4a17c2045b445d8e6d, which ported to
+typed_kwargs. There is actually a big chunk of code to handle
+annotations that got completely dropped, leading with a comment (that
+did not get dropped): "they are a list of lists of strings..."
+
+Reimplement this logic inside a validator/converter for the annotations
+kwarg container:
+
+- do not listify, we don't accept `annotations: ''` and listify is
+  supposed to be for when either x or list[x] is valid
+
+- go back to checking for a list of exactly 3 values
+
+- allow a list of the aforementioned, in the traditionally expected
+  form:
+
+  [
+    ['foo1', 'foo2', 'foo3'],
+    ['bar1', 'bar2', 'bar3'],
+  ]
+
+- pass one --annotate flag per 3-value-list
+
+And add some better error reporting for the cause of errors when
+processing lists of lists.
+---
+ mesonbuild/modules/gnome.py | 33 +++++++++++++++++++++++++++------
+ 1 file changed, 27 insertions(+), 6 deletions(-)
+
+diff --git a/mesonbuild/modules/gnome.py b/mesonbuild/modules/gnome.py
+index 1125e56e7..413ec23c0 100644
+--- a/mesonbuild/modules/gnome.py
++++ b/mesonbuild/modules/gnome.py
+@@ -134,7 +134,7 @@ if T.TYPE_CHECKING:
+         namespace: T.Optional[str]
+         object_manager: bool
+         build_by_default: bool
+-        annotations: T.List[str]
++        annotations: T.List[T.List[str]]
+         install_header: bool
+         install_dir: T.Optional[str]
+         docbook: T.Optional[str]
+@@ -222,6 +222,27 @@ _MK_ENUMS_COMMON_KWS: T.List[KwargInfo] = [
+     KwargInfo('symbol_prefix', (str, NoneType)),
+ ]
+ 
++def annotations_validator(annotations: T.List[T.Union[str, T.List[str]]]) -> T.Optional[str]:
++
++    """Validate gdbus-codegen annotations argument"""
++
++    badlist = 'must be made up of 3 strings for ELEMENT, KEY, and VALUE'
++
++    if all(isinstance(annot, str) for annot in annotations):
++        if len(annotations) == 3:
++            return None
++        else:
++            return badlist
++    elif not all(isinstance(annot, list) for annot in annotations):
++        for c, annot in enumerate(annotations):
++            if not isinstance(annot, list):
++                return f'element {c+1} must be a list'
++    else:
++        for c, annot in enumerate(annotations):
++            if len(annot) != 3 or not all(isinstance(i, str) for i in annot):
++                return f'element {c+1} {badlist}'
++    return None
++
+ # gresource compilation is broken due to the way
+ # the resource compiler and Ninja clash about it
+ #
+@@ -1434,10 +1455,10 @@ class GnomeModule(ExtensionModule):
+         KwargInfo('namespace', (str, NoneType)),
+         KwargInfo('object_manager', bool, default=False),
+         KwargInfo(
+-            'annotations', ContainerTypeInfo(list, str),
+-            listify=True,
++            'annotations', ContainerTypeInfo(list, (list, str)),
+             default=[],
+-            validator=lambda x: 'must be made up of 3 strings for ELEMENT, KEY, and VALUE' if len(x) != 3 else None
++            validator=annotations_validator,
++            convertor=lambda x: [x] if x and isinstance(x[0], str) else x,
+         ),
+         KwargInfo('install_header', bool, default=False, since='0.46.0'),
+         KwargInfo('install_dir', (str, NoneType), since='0.46.0'),
+@@ -1477,9 +1498,9 @@ class GnomeModule(ExtensionModule):
+         build_by_default = kwargs['build_by_default']
+ 
+         # Annotations are a bit ugly in that they are a list of lists of strings...
+-        if kwargs['annotations']:
++        for annot in kwargs['annotations']:
+             cmd.append('--annotate')
+-            cmd.extend(kwargs['annotations'])
++            cmd.extend(annot)
+ 
+         targets = []
+         install_header = kwargs['install_header']
+@@ -1934,7 +1955,7 @@
+         cmd: T.List[T.Union[str, 'ExternalProgram']]
+         cmd = [state.find_program('vapigen'), '--quiet', f'--library={library}', f'--directory={build_dir}']
+         cmd.extend([f'--vapidir={d}' for d in kwargs['vapi_dirs']])
+-        cmd.extend([f'--metadatdir={d}' for d in kwargs['metadata_dirs']])
++        cmd.extend([f'--metadatadir={d}' for d in kwargs['metadata_dirs']])
+         cmd.extend([f'--girdir={d}' for d in kwargs['gir_dirs']])
+         cmd += pkg_cmd
+         cmd += ['--metadatadir=' + source_dir]
+-- 
+2.34.1
+
