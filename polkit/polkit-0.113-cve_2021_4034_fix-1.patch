@@ -1,0 +1,74 @@
+Submitted By:            Xi Ruoyao <xry111 at linuxfromscratch dot org>
+Date:                    2021-01-27
+Initial Package Version: 0.113
+Upstream Status:         Applied
+Origin:                  Upstream, rebased for polkit <= 0.113, >= 0.92
+Description:             Fix CVE-2021-4034, a trivially exploitable local
+                         privilege escalation, to polkit since 0.92.
+
+From 034272c322534ab2b665c23c40380723ef15f0a9 Mon Sep 17 00:00:00 2001
+From: Jan Rybar <jrybar@redhat.com>
+Date: Tue, 25 Jan 2022 17:21:46 +0000
+Subject: [PATCH] pkexec: local privilege escalation (CVE-2021-4034)
+
+---
+ src/programs/pkcheck.c |  5 +++++
+ src/programs/pkexec.c  | 19 ++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/src/programs/pkcheck.c b/src/programs/pkcheck.c
+index 5781893..63c0559 100644
+--- a/src/programs/pkcheck.c
++++ b/src/programs/pkcheck.c
+@@ -362,6 +362,11 @@ main (int argc, char *argv[])
+   local_agent_handle = NULL;
+   ret = 126;
+ 
++  if (argc < 1)
++    {
++      exit(126);
++    }
++
+   g_type_init ();
+ 
+   details = polkit_details_new ();
+diff --git a/src/programs/pkexec.c b/src/programs/pkexec.c
+index 50de92c..c31356f 100644
+--- a/src/programs/pkexec.c
++++ b/src/programs/pkexec.c
+@@ -490,6 +490,15 @@ main (int argc, char *argv[])
+   pid_t pid_of_caller;
+   gpointer local_agent_handle;
+ 
++
++  /*
++   * If 'pkexec' is called THIS wrong, someone's probably evil-doing. Don't be nice, just bail out.
++   */
++  if (argc<1)
++    {
++      exit(127);
++    }
++
+   ret = 127;
+   authority = NULL;
+   subject = NULL;
+@@ -635,7 +644,15 @@ main (int argc, char *argv[])
+           goto out;
+         }
+       g_free (path);
+-      argv[n] = path = s;
++      path = s;
++
++      /* argc<2 and pkexec runs just shell, argv is guaranteed to be null-terminated.
++       * /-less shell shouldn't happen, but let's be defensive and don't write to null-termination
++       */
++      if (argv[n] != NULL)
++      {
++        argv[n] = path;
++      }
+     }
+   if (access (path, F_OK) != 0)
+     {
+-- 
+2.35.0
+
