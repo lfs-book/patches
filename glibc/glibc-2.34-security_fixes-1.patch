@@ -1,0 +1,1064 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2022-02-13
+Initial Package Version: 2.34
+Upstream Status:         Applied
+Origin:                  Upstream (Commits as follows):
+                         269eb9d930546ce57e83b56c44c430f154684a23
+                         73c362840c4efde45125a6c27bf41726397f4038
+                         062ff490c1467059f6cd64bb9c3d85f6cc6cf97a
+                         f7a79879c0b2bef0dadd6caaaeeb0d26423e04e5
+                         472e799a5f2102bc0c3206dbd5a801765fceb39c
+                         d084965adc7baa8ea804427cccf973cea556d697
+                         5575daae5099e779bb860b566b4d608418a5b832
+                         6890b8a3ae40ab9d4c96024ab95b04816fcc8a4a
+                         7b5d433fd097b8ed74e458eca33597290e07b974
+                         1081f1d3dd7c84ba3416b5198d47a4df2b70185d
+Description:             Fixes several security vulnerabilities in glibc-2.34
+                         as shipped by LFS 11.0. This includes fixes for
+                         CVE-2022-23219, CVE-2022-23218, CVE-2021-3998, and
+                         CVE-2021-3999. This patch was tested on a system with
+                         glibc-2.34, by running 'make' and 'make test' and
+                         comparing output to verify that there are no regressions.
+                         This patch is crafted for the security advisory for
+                         glibc.
+
+diff -Naurp glibc-2.34.orig/include/sys/un.h glibc-2.34/include/sys/un.h
+--- glibc-2.34.orig/include/sys/un.h	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/include/sys/un.h	2022-02-13 14:06:18.784971130 -0600
+@@ -1 +1,13 @@
+ #include <socket/sys/un.h>
++
++#ifndef _ISOMAC
++
++/* Set ADDR->sun_family to AF_UNIX and ADDR->sun_path to PATHNANE.
++   Return 0 on success or -1 on faliure (due to overlong PATHNAME).
++   The caller should always use sizeof (struct sockaddr_un) as the
++   socket address length, disregarding the length of PATHNAME.
++   Only concrete (non-abstract) pathnames are supported. */
++int __sockaddr_un_set (struct sockaddr_un *addr, const char *pathname)
++   attribute_hidden;
++
++#endif /* _ISOMAC */
+diff -Naurp glibc-2.34.orig/socket/Makefile glibc-2.34/socket/Makefile
+--- glibc-2.34.orig/socket/Makefile	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/socket/Makefile	2022-02-13 14:08:10.139299306 -0600
+@@ -29,13 +29,17 @@ headers	:= sys/socket.h sys/un.h bits/so
+ routines := accept bind connect getpeername getsockname getsockopt	\
+ 	    listen recv recvfrom recvmsg send sendmsg sendto		\
+ 	    setsockopt shutdown socket socketpair isfdtype opensock	\
+-	    sockatmark accept4 recvmmsg sendmmsg
++	    sockatmark accept4 recvmmsg sendmmsg sockaddr_un_set
+ 
+ tests := \
+   tst-accept4 \
+   tst-sockopt \
+   # tests
+ 
++tests-internal := \
++	tst-sockaddr_un_set \
++	# tests-internal
++
+ tests-time64 := \
+   tst-sockopt-time64 \
+   # tests
+diff -Naurp glibc-2.34.orig/socket/sockaddr_un_set.c glibc-2.34/socket/sockaddr_un_set.c
+--- glibc-2.34.orig/socket/sockaddr_un_set.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/socket/sockaddr_un_set.c	2022-02-13 14:10:30.921468249 -0600
+@@ -0,0 +1,41 @@
++/* Set the sun_path member of struct sockaddr_un.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <errno.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++
++int
++__sockaddr_un_set (struct sockaddr_un *addr, const char *pathname)
++{
++   size_t name_length = strlen (pathname);
++
++   /* The kernel supports names of exactly sizeof (addr->sun_path)
++      bytes, without a null terminator, but userspace does not; see the
++      SUN_LEN macro. */
++   if (name_length >= sizeof (addr->sun_path))
++   {
++      __set_errno (EINVAL); /* Error code used by the kernel. */
++      return -1;
++   }
++
++   addr->sun_family = AF_UNIX;
++   memcpy (addr->sun_path, pathname, name_length + 1);
++   return 0;
++}
+diff -Naurp glibc-2.34.orig/socket/tst-sockaddr_un_set.c glibc-2.34/socket/tst-sockaddr_un_set.c
+--- glibc-2.34.orig/socket/tst-sockaddr_un_set.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/socket/tst-sockaddr_un_set.c	2022-02-13 14:17:02.620228069 -0600
+@@ -0,0 +1,62 @@
++/* Test the __sockaddr_un_set function.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Re-compile the function because the version in libc is not
++   exported. */
++#include "sockaddr_un_set.c"
++
++#include <support/check.h>
++
++static int
++do_test (void)
++{
++   struct sockaddr_un sun;
++
++   memset (&sun, 0xcc, sizeof (sun));
++   __sockaddr_un_set (&sun, "");
++   TEST_COMPARE (sun.sun_family, AF_UNIX);
++   TEST_COMPARE (__sockaddr_un_set (&sun, ""), 0);
++
++   memset (&sun, 0xcc, sizeof (sun));
++   TEST_COMPARE (__sockaddr_un_set (&sun, "/example"), 0);
++   TEST_COMPARE_STRING (sun.sun_path, "/example");
++
++   {
++      char pathname[108]; /* Length of sun_path (ABI constant). */
++      memset (pathname, 'x', sizeof (pathname));
++      pathname[sizeof (pathname) - 1] = '\0';
++      memset (&sun, 0xcc, sizeof (sun));
++      TEST_COMPARE (__sockaddr_un_set (&sun, pathname), 0);
++      TEST_COMPARE (sun.sun_family, AF_UNIX);
++      TEST_COMPARE_STRING (sun.sun_path, pathname);
++   }
++
++   {
++      char pathname[109];
++      memset (pathname, 'x', sizeof (pathname));
++      pathname[sizeof (pathname) - 1] = '\0';
++      memset (&sun, 0xcc, sizeof (sun));
++      errno = 0;
++      TEST_COMPARE (__sockaddr_un_set (&sun, pathname), -1);
++      TEST_COMPARE (errno, EINVAL);
++   }
++
++   return 0;
++}
++
++#include <support/test-driver.c>
+diff -Naurp glibc-2.34.orig/stdlib/canonicalize.c glibc-2.34/stdlib/canonicalize.c
+--- glibc-2.34.orig/stdlib/canonicalize.c	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/stdlib/canonicalize.c	2022-02-13 14:55:02.199742723 -0600
+@@ -400,8 +400,16 @@ realpath_stk (const char *name, char *re
+ 
+ error:
+   *dest++ = '\0';
+-  if (resolved != NULL && dest - rname <= get_path_max ())
+-    rname = strcpy (resolved, rname);
++  if (resolved != NULL)
++  {
++     if (dest - rname <= get_path_max ())
++        rname = strcpy (resolved, rname);
++     else if (!failed)
++     {
++        failed = true;
++        __set_errno (ENAMETOOLONG);
++     }
++  }
+ 
+ error_nomem:
+   scratch_buffer_free (&extra_buffer);
+diff -Naurp glibc-2.34.orig/stdlib/Makefile glibc-2.34/stdlib/Makefile
+--- glibc-2.34.orig/stdlib/Makefile	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/stdlib/Makefile	2022-02-13 14:51:57.013749700 -0600
+@@ -65,30 +65,84 @@ aux =	grouping groupingwc tens_in_limb
+ static-only-routines = atexit at_quick_exit
+ 
+ test-srcs	:= tst-fmtmsg
+-tests		:= tst-strtol tst-strtod testmb testrand testsort testdiv   \
+-		   test-canon test-canon2 tst-strtoll tst-environ	    \
+-		   tst-xpg-basename tst-random tst-random2 tst-bsearch	    \
+-		   tst-limits tst-rand48 bug-strtod tst-setcontext	    \
+-		   tst-setcontext2 test-a64l tst-qsort testmb2              \
+-		   bug-strtod2 tst-atof1 tst-atof2 tst-strtod2		    \
+-		   tst-rand48-2 tst-makecontext tst-strtod5		    \
+-		   tst-qsort2 tst-makecontext2 tst-strtod6 tst-unsetenv1    \
+-		   tst-makecontext3 bug-getcontext bug-fmtmsg1		    \
+-		   tst-secure-getenv tst-strtod-overflow tst-strtod-round   \
+-		   tst-tininess tst-strtod-underflow tst-setcontext3	    \
+-		   tst-strtol-locale tst-strtod-nan-locale tst-strfmon_l    \
+-		   tst-quick_exit tst-thread-quick_exit tst-width	    \
+-		   tst-width-stdint tst-strfrom tst-strfrom-locale	    \
+-		   tst-getrandom tst-atexit tst-at_quick_exit 		    \
+-		   tst-cxa_atexit tst-on_exit test-atexit-race 		    \
+-		   test-at_quick_exit-race test-cxa_atexit-race		    \
+-		   test-cxa_atexit-race2				    \
+-		   test-on_exit-race test-dlclose-exit-race 		    \
+-		   tst-makecontext-align test-bz22786 tst-strtod-nan-sign \
+-		   tst-swapcontext1 tst-setcontext4 tst-setcontext5 \
+-		   tst-setcontext6 tst-setcontext7 tst-setcontext8 \
+-		   tst-setcontext9 tst-bz20544 tst-canon-bz26341 \
+-		   tst-realpath
++tests := \
++  bug-fmtmsg1 \
++  bug-getcontext \
++  bug-strtod \
++  bug-strtod2 \
++  test-a64l \
++  test-at_quick_exit-race \
++  test-atexit-race \
++  test-bz22786 \
++  test-canon \
++  test-canon2 \
++  test-cxa_atexit-race \
++  test-cxa_atexit-race2 \
++  test-dlclose-exit-race \
++  test-on_exit-race \
++  testdiv \
++  testmb \
++  testmb2 \
++  testrand \
++  testsort \
++  tst-at_quick_exit \
++  tst-atexit \
++  tst-atof1 \
++  tst-atof2 \
++  tst-bsearch \
++  tst-bz20544 \
++  tst-canon-bz26341 \
++  tst-cxa_atexit \
++  tst-environ \
++  tst-getrandom \
++  tst-limits \
++  tst-makecontext \
++  tst-makecontext-align \
++  tst-makecontext2 \
++  tst-makecontext3 \
++  tst-on_exit \
++  tst-qsort \
++  tst-qsort2 \
++  tst-quick_exit \
++  tst-rand48 \
++  tst-rand48-2 \
++  tst-random \
++  tst-random2 \
++  tst-realpath \
++  tst-realpath-toolong \
++  tst-secure-getenv \
++  tst-setcontext \
++  tst-setcontext2 \
++  tst-setcontext3 \
++  tst-setcontext4 \
++  tst-setcontext5 \
++  tst-setcontext6 \
++  tst-setcontext7 \
++  tst-setcontext8 \
++  tst-setcontext9 \
++  tst-strfmon_l \
++  tst-strfrom \
++  tst-strfrom-locale \
++  tst-strtod \
++  tst-strtod-nan-locale \
++  tst-strtod-nan-sign \
++  tst-strtod-overflow \
++  tst-strtod-round \
++  tst-strtod-underflow \
++  tst-strtod2 \
++  tst-strtod5 \
++  tst-strtod6 \
++  tst-strtol \
++  tst-strtol-locale \
++  tst-strtoll \
++  tst-swapcontext1 \
++  tst-thread-quick_exit \
++  tst-tininess \
++  tst-unsetenv1 \
++  tst-width \
++  tst-width-stdint \
++  tst-xpg-basename \
++# tests
+ 
+ tests-internal	:= tst-strtod1i tst-strtod3 tst-strtod4 tst-strtod5i \
+ 		   tst-tls-atexit tst-tls-atexit-nodelete
+diff -Naurp glibc-2.34.orig/stdlib/tst-realpath-toolong.c glibc-2.34/stdlib/tst-realpath-toolong.c
+--- glibc-2.34.orig/stdlib/tst-realpath-toolong.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/stdlib/tst-realpath-toolong.c	2022-02-13 14:54:44.642838192 -0600
+@@ -0,0 +1,49 @@
++/* Verify that realpath returns NULL with ENAMETOOLONG if the result exceeds
++   NAME_MAX.
++   Copyright The GNU Toolchain Authors.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <errno.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <support/check.h>
++#include <support/temp_file.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++
++#define BASENAME "tst-realpath-toolong."
++
++int
++do_test (void)
++{
++   char *base = support_create_and_chdir_toolong_temp_directory (BASENAME);
++
++   char buf[PATH_MAX + 1];
++   const char *res = realpath (".", buf);
++
++   /* canonicalize.c states that if the real path is >= PATH_MAX, then
++      realpath returns NULL and sets ENAMETOOLONG. */
++   TEST_VERIFY (res == NULL);
++   TEST_VERIFY (errno == ENAMETOOLONG);
++
++   free(base);
++   return 0;
++}
++
++#include <support/test-driver.c>
+diff -Naurp glibc-2.34.orig/sunrpc/clnt_gen.c glibc-2.34/sunrpc/clnt_gen.c
+--- glibc-2.34.orig/sunrpc/clnt_gen.c	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/sunrpc/clnt_gen.c	2022-02-13 14:22:40.122346989 -0600
+@@ -57,9 +57,13 @@ clnt_create (const char *hostname, u_lon
+ 
+   if (strcmp (proto, "unix") == 0)
+     {
+-      memset ((char *)&sun, 0, sizeof (sun));
+-      sun.sun_family = AF_UNIX;
+-      strcpy (sun.sun_path, hostname);
++      if (__sockaddr_un_set (&sun, hostname) < 0)
++      {
++         struct rpc_createerr *ce = &get_rpc_createerr ();
++         ce->cf_stat = RPC_SYSTEMERROR;
++         ce->cf_error.re_errno = errno;
++         return NULL;
++      }
+       sock = RPC_ANYSOCK;
+       client = clntunix_create (&sun, prog, vers, &sock, 0, 0);
+       if (client == NULL)
+diff -Naurp glibc-2.34.orig/sunrpc/Makefile glibc-2.34/sunrpc/Makefile
+--- glibc-2.34.orig/sunrpc/Makefile	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/sunrpc/Makefile	2022-02-13 15:27:55.508158618 -0600
+@@ -65,7 +65,7 @@ shared-only-routines = $(routines)
+ endif
+ 
+ tests = tst-xdrmem tst-xdrmem2 test-rpcent tst-udp-error tst-udp-timeout \
+-  tst-udp-nonblocking
++  tst-udp-nonblocking tst-bug22542 tst-bug28768
+ xtests := tst-getmyaddr
+ 
+ ifeq ($(have-thread-library),yes)
+@@ -110,6 +110,8 @@ $(objpfx)tst-udp-nonblocking: $(common-o
+ $(objpfx)tst-udp-garbage: \
+   $(common-objpfx)linkobj/libc.so $(shared-thread-library)
+ 
++$(objpfx)tst-bug22542:	$(common-objpfx)linkobj/libc.so
++
+ else # !have-GLIBC_2.31
+ 
+ routines = $(routines-for-nss)
+diff -Naurp glibc-2.34.orig/sunrpc/svc_unix.c glibc-2.34/sunrpc/svc_unix.c
+--- glibc-2.34.orig/sunrpc/svc_unix.c	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/sunrpc/svc_unix.c	2022-02-13 14:19:20.854453848 -0600
+@@ -154,7 +154,10 @@ svcunix_create (int sock, u_int sendsize
+   SVCXPRT *xprt;
+   struct unix_rendezvous *r;
+   struct sockaddr_un addr;
+-  socklen_t len = sizeof (struct sockaddr_in);
++  socklen_t len = sizeof (addr);
++  
++  if (__sockaddr_un_set (&addr, path) < 0)
++     return NULL;
+ 
+   if (sock == RPC_ANYSOCK)
+     {
+@@ -165,11 +168,6 @@ svcunix_create (int sock, u_int sendsize
+ 	}
+       madesock = TRUE;
+     }
+-  memset (&addr, '\0', sizeof (addr));
+-  addr.sun_family = AF_UNIX;
+-  len = strlen (path) + 1;
+-  memcpy (addr.sun_path, path, len);
+-  len += sizeof (addr.sun_family);
+ 
+   __bind (sock, (struct sockaddr *) &addr, len);
+ 
+diff -Naurp glibc-2.34.orig/sunrpc/tst-bug22542.c glibc-2.34/sunrpc/tst-bug22542.c
+--- glibc-2.34.orig/sunrpc/tst-bug22542.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/sunrpc/tst-bug22542.c	2022-02-13 14:24:30.632736630 -0600
+@@ -0,0 +1,44 @@
++/* Test to verify that overlong hostname is rejected by clnt_create
++   and doesn't cause a buffer overflow (bug  22542).
++
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <errno.h>
++#include <rpc/clnt.h>
++#include <string.h>
++#include <support/check.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++
++static int
++do_test (void)
++{
++   /* Create an arbitrary hostname that's longer than fits in sun_path. */
++   char name [sizeof ((struct sockaddr_un*)0)->sun_path * 2];
++   memset (name, 'x', sizeof name - 1);
++   name [sizeof name - 1] = '\0';
++
++   errno = 0;
++   CLIENT *clnt = clnt_create (name, 0, 0, "unix");
++
++   TEST_VERIFY (clnt == NULL);
++   TEST_COMPARE (errno, EINVAL);
++   return 0;
++}
++
++#include <support/test-driver.c>
+diff -Naurp glibc-2.34.orig/sunrpc/tst-bug28768.c glibc-2.34/sunrpc/tst-bug28768.c
+--- glibc-2.34.orig/sunrpc/tst-bug28768.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/sunrpc/tst-bug28768.c	2022-02-13 14:21:32.385722229 -0600
+@@ -0,0 +1,42 @@
++/* Test to verify that long path is rejected by svcunix_create (bug 28768).
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <errno.h>
++#include <rpc/svc.h>
++#include <shlib-compat.h>
++#include <string.h>
++#include <support/check.h>
++
++/* svcunix_create does not have a default version in linkobj/libc.so */
++compat_symbol_reference (libc, svcunix_create, svcunix_create, GLIBC_2_1);
++
++static int
++do_test (void)
++{
++   char pathname[109];
++   memset (pathname, 'x', sizeof (pathname));
++   pathname[sizeof (pathname) - 1] = '\0';
++
++   errno = 0;
++   TEST_VERIFY (svcunix_create (RPC_ANYSOCK, 4096, 4096, pathname) == NULL);
++   TEST_COMPARE (errno, EINVAL);
++
++   return 0;
++}
++
++#include <support/test-driver.c>
+diff -Naurp glibc-2.34.orig/support/temp_file.c glibc-2.34/support/temp_file.c
+--- glibc-2.34.orig/support/temp_file.c	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/support/temp_file.c	2022-02-13 15:05:53.300694453 -0600
+@@ -1,5 +1,6 @@
+ /* Temporary file handling for tests.
+-   Copyright (C) 1998-2021 Free Software Foundation, Inc.
++   Copyright (C) 1998-2022 Free Software Foundation, Inc.
++   Copyright The GNU Tools Authors.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -20,15 +21,17 @@
+    some 32-bit platforms. */
+ #define _FILE_OFFSET_BITS 64
+ 
++#include <support/check.h>
+ #include <support/temp_file.h>
+ #include <support/temp_file-internal.h>
+ #include <support/support.h>
+ 
++#include <errno.h>
+ #include <paths.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <unistd.h>
++#include <xunistd.h>
+ 
+ /* List of temporary files.  */
+ static struct temp_name_list
+@@ -36,14 +39,20 @@ static struct temp_name_list
+   struct temp_name_list *next;
+   char *name;
+   pid_t owner;
++  bool toolong;
+ } *temp_name_list;
+ 
+ /* Location of the temporary files.  Set by the test skeleton via
+    support_set_test_dir.  The string is not be freed.  */
+ static const char *test_dir = _PATH_TMP;
+ 
+-void
+-add_temp_file (const char *name)
++/* Name of subdirectories in a too long temporary directory tree. */
++static char toolong_subdir[NAME_MAX + 1];
++static bool toolong_initialized;
++static size_t toolong_path_max;
++
++static void
++add_temp_file_internal (const char *name, bool toolong)
+ {
+   struct temp_name_list *newp
+     = (struct temp_name_list *) xcalloc (sizeof (*newp), 1);
+@@ -53,12 +62,19 @@ add_temp_file (const char *name)
+       newp->name = newname;
+       newp->next = temp_name_list;
+       newp->owner = getpid ();
++      newp->toolong = toolong;
+       temp_name_list = newp;
+     }
+   else
+     free (newp);
+ }
+ 
++void
++add_temp_file (const char *name)
++{
++   add_temp_file_internal (name, false);
++}
++
+ int
+ create_temp_file_in_dir (const char *base, const char *dir, char **filename)
+ {
+@@ -90,8 +106,8 @@ create_temp_file (const char *base, char
+   return create_temp_file_in_dir (base, test_dir, filename);
+ }
+ 
+-char *
+-support_create_temp_directory (const char *base)
++static char *
++create_temp_directory_internal (const char *base, bool toolong)
+ {
+   char *path = xasprintf ("%s/%sXXXXXX", test_dir, base);
+   if (mkdtemp (path) == NULL)
+@@ -99,16 +115,133 @@ support_create_temp_directory (const cha
+       printf ("error: mkdtemp (\"%s\"): %m", path);
+       exit (1);
+     }
+-  add_temp_file (path);
++  add_temp_file_internal (path, toolong);
+   return path;
+ }
+ 
+-/* Helper functions called by the test skeleton follow.  */
++char *
++support_create_temp_directory (const char *base)
++{
++   return create_temp_directory_internal (base, false);
++}
++
++static void
++ensure_toolong_initialized (void)
++{
++   if (!toolong_initialized)
++      FAIL_EXIT1 ("uninitialized toolong directory tree\n");
++}
++
++static void
++initialize_toolong (const char *base)
++{
++   long name_max = pathconf (base, _PC_NAME_MAX);
++   name_max = (name_max < 0 ? 64
++              : (name_max < sizeof (toolong_subdir) ? name_max
++                 : sizeof (toolong_subdir) - 1));
++
++   long path_max = pathconf (base, _PC_PATH_MAX);
++   path_max = (path_max < 0 ? 1024
++               : path_max <= PTRDIFF_MAX ? path_max : PTRDIFF_MAX);
++
++   /* Sanity check to ensure that the test does not create temporary directories
++      in different filesystems because this API doesn't support it. */
++   if (toolong_initialized)
++   {
++      if (name_max != strlen (toolong_subdir))
++         FAIL_UNSUPPORTED ("name_max: Temporary directories in different"
++                           " filesystems not supported yet\n");
++      if (path_max != toolong_path_max)
++         FAIL_UNSUPPORTED ("path_max: Temporary directories in different"
++                           " filesystems not supported yet\n");
++      return;
++   }
++
++   toolong_path_max = path_max;
++
++   size_t len = name_max;
++   memset (toolong_subdir, 'X', len);
++   toolong_initialized = true;
++}
++
++char *
++support_create_and_chdir_toolong_temp_directory (const char *basename)
++{
++   char *base = create_temp_directory_internal (basename, true);
++   xchdir (base);
++
++   initialize_toolong (base);
++
++   size_t sz = strlen (toolong_subdir);
++
++   /* Create directories and descend into them so that the final path is larger
++      than PATH_MAX. */
++   for (size_t i = 0; i <= toolong_path_max / sz; i++)
++   {
++      int ret = mkdir (toolong_subdir, S_IRWXU);
++      if (ret != 0 && errno == ENAMETOOLONG)
++         FAIL_UNSUPPORTED ("Filesystem does not support creating too long "
++                           " directory trees\n");
++
++      else if (ret != 0)
++         FAIL_EXIT1("Failed to create directory tree: %m\n");
++      xchdir (toolong_subdir);
++   }
++   return base;
++}
+ 
+ void
+-support_set_test_dir (const char *path)
++support_chdir_toolong_temp_directory (const char *base)
++{
++  ensure_toolong_initialized ();
++
++  xchdir (base);
++
++  size_t sz = strlen (toolong_subdir);
++  for (size_t i = 0; i <= toolong_path_max / sz; i++)
++     xchdir (toolong_subdir);
++}
++
++/* Helper functions called by the test skeleton follow. */
++
++static void
++remove_toolong_subdirs (const char *base)
+ {
+-  test_dir = path;
++   ensure_toolong_initialized ();
++
++   if (chdir (base) != 0)
++   {
++      printf("warning: toolong cleanup base failed: chdir (\"%s\"): %m\n",
++             base);
++      return;
++   }
++
++   /* Descend. */
++   int levels = 0;
++   size_t sz = strlen (toolong_subdir);
++   for (levels = 0; levels <= toolong_path_max / sz; levels++)
++      if (chdir (toolong_subdir) != 0)
++      {
++         printf ("warning: toolong cleanup failed: chdir (\"%s\"): %m\n",
++                 toolong_subdir);
++         break;
++      }
++
++   /* Ascend and remove. */
++   while (--levels >= 0)
++   {
++      if (chdir ("..") != 0)
++      {
++         printf ("warning: toolong cleanup failed: chdir (\"..\"): %m\n");
++         return;
++      }
++      if (remove (toolong_subdir) != 0)
++      {
++         printf ("warning: could not remove subdirectory: %s: %m\n",
++                 toolong_subdir);
++         return;
++      }
++   }
+ }
+ 
+ void
+@@ -123,6 +256,9 @@ support_delete_temp_files (void)
+ 	 around, to prevent PID reuse.)  */
+       if (temp_name_list->owner == pid)
+ 	{
++     if (temp_name_list->toolong)
++        remove_toolong_subdirs (temp_name_list->name);
++
+ 	  if (remove (temp_name_list->name) != 0)
+ 	    printf ("warning: could not remove temporary file: %s: %m\n",
+ 		    temp_name_list->name);
+@@ -147,3 +283,9 @@ support_print_temp_files (FILE *f)
+       fprintf (f, ")\n");
+     }
+ }
++
++void
++support_set_test_dir (const char *path)
++{
++   test_dir = path;
++}
+diff -Naurp glibc-2.34.orig/support/temp_file.h glibc-2.34/support/temp_file.h
+--- glibc-2.34.orig/support/temp_file.h	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/support/temp_file.h	2022-02-13 14:51:28.311905804 -0600
+@@ -44,6 +44,15 @@ int create_temp_file_in_dir (const char
+    returns.  The caller should free this string.  */
+ char *support_create_temp_directory (const char *base);
+ 
++/* Create a temporary directory tree that is longer than PATH_MAX and schedule
++   it for deletion. BASENAME is used as a prefix for the unique directory
++   name, which the function returns. The caller should free this string. */
++char *support_create_and_chdir_toolong_temp_directory (const char *basename);
++
++/* Change into the innermost directory of the directory tree BASE, which was
++   created using support_create_and_chdir_toolong_temp_directory. */
++void support_chdir_toolong_temp_directory (const char *base);
++
+ __END_DECLS
+ 
+ #endif /* SUPPORT_TEMP_FILE_H */
+diff -Naurp glibc-2.34.orig/sysdeps/posix/getcwd.c glibc-2.34/sysdeps/posix/getcwd.c
+--- glibc-2.34.orig/sysdeps/posix/getcwd.c	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/sysdeps/posix/getcwd.c	2022-02-13 14:55:47.032630305 -0600
+@@ -187,6 +187,13 @@ __getcwd_generic (char *buf, size_t size
+   size_t allocated = size;
+   size_t used;
+ 
++  /* A size of 1 byte is never useful. */
++  if (allocated == 1)
++  {
++     __set_errno (ERANGE);
++     return NULL;
++  }
++
+ #if HAVE_MINIMALLY_WORKING_GETCWD
+   /* If AT_FDCWD is not defined, the algorithm below is O(N**2) and
+      this is much slower than the system getcwd (at least on
+diff -Naurp glibc-2.34.orig/sysdeps/unix/sysv/linux/Makefile glibc-2.34/sysdeps/unix/sysv/linux/Makefile
+--- glibc-2.34.orig/sysdeps/unix/sysv/linux/Makefile	2021-08-01 20:33:43.000000000 -0500
++++ glibc-2.34/sysdeps/unix/sysv/linux/Makefile	2022-02-13 14:56:50.988805209 -0600
+@@ -331,7 +331,13 @@ sysdep_routines += xstatconv internal_st
+ 
+ sysdep_headers += bits/fcntl-linux.h
+ 
+-tests += tst-fallocate tst-fallocate64 tst-o_path-locks
++tests += \
++	tst-fallocate \
++	tst-fallocate64 \
++	tst-getcwd-smallbuff \
++	tst-o_path-locks \
++	# tests
++
+ endif
+ 
+ ifeq ($(subdir),elf)
+diff -Naurp glibc-2.34.orig/sysdeps/unix/sysv/linux/tst-getcwd-smallbuff.c glibc-2.34/sysdeps/unix/sysv/linux/tst-getcwd-smallbuff.c
+--- glibc-2.34.orig/sysdeps/unix/sysv/linux/tst-getcwd-smallbuff.c	1969-12-31 18:00:00.000000000 -0600
++++ glibc-2.34/sysdeps/unix/sysv/linux/tst-getcwd-smallbuff.c	2022-02-13 14:57:21.579869925 -0600
+@@ -0,0 +1,241 @@
++/* Verify that getcwd returns ERANGE for size 1 byte and does not underflow
++   buffer when the CWD is too long and is also a mount target of /.  See bug
++   #28769 or CVE-2021-3999 for more context.
++   Copyright The GNU Toolchain Authors.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <errno.h>
++#include <fcntl.h>
++#include <intprops.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/mount.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <sys/wait.h>
++
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <support/check.h>
++#include <support/temp_file.h>
++#include <support/xsched.h>
++#include <support/xunistd.h>
++
++static char *base;
++#define BASENAME "tst-getcwd-smallbuff"
++#define MOUNT_NAME "mpoint"
++static int sockfd[2];
++
++static void
++do_cleanup (void)
++{
++  support_chdir_toolong_temp_directory (base);
++  TEST_VERIFY_EXIT (rmdir (MOUNT_NAME) == 0);
++  free (base);
++}
++
++static void
++send_fd (const int sock, const int fd)
++{
++  struct msghdr msg = {0};
++  union
++    {
++      struct cmsghdr hdr;
++      char buf[CMSG_SPACE (sizeof (int))];
++    } cmsgbuf = {0};
++  struct cmsghdr *cmsg;
++  struct iovec vec;
++  char ch = 'A';
++  ssize_t n;
++
++  msg.msg_control = &cmsgbuf.buf;
++  msg.msg_controllen = sizeof (cmsgbuf.buf);
++
++  cmsg = CMSG_FIRSTHDR (&msg);
++  cmsg->cmsg_len = CMSG_LEN (sizeof (int));
++  cmsg->cmsg_level = SOL_SOCKET;
++  cmsg->cmsg_type = SCM_RIGHTS;
++  memcpy (CMSG_DATA (cmsg), &fd, sizeof (fd));
++
++  vec.iov_base = &ch;
++  vec.iov_len = 1;
++  msg.msg_iov = &vec;
++  msg.msg_iovlen = 1;
++
++  while ((n = sendmsg (sock, &msg, 0)) == -1 && errno == EINTR);
++
++  TEST_VERIFY_EXIT (n == 1);
++}
++
++static int
++recv_fd (const int sock)
++{
++  struct msghdr msg = {0};
++  union
++    {
++      struct cmsghdr hdr;
++      char buf[CMSG_SPACE(sizeof(int))];
++    } cmsgbuf = {0};
++  struct cmsghdr *cmsg;
++  struct iovec vec;
++  ssize_t n;
++  char ch = '\0';
++  int fd = -1;
++
++  vec.iov_base = &ch;
++  vec.iov_len = 1;
++  msg.msg_iov = &vec;
++  msg.msg_iovlen = 1;
++
++  msg.msg_control = &cmsgbuf.buf;
++  msg.msg_controllen = sizeof (cmsgbuf.buf);
++
++  while ((n = recvmsg (sock, &msg, 0)) == -1 && errno == EINTR);
++  if (n != 1 || ch != 'A')
++    return -1;
++
++  cmsg = CMSG_FIRSTHDR (&msg);
++  if (cmsg == NULL)
++    return -1;
++  if (cmsg->cmsg_type != SCM_RIGHTS)
++    return -1;
++  memcpy (&fd, CMSG_DATA (cmsg), sizeof (fd));
++  if (fd < 0)
++    return -1;
++  return fd;
++}
++
++static int
++child_func (void * const arg)
++{
++  xclose (sockfd[0]);
++  const int sock = sockfd[1];
++  char ch;
++
++  TEST_VERIFY_EXIT (read (sock, &ch, 1) == 1);
++  TEST_VERIFY_EXIT (ch == '1');
++
++  if (mount ("/", MOUNT_NAME, NULL, MS_BIND | MS_REC, NULL))
++    FAIL_EXIT1 ("mount failed: %m\n");
++  const int fd = xopen ("mpoint",
++			O_RDONLY | O_PATH | O_DIRECTORY | O_NOFOLLOW, 0);
++
++  send_fd (sock, fd);
++  xclose (fd);
++
++  TEST_VERIFY_EXIT (read (sock, &ch, 1) == 1);
++  TEST_VERIFY_EXIT (ch == 'a');
++
++  xclose (sock);
++  return 0;
++}
++
++static void
++update_map (char * const mapping, const char * const map_file)
++{
++  const size_t map_len = strlen (mapping);
++
++  const int fd = xopen (map_file, O_WRONLY, 0);
++  xwrite (fd, mapping, map_len);
++  xclose (fd);
++}
++
++static void
++proc_setgroups_write (const long child_pid, const char * const str)
++{
++  const size_t str_len = strlen(str);
++
++  char setgroups_path[sizeof ("/proc//setgroups") + INT_STRLEN_BOUND (long)];
++
++  snprintf (setgroups_path, sizeof (setgroups_path),
++	    "/proc/%ld/setgroups", child_pid);
++
++  const int fd = open (setgroups_path, O_WRONLY);
++
++  if (fd < 0)
++    {
++      TEST_VERIFY_EXIT (errno == ENOENT);
++      FAIL_UNSUPPORTED ("/proc/%ld/setgroups not found\n", child_pid);
++    }
++
++  xwrite (fd, str, str_len);
++  xclose(fd);
++}
++
++static char child_stack[1024 * 1024];
++
++int
++do_test (void)
++{
++  base = support_create_and_chdir_toolong_temp_directory (BASENAME);
++
++  xmkdir (MOUNT_NAME, S_IRWXU);
++  atexit (do_cleanup);
++
++  TEST_VERIFY_EXIT (socketpair (AF_UNIX, SOCK_STREAM, 0, sockfd) == 0);
++  pid_t child_pid = xclone (child_func, NULL, child_stack,
++			    sizeof (child_stack),
++			    CLONE_NEWUSER | CLONE_NEWNS | SIGCHLD);
++
++  xclose (sockfd[1]);
++  const int sock = sockfd[0];
++
++  char map_path[sizeof ("/proc//uid_map") + INT_STRLEN_BOUND (long)];
++  char map_buf[sizeof ("0  1") + INT_STRLEN_BOUND (long)];
++
++  snprintf (map_path, sizeof (map_path), "/proc/%ld/uid_map",
++	    (long) child_pid);
++  snprintf (map_buf, sizeof (map_buf), "0 %ld 1", (long) getuid());
++  update_map (map_buf, map_path);
++
++  proc_setgroups_write ((long) child_pid, "deny");
++  snprintf (map_path, sizeof (map_path), "/proc/%ld/gid_map",
++	    (long) child_pid);
++  snprintf (map_buf, sizeof (map_buf), "0 %ld 1", (long) getgid());
++  update_map (map_buf, map_path);
++
++  TEST_VERIFY_EXIT (send (sock, "1", 1, MSG_NOSIGNAL) == 1);
++  const int fd = recv_fd (sock);
++  TEST_VERIFY_EXIT (fd >= 0);
++  TEST_VERIFY_EXIT (fchdir (fd) == 0);
++
++  static char buf[2 * 10 + 1];
++  memset (buf, 'A', sizeof (buf));
++
++  /* Finally, call getcwd and check if it resulted in a buffer underflow.  */
++  char * cwd = getcwd (buf + sizeof (buf) / 2, 1);
++  TEST_VERIFY (cwd == NULL);
++  TEST_VERIFY (errno == ERANGE);
++
++  for (int i = 0; i < sizeof (buf); i++)
++    if (buf[i] != 'A')
++      {
++	printf ("buf[%d] = %02x\n", i, (unsigned int) buf[i]);
++	support_record_failure ();
++      }
++
++  TEST_VERIFY_EXIT (send (sock, "a", 1, MSG_NOSIGNAL) == 1);
++  xclose (sock);
++  TEST_VERIFY_EXIT (xwaitpid (child_pid, NULL, 0) == child_pid);
++
++  return 0;
++}
++
++#define CLEANUP_HANDLER do_cleanup
++#include <support/test-driver.c>

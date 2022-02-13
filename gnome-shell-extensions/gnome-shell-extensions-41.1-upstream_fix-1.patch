@@ -1,0 +1,148 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2022-02-13
+Initial Package Version: 41.1
+Upstream Status:         Applied
+Origin:                  Upstream (MR #207)
+Description:             Fixes a bug in the window-list extension that causes
+                         application icons to not be displayed on the taskbar
+                         after opening a new window. This is due to changes in
+                         gnome-shell-41.3 which were not accounted for in
+                         gnome-shell-extensions.
+
+diff -Naurp gnome-shell-extensions-41.1.orig/extensions/window-list/extension.js gnome-shell-extensions-41.1/extensions/window-list/extension.js
+--- gnome-shell-extensions-41.1.orig/extensions/window-list/extension.js	2021-12-11 07:32:22.476889400 -0600
++++ gnome-shell-extensions-41.1/extensions/window-list/extension.js	2022-02-13 15:40:56.998528560 -0600
+@@ -765,10 +765,9 @@ class WindowList extends St.Widget {
+ 
+         let workspaceManager = global.workspace_manager;
+ 
+-        this._workspaceSignals = new Map();
+         this._nWorkspacesChangedId = workspaceManager.connect(
+-            'notify::n-workspaces', this._onWorkspacesChanged.bind(this));
+-        this._onWorkspacesChanged();
++            'notify::n-workspaces', this._updateWorkspaceIndicatorVisibility.bind(this));
++        this._updateWorkspaceIndicatorVisibility();
+ 
+         this._switchWorkspaceId = global.window_manager.connect(
+             'switch-workspace', this._checkGrouping.bind(this));
+@@ -791,6 +790,10 @@ class WindowList extends St.Widget {
+                 this._updateKeyboardAnchor();
+             });
+ 
++        this._windowSignals = new Map();
++        this._windowCreatedId = global.display.connect(
++            'window-created', (dsp, win) => this._addWindow(win));
++
+         this._dragBeginId = Main.xdndHandler.connect('drag-begin',
+             this._monitorDrag.bind(this));
+         this._dragEndId = Main.xdndHandler.connect('drag-end',
+@@ -913,7 +916,7 @@ class WindowList extends St.Widget {
+                        w2.metaWindow.get_stable_sequence();
+             });
+             for (let i = 0; i < windows.length; i++)
+-                this._onWindowAdded(null, windows[i].metaWindow);
++                this._addWindow(windows[i].metaWindow);
+         } else {
+             let apps = this._appSystem.get_running().sort((a1, a2) => {
+                 return _getAppStableSequence(a1) -
+@@ -953,7 +956,7 @@ class WindowList extends St.Widget {
+             child.destroy();
+     }
+ 
+-    _onWindowAdded(ws, win) {
++    _addWindow(win) {
+         if (!this._grouped)
+             this._checkGrouping();
+ 
+@@ -964,21 +967,26 @@ class WindowList extends St.Widget {
+         if (children.find(c => c.metaWindow === win))
+             return;
+ 
++        this._windowSignals.set(
++            win, win.connect('unmanaged', () => this._removeWindow(win)));
++
+         let button = new WindowButton(win, this._perMonitor, this._monitor.index);
+         this._settings.bind('display-all-workspaces',
+             button, 'ignore-workspace', Gio.SettingsBindFlags.GET);
+         this._windowList.add_child(button);
+     }
+ 
+-    _onWindowRemoved(ws, win) {
++    _removeWindow(win) {
+         if (this._grouped)
+             this._checkGrouping();
+ 
+         if (this._grouped)
+             return;
+ 
+-        if (win.get_compositor_private())
+-            return; // not actually removed, just moved to another workspace
++        const id = this._windowSignals.get(win);
++        if (id)
++            win.disconnect(id);
++        this._windowSignals.delete(id);
+ 
+         let children = this._windowList.get_children();
+         let child = children.find(c => c.metaWindow === win);
+@@ -986,39 +994,6 @@ class WindowList extends St.Widget {
+             child.destroy();
+     }
+ 
+-    _onWorkspacesChanged() {
+-        let workspaceManager = global.workspace_manager;
+-        let numWorkspaces = workspaceManager.n_workspaces;
+-
+-        for (let i = 0; i < numWorkspaces; i++) {
+-            let workspace = workspaceManager.get_workspace_by_index(i);
+-            if (this._workspaceSignals.has(workspace))
+-                continue;
+-
+-            let signals = { windowAddedId: 0, windowRemovedId: 0 };
+-            signals._windowAddedId = workspace.connect_after(
+-                'window-added', this._onWindowAdded.bind(this));
+-            signals._windowRemovedId = workspace.connect(
+-                'window-removed', this._onWindowRemoved.bind(this));
+-            this._workspaceSignals.set(workspace, signals);
+-        }
+-
+-        this._updateWorkspaceIndicatorVisibility();
+-    }
+-
+-    _disconnectWorkspaceSignals() {
+-        let workspaceManager = global.workspace_manager;
+-        let numWorkspaces = workspaceManager.n_workspaces;
+-
+-        for (let i = 0; i < numWorkspaces; i++) {
+-            let workspace = workspaceManager.get_workspace_by_index(i);
+-            let signals = this._workspaceSignals.get(workspace);
+-            this._workspaceSignals.delete(workspace);
+-            workspace.disconnect(signals._windowAddedId);
+-            workspace.disconnect(signals._windowRemovedId);
+-        }
+-    }
+-
+     _monitorDrag() {
+         DND.addDragMonitor(this._dragMonitor);
+     }
+@@ -1082,18 +1057,20 @@ class WindowList extends St.Widget {
+         Main.keyboard._bottomDragAction.disconnect(this._keyboardVisiblechangedId);
+         this._keyboardVisiblechangedId = 0;
+ 
+-        this._disconnectWorkspaceSignals();
+         global.workspace_manager.disconnect(this._nWorkspacesChangedId);
+         this._nWorkspacesChangedId = 0;
+ 
+         global.window_manager.disconnect(this._switchWorkspaceId);
+         this._switchWorkspaceId = 0;
+ 
++        this._windowSignals.forEach((id, win) => win.disconnect(id));
++        this._windowSignals.clear();
+ 
+         Main.overview.disconnect(this._overviewShowingId);
+         Main.overview.disconnect(this._overviewHidingId);
+ 
+         global.display.disconnect(this._fullscreenChangedId);
++        global.display.disconnect(this._windowCreatedId);
+ 
+         this._stopMonitoringDrag();
+         Main.xdndHandler.disconnect(this._dragBeginId);
