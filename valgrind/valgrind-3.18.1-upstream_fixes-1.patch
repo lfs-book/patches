@@ -1,0 +1,160 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2022-02-17
+Initial Package Version: 3.18.1
+Upstream Status:         Applied
+Origin:                  Upstream (commit 1024237358f01009fe233cb1294f3b8211304eaa)
+Description:             Fixes an issue with glibc-2.35 where Valgrind will
+                         almost instantly crash, or expel a warning (on i686),
+                         due to the __NR_rseq system call being added to glibc.
+
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-amd64-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-amd64-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-amd64-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-amd64-linux.c	2022-02-17 09:22:32.878781590 -0600
+@@ -862,6 +862,8 @@ static SyscallTableEntry syscall_table[]
+ 
+    LINXY(__NR_statx,             sys_statx),             // 332
+ 
++   GENX_(__NR_rseq,              sys_ni_syscall),        // 334
++
+    LINX_(__NR_membarrier,        sys_membarrier),        // 324
+ 
+    LINX_(__NR_copy_file_range,   sys_copy_file_range),   // 326
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-arm64-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-arm64-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-arm64-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-arm64-linux.c	2022-02-17 09:23:43.227402459 -0600
+@@ -823,8 +823,9 @@ static SyscallTableEntry syscall_main_ta
+    //   (__NR_pkey_mprotect,     sys_ni_syscall),        // 288
+    //   (__NR_pkey_alloc,        sys_ni_syscall),        // 289
+    //   (__NR_pkey_free,         sys_ni_syscall),        // 290
++   LINXY(__NR_statx,             sys_statx),             // 291
+ 
+-   LINXY(__NR_statx,             sys_statx),             // 397
++   GENX_(__NR_rseq,              sys_ni_syscall),        // 293
+ 
+    LINXY(__NR_io_uring_setup,    sys_io_uring_setup),    // 425
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-arm-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-arm-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-arm-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-arm-linux.c	2022-02-17 09:22:55.112676755 -0600
+@@ -1024,6 +1024,7 @@ static SyscallTableEntry syscall_main_ta
+    LINX_(__NR_pwritev2,          sys_pwritev2),         // 393
+ 
+    LINXY(__NR_statx,             sys_statx),            // 397
++   GENX_(__NR_rseq,              sys_ni_syscall),       // 398
+ 
+    LINXY(__NR_clock_gettime64,   sys_clock_gettime64),  // 403
+    LINX_(__NR_clock_settime64,   sys_clock_settime64),  // 404
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-ppc32-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-ppc32-linux.c	2022-02-17 09:24:11.678200990 -0600
+@@ -1028,6 +1028,8 @@ static SyscallTableEntry syscall_table[]
+ 
+    LINXY(__NR_statx,             sys_statx),            // 383
+ 
++   GENX_(__NR_rseq,              sys_ni_syscall),       // 387
++
+    LINXY(__NR_clock_gettime64,   sys_clock_gettime64),  // 403
+    LINX_(__NR_clock_settime64,   sys_clock_settime64),  // 404
+ 
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-ppc64-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-ppc64-linux.c	2022-02-17 09:24:32.408056372 -0600
+@@ -1019,6 +1019,8 @@ static SyscallTableEntry syscall_table[]
+ 
+    LINXY(__NR_statx,             sys_statx),            // 383
+ 
++   GENX_(__NR_rseq,              sys_ni_syscall),        // 387
++
+    LINXY(__NR_io_uring_setup,    sys_io_uring_setup),    // 425
+    LINXY(__NR_io_uring_enter,    sys_io_uring_enter),    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register), // 427
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-s390x-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-s390x-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-s390x-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-s390x-linux.c	2022-02-17 09:24:58.691875554 -0600
+@@ -860,6 +860,8 @@ static SyscallTableEntry syscall_table[]
+ 
+    LINXY(__NR_statx, sys_statx),                                      // 379
+ 
++   GENX_(__NR_rseq, sys_ni_syscall),                                  // 381
++
+    LINXY(__NR_io_uring_setup, sys_io_uring_setup),                    // 425
+    LINXY(__NR_io_uring_enter, sys_io_uring_enter),                    // 426
+    LINXY(__NR_io_uring_register, sys_io_uring_register),              // 427
+diff -Naurp valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-x86-linux.c valgrind-3.18.1/coregrind/m_syswrap/syswrap-x86-linux.c
+--- valgrind-3.18.1.orig/coregrind/m_syswrap/syswrap-x86-linux.c	2021-10-12 16:58:44.000000000 -0500
++++ valgrind-3.18.1/coregrind/m_syswrap/syswrap-x86-linux.c	2022-02-17 09:25:26.394687910 -0600
+@@ -1619,6 +1619,8 @@ static SyscallTableEntry syscall_table[]
+    /* Explicitly not supported on i386 yet. */
+    GENX_(__NR_arch_prctl,        sys_ni_syscall),       // 384
+ 
++   GENX_(__NR_rseq,              sys_ni_syscall),       // 386
++
+    LINXY(__NR_clock_gettime64,   sys_clock_gettime64),  // 403
+    LINX_(__NR_clock_settime64,   sys_clock_settime64),  // 404
+ 
+diff -Naurp valgrind-3.18.1.orig/include/vki/vki-scnums-arm64-linux.h valgrind-3.18.1/include/vki/vki-scnums-arm64-linux.h
+--- valgrind-3.18.1.orig/include/vki/vki-scnums-arm64-linux.h	2021-01-21 09:09:33.000000000 -0600
++++ valgrind-3.18.1/include/vki/vki-scnums-arm64-linux.h	2022-02-17 09:26:33.338245908 -0600
+@@ -323,9 +323,11 @@
+ #define __NR_pkey_alloc 289
+ #define __NR_pkey_free 290
+ #define __NR_statx 291
++#define __NR_io_pgetevents 291
++#define __NR_rseq 293
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 292
++#define __NR_syscalls 294
+ 
+ ///*
+ // * All syscalls below here should go away really,
+diff -Naurp valgrind-3.18.1.orig/include/vki/vki-scnums-arm-linux.h valgrind-3.18.1/include/vki/vki-scnums-arm-linux.h
+--- valgrind-3.18.1.orig/include/vki/vki-scnums-arm-linux.h	2021-01-21 09:09:33.000000000 -0600
++++ valgrind-3.18.1/include/vki/vki-scnums-arm-linux.h	2022-02-17 09:25:53.573506575 -0600
+@@ -432,7 +432,7 @@
+ #define __NR_pkey_alloc                 395
+ #define __NR_pkey_free                  396
+ #define __NR_statx                      397
+-
++#define __NR_rseq                       398
+ 
+ 
+ #define __NR_ARM_BASE                   (0x0f0000)
+diff -Naurp valgrind-3.18.1.orig/include/vki/vki-scnums-ppc32-linux.h valgrind-3.18.1/include/vki/vki-scnums-ppc32-linux.h
+--- valgrind-3.18.1.orig/include/vki/vki-scnums-ppc32-linux.h	2021-01-21 09:09:33.000000000 -0600
++++ valgrind-3.18.1/include/vki/vki-scnums-ppc32-linux.h	2022-02-17 09:27:00.645069919 -0600
+@@ -415,6 +415,7 @@
+ #define __NR_pkey_alloc		384
+ #define __NR_pkey_free		385
+ #define __NR_pkey_mprotect	386
++#define __NR_rseq          387
+ 
+ #endif /* __VKI_SCNUMS_PPC32_LINUX_H */
+ 
+diff -Naurp valgrind-3.18.1.orig/include/vki/vki-scnums-ppc64-linux.h valgrind-3.18.1/include/vki/vki-scnums-ppc64-linux.h
+--- valgrind-3.18.1.orig/include/vki/vki-scnums-ppc64-linux.h	2021-01-21 09:09:33.000000000 -0600
++++ valgrind-3.18.1/include/vki/vki-scnums-ppc64-linux.h	2022-02-17 09:27:13.534987649 -0600
+@@ -407,6 +407,7 @@
+ #define __NR_pkey_alloc		384
+ #define __NR_pkey_free		385
+ #define __NR_pkey_mprotect	386
++#define __NR_rseq          387
+ 
+ #endif /* __VKI_SCNUMS_PPC64_LINUX_H */
+ 
+diff -Naurp valgrind-3.18.1.orig/include/vki/vki-scnums-s390x-linux.h valgrind-3.18.1/include/vki/vki-scnums-s390x-linux.h
+--- valgrind-3.18.1.orig/include/vki/vki-scnums-s390x-linux.h	2021-01-21 09:09:33.000000000 -0600
++++ valgrind-3.18.1/include/vki/vki-scnums-s390x-linux.h	2022-02-17 09:28:01.735684326 -0600
+@@ -342,8 +342,11 @@
+ #define __NR_s390_guarded_storage	378
+ #define __NR_statx			379
+ #define __NR_s390_sthyi			380
++#define __NR_kexec_file_load  381
++#define __NR_io_pgetevents    382
++#define __NR_rseq             383
+ 
+-#define NR_syscalls 381
++#define NR_syscalls 384
+ 
+ /* 
+  * There are some system calls that are not present on 64 bit, some
