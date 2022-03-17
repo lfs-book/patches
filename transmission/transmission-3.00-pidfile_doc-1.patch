@@ -1,0 +1,20 @@
+diff -ruN transmission-3.00/daemon/transmission-daemon.1 transmission-3.00-pidfile-doc/daemon/transmission-daemon.1
+--- transmission-3.00/daemon/transmission-daemon.1	2020-05-22 13:04:23.378804764 +0200
++++ transmission-3.00-pidfile-doc/daemon/transmission-daemon.1	2022-03-12 22:30:45.845273400 +0100
+@@ -29,6 +29,7 @@
+ .Op Fl V
+ .Op Fl w Ar download-dir
+ .Op Fl e Ar logfile
++.Op Fl x Ar pid-file
+ .Op Fl log-error | log-info | log-debug
+ .Ek
+ .Sh DESCRIPTION
+@@ -132,6 +133,8 @@
+ Show error and info messages
+ .It Fl -log-debug
+ Show error, info, and debug messages
++.It Fl x Fl -pid-file
++Name of PID file
+ .El
+ .Sh ENVIRONMENT
+ .Bl -tag -width Fl
