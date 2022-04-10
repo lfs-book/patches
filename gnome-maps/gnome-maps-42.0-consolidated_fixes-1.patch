@@ -1,0 +1,352 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2022-04-10
+Initial Package Version: 42.0
+Origin:                  Upstream
+Upstream Status:         Applied
+Description:             Fixes for network connectivity and libgweather-4
+
+diff --git a/data/ui/main-window.ui b/data/ui/main-window.ui
+index c87b6321..a80a2985 100644
+--- a/data/ui/main-window.ui
++++ b/data/ui/main-window.ui
+@@ -69,69 +69,6 @@
+       <object class="GtkGrid" id="grid">
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+-        <child>
+-          <object class="GtkStack" id="mainStack">
+-            <property name="visible">True</property>
+-            <property name="can_focus">False</property>
+-            <property name="transition-type">crossfade</property>
+-            <child>
+-              <object class="GtkGrid" id="mainGrid">
+-                <property name="visible">True</property>
+-              </object>
+-            </child>
+-            <child>
+-              <object class="GtkSpinner" id="network-spinner">
+-                <property name="visible">True</property>
+-                <property name="active">True</property>
+-              </object>
+-            </child>
+-            <child>
+-              <object class="GtkGrid" id="noNetworkView">
+-                <property name="visible">True</property>
+-                <property name="orientation">vertical</property>
+-                <property name="can_focus">False</property>
+-                <property name="halign">center</property>
+-                <property name="valign">center</property>
+-                <property name="row_spacing">6</property>
+-                <property name="margin">18</property>
+-                <child>
+-                  <object class="GtkImage" id="no-network-conn-image">
+-                    <property name="visible">True</property>
+-                    <property name="pixel-size">100</property>
+-                    <property name="icon-name">network-offline-symbolic</property>
+-                  </object>
+-                </child>
+-                <child>
+-                  <object class="GtkLabel" id="no-network-conn-header">
+-                    <attributes>
+-                      <attribute name="weight" value="bold" />
+-                      <attribute name="scale" value="2" />
+-                    </attributes>
+-                    <property name="label" translatable="yes">Maps is offline!</property>
+-                    <property name="justify">center</property>
+-                    <property name="wrap">True</property>
+-                  </object>
+-                </child>
+-                <child>
+-                  <object class="GtkLabel" id="no-network-conn-text-1">
+-                    <property name="wrap">True</property>
+-                    <property name="max-width-chars">45</property>
+-                    <property name="label" translatable="yes">Maps need an active internet connection to function properly, but one can’t be found.</property>
+-                    <property name="justify">center</property>
+-                  </object>
+-                </child>
+-                <child>
+-                  <object class="GtkLabel" id="no-network-conn-text-2">
+-                    <property name="wrap">True</property>
+-                    <property name="max-width-chars">45</property>
+-                    <property name="label" translatable="yes">Check your connection and proxy settings.</property>
+-                    <property name="justify">center</property>
+-                  </object>
+-                </child>
+-              </object>
+-            </child>
+-          </object>
+-        </child>
+         <child>
+           <object class="GtkBox" id="placeBarContainer">
+             <property name="visible">True</property>
+diff --git a/meson.build b/meson.build
+index cbccfc90..1d04483c 100644
+--- a/meson.build
++++ b/meson.build
+@@ -37,6 +37,7 @@ girepository = dependency('gobject-introspection-1.0', version: '>= 0.10.1')
+ gtk3 = dependency('gtk+-3.0', version: '>= 3.22.0')
+ geoclue2 = dependency('geoclue-2.0', version: '>= 0.12.99')
+ handy = dependency('libhandy-1', version: '>= 1.5.0')
++gweather = dependency('gweather4', version: '>= 3.90.0')
+ 
+ libmaps_deps = [
+ 	dependency('gee-0.8', version: '>= 0.16.0'),
+diff --git a/org.gnome.Maps.json b/org.gnome.Maps.json
+index d8c18db0..7f0b0fbc 100644
+--- a/org.gnome.Maps.json
++++ b/org.gnome.Maps.json
+@@ -104,15 +104,16 @@
+         },
+         {
+             "name" : "libgweather",
+-            "buildsystem" : "meson",
+             "config-opts" : [
+-                "--libdir=/app/lib"
++                "-Denable_vala=false",
++                "-Dgtk_doc=false"
+             ],
++            "buildsystem" : "meson",
+             "sources" : [
+                 {
+                     "type" : "git",
+                     "url" : "https://gitlab.gnome.org/GNOME/libgweather.git",
+-                    "tag" : "40.0"
++                    "branch" : "main"
+                 }
+             ]
+         },
+@@ -149,7 +150,8 @@
+                 "-DENABLE_EXAMPLES=OFF",
+                 "-DENABLE_VALA_BINDINGS=ON",
+                 "-DENABLE_INTROSPECTION=ON",
+-                "-DENABLE_CANBERRA=OFF"
++                "-DENABLE_CANBERRA=OFF",
++                "-DENABLE_WEATHER=OFF"
+             ],
+             "buildsystem" : "cmake-ninja",
+             "sources" : [
+diff --git a/src/application.js b/src/application.js
+index 0e2e65e5..866bc69a 100644
+--- a/src/application.js
++++ b/src/application.js
+@@ -51,7 +51,6 @@ var settings = null;
+ var placeStore = null;
+ var routingDelegator = null;
+ var geoclue = null;
+-var networkMonitor = null;
+ var checkInManager = null;
+ var contactStore = null;
+ var osmEdit = null;
+@@ -63,11 +62,6 @@ const _ensuredTypes = [WebKit2.WebView,
+ 
+ var Application = GObject.registerClass({
+     Properties: {
+-        'connected': GObject.ParamSpec.boolean('connected',
+-                                               '',
+-                                               '',
+-                                               GObject.ParamFlags.READABLE |
+-                                               GObject.ParamFlags.WRITABLE),
+         'selected-place': GObject.ParamSpec.object('selected-place',
+                                                    'Selected Place',
+                                                    'The selected place',
+@@ -82,15 +76,6 @@ var Application = GObject.registerClass({
+     },
+ }, class Application extends Gtk.Application {
+ 
+-    set connected(p) {
+-        this._connected = p;
+-        this.notify('connected');
+-    }
+-
+-    get connected() {
+-        return this._connected;
+-    }
+-
+     _init() {
+         /* Translators: This is the program name. */
+         GLib.set_application_name(_("Maps"));
+@@ -101,7 +86,6 @@ var Application = GObject.registerClass({
+         super._init({ application_id: pkg.name,
+                       flags: Gio.ApplicationFlags.HANDLES_OPEN |
+                              Gio.ApplicationFlags.HANDLES_COMMAND_LINE });
+-        this._connected = false;
+ 
+         this.add_main_option('local',
+                              0,
+@@ -119,13 +103,6 @@ var Application = GObject.registerClass({
+         this.add_main_option('version', 'v'.charCodeAt(0), GLib.OptionFlags.NONE, GLib.OptionArg.NONE,
+                              _("Show the version of the program"), null);
+ 
+-        this.add_main_option('force-online',
+-                             0,
+-                             GLib.OptionFlags.NONE,
+-                             GLib.OptionArg.NONE,
+-                             _("Ignore network availability"),
+-                             null);
+-
+         this.add_main_option('search',
+                              'S'.charCodeAt(0),
+                              GLib.OptionFlags.NONE,
+@@ -145,12 +122,6 @@ var Application = GObject.registerClass({
+                              _("[FILE…|URI]"));
+     }
+ 
+-    _checkNetwork() {
+-        this.connected =
+-            this._forceOnline ||
+-            networkMonitor.connectivity === Gio.NetworkConnectivity.FULL;
+-    }
+-
+     _showContact(id) {
+         contactStore.lookup(id, (contact) => {
+             this.mark_busy();
+@@ -167,7 +138,6 @@ var Application = GObject.registerClass({
+ 
+     _onShowContactActivate(action, parameter) {
+         this._createWindow();
+-        this._checkNetwork();
+         this._mainWindow.present();
+ 
+         let id = parameter.deep_unpack();
+@@ -294,9 +264,6 @@ var Application = GObject.registerClass({
+         routeQuery       = new RouteQuery.RouteQuery();
+         routingDelegator = new RoutingDelegator.RoutingDelegator({ query: routeQuery });
+         geoclue          = new Geoclue.Geoclue();
+-        networkMonitor   = Gio.NetworkMonitor.get_default();
+-        networkMonitor.connect('network-changed',
+-                               this._checkNetwork.bind(this));
+         checkInManager = new CheckIn.CheckInManager();
+         contactStore = new Maps.ContactStore();
+         contactStore.load();
+@@ -327,7 +294,6 @@ var Application = GObject.registerClass({
+ 
+     vfunc_activate() {
+         this._createWindow();
+-        this._checkNetwork();
+         this._mainWindow.present();
+     }
+ 
+@@ -446,8 +412,6 @@ var Application = GObject.registerClass({
+              * leaving the running instance unaffected
+              */
+             return 0;
+-        } else if (options.contains('force-online')) {
+-            this._forceOnline = true;
+         }
+ 
+         let remaining = options.lookup(GLib.OPTION_REMAINING, null);
+diff --git a/src/headerBar.js b/src/headerBar.js
+index fed6569c..cbd74274 100644
+--- a/src/headerBar.js
++++ b/src/headerBar.js
+@@ -44,11 +44,6 @@ var HeaderBarLeft = GObject.registerClass({
+             mapView: this._mapView
+         });
+         this._layersButton.popover = this._layersPopover;
+-
+-        this._application.connect('notify::connected', () => {
+-            let app = this._application;
+-            this._layersButton.sensitive = app.connected;
+-        });
+     }
+ 
+     popdownLayersPopover() {
+@@ -82,14 +77,5 @@ var HeaderBarRight = GObject.registerClass({
+ 
+         this._mapView.bind_property('routeShowing', this._printRouteButton,
+                                     'visible', GObject.BindingFlags.DEFAULT);
+-
+-        this._application.connect('notify::connected', () => {
+-            let app = this._application;
+-
+-            this._toggleSidebarButton.sensitive = app.connected;
+-            this._favoritesButton.sensitive = (app.connected &&
+-                                               favoritesPopover.rows > 0);
+-            this._printRouteButton.sensitive = app.connected;
+-        });
+     }
+ });
+diff --git a/src/main.js b/src/main.js
+index e57e45fc..523f659b 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -36,7 +36,7 @@ pkg.require({ 'cairo': '1.0',
+               'Gtk': '3.0',
+               'GtkChamplain': '0.12',
+               'GtkClutter': '1.0',
+-              'GWeather': '3.0',
++              'GWeather': '4.0',
+               'Handy': '1',
+               'Rest': '0.7',
+               'Soup': '2.4',
+diff --git a/src/mainWindow.js b/src/mainWindow.js
+index f5179f83..e5ee2817 100644
+--- a/src/mainWindow.js
++++ b/src/mainWindow.js
+@@ -81,9 +81,6 @@ var MainWindow = GObject.registerClass({
+     Template: 'resource:///org/gnome/Maps/ui/main-window.ui',
+     InternalChildren: [ 'headerBar',
+                         'grid',
+-                        'mainStack',
+-                        'mainGrid',
+-                        'noNetworkView',
+                         'actionBar',
+                         'actionBarRevealer',
+                         'placeBarContainer']
+@@ -107,7 +104,7 @@ var MainWindow = GObject.registerClass({
+                 MapView.MapType.LOCAL : undefined,
+             mainWindow: this });
+ 
+-        this._mainGrid.attach(this._mapView, 0, 0, 1, 1);
++        this._grid.attach(this._mapView, 0, 0, 1, 1);
+ 
+         this._mapView.gotoUserLocation(false);
+ 
+@@ -164,9 +161,7 @@ var MainWindow = GObject.registerClass({
+         let sidebar = new Sidebar.Sidebar(this._mapView);
+ 
+         Application.routeQuery.connect('notify', () => this._setRevealSidebar(true));
+-        this.application.bind_property('connected',
+-                                       sidebar, 'visible',
+-                                       GObject.BindingFlags.DEFAULT);
++
+         return sidebar;
+     }
+ 
+@@ -282,13 +277,6 @@ var MainWindow = GObject.registerClass({
+             Mainloop.idle_add(() => this._mapView.grab_focus());
+         });
+ 
+-        this.application.connect('notify::connected', () => {
+-            if (this.application.connected || this.application.local_tile_path)
+-                this._mainStack.visible_child = this._mainGrid;
+-            else
+-                this._mainStack.visible_child = this._noNetworkView;
+-        });
+-
+         /*
+          * If the currently focused widget is an entry then we will
+          * hijack the key-press to the main window and make sure that
+@@ -353,9 +341,7 @@ var MainWindow = GObject.registerClass({
+     }
+ 
+     _updateLocationSensitivity() {
+-        let sensitive = (Application.geoclue.state !== Geoclue.State.INITIAL &&
+-                         (this.application.connected ||
+-                          this.application.local_tile_path));
++        let sensitive = Application.geoclue.state !== Geoclue.State.INITIAL;
+ 
+         this.lookup_action("goto-user-location").set_enabled(sensitive);
+     }
+diff --git a/src/mapView.js b/src/mapView.js
+index 8ead5916..d56cc157 100644
+--- a/src/mapView.js
++++ b/src/mapView.js
+@@ -465,7 +465,6 @@ var MapView = GObject.registerClass({
+             } catch(e) {
+                 this.setMapType(MapType.STREET);
+                 Application.application.local_tile_path = false;
+-                Application.application.notify('connected');
+                 Utils.showDialog(e.message, Gtk.MessageType.ERROR, this._mainWindow);
+             }
+         }
