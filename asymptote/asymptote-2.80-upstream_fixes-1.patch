@@ -1,0 +1,92 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2022-05-14
+Initial Package Version: 2.80
+Upstream Status: Applied
+Origin: Upstream, to fix https://github.com/vectorgraphics/asymptote/issues/31{2,3}
+Description: Fix runtime failures on one of my machines.
+
+commit de70a958b3844210142a9066b20bfce2a62bde4f
+Author: John Bowman <bowman@ualberta.ca>
+Date:   Tue May 10 21:38:21 2022 -0600
+
+    Zero offset buffer when required.
+
+diff --git a/doc/asymptote.texi b/doc/asymptote.texi
+index e653575a..f27d96a1 100644
+--- a/doc/asymptote.texi
++++ b/doc/asymptote.texi
+@@ -4048,6 +4048,7 @@ value, @code{settings.scroll=0}, specifies continuous scrolling.
+ 
+ The routines
+ @cindex @code{getstring}
++@cindex @code{getint}
+ @cindex @code{getreal}
+ @cindex @code{getpair}
+ @cindex @code{gettriple}
+diff --git a/glrender.cc b/glrender.cc
+index 9b608467..3f67b930 100644
+--- a/glrender.cc
++++ b/glrender.cc
+@@ -2408,7 +2408,6 @@ void refreshBuffers()
+                  (GPUindexing ? 2 : 1)*(gl::pixels+1)*sizeof(GLuint),
+                  NULL,GL_DYNAMIC_DRAW);
+     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,0,camp::offsetBuffer);
+-
+     if(GPUcompress) {
+       glBindBuffer(GL_SHADER_STORAGE_BUFFER,camp::indexBuffer);
+       glBufferData(GL_SHADER_STORAGE_BUFFER,gl::pixels*sizeof(GLuint),
+@@ -2422,6 +2421,10 @@ void refreshBuffers()
+       glBufferData(GL_ATOMIC_COUNTER_BUFFER,sizeof(GLuint),&one,
+                    GL_DYNAMIC_DRAW);
+       glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER,0,camp::elementsBuffer);
++    } else {
++      if(GPUindexing)
++        glClearBufferData(GL_SHADER_STORAGE_BUFFER,GL_R8UI,GL_RED_INTEGER,
++                          GL_UNSIGNED_BYTE,&zero);
+     }
+ 
+     if(!GPUindexing) {
+@@ -2447,6 +2450,13 @@ void refreshBuffers()
+ 
+   // Determine the fragment offsets
+ 
++  if(gl::exporting && GPUindexing && !GPUcompress) {
++    glBindBuffer(GL_SHADER_STORAGE_BUFFER,camp::offsetBuffer);
++    glClearBufferData(GL_SHADER_STORAGE_BUFFER,GL_R8UI,GL_RED_INTEGER,
++                      GL_UNSIGNED_BYTE,&zero);
++    glBindBuffer(GL_SHADER_STORAGE_BUFFER,camp::globalSumBuffer);
++  }
++
+   if(!interlock) {
+     drawBuffer(material1Data,countShader);
+     drawBuffer(materialData,countShader);
+@@ -2535,8 +2545,7 @@ void refreshBuffers()
+     glBindBuffer(GL_SHADER_STORAGE_BUFFER,camp::countBuffer);
+     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+ 
+-    if(gl::exporting && !GPUindexing) {
+-      GLuint zero=0;
++    if(gl::exporting) {
+       glBindBuffer(GL_SHADER_STORAGE_BUFFER,camp::countBuffer);
+       glClearBufferData(GL_SHADER_STORAGE_BUFFER,GL_R32UI,GL_RED_INTEGER,
+                         GL_UNSIGNED_INT,&zero);
+
+commit c895e09915302ae276740f1cc91afd834658ae37
+Author: John Bowman <bowman@ualberta.ca>
+Date:   Fri May 13 22:31:19 2022 -0600
+
+    Fix bug #313: opaque rendering on platforms lacking GL_ARB_fragment_shader_interlock.
+
+diff --git a/glrender.cc b/glrender.cc
+index 3f67b930..b221c0b0 100644
+--- a/glrender.cc
++++ b/glrender.cc
+@@ -2588,7 +2588,7 @@ void setUniforms(vertexBuffer& data, GLint shader)
+       glUniform1ui(glGetUniformLocation(shader,"width"),gl::Width);
+ 
+     if(camp::ssbo && GPUindexing &&
+-       (shader == transparentShader || !interlock)) {
++       (shader == transparentShader || (!Opaque && !interlock))) {
+       GLuint offset2=1+gl::processors;
+       glUniform1ui(glGetUniformLocation(shader,"elements"),gl::elements);
+       glUniform1ui(glGetUniformLocation(shader,"offset2"),offset2);
