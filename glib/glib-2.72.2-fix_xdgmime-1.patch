@@ -1,0 +1,43 @@
+Submitted By:            Pierre Labastie <pierre@linuxfromscratch.org>
+Date:                    2022-06-02
+Initial Package Version: 2.72.2
+Upstream Status:         Committed
+Origin:                  Upstream
+Description:             Fix broken file:// content type lookups for webkitgtk
+
+This affects webkitgtk and epiphany, which are unable to display
+local html files if the user mime directory (~/.local/share/mime) has
+been populated with custom mime types, for example by firefox when
+setting itself as a default browser.
+
+diff --git a/gio/xdgmime/xdgmimecache.c b/gio/xdgmime/xdgmimecache.c
+index f80f122a140bd074ef129d73a0b9c0800eda28a6..234e4b467723e11976377eca8283ae41ef078c91 100644
+--- a/gio/xdgmime/xdgmimecache.c
++++ b/gio/xdgmime/xdgmimecache.c
+@@ -568,17 +568,17 @@ cache_glob_lookup_suffix (const char *file_name,
+       n_entries = GET_UINT32 (cache->buffer, list_offset);
+       offset = GET_UINT32 (cache->buffer, list_offset + 4);
+ 
+-      n = cache_glob_node_lookup_suffix (cache, 
+-					 n_entries, offset, 
+-					 file_name, len,
+-					 ignore_case,
+-					 mime_types,
+-					 n_mime_types);
+-      if (n > 0)
+-	return n;
++      n += cache_glob_node_lookup_suffix (cache,
++					  n_entries, offset,
++					  file_name, len,
++					  ignore_case,
++					  mime_types + n,
++					  n_mime_types - n);
++      if (n == n_mime_types)
++	break;
+     }
+ 
+-  return 0;
++  return n;
+ }
+ 
+ static int compare_mime_weight (const void *a, const void *b)
