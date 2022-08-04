@@ -1,0 +1,22 @@
+Submitted By:            Xi Ruoyao <xry111 AT xry111 DOT site>
+Date:                    2022-08-04
+Initial Package Version: 2.36.5
+Upstream Status:         Applied.
+Origin:                  https://commits.webkit.org/248926@main
+Description:             Fixes a crash viewing GitHub pull request pages.
+
+diff --git a/Source/WebCore/html/HTMLInputElement.cpp b/Source/WebCore/html/HTMLInputElement.cpp
+index 9a08741b1c40da698fa68c8a7308386d855d284d..b10d7a745a9cc233d4a8a0e297e0e28660a1dcb8 100644
+--- a/Source/WebCore/html/HTMLInputElement.cpp
++++ b/Source/WebCore/html/HTMLInputElement.cpp
+@@ -1637,6 +1637,10 @@ void HTMLInputElement::removedFromAncestor(RemovalType removalType, ContainerNod
+         oldParentOfRemovedTree.treeScope().radioButtonGroups().removeButton(*this);
+     if (removalType.disconnectedFromDocument && !form())
+         removeFromRadioButtonGroup();
++    if (removalType.disconnectedFromDocument && m_hasPendingUserAgentShadowTreeUpdate) {
++        document().removeElementWithPendingUserAgentShadowTreeUpdate(*this);
++        m_hasPendingUserAgentShadowTreeUpdate = false;
++    }
+     HTMLTextFormControlElement::removedFromAncestor(removalType, oldParentOfRemovedTree);
+     ASSERT(!isConnected());
+     if (removalType.disconnectedFromDocument && !form() && isRadioButton())
