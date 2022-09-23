@@ -1,0 +1,53 @@
+Submitted By: Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date: 2022-09-23
+Initial Package Version: 2.6.4
+Upstream Status: Committted
+Origin: Upstream
+Description: Fix build error if HTML support is disabled
+
+diff -Naur balsa-2.6.4.orig/libbalsa/body.c balsa-2.6.4/libbalsa/body.c
+--- balsa-2.6.4.orig/libbalsa/body.c	2022-09-11 10:04:53.000000000 -0500
++++ balsa-2.6.4/libbalsa/body.c	2022-09-23 11:28:37.078062326 -0500
+@@ -65,6 +65,7 @@
+     return body;
+ }
+ 
++#ifdef HAVE_HTML_WIDGET
+ static void
+ body_weak_notify(gpointer  data,
+                  GObject  *key)
+@@ -81,6 +82,7 @@
+ {
+     g_object_weak_unref(key, body_weak_notify, user_data);
+ }
++#endif
+ 
+ void
+ libbalsa_message_body_free(LibBalsaMessageBody * body)
+@@ -111,10 +113,12 @@
+     if (body->mime_part)
+ 	g_object_unref(body->mime_part);
+ 
++#ifdef HAVE_HTML_WIDGET
+     if (body->selection_table != NULL) {
+         g_hash_table_foreach(body->selection_table, selection_table_foreach, body);
+         g_hash_table_destroy(body->selection_table);
+     }
++#endif
+ 
+     g_free(body);
+ }
+diff -Naur balsa-2.6.4.orig/libbalsa/body.h balsa-2.6.4/libbalsa/body.h
+--- balsa-2.6.4.orig/libbalsa/body.h	2022-09-11 10:04:53.000000000 -0500
++++ balsa-2.6.4/libbalsa/body.h	2022-09-23 11:29:40.438641805 -0500
+@@ -155,8 +155,8 @@
+ LibBalsaMpAltSelection libbalsa_message_body_get_mp_alt_selection(LibBalsaMessageBody *body,
+                                                                   gpointer key);
+ #else
+-#define libbalsa_message_body_set_mp_alt_selection(x)
+-#define libbalsa_message_body_get_mp_alt_selection(x)	LIBBALSA_MP_ALT_AUTO
++#define libbalsa_message_body_set_mp_alt_selection(x, y)
++#define libbalsa_message_body_get_mp_alt_selection(x, y)	LIBBALSA_MP_ALT_AUTO
+ #endif /*HAVE_HTML_WIDGET*/
+ 
+ guint libbalsa_message_body_protect_mode(const LibBalsaMessageBody * body);
