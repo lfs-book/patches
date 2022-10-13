@@ -1,0 +1,47 @@
+Submitted By:                Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date:                        2021-10-12
+Initial Package Version:     5.2
+Upstream Status:             Applied
+Origin:                      Upstream release repository
+Description:               - Expanding unset arrays in an arithmetic context can 
+                             cause a segmentation fault.
+                           - Starting bash with an invalid locale specification for 
+                             LC_ALL/LANG/LC_CTYPE can cause the shell to crash.
+
+diff -Naur bash-5.2/lib/readline/nls.c bash-5.2-new/lib/readline/nls.c
+--- bash-5.2/lib/readline/nls.c	2022-08-15 08:38:51.000000000 -0500
++++ bash-5.2-new/lib/readline/nls.c	2022-10-12 19:41:11.268225981 -0500
+@@ -141,6 +141,10 @@
+   if (lspec == 0)
+     lspec = "";
+   ret = setlocale (LC_CTYPE, lspec);	/* ok, since it does not change locale */
++  if (ret == 0 || *ret == 0)
++    ret = setlocale (LC_CTYPE, (char *)NULL);
++  if (ret == 0 || *ret == 0)
++    ret = RL_DEFAULT_LOCALE;
+ #else
+   ret = (lspec == 0 || *lspec == 0) ? RL_DEFAULT_LOCALE : lspec;
+ #endif
+diff -Naur bash-5.2/patchlevel.h bash-5.2-new/patchlevel.h
+--- bash-5.2/patchlevel.h	2021-11-04 13:09:07.000000000 -0500
++++ bash-5.2-new/patchlevel.h	2022-10-12 19:41:11.268225981 -0500
+@@ -25,6 +25,6 @@
+    regexp `^#define[ 	]*PATCHLEVEL', since that's what support/mkversion.sh
+    looks for to find the patch level (for the sccs version string). */
+ 
+-#define PATCHLEVEL 0
++#define PATCHLEVEL 2
+ 
+ #endif /* _PATCHLEVEL_H_ */
+diff -Naur bash-5.2/subst.c bash-5.2-new/subst.c
+--- bash-5.2/subst.c	2022-08-31 16:36:46.000000000 -0500
++++ bash-5.2-new/subst.c	2022-10-12 19:40:49.475719774 -0500
+@@ -10857,7 +10857,7 @@
+   exp = substring (string, si+1, ni);
+   t = expand_subscript_string (exp, quoted & ~(Q_ARITH|Q_DOUBLE_QUOTES));
+   free (exp);
+-  exp = sh_backslash_quote (t, abstab, 0);
++  exp = t ? sh_backslash_quote (t, abstab, 0) : savestring ("");
+   free (t);
+ 
+   slen = STRLEN (exp);
