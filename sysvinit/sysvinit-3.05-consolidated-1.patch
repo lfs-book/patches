@@ -105,7 +105,7 @@ diff -Naur sysvinit-3.05/src/Makefile sysvinit-3.05.test/src/Makefile
 +			[ x"$$lang" = "xpo/" ] && continue; \
 +			for man in $(MAN1); do \
 +				if ! test -f "../man/$$lang/$$man"; then continue; fi; \
-+				$(INSTALL_DATA) ../man/$$lang/$$man $(DESTDIR)/usr/share/man/$$lang/man5/$$man; \
++				$(INSTALL_DATA) ../man/$$lang/$$man $(DESTDIR)/usr/share/man/$$lang/man1/$$man; \
 +			done; \
 +			for man in $(MAN5); do \
 +				if ! test -f "../man/$$lang/$$man"; then continue; fi; \
