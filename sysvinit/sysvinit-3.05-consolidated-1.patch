@@ -1,0 +1,130 @@
+diff -Naur sysvinit-3.05/src/Makefile sysvinit-3.05.test/src/Makefile
+--- sysvinit-3.05/src/Makefile	2022-08-21 11:48:33.000000000 -0500
++++ sysvinit-3.05.test/src/Makefile	2022-11-05 16:54:14.886625005 -0500
+@@ -60,6 +60,16 @@
+ MANDB	:=
+ endif
+ 
++ifeq ($(DISTRO),LFS)
++USRBIN=
++SBIN  = init halt shutdown runlevel killall5
++MAN1  =
++MAN5  = initscript.5 inittab.5 initctl.5
++MAN8  = halt.8 init.8 killall5.8 pidof.8 poweroff.8 reboot.8 runlevel.8
++MAN8 += shutdown.8 telinit.8
++MANDB:=
++endif
++
+ ifeq ($(MNTPOINT),yes)
+ BIN	+= mountpoint
+ MAN1	+= mountpoint.1
+@@ -90,12 +100,12 @@
+ endif
+ 
+ # Additional libs for GNU libc.
+-ifneq ($(wildcard $(ROOT)/usr/lib*/libcrypt.*),)
++ifneq ($(wildcard $(DESTDIR)/usr/lib*/libcrypt.*),)
+   SULOGINLIBS	+= -lcrypt
+ endif
+ 
+ # Additional libs for GNU libc / multiarch on Debian based systems.
+-ifneq ($(wildcard $(ROOT)/usr/lib/*/libcrypt.*),)
++ifneq ($(wildcard $(DESTDIR)/usr/lib/*/libcrypt.*),)
+ ifneq ($(findstring -lcrypt, $(SULOGINLIBS)), -lcrypt)
+   SULOGINLIBS	+= -lcrypt
+ endif
+@@ -191,47 +201,56 @@
+ distclean:	clobber
+ 
+ install:	all
+-		$(INSTALL_DIR) $(ROOT)/bin/ $(ROOT)/sbin/
+-		$(INSTALL_DIR) $(ROOT)/usr/bin/
++		$(INSTALL_DIR) $(DESTDIR)/bin/ $(DESTDIR)/sbin/
++		$(INSTALL_DIR) $(DESTDIR)/usr/bin/
+ 		for i in $(BIN); do \
+-			$(INSTALL_EXEC) $$i $(ROOT)/bin/ ; \
++			$(INSTALL_EXEC) $$i $(DESTDIR)/bin/ ; \
+ 		done
+ 		for i in $(SBIN); do \
+-			$(INSTALL_EXEC) $$i $(ROOT)/sbin/ ; \
++			$(INSTALL_EXEC) $$i $(DESTDIR)/sbin/ ; \
+ 		done
+ 		for i in $(USRBIN); do \
+-			$(INSTALL_EXEC) $$i $(ROOT)/usr/bin/ ; \
++			$(INSTALL_EXEC) $$i $(DESTDIR)/usr/bin/ ; \
+ 		done
+-		# $(INSTALL_DIR) $(ROOT)/etc/
+-		$(INSTALL_DIR) $(ROOT)/etc/inittab.d
+-		# $(INSTALL_EXEC) ../doc/initscript.sample $(ROOT)/etc/
+-		ln -sf halt $(ROOT)/sbin/reboot
+-		ln -sf halt $(ROOT)/sbin/poweroff
+-		ln -sf init $(ROOT)/sbin/telinit
+-		ln -sf /sbin/killall5 $(ROOT)/bin/pidof
+-		if [ ! -f $(ROOT)/usr/bin/lastb ]; then \
+-			ln -sf last $(ROOT)/usr/bin/lastb; \
++		# $(INSTALL_DIR) $(DESTDIR)/etc/
++		$(INSTALL_DIR) $(DESTDIR)/etc/inittab.d
++		# $(INSTALL_EXEC) ../doc/initscript.sample $(DESTDIR)/etc/
++		ln -sf halt $(DESTDIR)/sbin/reboot
++		ln -sf halt $(DESTDIR)/sbin/poweroff
++		ln -sf init $(DESTDIR)/sbin/telinit
++ifneq ($(DISTRO),LFS)
++		ln -sf /sbin/killall5 $(DESTDIR)/bin/pidof
++		if [ ! -f $(DESTDIR)/usr/bin/lastb ]; then \
++			ln -sf last $(DESTDIR)/usr/bin/lastb; \
+ 		fi
+-		$(INSTALL_DIR) $(ROOT)/usr/include/
+-		$(INSTALL_DATA) initreq.h $(ROOT)/usr/include/
+-		for lang in  '' $(subst ../man/,,$(wildcard ../man/po/??/)); do \
+-			$(INSTALL_DIR) $(ROOT)$(MANDIR)/man1/$$lang; \
+-			$(INSTALL_DIR) $(ROOT)$(MANDIR)/man5/$$lang; \
+-			$(INSTALL_DIR) $(ROOT)$(MANDIR)/man8/$$lang; \
+-		done
+-		for man in $(MAN1) $(subst ../man/,,$(foreach man,$(MAN1),$(wildcard ../man/??/$(man)))); do \
+-			$(INSTALL_DATA) ../man/$$man $(ROOT)$(MANDIR)/man1/$$man; \
+-			sed -i "1{ $(MANDB); }" $(ROOT)$(MANDIR)/man1/$$man ; \
+-		done
+-		for man in $(MAN5) $(subst ../man/,,$(foreach man,$(MAN5),$(wildcard ../man/??/$(man)))); do \
+-			$(INSTALL_DATA) ../man/$$man $(ROOT)$(MANDIR)/man5/$$man; \
+-			sed -i "1{ $(MANDB); }" $(ROOT)$(MANDIR)/man5/$$man ; \
+-		done
+-		for man in $(MAN8) $(subst ../man/,,$(foreach man,$(MAN8),$(wildcard ../man/??/$(man)))); do \
+-			$(INSTALL_DATA) ../man/$$man $(ROOT)$(MANDIR)/man8/$$man; \
+-			sed -i "1{ $(MANDB); }" $(ROOT)$(MANDIR)/man8/$$man ; \
++endif
++		$(INSTALL_DIR) $(DESTDIR)/usr/include/
++		$(INSTALL_DATA) initreq.h $(DESTDIR)/usr/include/
++		for lang in  '' $(subst ../man/,,$(wildcard ../man/??/)); do \
++         [ x"$$lang" = 'xpo/' ] && continue; \
++			$(INSTALL_DIR) $(DESTDIR)$(MANDIR)/$$lang/man1; \
++			$(INSTALL_DIR) $(DESTDIR)$(MANDIR)/$$lang/man5; \
++			$(INSTALL_DIR) $(DESTDIR)$(MANDIR)/$$lang/man8; \
++		done
++
++		for lang in  '' $(subst ../man/,,$(wildcard ../man/??/)); do \
++			[ x"$$lang" = "xpo/" ] && continue; \
++			for man in $(MAN1); do \
++				if ! test -f "../man/$$lang/$$man"; then continue; fi; \
++				$(INSTALL_DATA) ../man/$$lang/$$man $(DESTDIR)/usr/share/man/$$lang/man1/$$man; \
++			done; \
++			for man in $(MAN5); do \
++				if ! test -f "../man/$$lang/$$man"; then continue; fi; \
++				$(INSTALL_DATA) ../man/$$lang/$$man $(DESTDIR)/usr/share/man/$$lang/man5/$$man; \
++			done; \
++			for man in $(MAN8); do \
++				if ! test -f "../man/$$lang/$$man"; then continue; fi; \
++				$(INSTALL_DATA) ../man/$$lang/$$man $(DESTDIR)/usr/share/man/$$lang/man8/$$man; \
++			done; \
+ 		done
+-ifeq ($(ROOT),)
++
++ifeq ($(DESTDIR),)
++ifneq ($(DISTRO),LFS)
+ 		#
+ 		# This part is skipped on Debian systems, the
+ 		# debian.preinst script takes care of it.
+@@ -240,3 +259,4 @@
+ 		 rm -f /run/initctl; \
+ 		 mknod -m 600 /run/initctl p; fi
+ endif
++endif
