@@ -1,0 +1,61 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2022-12-01
+Initial Package Version: 2.28.1
+Upstream Status: N/A
+Origin: Self, fedora and Arch
+Description: Prefer system certificates.
+
+1. Based on what pip does to its vendored requests, use the
+ same environment variable to point to the certificates
+ instead of the certs from vendored certifi.
+
+2. If that variable is not present, use the system certs.
+
+Note that the variable can be set to point to
+/usr/lib/python3.11/site-packages/pip/_vendor/certifi/cacert.pem
+if there is a need to use the shipped certificates.
+
+3. Remove the requirement to install system Certifi.
+
+diff -Naur a/requests/certs.py b/requests/certs.py
+--- a/requests/certs.py	2022-06-29 16:09:45.000000000 +0100
++++ b/requests/certs.py	2022-11-28 16:23:05.019962254 +0000
+@@ -11,7 +11,15 @@
+ environment, you can change the definition of where() to return a separately
+ packaged CA bundle.
+ """
+-from certifi import where
++
++import os
++
++if "_PIP_STANDALONE_CERT" not in os.environ:
++    def where():
++        return "/etc/pki/tls/certs/ca-bundle.crt"
++else:
++    def where():
++        return os.environ["_PIP_STANDALONE_CERT"]
+ 
+ if __name__ == "__main__":
+     print(where())
+diff -Naur a/setup.cfg b/setup.cfg
+--- a/setup.cfg	2022-06-29 16:13:33.191320700 +0100
++++ b/setup.cfg	2022-11-28 16:26:00.764737746 +0000
+@@ -4,7 +4,6 @@
+ 	socks
+ 	use_chardet_on_py3
+ requires-dist = 
+-	certifi>=2017.4.17
+ 	charset_normalizer>=2,<3
+ 	idna>=2.5,<4
+ 	urllib3>=1.21.1,<1.27
+diff -Naur a/setup.py b/setup.py
+--- a/setup.py	2022-06-29 16:09:45.000000000 +0100
++++ b/setup.py	2022-11-28 16:25:38.323635738 +0000
+@@ -62,7 +62,6 @@
+     "charset_normalizer>=2,<3",
+     "idna>=2.5,<4",
+     "urllib3>=1.21.1,<1.27",
+-    "certifi>=2017.4.17",
+ ]
+ test_requirements = [
+     "pytest-httpbin==0.0.7",
