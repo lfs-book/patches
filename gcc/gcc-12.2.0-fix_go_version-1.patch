@@ -1,0 +1,58 @@
+From d5b4abed2f206e492890acc20738e89617ea542c Mon Sep 17 00:00:00 2001
+From: Ian Lance Taylor <iant@golang.org>
+Date: Mon, 27 Jun 2022 17:22:53 -0700
+Subject: [PATCH] libgo: make runtime.Version return a meaningful string
+
+Fixes golang/go#51850
+
+Change-Id: I50a97de81b3f07855cdae8a02a4b53e7da93f850
+Reviewed-on: https://go-review.googlesource.com/c/gofrontend/+/414734
+Reviewed-by: Ian Lance Taylor <iant@google.com>
+Reviewed-by: Cherry Mui <cherryyz@google.com>
+---
+
+diff --git a/libgo/Makefile.am b/libgo/Makefile.am
+index a5d4b6a..b03e655 100644
+--- a/libgo/Makefile.am
++++ b/libgo/Makefile.am
+@@ -568,6 +568,7 @@
+ 	rm -f goroot.go.tmp
+ 	echo "package runtime" > goroot.go.tmp
+ 	echo 'var defaultGOROOT = `$(prefix)`' >> goroot.go.tmp
++	echo 'var buildVersion = `'`cat $(srcdir)/VERSION | sed 1q`' '`$(GOC) --version | sed 1q`'`' >> goroot.go.tmp
+ 	$(SHELL) $(srcdir)/mvifdiff.sh goroot.go.tmp goroot.go
+ 	$(STAMP) $@
+ 
+diff --git a/libgo/Makefile.in b/libgo/Makefile.in
+index 22f48a5..16ed62a 100644
+--- a/libgo/Makefile.in
++++ b/libgo/Makefile.in
+@@ -2780,6 +2780,7 @@
+ 	rm -f goroot.go.tmp
+ 	echo "package runtime" > goroot.go.tmp
+ 	echo 'var defaultGOROOT = `$(prefix)`' >> goroot.go.tmp
++	echo 'var buildVersion = `'`cat $(srcdir)/VERSION | sed 1q`' '`$(GOC) --version | sed 1q`'`' >> goroot.go.tmp
+ 	$(SHELL) $(srcdir)/mvifdiff.sh goroot.go.tmp goroot.go
+ 	$(STAMP) $@
+ 
+diff --git a/libgo/go/runtime/extern.go b/libgo/go/runtime/extern.go
+index a371d9c..8e22614 100644
+--- a/libgo/go/runtime/extern.go
++++ b/libgo/go/runtime/extern.go
+@@ -231,16 +231,6 @@
+ 	return defaultGOROOT
+ }
+ 
+-// buildVersion is the Go tree's version string at build time.
+-//
+-// If any GOEXPERIMENTs are set to non-default values, it will include
+-// "X:<GOEXPERIMENT>".
+-//
+-// This is set by the linker.
+-//
+-// This is accessed by "go version <binary>".
+-var buildVersion string
+-
+ // Version returns the Go tree's version string.
+ // It is either the commit hash and date at the time of the build or,
+ // when possible, a release tag like "go1.3".
