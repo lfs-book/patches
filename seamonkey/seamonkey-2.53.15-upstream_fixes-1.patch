@@ -1,0 +1,1236 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-03-23
+Initial Package Version: 2.53.15
+Origin:                  Upstream (commit d4c8c2675)
+Upstream Status:         Applied
+Description:             Fixes building Seamonkey with LLVM-16. LLVM-16 became
+                         more strict when it comes to implicit function
+                         declarations, and the build of nICEr fails due to
+                         this change. An example of the error output can be
+                         seen in BLFS Ticket #17852.
+
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/nricectx.cpp seamonkey-2.53.15/media/mtransport/nricectx.cpp
+--- seamonkey-2.53.15.orig/media/mtransport/nricectx.cpp	2022-11-02 15:12:32.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/nricectx.cpp	2023-03-23 15:28:49.820691000 -0500
+@@ -116,7 +116,7 @@ const char kNrIceTransportTls[] = "tls";
+ static bool initialized = false;
+ 
+ // Implement NSPR-based crypto algorithms
+-static int nr_crypto_nss_random_bytes(UCHAR *buf, int len) {
++static int nr_crypto_nss_random_bytes(UCHAR *buf, size_t len) {
+   UniquePK11SlotInfo slot(PK11_GetInternalSlot());
+   if (!slot)
+     return R_INTERNAL;
+@@ -128,7 +128,7 @@ static int nr_crypto_nss_random_bytes(UC
+   return 0;
+ }
+ 
+-static int nr_crypto_nss_hmac(UCHAR *key, int keyl, UCHAR *buf, int bufl,
++static int nr_crypto_nss_hmac(UCHAR *key, size_t keyl, UCHAR *buf, size_t bufl,
+                               UCHAR *result) {
+   CK_MECHANISM_TYPE mech = CKM_SHA_1_HMAC;
+   PK11SlotInfo *slot = nullptr;
+@@ -180,7 +180,7 @@ static int nr_crypto_nss_hmac(UCHAR *key
+   return err;
+ }
+ 
+-static int nr_crypto_nss_md5(UCHAR *buf, int bufl, UCHAR *result) {
++static int nr_crypto_nss_md5(UCHAR *buf, size_t bufl, UCHAR *result) {
+   int err = R_INTERNAL;
+   SECStatus rv;
+ 
+@@ -732,11 +732,11 @@ void NrIceCtx::internal_SetTimerAccelara
+ }
+ 
+ void NrIceCtx::AccumulateStats(const NrIceStats& stats) {
+-  nr_ice_accumulate_count(&(ctx_->stats.stun_retransmits),
+-                          stats.stun_retransmits);
+-  nr_ice_accumulate_count(&(ctx_->stats.turn_401s), stats.turn_401s);
+-  nr_ice_accumulate_count(&(ctx_->stats.turn_403s), stats.turn_403s);
+-  nr_ice_accumulate_count(&(ctx_->stats.turn_438s), stats.turn_438s);
++  nr_accumulate_count(&(ctx_->stats.stun_retransmits),
++                      stats.stun_retransmits);
++  nr_accumulate_count(&(ctx_->stats.turn_401s), stats.turn_401s);
++  nr_accumulate_count(&(ctx_->stats.turn_403s), stats.turn_403s);
++  nr_accumulate_count(&(ctx_->stats.turn_438s), stats.turn_438s);
+ }
+ 
+ NrIceStats NrIceCtx::Destroy() {
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/nicer.gyp seamonkey-2.53.15/media/mtransport/third_party/nICEr/nicer.gyp
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/nicer.gyp	2022-06-08 14:10:28.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/nicer.gyp	2023-03-23 15:28:49.821690991 -0500
+@@ -187,6 +187,7 @@
+               [ 'OS == "win"', {
+                 'defines' : [
+                     'WIN32',
++                    '_WINSOCK_DEPRECATED_NO_WARNINGS',
+                     'USE_ICE',
+                     'USE_TURN',
+                     'USE_RFC_3489_BACKWARDS_COMPATIBLE',
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.c	2023-03-23 15:28:49.821690991 -0500
+@@ -37,21 +37,21 @@ static char *RCSSTRING __UNUSED__="$Id:
+ #include <nr_api.h>
+ #include "nr_crypto.h"
+ 
+-static int nr_ice_crypto_dummy_random_bytes(UCHAR *buf, int len)
++static int nr_ice_crypto_dummy_random_bytes(UCHAR *buf, size_t len)
+   {
+     fprintf(stderr,"Need to define crypto API implementation\n");
+ 
+     exit(1);
+   }
+ 
+-static int nr_ice_crypto_dummy_hmac_sha1(UCHAR *key, int key_l, UCHAR *buf, int buf_l, UCHAR digest[20])
++static int nr_ice_crypto_dummy_hmac_sha1(UCHAR *key, size_t key_l, UCHAR *buf, size_t buf_l, UCHAR digest[20])
+   {
+     fprintf(stderr,"Need to define crypto API implementation\n");
+ 
+     exit(1);
+   }
+ 
+-static int nr_ice_crypto_dummy_md5(UCHAR *buf, int buf_l, UCHAR digest[16])
++static int nr_ice_crypto_dummy_md5(UCHAR *buf, size_t buf_l, UCHAR digest[16])
+   {
+     fprintf(stderr,"Need to define crypto API implementation\n");
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/crypto/nr_crypto.h	2023-03-23 15:28:49.821690991 -0500
+@@ -37,9 +37,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ 
+ 
+ typedef struct nr_ice_crypto_vtbl_ {
+-  int (*random_bytes)(UCHAR *buf, int len);
+-  int (*hmac_sha1)(UCHAR *key, int key_l, UCHAR *buf, int buf_l, UCHAR digest[20]);
+-  int (*md5)(UCHAR *buf, int buf_l, UCHAR digest[16]);
++  int (*random_bytes)(UCHAR *buf, size_t len);
++  int (*hmac_sha1)(UCHAR *key, size_t key_l, UCHAR *buf, size_t buf_l, UCHAR digest[20]);
++  int (*md5)(UCHAR *buf, size_t buf_l, UCHAR digest[16]);
+ } nr_ice_crypto_vtbl;
+ 
+ extern nr_ice_crypto_vtbl *nr_crypto_vtbl;
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_candidate.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_candidate.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_candidate.c	2020-08-10 06:30:35.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_candidate.c	2023-03-23 15:28:49.821690991 -0500
+@@ -323,14 +323,14 @@ int nr_ice_candidate_destroy(nr_ice_cand
+       case RELAYED:
+         // record stats back to the ice ctx on destruction
+         if (cand->u.relayed.turn) {
+-          nr_ice_accumulate_count(&(cand->ctx->stats.turn_401s), cand->u.relayed.turn->cnt_401s);
+-          nr_ice_accumulate_count(&(cand->ctx->stats.turn_403s), cand->u.relayed.turn->cnt_403s);
+-          nr_ice_accumulate_count(&(cand->ctx->stats.turn_438s), cand->u.relayed.turn->cnt_438s);
++          nr_accumulate_count(&(cand->ctx->stats.turn_401s), cand->u.relayed.turn->cnt_401s);
++          nr_accumulate_count(&(cand->ctx->stats.turn_403s), cand->u.relayed.turn->cnt_403s);
++          nr_accumulate_count(&(cand->ctx->stats.turn_438s), cand->u.relayed.turn->cnt_438s);
+ 
+           nr_turn_stun_ctx* stun_ctx;
+           stun_ctx = STAILQ_FIRST(&cand->u.relayed.turn->stun_ctxs);
+           while (stun_ctx) {
+-            nr_ice_accumulate_count(&(cand->ctx->stats.stun_retransmits), stun_ctx->stun->retransmit_ct);
++            nr_accumulate_count(&(cand->ctx->stats.stun_retransmits), stun_ctx->stun->retransmit_ct);
+ 
+             stun_ctx = STAILQ_NEXT(stun_ctx, entry);
+           }
+@@ -380,7 +380,9 @@ static int nr_ice_get_foundation(nr_ice_
+     while(foundation){
+       if(nr_transport_addr_cmp(&cand->base,&foundation->addr,NR_TRANSPORT_ADDR_CMP_MODE_ADDR))
+         goto next;
+-      if(cand->type != foundation->type)
++      // cast necessary because there is no guarantee that enum is signed.
++      // foundation->type should probably match nr_ice_candidate_type
++      if((int)cand->type != foundation->type)
+         goto next;
+       if(cand->stun_server != foundation->stun_server)
+         goto next;
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_candidate_pair.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_candidate_pair.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_candidate_pair.c	2020-08-10 06:30:35.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_candidate_pair.c	2023-03-23 15:28:49.821690991 -0500
+@@ -154,7 +154,7 @@ int nr_ice_candidate_pair_destroy(nr_ice
+ 
+     // record stats back to the ice ctx on destruction
+     if (pair->stun_client) {
+-      nr_ice_accumulate_count(&(pair->local->ctx->stats.stun_retransmits), pair->stun_client->retransmit_ct);
++      nr_accumulate_count(&(pair->local->ctx->stats.stun_retransmits), pair->stun_client->retransmit_ct);
+     }
+ 
+     RFREE(pair->as_string);
+@@ -357,6 +357,12 @@ static void nr_ice_candidate_pair_stun_c
+   done:
+     _status=0;
+   abort:
++    if (_status) {
++      // cb doesn't return anything, but we should probably log that we aborted
++      // This also quiets the unused variable warnings.
++      r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s)/STREAM(%s)/CAND-PAIR(%s): STUN cb pair addr = %s abort with status: %d",
++        pair->pctx->label,pair->local->stream->label,pair->codeword,pair->as_string, _status);
++    }
+     return;
+   }
+ 
+@@ -640,6 +646,12 @@ void nr_ice_candidate_pair_restart_stun_
+ 
+     _status=0;
+   abort:
++    if (_status) {
++      // cb doesn't return anything, but we should probably log that we aborted
++      // This also quiets the unused variable warnings.
++      r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s)/STREAM(%s)/CAND-PAIR(%s)/COMP(%d): STUN nominated cb pair as nominated: %s abort with status: %d",
++        pair->pctx->label,pair->local->stream->label,pair->codeword,pair->remote->component->component_id,pair->as_string, _status);
++    }
+     return;
+   }
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_component.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_component.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_component.c	2020-08-10 06:30:35.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_component.c	2023-03-23 15:28:49.821690991 -0500
+@@ -51,10 +51,16 @@ static char *RCSSTRING __UNUSED__="$Id:
+ #include "nr_crypto.h"
+ #include "r_time.h"
+ 
++static void nr_ice_component_refresh_consent_cb(NR_SOCKET s, int how, void *cb_arg);
+ static int nr_ice_component_stun_server_default_cb(void *cb_arg,nr_stun_server_ctx *stun_ctx,nr_socket *sock, nr_stun_server_request *req, int *dont_free, int *error);
+ static int nr_ice_pre_answer_request_destroy(nr_ice_pre_answer_request **parp);
++int nr_ice_component_can_candidate_addr_pair(nr_transport_addr *local, nr_transport_addr *remote);
++int nr_ice_component_can_candidate_tcptype_pair(nr_socket_tcp_type left, nr_socket_tcp_type right);
++void nr_ice_component_consent_calc_consent_timer(nr_ice_component *comp);
+ void nr_ice_component_consent_schedule_consent_timer(nr_ice_component *comp);
+-void nr_ice_component_consent_destroy(nr_ice_component *comp);
++int nr_ice_component_refresh_consent(nr_stun_client_ctx *ctx, NR_async_cb finished_cb, void *cb_arg);
++int nr_ice_component_setup_consent(nr_ice_component *comp);
++int nr_ice_pre_answer_enqueue(nr_ice_component *comp, nr_socket *sock, nr_stun_server_request *req, int *dont_free);
+ 
+ /* This function takes ownership of the contents of req (but not req itself) */
+ static int nr_ice_pre_answer_request_create(nr_transport_addr *dst, nr_stun_server_request *req, nr_ice_pre_answer_request **parp)
+@@ -813,7 +819,7 @@ static int nr_ice_component_handle_trigg
+ 
+     _status=0;
+   abort:
+-    return(r);
++    return(_status);
+   }
+ 
+ /* Section 7.2.1 */
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_component.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_component.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_component.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_component.h	2023-03-23 15:28:49.822690982 -0500
+@@ -98,6 +98,7 @@ int nr_ice_component_set_failed(nr_ice_c
+ int nr_ice_component_finalize(nr_ice_component *lcomp, nr_ice_component *rcomp);
+ int nr_ice_component_insert_pair(nr_ice_component *pcomp, nr_ice_cand_pair *pair);
+ int nr_ice_component_get_default_candidate(nr_ice_component *comp, nr_ice_candidate **candp, int ip_version);
++void nr_ice_component_consent_destroy(nr_ice_component *comp);
+ void nr_ice_component_refresh_consent_now(nr_ice_component *comp);
+ void nr_ice_component_disconnected(nr_ice_component *comp);
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_ctx.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_ctx.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_ctx.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_ctx.c	2023-03-23 15:28:49.822690982 -0500
+@@ -689,7 +689,7 @@ static int nr_ice_get_default_local_addr
+     if (i == addr_ct) {
+       if ((r=nr_transport_addr_copy(&addrp->addr, &default_addr)))
+         ABORT(r);
+-      strlcpy(addrp->addr.ifname, "default route", sizeof(addrp->addr.ifname));
++      (void)strlcpy(addrp->addr.ifname, "default route", sizeof(addrp->addr.ifname));
+     }
+ 
+     _status=0;
+@@ -914,7 +914,7 @@ int nr_ice_get_global_attributes(nr_ice_
+ static int nr_ice_random_string(char *str, int len)
+   {
+     unsigned char bytes[100];
+-    int needed;
++    size_t needed;
+     int r,_status;
+ 
+     if(len%2) ABORT(R_BAD_ARGS);
+@@ -1087,17 +1087,3 @@ int nr_ice_get_new_ice_pwd(char** pwd)
+     }
+     return(_status);
+   }
+-
+-#ifndef UINT2_MAX
+-#define UINT2_MAX ((UINT2)(65535U))
+-#endif
+-
+-void nr_ice_accumulate_count(UINT2* orig_count, UINT2 new_count)
+-  {
+-    if (UINT2_MAX - new_count < *orig_count) {
+-      // don't rollover, just stop accumulating at MAX value
+-      *orig_count = UINT2_MAX;
+-    } else {
+-      *orig_count += new_count;
+-    }
+-  }
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_ctx.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_ctx.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_ctx.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_ctx.h	2023-03-23 15:28:49.822690982 -0500
+@@ -199,8 +199,6 @@ int nr_ice_ctx_set_trickle_cb(nr_ice_ctx
+ int nr_ice_ctx_hide_candidate(nr_ice_ctx *ctx, nr_ice_candidate *cand);
+ int nr_ice_get_new_ice_ufrag(char** ufrag);
+ int nr_ice_get_new_ice_pwd(char** pwd);
+-// accumulate a count without worrying about rollover
+-void nr_ice_accumulate_count(UINT2* orig_count, UINT2 new_count);
+ 
+ #define NR_ICE_MAX_ATTRIBUTE_SIZE 256
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_media_stream.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_media_stream.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/ice/ice_media_stream.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/ice/ice_media_stream.c	2023-03-23 15:28:49.822690982 -0500
+@@ -376,6 +376,12 @@ static void nr_ice_media_stream_check_ti
+ 
+     _status=0;
+   abort:
++    if (_status) {
++      // cb doesn't return anything, but we should probably log that we aborted
++      // This also quiets the unused variable warnings.
++      r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s): check timer cb for media stream %s abort with status: %d",
++        stream->pctx->label,stream->label, _status);
++    }
+     return;
+   }
+ 
+@@ -564,8 +570,8 @@ int nr_ice_media_stream_set_state(nr_ice
+     if (state == str->ice_state)
+       return 0;
+ 
+-    assert(state < sizeof(nr_ice_media_stream_states)/sizeof(char *));
+-    assert(str->ice_state < sizeof(nr_ice_media_stream_states)/sizeof(char *));
++    assert((size_t)state < sizeof(nr_ice_media_stream_states)/sizeof(char *));
++    assert((size_t)str->ice_state < sizeof(nr_ice_media_stream_states)/sizeof(char *));
+ 
+     r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s): stream %s state %s->%s",
+       str->pctx->label,str->label,
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/nr_socket.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/nr_socket.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/nr_socket.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/nr_socket.h	2023-03-23 15:28:49.822690982 -0500
+@@ -49,6 +49,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ #ifdef __cplusplus
+ #define restrict
+ #elif defined(WIN32)
++/* Undef before defining to avoid a compiler warning */
++#undef restrict
+ #define restrict __restrict
+ #endif
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/transport_addr.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/transport_addr.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/transport_addr.c	2020-08-10 06:30:35.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/transport_addr.c	2023-03-23 15:28:49.822690982 -0500
+@@ -537,7 +537,7 @@ int nr_transport_addr_get_private_addr_r
+       case NR_IPV4:
+         {
+           UINT4 ip = ntohl(addr->u.addr4.sin_addr.s_addr);
+-          for (int i=0; i<(sizeof(nr_private_ipv4_addrs)/sizeof(nr_transport_addr_mask)); i++) {
++          for (size_t i=0; i<(sizeof(nr_private_ipv4_addrs)/sizeof(nr_transport_addr_mask)); i++) {
+             if ((ip & nr_private_ipv4_addrs[i].mask) == nr_private_ipv4_addrs[i].addr)
+               return i + 1;
+           }
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/transport_addr_reg.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/transport_addr_reg.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/net/transport_addr_reg.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/net/transport_addr_reg.c	2023-03-23 15:28:49.822690982 -0500
+@@ -114,8 +114,9 @@ nr_reg_get_transport_addr(NR_registry pr
+     if ((r=nr_str_port_to_transport_addr(address?address:"0.0.0.0", port, p, addr)))
+         ABORT(r);
+ 
+-    if (ifname)
+-        strlcpy(addr->ifname, ifname, sizeof(addr->ifname));
++    if (ifname) {
++        (void)strlcpy(addr->ifname, ifname, sizeof(addr->ifname));
++    }
+ 
+     _status=0;
+   abort:
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/addrs.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/addrs.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/addrs.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/addrs.c	2023-03-23 15:28:49.822690982 -0500
+@@ -327,7 +327,7 @@ stun_getifaddrs(nr_local_addr addrs[], i
+             addrs[*count].interface.type = NR_INTERFACE_TYPE_UNKNOWN;
+             addrs[*count].interface.estimated_speed = 0;
+ #endif
+-            strlcpy(addrs[*count].addr.ifname, if_addr->ifa_name, sizeof(addrs[*count].addr.ifname));
++            (void)strlcpy(addrs[*count].addr.ifname, if_addr->ifa_name, sizeof(addrs[*count].addr.ifname));
+             ++(*count);
+           }
+           break;
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_build.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_build.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_build.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_build.c	2023-03-23 15:28:49.823690973 -0500
+@@ -308,7 +308,7 @@ nr_stun_compute_lt_message_integrity_pas
+                                               Data *password, Data *hmac_key)
+ {
+   char digest_input[1000];
+-  int i;
++  size_t i;
+   int r, _status;
+   size_t len;
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.c	2023-03-23 15:28:49.823690973 -0500
+@@ -253,7 +253,7 @@ static void nr_stun_client_timer_expired
+         ABORT(R_NOT_PERMITTED);
+ 
+     // track retransmits for ice telemetry
+-    nr_ice_accumulate_count(&(ctx->retransmit_ct), 1);
++    nr_accumulate_count(&(ctx->retransmit_ct), 1);
+ 
+     /* as a side effect will reset the timer */
+     nr_stun_client_send_request(ctx);
+@@ -269,6 +269,12 @@ static void nr_stun_client_timer_expired
+ 
+         nr_stun_client_fire_finished_cb(ctx);
+     }
++    if (_status) {
++      // cb doesn't return anything, but we should probably log that we aborted
++      // This also quiets the unused variable warnings.
++      r_log(NR_LOG_STUN,LOG_DEBUG,"STUN-CLIENT(%s): Timer expired cb abort with status: %d",
++        ctx->label, _status);
++    }
+     return;
+   }
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_client_ctx.h	2023-03-23 15:28:49.823690973 -0500
+@@ -167,7 +167,7 @@ struct nr_stun_client_ctx_ {
+   char *nonce;
+   char *realm;
+   void *timer_handle;
+-  int request_ct;
++  UINT2 request_ct;
+   UINT2 retransmit_ct;
+   UINT4 rto_ms;    /* retransmission time out */
+   double retransmission_backoff_factor;
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_codec.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_codec.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_codec.c	2020-08-10 06:30:35.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_codec.c	2023-03-23 15:28:49.823690973 -0500
+@@ -62,29 +62,29 @@ static int nr_stun_find_attr_info(UINT2
+ 
+ static int nr_stun_fix_attribute_ordering(nr_stun_message *msg);
+ 
+-static int nr_stun_encode_htons(UINT2 data, int buflen, UCHAR *buf, int *offset);
+-static int nr_stun_encode_htonl(UINT4 data, int buflen, UCHAR *buf, int *offset);
+-static int nr_stun_encode_htonll(UINT8 data, int buflen, UCHAR *buf, int *offset);
+-static int nr_stun_encode(UCHAR *data, int length, int buflen, UCHAR *buf, int *offset);
+-
+-static int nr_stun_decode_htons(UCHAR *buf, int buflen, int *offset, UINT2 *data);
+-static int nr_stun_decode_htonl(UCHAR *buf, int buflen, int *offset, UINT4 *data);
+-static int nr_stun_decode_htonll(UCHAR *buf, int buflen, int *offset, UINT8 *data);
+-static int nr_stun_decode(int length, UCHAR *buf, int buflen, int *offset, UCHAR *data);
+-
+-static int nr_stun_attr_string_illegal(nr_stun_attr_info *attr_info, int len, void *data, int max_bytes, int max_chars);
+-
+-static int nr_stun_attr_error_code_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data);
+-static int nr_stun_attr_nonce_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data);
+-static int nr_stun_attr_realm_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data);
+-static int nr_stun_attr_server_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data);
+-static int nr_stun_attr_username_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data);
++static int nr_stun_encode_htons(UINT2 data, size_t buflen, UCHAR *buf, size_t *offset);
++static int nr_stun_encode_htonl(UINT4 data, size_t buflen, UCHAR *buf, size_t *offset);
++static int nr_stun_encode_htonll(UINT8 data, size_t buflen, UCHAR *buf, size_t *offset);
++static int nr_stun_encode(UCHAR *data, size_t length, size_t buflen, UCHAR *buf, size_t *offset);
++
++static int nr_stun_decode_htons(UCHAR *buf, size_t buflen, size_t *offset, UINT2 *data);
++static int nr_stun_decode_htonl(UCHAR *buf, size_t buflen, size_t *offset, UINT4 *data);
++static int nr_stun_decode_htonll(UCHAR *buf, size_t buflen, size_t *offset, UINT8 *data);
++static int nr_stun_decode(size_t length, UCHAR *buf, size_t buflen, size_t *offset, UCHAR *data);
++
++static int nr_stun_attr_string_illegal(nr_stun_attr_info *attr_info, size_t len, void *data, size_t max_bytes, size_t max_chars);
++
++static int nr_stun_attr_error_code_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
++static int nr_stun_attr_nonce_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
++static int nr_stun_attr_realm_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
++static int nr_stun_attr_server_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
++static int nr_stun_attr_username_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
+ static int
+-nr_stun_attr_codec_fingerprint_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data);
++nr_stun_attr_codec_fingerprint_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data);
+ 
+ 
+ int
+-nr_stun_encode_htons(UINT2 data, int buflen, UCHAR *buf, int *offset)
++nr_stun_encode_htons(UINT2 data, size_t buflen, UCHAR *buf, size_t *offset)
+ {
+    UINT2 d = htons(data);
+ 
+@@ -100,7 +100,7 @@ nr_stun_encode_htons(UINT2 data, int buf
+ }
+ 
+ int
+-nr_stun_encode_htonl(UINT4 data, int buflen, UCHAR *buf, int *offset)
++nr_stun_encode_htonl(UINT4 data, size_t buflen, UCHAR *buf, size_t *offset)
+ {
+    UINT4 d = htonl(data);
+ 
+@@ -116,7 +116,7 @@ nr_stun_encode_htonl(UINT4 data, int buf
+ }
+ 
+ int
+-nr_stun_encode_htonll(UINT8 data, int buflen, UCHAR *buf, int *offset)
++nr_stun_encode_htonll(UINT8 data, size_t buflen, UCHAR *buf, size_t *offset)
+ {
+    UINT8 d = nr_htonll(data);
+ 
+@@ -132,7 +132,7 @@ nr_stun_encode_htonll(UINT8 data, int bu
+ }
+ 
+ int
+-nr_stun_encode(UCHAR *data, int length, int buflen, UCHAR *buf, int *offset)
++nr_stun_encode(UCHAR *data, size_t length, size_t buflen, UCHAR *buf, size_t *offset)
+ {
+    if (*offset + length > buflen) {
+       r_log(NR_LOG_STUN, LOG_WARNING, "Attempted buffer overrun: %d + %d > %d", *offset, length, buflen);
+@@ -147,7 +147,7 @@ nr_stun_encode(UCHAR *data, int length,
+ 
+ 
+ int
+-nr_stun_decode_htons(UCHAR *buf, int buflen, int *offset, UINT2 *data)
++nr_stun_decode_htons(UCHAR *buf, size_t buflen, size_t *offset, UINT2 *data)
+ {
+    UINT2 d;
+ 
+@@ -164,7 +164,7 @@ nr_stun_decode_htons(UCHAR *buf, int buf
+ }
+ 
+ int
+-nr_stun_decode_htonl(UCHAR *buf, int buflen, int *offset, UINT4 *data)
++nr_stun_decode_htonl(UCHAR *buf, size_t buflen, size_t *offset, UINT4 *data)
+ {
+    UINT4 d;
+ 
+@@ -181,7 +181,7 @@ nr_stun_decode_htonl(UCHAR *buf, int buf
+ }
+ 
+ int
+-nr_stun_decode_htonll(UCHAR *buf, int buflen, int *offset, UINT8 *data)
++nr_stun_decode_htonll(UCHAR *buf, size_t buflen, size_t *offset, UINT8 *data)
+ {
+    UINT8 d;
+ 
+@@ -198,7 +198,7 @@ nr_stun_decode_htonll(UCHAR *buf, int bu
+ }
+ 
+ int
+-nr_stun_decode(int length, UCHAR *buf, int buflen, int *offset, UCHAR *data)
++nr_stun_decode(size_t length, UCHAR *buf, size_t buflen, size_t *offset, UCHAR *data)
+ {
+    if (*offset + length > buflen) {
+       r_log(NR_LOG_STUN, LOG_WARNING, "Attempted buffer overrun: %d + %d > %d", *offset, length, buflen);
+@@ -237,7 +237,7 @@ nr_count_utf8_code_points_without_valida
+ }
+ 
+ int
+-nr_stun_attr_string_illegal(nr_stun_attr_info *attr_info, int len, void *data, int max_bytes, int max_chars)
++nr_stun_attr_string_illegal(nr_stun_attr_info *attr_info, size_t len, void *data, size_t max_bytes, size_t max_chars)
+ {
+     int _status;
+     char *s = data;
+@@ -248,12 +248,10 @@ nr_stun_attr_string_illegal(nr_stun_attr
+         ABORT(R_FAILED);
+     }
+ 
+-    if (max_chars >= 0) {
+-        nchars = nr_count_utf8_code_points_without_validation(s);
+-        if (nchars > max_chars) {
+-            r_log(NR_LOG_STUN, LOG_WARNING, "%s is too large: %zd characters", attr_info->name, nchars);
+-            ABORT(R_FAILED);
+-        }
++    nchars = nr_count_utf8_code_points_without_validation(s);
++    if (nchars > max_chars) {
++        r_log(NR_LOG_STUN, LOG_WARNING, "%s is too large: %zd characters", attr_info->name, nchars);
++        ABORT(R_FAILED);
+     }
+ 
+     _status = 0;
+@@ -262,7 +260,7 @@ nr_stun_attr_string_illegal(nr_stun_attr
+ }
+ 
+ int
+-nr_stun_attr_error_code_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data)
++nr_stun_attr_error_code_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data)
+ {
+     int r,_status;
+     nr_stun_attr_error_code *ec = data;
+@@ -279,25 +277,25 @@ nr_stun_attr_error_code_illegal(nr_stun_
+ }
+ 
+ int
+-nr_stun_attr_nonce_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data)
++nr_stun_attr_nonce_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data)
+ {
+     return nr_stun_attr_string_illegal(attr_info, attrlen, data, NR_STUN_MAX_NONCE_BYTES, NR_STUN_MAX_NONCE_CHARS);
+ }
+ 
+ int
+-nr_stun_attr_realm_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data)
++nr_stun_attr_realm_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data)
+ {
+     return nr_stun_attr_string_illegal(attr_info, attrlen, data, NR_STUN_MAX_REALM_BYTES, NR_STUN_MAX_REALM_CHARS);
+ }
+ 
+ int
+-nr_stun_attr_server_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data)
++nr_stun_attr_server_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data)
+ {
+     return nr_stun_attr_string_illegal(attr_info, attrlen, data, NR_STUN_MAX_SERVER_BYTES, NR_STUN_MAX_SERVER_CHARS);
+ }
+ 
+ int
+-nr_stun_attr_username_illegal(nr_stun_attr_info *attr_info, int attrlen, void *data)
++nr_stun_attr_username_illegal(nr_stun_attr_info *attr_info, size_t attrlen, void *data)
+ {
+     return nr_stun_attr_string_illegal(attr_info, attrlen, data, NR_STUN_MAX_USERNAME_BYTES, -1);
+ }
+@@ -310,7 +308,7 @@ nr_stun_attr_codec_UCHAR_print(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_UCHAR_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_UCHAR_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+     UINT4 tmp = *((UCHAR *)data);
+@@ -327,7 +325,7 @@ nr_stun_attr_codec_UCHAR_encode(nr_stun_
+ }
+ 
+ static int
+-nr_stun_attr_codec_UCHAR_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_UCHAR_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     UINT4 tmp;
+ 
+@@ -359,7 +357,7 @@ nr_stun_attr_codec_UINT4_print(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_UINT4_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_UINT4_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+ 
+@@ -374,7 +372,7 @@ nr_stun_attr_codec_UINT4_encode(nr_stun_
+ }
+ 
+ static int
+-nr_stun_attr_codec_UINT4_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_UINT4_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     if (attrlen != sizeof(UINT4)) {
+         r_log(NR_LOG_STUN, LOG_WARNING, "Integer is illegal size: %d", attrlen);
+@@ -402,7 +400,7 @@ nr_stun_attr_codec_UINT8_print(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_UINT8_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_UINT8_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+ 
+@@ -417,7 +415,7 @@ nr_stun_attr_codec_UINT8_encode(nr_stun_
+ }
+ 
+ static int
+-nr_stun_attr_codec_UINT8_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_UINT8_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     if (attrlen != sizeof(UINT8)) {
+         r_log(NR_LOG_STUN, LOG_WARNING, "Integer is illegal size: %d", attrlen);
+@@ -445,7 +443,7 @@ nr_stun_attr_codec_addr_print(nr_stun_at
+ }
+ 
+ static int
+-nr_stun_attr_codec_addr_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_addr_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int r,_status;
+     int start = offset;
+@@ -491,7 +489,7 @@ nr_stun_attr_codec_addr_encode(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_addr_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_addr_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     UCHAR pad;
+@@ -561,7 +559,7 @@ nr_stun_attr_codec_data_print(nr_stun_at
+ }
+ 
+ static int
+-nr_stun_attr_codec_data_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_data_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     nr_stun_attr_data *d = data;
+     int start = offset;
+@@ -577,7 +575,7 @@ nr_stun_attr_codec_data_encode(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_data_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_data_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     nr_stun_attr_data *result = data;
+@@ -617,7 +615,7 @@ nr_stun_attr_codec_error_code_print(nr_s
+ }
+ 
+ static int
+-nr_stun_attr_codec_error_code_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_error_code_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     nr_stun_attr_error_code *error_code = data;
+     int start = offset;
+@@ -640,14 +638,14 @@ nr_stun_attr_codec_error_code_encode(nr_
+ }
+ 
+ static int
+-nr_stun_attr_codec_error_code_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_error_code_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     nr_stun_attr_error_code *result = data;
+     UCHAR pad[2];
+     UCHAR class;
+     UCHAR number;
+-    int size_reason;
++    size_t size_reason;
+ 
+     if (nr_stun_decode(2, buf, buflen, &offset, pad)
+      || nr_stun_decode(1, buf, buflen, &offset, &class)
+@@ -690,7 +688,7 @@ nr_stun_attr_codec_fingerprint_print(nr_
+ }
+ 
+ static int
+-nr_stun_attr_codec_fingerprint_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_fingerprint_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     UINT4 checksum;
+     nr_stun_attr_fingerprint *fingerprint = data;
+@@ -716,12 +714,12 @@ nr_stun_attr_codec_fingerprint_encode(nr
+ }
+ 
+ static int
+-nr_stun_attr_codec_fingerprint_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_fingerprint_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int r,_status;
+     nr_stun_attr_fingerprint *fingerprint = data;
+     nr_stun_message_header *header = (nr_stun_message_header*)buf;
+-    int length;
++    size_t length;
+     UINT4 checksum;
+ 
+     if ((r=nr_stun_attr_codec_UINT4.decode(attr_info, attrlen, buf, offset, buflen, &fingerprint->checksum)))
+@@ -773,7 +771,7 @@ nr_stun_attr_codec_flag_print(nr_stun_at
+ }
+ 
+ static int
+-nr_stun_attr_codec_flag_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_flag_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+ 
+@@ -787,7 +785,7 @@ nr_stun_attr_codec_flag_encode(nr_stun_a
+ }
+ 
+ static int
+-nr_stun_attr_codec_flag_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_flag_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     if (attrlen != 0) {
+         r_log(NR_LOG_STUN, LOG_WARNING, "Illegal flag length: %d", attrlen);
+@@ -844,7 +842,7 @@ nr_stun_compute_message_integrity(UCHAR
+ }
+ 
+ static int
+-nr_stun_attr_codec_message_integrity_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_message_integrity_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+     nr_stun_attr_message_integrity *integrity = data;
+@@ -863,7 +861,7 @@ nr_stun_attr_codec_message_integrity_enc
+ }
+ 
+ static int
+-nr_stun_attr_codec_message_integrity_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_message_integrity_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     int start;
+@@ -909,7 +907,7 @@ nr_stun_attr_codec nr_stun_attr_codec_me
+ };
+ 
+ static int
+-nr_stun_attr_codec_noop_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_noop_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     return SKIP_ATTRIBUTE_DECODE;
+ }
+@@ -930,7 +928,7 @@ nr_stun_attr_codec_quoted_string_print(n
+ }
+ 
+ static int
+-nr_stun_attr_codec_quoted_string_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_quoted_string_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+ //TODO: !nn! syntax check, conversion if not quoted already?
+ //We'll just restrict this in the API -- EKR
+@@ -938,7 +936,7 @@ nr_stun_attr_codec_quoted_string_encode(
+ }
+ 
+ static int
+-nr_stun_attr_codec_quoted_string_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_quoted_string_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+ //TODO: !nn! I don't see any need to unquote this but we may
+ //find one later -- EKR
+@@ -961,7 +959,7 @@ nr_stun_attr_codec_string_print(nr_stun_
+ }
+ 
+ static int
+-nr_stun_attr_codec_string_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_string_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int start = offset;
+     char *str = data;
+@@ -978,7 +976,7 @@ nr_stun_attr_codec_string_encode(nr_stun
+ }
+ 
+ static int
+-nr_stun_attr_codec_string_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_string_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     char *result = data;
+@@ -1033,7 +1031,7 @@ nr_stun_attr_codec_unknown_attributes_pr
+ }
+ 
+ static int
+-nr_stun_attr_codec_unknown_attributes_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_unknown_attributes_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     int _status;
+     int start = offset;
+@@ -1063,7 +1061,7 @@ nr_stun_attr_codec_unknown_attributes_en
+ }
+ 
+ static int
+-nr_stun_attr_codec_unknown_attributes_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_unknown_attributes_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int _status;
+     nr_stun_attr_unknown_attributes *unknown_attributes = data;
+@@ -1112,7 +1110,7 @@ nr_stun_attr_codec_xor_mapped_address_pr
+ }
+ 
+ static int
+-nr_stun_attr_codec_xor_mapped_address_encode(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen)
++nr_stun_attr_codec_xor_mapped_address_encode(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen)
+ {
+     nr_stun_attr_xor_mapped_address *xor_mapped_address = data;
+     nr_stun_message_header *header = (nr_stun_message_header*)buf;
+@@ -1137,7 +1135,7 @@ nr_stun_attr_codec_xor_mapped_address_en
+ }
+ 
+ static int
+-nr_stun_attr_codec_xor_mapped_address_decode(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data)
++nr_stun_attr_codec_xor_mapped_address_decode(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data)
+ {
+     int r,_status;
+     nr_stun_attr_xor_mapped_address *xor_mapped_address = data;
+@@ -1239,7 +1237,7 @@ int
+ nr_stun_find_attr_info(UINT2 type, nr_stun_attr_info **info)
+ {
+     int _status;
+-    int i;
++    size_t i;
+ 
+     *info = 0;
+     for (i = 0; i < sizeof(attrs)/sizeof(*attrs); ++i) {
+@@ -1278,6 +1276,13 @@ nr_stun_fix_attribute_ordering(nr_stun_m
+     return 0;
+ }
+ 
++// Since this sanity check is only a collection of assert statements and those
++// assert statements are compiled out in non-debug builds, undef SANITY_CHECKS
++// so we can avoid the warning that padding_bytes is never used in opt builds.
++#ifdef NDEBUG
++#undef SANITY_CHECKS
++#endif
++
+ #ifdef SANITY_CHECKS
+ static void sanity_check_encoding_stuff(nr_stun_message *msg)
+ {
+@@ -1307,8 +1312,8 @@ int
+ nr_stun_encode_message(nr_stun_message *msg)
+ {
+     int r,_status;
+-    int length_offset;
+-    int length_offset_hold;
++    size_t length_offset;
++    size_t length_offset_hold;
+     nr_stun_attr_info *attr_info;
+     nr_stun_message_attribute *attr;
+     int padding_bytes;
+@@ -1471,7 +1476,7 @@ nr_stun_decode_message(nr_stun_message *
+             attr->encoding_length += padding_bytes;
+         }
+ 
+-        if ((attr->encoding_length) > size) {
++        if ((attr->encoding_length) > (size_t)size) {
+            r_log(NR_LOG_STUN, LOG_WARNING, "Attribute length larger than remaining message size: %d/%d", attr->encoding_length, size);
+            ABORT(R_FAILED);
+         }
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_codec.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_codec.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_codec.h	2020-06-06 14:59:56.000000000 -0500
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_codec.h	2023-03-23 15:28:49.823690973 -0500
+@@ -42,15 +42,15 @@ typedef struct nr_stun_attr_info_  nr_st
+ typedef struct nr_stun_attr_codec_ {
+     char     *name;
+     int     (*print)(nr_stun_attr_info *attr_info, char *msg, void *data);
+-    int     (*encode)(nr_stun_attr_info *attr_info, void *data, int offset, int buflen, UCHAR *buf, int *attrlen);
+-    int     (*decode)(nr_stun_attr_info *attr_info, int attrlen, UCHAR *buf, int offset, int buflen, void *data);
++    int     (*encode)(nr_stun_attr_info *attr_info, void *data, size_t offset, size_t buflen, UCHAR *buf, size_t *attrlen);
++    int     (*decode)(nr_stun_attr_info *attr_info, size_t attrlen, UCHAR *buf, size_t offset, size_t buflen, void *data);
+ } nr_stun_attr_codec;
+ 
+ struct nr_stun_attr_info_ {
+      UINT2                 type;
+      char                 *name;
+      nr_stun_attr_codec   *codec;
+-     int                 (*illegal)(nr_stun_attr_info *attr_info, int attrlen, void *data);
++     int                 (*illegal)(nr_stun_attr_info *attr_info, size_t attrlen, void *data);
+ };
+ 
+ extern nr_stun_attr_codec nr_stun_attr_codec_UINT4;
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_hint.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_hint.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_hint.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_hint.c	2023-03-23 15:28:49.823690973 -0500
+@@ -55,7 +55,7 @@ static char *RCSSTRING __UNUSED__="$Id:
+  *         2 if it's super likely to be a STUN message
+  *         3 if it really is a STUN message */
+ int
+-nr_is_stun_message(UCHAR *buf, int len)
++nr_is_stun_message(UCHAR *buf, size_t len)
+ {
+    const UINT4 cookie = htonl(NR_STUN_MAGIC_COOKIE);
+    const UINT4 cookie2 = htonl(NR_STUN_MAGIC_COOKIE2);
+@@ -163,7 +163,7 @@ nr_is_stun_message(UCHAR *buf, int len)
+ }
+ 
+ int
+-nr_is_stun_request_message(UCHAR *buf, int len)
++nr_is_stun_request_message(UCHAR *buf, size_t len)
+ {
+    UINT2 type;
+ 
+@@ -180,7 +180,7 @@ nr_is_stun_request_message(UCHAR *buf, i
+ }
+ 
+ int
+-nr_is_stun_indication_message(UCHAR *buf, int len)
++nr_is_stun_indication_message(UCHAR *buf, size_t len)
+ {
+    UINT2 type;
+ 
+@@ -197,7 +197,7 @@ nr_is_stun_indication_message(UCHAR *buf
+ }
+ 
+ int
+-nr_is_stun_response_message(UCHAR *buf, int len)
++nr_is_stun_response_message(UCHAR *buf, size_t len)
+ {
+    UINT2 type;
+ 
+@@ -215,7 +215,7 @@ nr_is_stun_response_message(UCHAR *buf,
+ }
+ 
+ int
+-nr_has_stun_cookie(UCHAR *buf, int len)
++nr_has_stun_cookie(UCHAR *buf, size_t len)
+ {
+    static UINT4 cookie;
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_hint.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_hint.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_hint.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_hint.h	2023-03-23 15:28:49.823690973 -0500
+@@ -34,11 +34,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ #ifndef _stun_hint_h
+ #define _stun_hint_h
+ 
+-int nr_is_stun_message(UCHAR *buf, int len);
+-int nr_is_stun_request_message(UCHAR *buf, int len);
+-int nr_is_stun_response_message(UCHAR *buf, int len);
+-int nr_is_stun_indication_message(UCHAR *buf, int len);
+-int nr_has_stun_cookie(UCHAR *buf, int len);
++int nr_is_stun_message(UCHAR *buf, size_t len);
++int nr_is_stun_request_message(UCHAR *buf, size_t len);
++int nr_is_stun_response_message(UCHAR *buf, size_t len);
++int nr_is_stun_indication_message(UCHAR *buf, size_t len);
++int nr_has_stun_cookie(UCHAR *buf, size_t len);
+ int nr_stun_message_length(UCHAR *buf, int len, int *length);
+ 
+ #endif
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_msg.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_msg.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_msg.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_msg.c	2023-03-23 15:28:49.824690964 -0500
+@@ -69,7 +69,7 @@ nr_stun_message_create(nr_stun_message *
+ }
+ 
+ int
+-nr_stun_message_create2(nr_stun_message **msg, UCHAR *buffer, int length)
++nr_stun_message_create2(nr_stun_message **msg, UCHAR *buffer, size_t length)
+ {
+     int r,_status;
+     nr_stun_message *m = 0;
+@@ -209,7 +209,7 @@ NR_STUN_MESSAGE_ADD_ATTRIBUTE(
+     NR_STUN_ATTR_ERROR_CODE,
+     {
+         attr->u.error_code.number = number;
+-        strlcpy(attr->u.error_code.reason, reason, sizeof(attr->u.error_code.reason));
++        (void)strlcpy(attr->u.error_code.reason, reason, sizeof(attr->u.error_code.reason));
+     }
+ )
+ 
+@@ -237,21 +237,21 @@ int
+ nr_stun_message_add_nonce_attribute(nr_stun_message *msg, char *nonce)
+ NR_STUN_MESSAGE_ADD_ATTRIBUTE(
+     NR_STUN_ATTR_NONCE,
+-    { strlcpy(attr->u.nonce, nonce, sizeof(attr->u.nonce)); }
++    { (void)strlcpy(attr->u.nonce, nonce, sizeof(attr->u.nonce)); }
+ )
+ 
+ int
+ nr_stun_message_add_realm_attribute(nr_stun_message *msg, char *realm)
+ NR_STUN_MESSAGE_ADD_ATTRIBUTE(
+     NR_STUN_ATTR_REALM,
+-    { strlcpy(attr->u.realm, realm, sizeof(attr->u.realm)); }
++    { (void)strlcpy(attr->u.realm, realm, sizeof(attr->u.realm)); }
+ )
+ 
+ int
+ nr_stun_message_add_server_attribute(nr_stun_message *msg, char *server_name)
+ NR_STUN_MESSAGE_ADD_ATTRIBUTE(
+     NR_STUN_ATTR_SERVER,
+-    { strlcpy(attr->u.server_name, server_name, sizeof(attr->u.server_name)); }
++    { (void)strlcpy(attr->u.server_name, server_name, sizeof(attr->u.server_name)); }
+ )
+ 
+ int
+@@ -265,7 +265,7 @@ int
+ nr_stun_message_add_username_attribute(nr_stun_message *msg, char *username)
+ NR_STUN_MESSAGE_ADD_ATTRIBUTE(
+     NR_STUN_ATTR_USERNAME,
+-    { strlcpy(attr->u.username, username, sizeof(attr->u.username)); }
++    { (void)strlcpy(attr->u.username, username, sizeof(attr->u.username)); }
+ )
+ 
+ int
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_msg.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_msg.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_msg.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_msg.h	2023-03-23 15:28:49.824690964 -0500
+@@ -87,7 +87,7 @@ typedef struct nr_stun_attr_xor_mapped_a
+ 
+ typedef struct nr_stun_attr_data_ {
+     UCHAR  data[NR_STUN_MAX_MESSAGE_SIZE];
+-    int    length;
++    size_t length;
+ } nr_stun_attr_data;
+ 
+ 
+@@ -137,7 +137,7 @@ typedef struct nr_stun_message_attribute
+         UCHAR                           largest_possible_attribute[NR_STUN_MAX_MESSAGE_SIZE];
+     } u;
+     nr_stun_encoded_attribute          *encoding;
+-    int                                 encoding_length;
++    size_t                              encoding_length;
+     char                               *name;
+     char                               *type_name;
+     int                                 invalid;
+@@ -156,7 +156,7 @@ typedef struct nr_stun_message_header_ {
+ typedef struct nr_stun_message_ {
+     char                               *name;
+     UCHAR                               buffer[NR_STUN_MAX_MESSAGE_SIZE];
+-    int                                 length;
++    size_t                              length;
+     nr_stun_message_header              header;
+     int                                 comprehension_required_unknown_attributes;
+     int                                 comprehension_optional_unknown_attributes;
+@@ -164,7 +164,7 @@ typedef struct nr_stun_message_ {
+ } nr_stun_message;
+ 
+ int nr_stun_message_create(nr_stun_message **msg);
+-int nr_stun_message_create2(nr_stun_message **msg, UCHAR *buffer, int length);
++int nr_stun_message_create2(nr_stun_message **msg, UCHAR *buffer, size_t length);
+ int nr_stun_message_destroy(nr_stun_message **msg);
+ 
+ int nr_stun_message_attribute_create(nr_stun_message *msg, nr_stun_message_attribute **attr);
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_server_ctx.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_server_ctx.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_server_ctx.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_server_ctx.c	2023-03-23 15:28:49.824690964 -0500
+@@ -386,18 +386,10 @@ int nr_stun_server_process_request(nr_st
+ static int nr_stun_server_send_response(nr_stun_server_ctx *ctx, nr_socket *sock, nr_transport_addr *peer_addr, nr_stun_message *res, nr_stun_server_client *clnt)
+   {
+     int r,_status;
+-    Data *hmacPassword;
+     char string[256];
+ 
+     r_log(NR_LOG_STUN,LOG_DEBUG,"STUN-SERVER(label=%s): Sending(my_addr=%s,peer_addr=%s)",ctx->label,ctx->my_addr.as_string,peer_addr->as_string);
+ 
+-    if (clnt) {
+-        hmacPassword = &clnt->password;
+-    }
+-    else {
+-        hmacPassword = 0;
+-    }
+-
+     if ((r=nr_stun_encode_message(res))) {
+         /* should never happen */
+         r_log(NR_LOG_STUN,LOG_ERR,"STUN-SERVER(label=%s): Unable to encode message", ctx->label);
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_util.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_util.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_util.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_util.c	2023-03-23 15:28:49.824690964 -0500
+@@ -94,7 +94,7 @@ nr_stun_xor_mapped_address(UINT4 magicCo
+ 
+           /* We now have the mask in network byte order */
+           /* Xor the address in network byte order */
+-          for (int i = 0; i < sizeof(maskedAddr); ++i) {
++          for (size_t i = 0; i < sizeof(maskedAddr); ++i) {
+             maskedAddr.addr[i] ^= from->u.addr6.sin6_addr.s6_addr[i];
+           }
+ 
+@@ -206,7 +206,7 @@ nr_stun_find_local_addresses(nr_local_ad
+ }
+ 
+ int
+-nr_stun_different_transaction(UCHAR *msg, int len, nr_stun_message *req)
++nr_stun_different_transaction(UCHAR *msg, size_t len, nr_stun_message *req)
+ {
+     int _status;
+     nr_stun_message_header header;
+@@ -339,3 +339,17 @@ nr_random_alphanum(char *alphanum, int s
+ 
+     return 0;
+ }
++
++#ifndef UINT2_MAX
++#define UINT2_MAX ((UINT2)(65535U))
++#endif
++
++void nr_accumulate_count(UINT2* orig_count, UINT2 add_count)
++  {
++    if (UINT2_MAX - add_count < *orig_count) {
++      // don't rollover, just stop accumulating at MAX value
++      *orig_count = UINT2_MAX;
++    } else {
++      *orig_count += add_count;
++    }
++  }
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_util.h seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_util.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/stun_util.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/stun_util.h	2023-03-23 15:28:49.824690964 -0500
+@@ -49,11 +49,14 @@ int nr_stun_filter_local_addresses(nr_lo
+ 
+ int nr_stun_find_local_addresses(nr_local_addr addrs[], int maxaddrs, int *count);
+ 
+-int nr_stun_different_transaction(UCHAR *msg, int len, nr_stun_message *req);
++int nr_stun_different_transaction(UCHAR *msg, size_t len, nr_stun_message *req);
+ 
+ char* nr_stun_msg_type(int type);
+ 
+ int nr_random_alphanum(char *alphanum, int size);
+ 
++// accumulate a count without worrying about rollover
++void nr_accumulate_count(UINT2* orig_count, UINT2 add_count);
++
+ #endif
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/turn_client_ctx.c seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/turn_client_ctx.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nICEr/src/stun/turn_client_ctx.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nICEr/src/stun/turn_client_ctx.c	2023-03-23 15:28:49.824690964 -0500
+@@ -257,13 +257,13 @@ static void nr_turn_stun_ctx_cb(NR_SOCKE
+       /* TODO(ekr@rtfm.com): Add alternate-server (Mozilla bug 857688) */
+       if (ctx->stun->error_code == 438) {
+         // track 438s for ice telemetry
+-        nr_ice_accumulate_count(&(ctx->tctx->cnt_438s), 1);
++        nr_accumulate_count(&(ctx->tctx->cnt_438s), 1);
+       }
+       if (ctx->stun->error_code == 401 || ctx->stun->error_code == 438) {
+         if (ctx->retry_ct > 0) {
+           if (ctx->stun->error_code == 401) {
+             // track 401s for ice telemetry
+-            nr_ice_accumulate_count(&(ctx->tctx->cnt_401s), 1);
++            nr_accumulate_count(&(ctx->tctx->cnt_401s), 1);
+           }
+           r_log(NR_LOG_TURN, LOG_WARNING, "TURN(%s): Exceeded the number of retries", ctx->tctx->label);
+           ABORT(R_FAILED);
+@@ -615,7 +615,7 @@ static void nr_turn_client_permission_er
+ 
+   if (ctx->last_error_code == 403) {
+     // track 403s for ice telemetry
+-    nr_ice_accumulate_count(&(ctx->tctx->cnt_403s), 1);
++    nr_accumulate_count(&(ctx->tctx->cnt_403s), 1);
+     r_log(NR_LOG_TURN, LOG_WARNING, "TURN(%s): mode %d, permission denied",
+           ctx->tctx->label, ctx->mode);
+ 
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.c seamonkey-2.53.15/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.c
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.c	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.c	2023-03-23 15:28:49.824690964 -0500
+@@ -90,7 +90,7 @@ static char *RCSSTRING __UNUSED__ =(char
+ int r_data_create(dp,d,l)
+   Data **dp;
+   const UCHAR *d;
+-  int l;
++  size_t l;
+   {
+     Data *d_=0;
+     int _status;
+@@ -116,7 +116,7 @@ int r_data_create(dp,d,l)
+ 
+ int r_data_alloc_mem(d,l)
+   Data *d;
+-  int l;
++  size_t l;
+   {
+     int _status;
+ 
+@@ -131,7 +131,7 @@ int r_data_alloc_mem(d,l)
+ 
+ int r_data_alloc(dp,l)
+   Data **dp;
+-  int l;
++  size_t l;
+   {
+     Data *d_=0;
+     int _status;
+@@ -155,7 +155,7 @@ int r_data_alloc(dp,l)
+ int r_data_make(dp,d,l)
+   Data *dp;
+   const UCHAR *d;
+-  int l;
++  size_t l;
+   {
+     if(!(dp->data=(UCHAR *)RMALLOC(l)))
+       ERETURN(R_NO_MEMORY);
+diff -Naurp seamonkey-2.53.15.orig/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.h seamonkey-2.53.15/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.h
+--- seamonkey-2.53.15.orig/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.15/media/mtransport/third_party/nrappkit/src/util/libekr/r_data.h	2023-03-23 15:28:49.824690964 -0500
+@@ -86,13 +86,13 @@
+ 
+ typedef struct Data_ {
+      UCHAR *data;
+-     int len;
++     size_t len;
+ } Data;
+ 
+-int r_data_create(Data **dp,const UCHAR *d,int l);
+-int r_data_alloc(Data **dp, int l);
+-int r_data_make(Data *dp, const UCHAR *d,int l);
+-int r_data_alloc_mem(Data *d,int l);
++int r_data_create(Data **dp,const UCHAR *d,size_t l);
++int r_data_alloc(Data **dp, size_t l);
++int r_data_make(Data *dp, const UCHAR *d,size_t l);
++int r_data_alloc_mem(Data *d,size_t l);
+ int r_data_destroy(Data **dp);
+ int r_data_destroy_v(void *v);
+ int r_data_destroy_vp(void **vp);
