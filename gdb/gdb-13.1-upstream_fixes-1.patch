@@ -1,0 +1,102 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-03-26
+Initial Package Version: 13.1
+Origin:                  Upstream (Sourceware bug #30158)
+Upstream Status:         Applied
+Description:             Fixes a bug in GDB that causes GDB to crash when
+                         running rust's test suite. This fixes five test
+                         failures when running rust's test suite, and may also
+                         fix some runtime issues when using GDB to debug
+                         programs which were written in rust.
+
+diff -Naurp gdb-13.1.orig/gdb/frame.c gdb-13.1/gdb/frame.c
+--- gdb-13.1.orig/gdb/frame.c	2023-02-19 07:45:05.000000000 -0600
++++ gdb-13.1/gdb/frame.c	2023-03-25 23:56:42.062924228 -0500
+@@ -2453,6 +2453,14 @@ inside_main_func (frame_info_ptr this_fr
+       if (bs.symbol == nullptr)
+ 	return false;
+ 
++      /* We might have found some unrelated symbol.  For example, the
++	 Rust compiler can emit both a subprogram and a namespace with
++	 the same name in the same scope; and due to how gdb's symbol
++	 tables currently work, we can't request the one we'd
++	 prefer.  */
++      if (bs.symbol->aclass () != LOC_BLOCK)
++	return false;
++
+       const struct block *block = bs.symbol->value_block ();
+       gdb_assert (block != nullptr);
+       sym_addr = block->start ();
+diff -Naurp gdb-13.1.orig/gdb/testsuite/gdb.rust/main-crash.exp gdb-13.1/gdb/testsuite/gdb.rust/main-crash.exp
+--- gdb-13.1.orig/gdb/testsuite/gdb.rust/main-crash.exp	1969-12-31 18:00:00.000000000 -0600
++++ gdb-13.1/gdb/testsuite/gdb.rust/main-crash.exp	2023-03-25 23:49:22.229988000 -0500
+@@ -0,0 +1,35 @@
++# Copyright (C) 2023 Free Software Foundation, Inc.
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++# Regression test for a crash in inside_main_func.
++
++load_lib rust-support.exp
++if {[skip_rust_tests]} { return }
++
++standard_testfile main.rs
++if {[prepare_for_testing "failed to prepare" $testfile $srcfile \
++	 {debug rust}]} {
++    return -1
++}
++
++set line [gdb_get_line_number "BREAK"]
++# The bug was that this would crash.
++if {![runto ${srcfile}:$line]} {
++    untested "could not run to breakpoint"
++    return -1
++}
++
++# Test that gdb is alive.
++gdb_test "print 23" " = 23"
+diff -Naurp gdb-13.1.orig/gdb/testsuite/gdb.rust/main.rs gdb-13.1/gdb/testsuite/gdb.rust/main.rs
+--- gdb-13.1.orig/gdb/testsuite/gdb.rust/main.rs	1969-12-31 18:00:00.000000000 -0600
++++ gdb-13.1/gdb/testsuite/gdb.rust/main.rs	2023-03-25 23:49:22.229988000 -0500
+@@ -0,0 +1,30 @@
++// Copyright (C) 2016-2023 Free Software Foundation, Inc.
++
++// This program is free software; you can redistribute it and/or modify
++// it under the terms of the GNU General Public License as published by
++// the Free Software Foundation; either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// You should have received a copy of the GNU General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++#![allow(dead_code)]
++#![allow(unused_variables)]
++#![allow(unused_assignments)]
++
++fn global_fn(x: u8) {
++    // BREAK
++}
++
++fn main() {
++    fn nested(y: u8) {
++	global_fn(y)
++    }
++
++    nested(23);
++}
