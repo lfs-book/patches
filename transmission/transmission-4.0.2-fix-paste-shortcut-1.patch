@@ -1,0 +1,12 @@
+diff -ruN transmission-4.0.2/web/src/action-manager.js transmission-4.0.2-fix-paste-shortcut/web/src/action-manager.js
+--- transmission-4.0.2/web/src/action-manager.js	2023-03-15 22:02:10.000000000 +0100
++++ transmission-4.0.2-fix-paste-shortcut/web/src/action-manager.js	2023-03-30 13:32:06.103632614 +0200
+@@ -83,7 +83,7 @@
+       },
+       'verify-selected-torrents': {
+         enabled: false,
+-        shortcut: 'Control+V',
++        shortcut: 'Control+I',
+         text: 'Verify local data',
+       },
+     });
