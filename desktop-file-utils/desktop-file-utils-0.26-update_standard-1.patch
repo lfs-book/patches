@@ -1,0 +1,56 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-06-09
+Initial Package Version: 0.26
+Origin:                  Upstream (MR 11)
+Upstream Status:         Applied
+Description:             Updates the Desktop Entry Specification to handle the
+                         SingleMainWindow type. This fixes an install error in
+                         gnome-terminal.
+
+diff -Naurp desktop-file-utils-0.26.orig/man/desktop-file-validate.1 desktop-file-utils-0.26/man/desktop-file-validate.1
+--- desktop-file-utils-0.26.orig/man/desktop-file-validate.1	2020-06-19 07:51:42.508910000 -0500
++++ desktop-file-utils-0.26/man/desktop-file-validate.1	2023-06-09 12:50:16.642622698 -0500
+@@ -9,7 +9,7 @@ desktop-file-validate \- Validate deskto
+ .B desktop-file-validate [\-\-no-hints] [\-\-no-warn-deprecated] [\-\-warn-kde] FILE...
+ .SH DESCRIPTION
+ The \fIdesktop-file-validate\fP program is a tool to validate desktop
+-entry files according to the Desktop Entry specification 1.4.
++entry files according to the Desktop Entry specification 1.5.
+ .PP
+ The specification describes a file format to provide information such as
+ name, icon and description for an application. Such a file can then be
+diff -Naurp desktop-file-utils-0.26.orig/src/validate.c desktop-file-utils-0.26/src/validate.c
+--- desktop-file-utils-0.26.orig/src/validate.c	2020-06-19 07:51:42.508910000 -0500
++++ desktop-file-utils-0.26/src/validate.c	2023-06-09 12:50:16.643622691 -0500
+@@ -326,6 +326,9 @@ static DesktopKeyDefinition registered_d
+   /* Since 1.4 */
+   { DESKTOP_BOOLEAN_TYPE,           "PrefersNonDefaultGPU", FALSE, FALSE, FALSE, NULL },
+ 
++  /* Since 1.5 */
++  { DESKTOP_BOOLEAN_TYPE,           "SingleMainWindow", FALSE, FALSE, FALSE, NULL },
++
+   /* Keys reserved for KDE */
+ 
+   /* since 0.9.4 */
+@@ -958,6 +961,9 @@ handle_version_key (kf_validator *kf,
+                     const char   *locale_key,
+                     const char   *value)
+ {
++  if (!strcmp (value, "1.5"))
++    return TRUE;
++
+   if (!strcmp (value, "1.4"))
+     return TRUE;
+ 
+diff -Naurp desktop-file-utils-0.26.orig/src/validate.h desktop-file-utils-0.26/src/validate.h
+--- desktop-file-utils-0.26.orig/src/validate.h	2020-06-19 07:51:42.508910000 -0500
++++ desktop-file-utils-0.26/src/validate.h	2023-06-09 12:50:16.643622691 -0500
+@@ -30,7 +30,7 @@
+ 
+ #include <glib.h>
+ 
+-#define CURRENT_SPEC_VERSION "1.4"
++#define CURRENT_SPEC_VERSION "1.5"
+ 
+ #define GROUP_KDE_DESKTOP_ENTRY "KDE Desktop Entry"
+ #define GROUP_DESKTOP_ACTION "Desktop Action "
