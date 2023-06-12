@@ -6,6 +6,7 @@ Origin:                  Revert of https://gitlab.freedesktop.org/mesa/mesa/-/co
 Description:             Fix segfault in gnome-shell on old Intel IGP
                          Should be necessary until gen 9th IGP
                          See also issue https://gitlab.freedesktop.org/mesa/mesa/-/issues/8542
+                         Reported by Remi Carrier on blfs-dev
 diff -ur a/src/glx/dri2_glx.c b/src/glx/dri2_glx.c
 --- a/src/glx/dri2_glx.c	2023-06-08 13:13:06.000000000 +0200
 +++ b/src/glx/dri2_glx.c	2023-06-12 08:29:15.380214921 +0200
