@@ -1,0 +1,70 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2023-06-12
+Initial Package Version: 23.1.2
+Upstream Status:         Not applied
+Origin:                  Revert of https://gitlab.freedesktop.org/mesa/mesa/-/commit/19c57ea3bf6d77cf6f07f2a56e781f55b0e6013b
+Description:             Fix segfault in gnome-shell on old Intel IGP
+                         Should be necessary until gen 9th IGP
+                         See also issue https://gitlab.freedesktop.org/mesa/mesa/-/issues/8542
+diff -ur a/src/glx/dri2_glx.c b/src/glx/dri2_glx.c
+--- a/src/glx/dri2_glx.c	2023-06-08 13:13:06.000000000 +0200
++++ b/src/glx/dri2_glx.c	2023-06-12 08:29:15.380214921 +0200
+@@ -652,7 +652,7 @@
+       struct glx_display *glx_dpy = __glXInitialize(dpy);
+       __GLXDRIdrawable *pdraw;
+       pdraw = dri2GetGlxDrawableFromXDrawableId(dpy, drawable);
+-      if (!pdraw)
++      if (!pdraw || !(pdraw->eventMask & GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK))
+          return 0;
+       return glx_dpy->codes.first_event + GLX_BufferSwapComplete;
+ }
+Only in b/src/glx: dri2_glx.c.orig
+diff -ur a/src/glx/glxclient.h b/src/glx/glxclient.h
+--- a/src/glx/glxclient.h	2023-06-08 13:13:06.000000000 +0200
++++ b/src/glx/glxclient.h	2023-06-12 08:29:15.380214921 +0200
+@@ -127,6 +127,7 @@
+    struct glx_screen *psc;
+    GLenum textureTarget;
+    GLenum textureFormat;        /* EXT_texture_from_pixmap support */
++   unsigned long eventMask;
+    int refcount;
+ };
+ 
+diff -ur a/src/glx/glx_pbuffer.c b/src/glx/glx_pbuffer.c
+--- a/src/glx/glx_pbuffer.c	2023-06-08 13:13:06.000000000 +0200
++++ b/src/glx/glx_pbuffer.c	2023-06-12 08:29:15.380214921 +0200
+@@ -60,6 +60,10 @@
+                         const CARD32 * attribs, size_t num_attribs)
+ {
+    struct glx_display *priv = __glXInitialize(dpy);
++#ifdef GLX_DIRECT_RENDERING
++   __GLXDRIdrawable *pdraw;
++   int i;
++#endif
+    CARD32 *output;
+    CARD8 opcode;
+ 
+@@ -87,6 +91,22 @@
+    UnlockDisplay(dpy);
+    SyncHandle();
+ 
++#ifdef GLX_DIRECT_RENDERING
++   pdraw = GetGLXDRIDrawable(dpy, drawable);
++
++   if (!pdraw)
++      return;
++
++   for (i = 0; i < num_attribs; i++) {
++      switch(attribs[i * 2]) {
++      case GLX_EVENT_MASK:
++	 /* Keep a local copy for masking out DRI2 proto events as needed */
++	 pdraw->eventMask = attribs[i * 2 + 1];
++	 break;
++      }
++   }
++#endif
++
+    return;
+ }
+ 
+Only in b/src/glx: glx_pbuffer.c.orig
