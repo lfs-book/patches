@@ -1,0 +1,22 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2023-06-13
+Initial Package Version: 2.86
+Upstream Status: Submitted
+Origin: Self, to fix https://github.com/vectorgraphics/asymptote/issues/379
+Description: Fixes build failure using --without-lsp.
+
+diff -Naur a/common.h b/common.h
+--- a/common.h	2023-06-07 02:59:39.000000000 +0100
++++ b/common.h	2023-06-13 19:57:51.333429562 +0100
+@@ -38,6 +38,11 @@
+ using nonstd::optional;
+ using nonstd::nullopt;
+ using nonstd::make_optional;
++#else
++#include <optional>
++using std::optional;
++using std::nullopt;
++using std::make_optional;
+ #endif
+ #endif
+ 
