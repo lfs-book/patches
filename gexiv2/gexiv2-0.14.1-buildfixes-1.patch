@@ -1,0 +1,81 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-06-27
+Initial Package Version: 0.14.1
+Origin:                  Upstream + Self
+Upstream Status:         Waiting (MR #75)
+Description:             Fixes building gexiv2 on i686 systems when using
+                         exiv2-0.28 by adjusting some types. It also adapts
+                         test output to those that should be expected on an
+                         i686 system. My modification was to include the
+                         test suite fix in Comment #3 in the Merge Request.
+
+diff -Naurp gexiv2-0.14.1.orig/gexiv2/gexiv2-metadata.cpp gexiv2-0.14.1/gexiv2/gexiv2-metadata.cpp
+--- gexiv2-0.14.1.orig/gexiv2/gexiv2-metadata.cpp	2023-05-06 03:50:03.000000000 -0500
++++ gexiv2-0.14.1/gexiv2/gexiv2-metadata.cpp	2023-06-27 15:14:26.770497779 -0500
+@@ -57,7 +57,7 @@ public:
+ #if defined(_MSC_VER)
+     typedef int64_t seek_offset_t;
+ #else
+-    typedef long seek_offset_t;
++    typedef int64_t seek_offset_t;
+ #endif
+ 
+ #if EXIV2_TEST_VERSION(0,27,99)
+diff -Naurp gexiv2-0.14.1.orig/gexiv2/gexiv2-stream-io.cpp gexiv2-0.14.1/gexiv2/gexiv2-stream-io.cpp
+--- gexiv2-0.14.1.orig/gexiv2/gexiv2-stream-io.cpp	2023-05-06 03:50:03.000000000 -0500
++++ gexiv2-0.14.1/gexiv2/gexiv2-stream-io.cpp	2023-06-27 15:14:43.180366135 -0500
+@@ -119,7 +119,7 @@ int StreamIo::putb (Exiv2::byte data) {
+     return EOF;
+ }
+ 
+-int StreamIo::seek (long offset, Position position) {
++int StreamIo::seek (int64_t offset, Position position) {
+     // FIXME: handle Error
+     switch (position) {
+         case (beg):
+diff -Naurp gexiv2-0.14.1.orig/gexiv2/gexiv2-stream-io.h gexiv2-0.14.1/gexiv2/gexiv2-stream-io.h
+--- gexiv2-0.14.1.orig/gexiv2/gexiv2-stream-io.h	2023-05-06 03:50:03.000000000 -0500
++++ gexiv2-0.14.1/gexiv2/gexiv2-stream-io.h	2023-06-27 15:15:01.605218154 -0500
+@@ -42,7 +42,7 @@ public:
+     size_type read (Exiv2::byte* buf, size_type rcount) override;
+ 	int getb () override;
+ 	void transfer (Exiv2::BasicIo& src) override;
+-	int seek (long offset, Position pos) override;
++	int seek (int64_t offset, Position pos) override;
+ 	Exiv2::byte* mmap (bool isWriteable = false) override;
+ 	int munmap () override;
+ 	long tell () const override;
+diff -Naurp gexiv2-0.14.1.orig/test/gexiv2-regression.c gexiv2-0.14.1/test/gexiv2-regression.c
+--- gexiv2-0.14.1.orig/test/gexiv2-regression.c	2023-05-06 03:50:03.000000000 -0500
++++ gexiv2-0.14.1/test/gexiv2-regression.c	2023-06-27 15:14:07.561651683 -0500
+@@ -158,12 +158,12 @@ static void test_bgo_775249(void)
+     g_assert_true(result);
+     g_assert_true(gexiv2_metadata_get_gps_info(meta, &lon, &lat, &alt));
+ 
+-    g_assert_cmpfloat(lon, ==, -1.508425);
++    g_assert_cmpfloat_with_epsilon(lon, -1.508425, 0.0001);
+ 
+     /* Just check if it fits in there; The main issue is that it's not 0 */
+     g_assert_cmpfloat(lat, >=, 48.631806);
+     g_assert_cmpfloat(lat, <=, 48.631807);
+-    g_assert_cmpfloat(alt, ==, -0.926000);
++    g_assert_cmpfloat_with_epsilon(alt, -0.926000, 0.0001);
+ 
+     g_clear_object(&meta);
+ }
+diff -Naurp gexiv2-0.14.1.orig/test/python/gexiv2.py gexiv2-0.14.1/test/python/gexiv2.py
+--- gexiv2-0.14.1.orig/test/python/gexiv2.py	2023-05-06 03:50:03.000000000 -0500
++++ gexiv2-0.14.1/test/python/gexiv2.py	2023-06-27 15:15:15.948102835 -0500
+@@ -48,9 +48,9 @@ class TestGexiv2(unittest.TestCase):
+         md.open_path(self.get_sample_path(sample))
+ 
+         (lo, la, alt) = md.get_gps_info()
+-        self.assertEqual(lo, -1.508425)
+-        self.assertEqual(la, 48.631806166666664)
+-        self.assertEqual(alt, -0.926000)
++        self.assertAlmostEqual(lo, -1.508425)
++        self.assertAlmostEqual(la, 48.631806166666664)
++        self.assertAlmostEqual(alt, -0.926000)
+ 
+     def test_xmp_packet_formatting(self):
+         sample = 'CaorVN.jpeg'
