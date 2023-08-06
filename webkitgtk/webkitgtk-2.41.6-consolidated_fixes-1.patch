@@ -1,0 +1,1148 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-08-06
+Initial Package Version: 2.41.6
+Upstream Status:         Applied
+Origin:                  Upstream (see description)
+Description:             This patch contains the original security fixes patch
+                         and combines it with fixes for CVE-2023-38133,
+                         CVE-2023-38572, CVE-2023-38592, CVE-2023-38594,
+                         CVE-2023-38595, CVE-2023-38597, CVE-2023-38599,
+                         CVE-2023-38600, and CVE-2023-38611. It additionally
+                         fixes a minor regression with one of the security 
+                         updates, and resolves a problem with running WebKit
+                         applications in a VM. The commits can be found at
+                         https://github.com/xry111/WebKit/commits/webkitgtk-2.41.6-security
+                         as well as
+                         https://github.com/WebKit/WebKit/commit/ec83f7580fdcc4a4ad7c1597053adc78dd0a922b
+                         and https://github.com/WebKit/WebKit/pull/15929.
+                         Major thanks goes to Xi Ruoyao for helping me with this!
+
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/b3/B3ReduceStrength.cpp webkitgtk-2.41.6/Source/JavaScriptCore/b3/B3ReduceStrength.cpp
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/b3/B3ReduceStrength.cpp	2023-06-15 03:13:16.444707900 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/b3/B3ReduceStrength.cpp	2023-08-06 10:46:35.542328637 -0500
+@@ -108,6 +108,7 @@ public:
+         : m_min(min)
+         , m_max(max)
+     {
++        ASSERT(m_min <= m_max);
+     }
+ 
+     template<typename T>
+@@ -456,9 +457,15 @@ public:
+     {
+         ASSERT(m_min >= INT32_MIN);
+         ASSERT(m_max <= INT32_MAX);
+-        int32_t min = m_min;
+-        int32_t max = m_max;
+-        return IntRange(static_cast<uint64_t>(static_cast<uint32_t>(min)), static_cast<uint64_t>(static_cast<uint32_t>(max)));
++        uint64_t min = static_cast<uint64_t>(static_cast<uint32_t>(m_min));
++        uint64_t max = static_cast<uint64_t>(static_cast<uint32_t>(m_max));
++        if (m_max < 0 || m_min >= 0) {
++            // m_min = -2, m_max = -1 then should return [0xFFFF_FFFE, 0xFFFF_FFFF]
++            // m_min =  1, m_max =  2 then should return [1, 2]
++            return IntRange(min, max);
++        }
++        // m_min = a negative integer, m_max >= 0 then should return [0, 0xFFFF_FFFF]
++        return IntRange(0, std::numeric_limits<uint32_t>::max());
+     }
+ 
+ private:
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/dfg/DFGPreciseLocalClobberize.h webkitgtk-2.41.6/Source/JavaScriptCore/dfg/DFGPreciseLocalClobberize.h
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/dfg/DFGPreciseLocalClobberize.h	2023-03-22 06:41:35.752006500 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/dfg/DFGPreciseLocalClobberize.h	2023-08-06 14:14:37.906343106 -0500
+@@ -190,13 +190,19 @@ private:
+         case CreateRest: {
+             bool isForwardingNode = false;
+             bool isPhantomNode = false;
++            bool mayReadArguments = false;
+             switch (m_node->op()) {
+             case ForwardVarargs:
++            // This is used iff allInlineFramesAreTailCalls, so we will
++            // actually do a real tail call and destroy our frame.
++            case TailCallForwardVarargs:
++                isForwardingNode = true;
++                break;
+             case CallForwardVarargs:
+             case ConstructForwardVarargs:
+-            case TailCallForwardVarargs:
+             case TailCallForwardVarargsInlinedCaller:
+                 isForwardingNode = true;
++                mayReadArguments = true;
+                 break;
+             case PhantomDirectArguments:
+             case PhantomClonedArguments:
+@@ -208,7 +214,10 @@ private:
+ 
+             if (isPhantomNode && m_graph.m_plan.isFTL())
+                 break;
+-            
++
++            if (mayReadArguments)
++                readWorld(m_node);
++
+             if (isForwardingNode && m_node->hasArgumentsChild() && m_node->argumentsChild()
+                 && (m_node->argumentsChild()->op() == PhantomNewArrayWithSpread || m_node->argumentsChild()->op() == PhantomSpread)) {
+                 if (m_node->argumentsChild()->op() == PhantomNewArrayWithSpread)
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/dfg/DFGSpeculativeJIT.cpp webkitgtk-2.41.6/Source/JavaScriptCore/dfg/DFGSpeculativeJIT.cpp
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/dfg/DFGSpeculativeJIT.cpp	2023-07-03 02:41:42.494953900 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/dfg/DFGSpeculativeJIT.cpp	2023-08-06 10:46:33.547350829 -0500
+@@ -8853,7 +8853,7 @@ void SpeculativeJIT::compileGetTypedArra
+ #if USE(LARGE_TYPED_ARRAYS)
+         load64(Address(baseGPR, JSArrayBufferView::offsetOfByteOffset()), resultGPR);
+         // AI promises that the result of GetTypedArrayByteOffset will be Int32, so we must uphold that promise here.
+-        speculationCheck(ExitKind::Overflow, JSValueRegs(), nullptr, branch32(Above, resultGPR, TrustedImm32(std::numeric_limits<int32_t>::max())));
++        speculationCheck(ExitKind::Overflow, JSValueRegs(), nullptr, branch64(Above, resultGPR, TrustedImm32(std::numeric_limits<int32_t>::max())));
+ #else
+         load32(Address(baseGPR, JSArrayBufferView::offsetOfByteOffset()), resultGPR);
+ #endif
+@@ -8879,7 +8879,7 @@ void SpeculativeJIT::compileGetTypedArra
+ #if USE(LARGE_TYPED_ARRAYS)
+     load64(Address(baseGPR, JSArrayBufferView::offsetOfByteOffset()), resultGPR);
+     // AI promises that the result of GetTypedArrayByteOffset will be Int32, so we must uphold that promise here.
+-    speculationCheck(ExitKind::Overflow, JSValueRegs(), nullptr, branch32(Above, resultGPR, TrustedImm32(std::numeric_limits<int32_t>::max())));
++    speculationCheck(ExitKind::Overflow, JSValueRegs(), nullptr, branch64(Above, resultGPR, TrustedImm32(std::numeric_limits<int32_t>::max())));
+ #else
+     load32(Address(baseGPR, JSArrayBufferView::offsetOfByteOffset()), resultGPR);
+ #endif
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/inspector/agents/InspectorConsoleAgent.cpp webkitgtk-2.41.6/Source/JavaScriptCore/inspector/agents/InspectorConsoleAgent.cpp
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/inspector/agents/InspectorConsoleAgent.cpp	2023-04-10 03:02:52.337364700 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/inspector/agents/InspectorConsoleAgent.cpp	2023-08-06 10:46:26.972424127 -0500
+@@ -252,15 +252,14 @@ void InspectorConsoleAgent::addConsoleMe
+         if (m_enabled)
+             previousMessage->updateRepeatCountInConsole(*m_frontendDispatcher);
+     } else {
+-        ConsoleMessage* newMessage = consoleMessage.get();
+-        m_consoleMessages.append(WTFMove(consoleMessage));
+         if (m_enabled) {
+             auto generatePreview = !m_isAddingMessageToFrontend;
+             SetForScope isAddingMessageToFrontend(m_isAddingMessageToFrontend, true);
+ 
+-            newMessage->addToFrontend(*m_frontendDispatcher, m_injectedScriptManager, generatePreview);
++            consoleMessage->addToFrontend(*m_frontendDispatcher, m_injectedScriptManager, generatePreview);
+         }
+ 
++        m_consoleMessages.append(WTFMove(consoleMessage));
+         if (m_consoleMessages.size() >= maximumConsoleMessages) {
+             m_expiredConsoleMessageCount += expireConsoleMessagesStep;
+             m_consoleMessages.remove(0, expireConsoleMessagesStep);
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/inspector/ScriptCallStack.cpp webkitgtk-2.41.6/Source/JavaScriptCore/inspector/ScriptCallStack.cpp
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/inspector/ScriptCallStack.cpp	2023-05-26 02:59:18.115152600 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/inspector/ScriptCallStack.cpp	2023-08-06 10:46:26.972424127 -0500
+@@ -53,7 +53,7 @@ ScriptCallStack::ScriptCallStack(Vector<
+     , m_truncated(truncated)
+     , m_parentStackTrace(parentStackTrace)
+ {
+-    ASSERT(m_frames.size() < maxCallStackSizeToCapture);
++    ASSERT(m_frames.size() <= maxCallStackSizeToCapture);
+ }
+ 
+ ScriptCallStack::~ScriptCallStack()
+diff -Naurp webkitgtk-2.41.6.orig/Source/JavaScriptCore/runtime/JSGenericTypedArrayViewPrototypeFunctions.h webkitgtk-2.41.6/Source/JavaScriptCore/runtime/JSGenericTypedArrayViewPrototypeFunctions.h
+--- webkitgtk-2.41.6.orig/Source/JavaScriptCore/runtime/JSGenericTypedArrayViewPrototypeFunctions.h	2023-04-20 03:59:25.911944900 -0500
++++ webkitgtk-2.41.6/Source/JavaScriptCore/runtime/JSGenericTypedArrayViewPrototypeFunctions.h	2023-08-06 10:46:43.358241904 -0500
+@@ -276,8 +276,12 @@ ALWAYS_INLINE EncodedJSValue genericType
+         // https://tc39.es/proposal-resizablearraybuffer/#sec-%typedarray%.prototype.copywithin
+         if (updatedLength.value() != length) {
+             length = updatedLength.value();
+-            if (std::max(to, from) + count > length)
++            if (std::max(to, from) + count > length) {
++                // Either to or from index is larger than the updated length. In this case, we do not need to copy anything and finish copyWithin.
++                if (std::max(to, from) > length)
++                    return JSValue::encode(callFrame->thisValue());
+                 count = length - std::max(to, from);
++            }
+         }
+ 
+         typename ViewClass::ElementType* array = thisObject->typedVector();
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/dom/Document.cpp webkitgtk-2.41.6/Source/WebCore/dom/Document.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/dom/Document.cpp	2023-07-03 02:41:42.558954500 -0500
++++ webkitgtk-2.41.6/Source/WebCore/dom/Document.cpp	2023-08-06 10:46:29.215399094 -0500
+@@ -3921,10 +3921,13 @@ bool Document::isNavigationBlockedByThir
+ 
+     // Only prevent cross-site navigations.
+     RefPtr targetDocument = targetFrame.document();
+-    if (targetDocument && (targetDocument->securityOrigin().isSameOriginDomain(SecurityOrigin::create(destinationURL)) || areRegistrableDomainsEqual(targetDocument->url(), destinationURL)))
+-        return false;
++    if (!targetDocument)
++        return true;
+ 
+-    return true;
++    if (targetDocument->securityOrigin().protocol() != destinationURL.protocol())
++        return true;
++
++    return !(targetDocument->securityOrigin().isSameOriginDomain(SecurityOrigin::create(destinationURL)) || areRegistrableDomainsEqual(targetDocument->url(), destinationURL));
+ }
+ 
+ void Document::didRemoveAllPendingStylesheet()
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/dom/Document.h webkitgtk-2.41.6/Source/WebCore/dom/Document.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/dom/Document.h	2023-06-28 03:28:27.149824400 -0500
++++ webkitgtk-2.41.6/Source/WebCore/dom/Document.h	2023-08-06 10:46:29.215399094 -0500
+@@ -1777,6 +1777,8 @@ public:
+ 
+     virtual void didChangeViewSize() { }
+ 
++    bool isNavigationBlockedByThirdPartyIFrameRedirectBlocking(LocalFrame& targetFrame, const URL& destinationURL);
++
+ protected:
+     enum class ConstructionFlag : uint8_t {
+         Synthesized = 1 << 0,
+@@ -1880,7 +1882,6 @@ private:
+     void didLoadResourceSynchronously(const URL&) final;
+ 
+     bool canNavigateInternal(LocalFrame& targetFrame);
+-    bool isNavigationBlockedByThirdPartyIFrameRedirectBlocking(LocalFrame& targetFrame, const URL& destinationURL);
+ 
+ #if USE(QUICK_LOOK)
+     bool shouldEnforceQuickLookSandbox() const;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/editing/markup.cpp webkitgtk-2.41.6/Source/WebCore/editing/markup.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/editing/markup.cpp	2023-06-20 07:22:55.791674900 -0500
++++ webkitgtk-2.41.6/Source/WebCore/editing/markup.cpp	2023-08-06 10:46:37.787303691 -0500
+@@ -193,6 +193,7 @@ std::unique_ptr<Page> createPageForSanit
+     page->settings().setHTMLParserScriptingFlagPolicy(HTMLParserScriptingFlagPolicy::Enabled);
+     page->settings().setPluginsEnabled(false);
+     page->settings().setAcceleratedCompositingEnabled(false);
++    page->settings().setLinkPreloadEnabled(false);
+ 
+     auto* localMainFrame = dynamicDowncast<LocalFrame>(page->mainFrame());
+     if (!localMainFrame)
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/html/HTMLFormElement.cpp webkitgtk-2.41.6/Source/WebCore/html/HTMLFormElement.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/html/HTMLFormElement.cpp	2023-07-03 02:41:42.562954400 -0500
++++ webkitgtk-2.41.6/Source/WebCore/html/HTMLFormElement.cpp	2023-08-06 10:46:31.335375462 -0500
+@@ -480,7 +480,7 @@ void HTMLFormElement::attributeChanged(c
+         if (!m_attributes.action().isEmpty()) {
+             if (RefPtr f = document().frame()) {
+                 if (auto* topFrame = dynamicDowncast<LocalFrame>(f->tree().top()))
+-                    MixedContentChecker::checkFormForMixedContent(*topFrame, topFrame->document()->securityOrigin(), document().completeURL(m_attributes.action()));
++                    MixedContentChecker::checkFormForMixedContent(*topFrame, document().completeURL(m_attributes.action()));
+             }
+         }
+         break;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/cache/CachedResourceLoader.cpp webkitgtk-2.41.6/Source/WebCore/loader/cache/CachedResourceLoader.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/cache/CachedResourceLoader.cpp	2023-06-20 07:22:55.795674800 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/cache/CachedResourceLoader.cpp	2023-08-06 10:46:31.336375451 -0500
+@@ -449,11 +449,7 @@ bool CachedResourceLoader::checkInsecure
+         // These resource can inject script into the current document (Script,
+         // XSL) or exfiltrate the content of the current document (CSS).
+         if (auto* frame = this->frame()) {
+-            if (m_document && !MixedContentChecker::canRunInsecureContent(*frame, m_document->securityOrigin(), url))
+-                return false;
+-            auto& top = frame->tree().top();
+-            auto* localTop = dynamicDowncast<LocalFrame>(top);
+-            if (&top != frame && localTop && localTop->document() && !MixedContentChecker::canRunInsecureContent(*localTop, localTop->document()->securityOrigin(), url))
++            if (!MixedContentChecker::frameAndAncestorsCanRunInsecureContent(*frame, m_document->securityOrigin(), url))
+                 return false;
+         }
+         break;
+@@ -471,11 +467,7 @@ bool CachedResourceLoader::checkInsecure
+     case CachedResource::Type::FontResource: {
+         // These resources can corrupt only the frame's pixels.
+         if (auto* frame = this->frame()) {
+-            if (m_document && !MixedContentChecker::canDisplayInsecureContent(*frame, m_document->securityOrigin(), contentTypeFromResourceType(type), url, MixedContentChecker::AlwaysDisplayInNonStrictMode::Yes))
+-                return false;
+-            auto& topFrame = frame->tree().top();
+-            auto* localTopFrame = dynamicDowncast<LocalFrame>(topFrame);
+-            if (!localTopFrame || !localTopFrame->document() || !MixedContentChecker::canDisplayInsecureContent(*localTopFrame, localTopFrame->document()->securityOrigin(), contentTypeFromResourceType(type), url))
++            if (!MixedContentChecker::frameAndAncestorsCanDisplayInsecureContent(*frame, contentTypeFromResourceType(type), url))
+                 return false;
+         }
+         break;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/DocumentLoader.cpp webkitgtk-2.41.6/Source/WebCore/loader/DocumentLoader.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/DocumentLoader.cpp	2023-07-04 02:17:31.517223400 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/DocumentLoader.cpp	2023-08-06 10:46:49.070178726 -0500
+@@ -664,6 +664,24 @@ void DocumentLoader::willSendRequest(Res
+         return completionHandler(WTFMove(newRequest));
+     }
+ 
++    if (auto requester = m_triggeringAction.requester(); requester && requester->documentIdentifier) {
++        if (RefPtr requestingDocument = Document::allDocumentsMap().get(requester->documentIdentifier); requestingDocument && requestingDocument->frame()) {
++            if (m_frame && requestingDocument->isNavigationBlockedByThirdPartyIFrameRedirectBlocking(*m_frame, newRequest.url())) {
++                DOCUMENTLOADER_RELEASE_LOG("willSendRequest: canceling - cross-site redirect of top frame triggered by third-party iframe");
++                if (m_frame->document()) {
++                    auto message = makeString("Unsafe JavaScript attempt to initiate navigation for frame with URL '"
++                        , m_frame->document()->url().string()
++                        , "' from frame with URL '"
++                        , requestingDocument->url().string()
++                        , "'. The frame attempting navigation of the top-level window is cross-origin or untrusted and the user has never interacted with the frame.");
++                    m_frame->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, message);
++                }
++                cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
++                return completionHandler(WTFMove(newRequest));
++            }
++        }
++    }
++
+     ASSERT(timing().startTime());
+     if (didReceiveRedirectResponse) {
+         if (newRequest.url().protocolIsAbout() || newRequest.url().protocolIsData()) {
+@@ -721,14 +739,11 @@ void DocumentLoader::willSendRequest(Res
+     if (isRedirectToGetAfterPost(m_request, newRequest))
+         newRequest.clearHTTPOrigin();
+ 
+-    // FIXME: Get mixed content checking working when the top frame is a RemoteFrame.
+-    if (topFrame && topFrame != m_frame) {
+-        ASSERT(topFrame->document());
+-        if (!MixedContentChecker::canDisplayInsecureContent(*m_frame, m_frame->document()->securityOrigin(), MixedContentChecker::ContentType::Active, newRequest.url(), MixedContentChecker::AlwaysDisplayInNonStrictMode::Yes)) {
+-            cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
+-            return completionHandler(WTFMove(newRequest));
+-        }
+-        if (!topFrame || !MixedContentChecker::canDisplayInsecureContent(*m_frame, topFrame->document()->securityOrigin(), MixedContentChecker::ContentType::Active, newRequest.url())) {
++    if (topFrame != m_frame) {
++        // We shouldn't check for mixed content against the current frame when navigating; we only need to be concerned with the ancestor frames.
++        auto* parentFrame = dynamicDowncast<LocalFrame>(m_frame->tree().parent());
++        ASSERT(parentFrame && topFrame);
++        if (!MixedContentChecker::frameAndAncestorsCanDisplayInsecureContent(*parentFrame, MixedContentChecker::ContentType::Active, newRequest.url())) {
+             cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
+             return completionHandler(WTFMove(newRequest));
+         }
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/DocumentThreadableLoader.cpp webkitgtk-2.41.6/Source/WebCore/loader/DocumentThreadableLoader.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/DocumentThreadableLoader.cpp	2023-05-26 02:59:18.183153000 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/DocumentThreadableLoader.cpp	2023-08-06 10:46:31.336375451 -0500
+@@ -619,7 +619,7 @@ void DocumentThreadableLoader::loadReque
+     ResourceResponse response;
+     auto identifier = AtomicObjectIdentifier<ResourceLoader> { std::numeric_limits<uint64_t>::max() };
+     if (auto* frame = m_document.frame()) {
+-        if (!MixedContentChecker::canRunInsecureContent(*frame, m_document.securityOrigin(), requestURL))
++        if (!MixedContentChecker::frameAndAncestorsCanRunInsecureContent(*frame, m_document.securityOrigin(), requestURL))
+             return;
+         auto& frameLoader = frame->loader();
+         identifier = frameLoader.loadResourceSynchronously(request, m_options.clientCredentialPolicy, m_options, *m_originalHeaders, error, response, data);
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/MixedContentChecker.cpp webkitgtk-2.41.6/Source/WebCore/loader/MixedContentChecker.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/MixedContentChecker.cpp	2023-05-18 03:02:06.948160600 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/MixedContentChecker.cpp	2023-08-06 10:46:31.336375451 -0500
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2012 Google Inc. All rights reserved.
+- * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
++ * Copyright (C) 2013-2023 Apple Inc. All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+@@ -37,22 +37,43 @@
+ #include "LocalFrame.h"
+ #include "LocalFrameLoaderClient.h"
+ #include "SecurityOrigin.h"
+-#include "Settings.h"
+-#include <wtf/text/CString.h>
+-#include <wtf/text/WTFString.h>
+ 
+ namespace WebCore {
+ 
+-// static
+-bool MixedContentChecker::isMixedContent(SecurityOrigin& securityOrigin, const URL& url)
++static bool isMixedContent(const Document& document, const URL& url)
+ {
+-    if (securityOrigin.protocol() != "https"_s)
+-        return false; // We only care about HTTPS security origins.
++    // sandboxed iframes have an opaque origin so we should perform the mixed content check considering the origin
++    // the iframe would have had if it were not sandboxed.
++    if (document.securityOrigin().protocol() == "https"_s || (document.securityOrigin().isOpaque() && document.url().protocolIs("https"_s)))
++        return !SecurityOrigin::isSecure(url);
+ 
+-    // We're in a secure context, so |url| is mixed content if it's insecure.
+-    return !SecurityOrigin::isSecure(url);
++    return false;
+ }
+ 
++static bool foundMixedContentInFrameTree(const LocalFrame& frame, const URL& url)
++{
++    auto* document = frame.document();
++
++    while (document) {
++        RELEASE_ASSERT_WITH_MESSAGE(document->frame(), "An unparented document tried to load or run content with url: %s", url.string().utf8().data());
++
++        if (isMixedContent(*document, url))
++            return true;
++
++        auto* frame = document->frame();
++        if (frame->isMainFrame())
++            break;
++
++        auto* abstractParentFrame = frame->tree().parent();
++        RELEASE_ASSERT_WITH_MESSAGE(abstractParentFrame, "Should never have a parentless non main frame");
++        if (auto* parentFrame = dynamicDowncast<LocalFrame>(abstractParentFrame))
++            document = parentFrame->document();
++    }
++
++    return false;
++}
++
++
+ static void logWarning(const LocalFrame& frame, bool allowed, ASCIILiteral action, const URL& target)
+ {
+     const char* errorString = allowed ? " was allowed to " : " was not allowed to ";
+@@ -60,19 +81,15 @@ static void logWarning(const LocalFrame&
+     frame.document()->addConsoleMessage(MessageSource::Security, MessageLevel::Warning, message);
+ }
+ 
+-bool MixedContentChecker::canDisplayInsecureContent(LocalFrame& frame, SecurityOrigin& securityOrigin, ContentType type, const URL& url, AlwaysDisplayInNonStrictMode alwaysDisplayInNonStrictMode)
++bool MixedContentChecker::frameAndAncestorsCanDisplayInsecureContent(LocalFrame& frame, ContentType type, const URL& url)
+ {
+-    if (!isMixedContent(securityOrigin, url))
++    if (!foundMixedContentInFrameTree(frame, url))
+         return true;
+ 
+     if (!frame.document()->contentSecurityPolicy()->allowRunningOrDisplayingInsecureContent(url))
+         return false;
+ 
+-    bool isStrictMode = frame.document()->isStrictMixedContentMode();
+-    if (!isStrictMode && alwaysDisplayInNonStrictMode == AlwaysDisplayInNonStrictMode::Yes)
+-        return true;
+-
+-    bool allowed = !isStrictMode && (frame.settings().allowDisplayOfInsecureContent() || type == ContentType::ActiveCanWarn) && !frame.document()->geolocationAccessed();
++    bool allowed = !frame.document()->isStrictMixedContentMode() && (frame.settings().allowDisplayOfInsecureContent() || type == ContentType::ActiveCanWarn) && !frame.document()->geolocationAccessed();
+     logWarning(frame, allowed, "display"_s, url);
+ 
+     if (allowed) {
+@@ -83,16 +100,17 @@ bool MixedContentChecker::canDisplayInse
+     return allowed;
+ }
+ 
+-bool MixedContentChecker::canRunInsecureContent(LocalFrame& frame, SecurityOrigin& securityOrigin, const URL& url)
++bool MixedContentChecker::frameAndAncestorsCanRunInsecureContent(LocalFrame& frame, SecurityOrigin& securityOrigin, const URL& url, ShouldLogWarning shouldLogWarning)
+ {
+-    if (!isMixedContent(securityOrigin, url))
++    if (!foundMixedContentInFrameTree(frame, url))
+         return true;
+ 
+     if (!frame.document()->contentSecurityPolicy()->allowRunningOrDisplayingInsecureContent(url))
+         return false;
+ 
+     bool allowed = !frame.document()->isStrictMixedContentMode() && frame.settings().allowRunningOfInsecureContent() && !frame.document()->geolocationAccessed() && !frame.document()->secureCookiesAccessed();
+-    logWarning(frame, allowed, "run"_s, url);
++    if (LIKELY(shouldLogWarning == ShouldLogWarning::Yes))
++        logWarning(frame, allowed, "run"_s, url);
+ 
+     if (allowed) {
+         frame.document()->setFoundMixedContent(SecurityContext::MixedContentType::Active);
+@@ -102,14 +120,14 @@ bool MixedContentChecker::canRunInsecure
+     return allowed;
+ }
+ 
+-void MixedContentChecker::checkFormForMixedContent(LocalFrame& frame, SecurityOrigin& securityOrigin, const URL& url)
++void MixedContentChecker::checkFormForMixedContent(LocalFrame& frame, const URL& url)
+ {
+     // Unconditionally allow javascript: URLs as form actions as some pages do this and it does not introduce
+     // a mixed content issue.
+     if (url.protocolIsJavaScript())
+         return;
+ 
+-    if (!isMixedContent(securityOrigin, url))
++    if (!isMixedContent(*frame.document(), url))
+         return;
+ 
+     auto message = makeString("The page at ", frame.document()->url().stringCenterEllipsizedToLength(), " contains a form which targets an insecure URL ", url.stringCenterEllipsizedToLength(), ".\n");
+@@ -118,27 +136,4 @@ void MixedContentChecker::checkFormForMi
+     frame.loader().client().didDisplayInsecureContent();
+ }
+ 
+-std::optional<String> MixedContentChecker::checkForMixedContentInFrameTree(const LocalFrame& frame, const URL& url)
+-{
+-    auto* document = frame.document();
+-
+-    while (document) {
+-        RELEASE_ASSERT_WITH_MESSAGE(document->frame(), "An unparented document tried to connect to a websocket with url: %s", url.string().utf8().data());
+-        
+-        auto* frame = document->frame();
+-        if (isMixedContent(document->securityOrigin(), url))
+-            return makeString("The page at ", document->url().stringCenterEllipsizedToLength(), " was blocked from connecting insecurely to ", url.stringCenterEllipsizedToLength(), " either because the protocol is insecure or the page is embedded from an insecure page.");
+-
+-        if (frame->isMainFrame())
+-            break;
+-
+-        auto* parentFrame = frame->tree().parent();
+-        RELEASE_ASSERT_WITH_MESSAGE(parentFrame, "Should never have a parentless non main frame");
+-        if (auto* localParentFrame = dynamicDowncast<LocalFrame>(parentFrame))
+-            document = localParentFrame->document();
+-    }
+-    
+-    return std::nullopt;
+-}
+-
+ } // namespace WebCore
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/MixedContentChecker.h webkitgtk-2.41.6/Source/WebCore/loader/MixedContentChecker.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/MixedContentChecker.h	2023-05-18 03:02:06.948160600 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/MixedContentChecker.h	2023-08-06 10:46:31.336375451 -0500
+@@ -1,38 +1,35 @@
+ /*
+  * Copyright (C) 2012 Google Inc. All rights reserved.
++ * Copyright (C) 2023 Apple Inc. All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions are
+- * met:
++ * modification, are permitted provided that the following conditions
++ * are met:
+  *
+- *     * Redistributions of source code must retain the above copyright
+- * notice, this list of conditions and the following disclaimer.
+- *     * Redistributions in binary form must reproduce the above
+- * copyright notice, this list of conditions and the following disclaimer
+- * in the documentation and/or other materials provided with the
+- * distribution.
+- *     * Neither the name of Google Inc. nor the names of its
+- * contributors may be used to endorse or promote products derived from
+- * this software without specific prior written permission.
++ * 1.  Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ * 2.  Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in the
++ *     documentation and/or other materials provided with the distribution.
++ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
++ *     its contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
+  *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
++ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ #pragma once
+ 
+-#include <optional>
+ #include <wtf/Forward.h>
+-#include <wtf/Noncopyable.h>
+ 
+ namespace WebCore {
+ 
+@@ -40,25 +37,18 @@ class LocalFrame;
+ class LocalFrameLoaderClient;
+ class SecurityOrigin;
+ 
+-class MixedContentChecker {
+-    WTF_MAKE_NONCOPYABLE(MixedContentChecker);
+-public:
+-    enum class ContentType {
+-        Active,
+-        ActiveCanWarn,
+-    };
+-
+-    enum class AlwaysDisplayInNonStrictMode {
+-        No,
+-        Yes,
+-    };
+-
+-    // FIXME: This should probably have a separate client from FrameLoader.
+-    static bool canDisplayInsecureContent(LocalFrame&, SecurityOrigin&, ContentType, const URL&, AlwaysDisplayInNonStrictMode = AlwaysDisplayInNonStrictMode::No);
+-    static bool canRunInsecureContent(LocalFrame&, SecurityOrigin&, const URL&);
+-    static void checkFormForMixedContent(LocalFrame&, SecurityOrigin&, const URL&);
+-    static bool isMixedContent(SecurityOrigin&, const URL&);
+-    static std::optional<String> checkForMixedContentInFrameTree(const LocalFrame&, const URL&);
++namespace MixedContentChecker {
++
++enum class ContentType {
++    Active,
++    ActiveCanWarn,
+ };
+ 
++enum class ShouldLogWarning { No, Yes };
++
++bool frameAndAncestorsCanDisplayInsecureContent(LocalFrame&, ContentType, const URL&);
++bool frameAndAncestorsCanRunInsecureContent(LocalFrame&, SecurityOrigin&, const URL&, ShouldLogWarning = ShouldLogWarning::Yes);
++void checkFormForMixedContent(LocalFrame&, const URL&);
++
++} // namespace MixedContentChecker
+ } // namespace WebCore
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/NavigationRequester.cpp webkitgtk-2.41.6/Source/WebCore/loader/NavigationRequester.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/NavigationRequester.cpp	2023-05-04 03:46:16.091112000 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/NavigationRequester.cpp	2023-08-06 10:46:29.215399094 -0500
+@@ -54,6 +54,7 @@ NavigationRequester NavigationRequester:
+         document.securityOrigin(),
+         document.topOrigin(),
+         document.policyContainer(),
++        document.identifier(),
+         createGlobalFrameIdentifier(document)
+     };
+ }
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/NavigationRequester.h webkitgtk-2.41.6/Source/WebCore/loader/NavigationRequester.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/NavigationRequester.h	2023-02-04 01:16:53.530042600 -0600
++++ webkitgtk-2.41.6/Source/WebCore/loader/NavigationRequester.h	2023-08-06 10:46:29.215399094 -0500
+@@ -40,6 +40,7 @@ struct NavigationRequester {
+     Ref<SecurityOrigin> securityOrigin;
+     Ref<SecurityOrigin> topOrigin;
+     PolicyContainer policyContainer;
++    ScriptExecutionContextIdentifier documentIdentifier;
+     std::optional<GlobalFrameIdentifier> globalFrameIdentifier;
+ };
+ 
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/loader/SubframeLoader.cpp webkitgtk-2.41.6/Source/WebCore/loader/SubframeLoader.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/loader/SubframeLoader.cpp	2023-05-18 03:02:06.948160600 -0500
++++ webkitgtk-2.41.6/Source/WebCore/loader/SubframeLoader.cpp	2023-08-06 10:46:31.336375451 -0500
+@@ -137,7 +137,7 @@ bool FrameLoader::SubframeLoader::plugin
+             return false;
+         }
+ 
+-        if (!MixedContentChecker::canRunInsecureContent(m_frame, document->securityOrigin(), url))
++        if (!MixedContentChecker::frameAndAncestorsCanRunInsecureContent(m_frame, document->securityOrigin(), url))
+             return false;
+     }
+ 
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/Modules/websockets/WebSocket.cpp webkitgtk-2.41.6/Source/WebCore/Modules/websockets/WebSocket.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/Modules/websockets/WebSocket.cpp	2023-05-18 03:02:06.924160500 -0500
++++ webkitgtk-2.41.6/Source/WebCore/Modules/websockets/WebSocket.cpp	2023-08-06 10:46:31.335375462 -0500
+@@ -313,7 +313,8 @@ ExceptionOr<void> WebSocket::connect(con
+         Document& document = downcast<Document>(context);
+         RefPtr frame = document.frame();
+         // FIXME: make the mixed content check equivalent to the non-document mixed content check currently in WorkerThreadableWebSocketChannel::Bridge::connect()
+-        if (!frame || !MixedContentChecker::canRunInsecureContent(*frame, document.securityOrigin(), m_url)) {
++        // In particular we need to match the error messaging in the console and the inspector instrumentation. See WebSocketChannel::fail.
++        if (!frame || !MixedContentChecker::frameAndAncestorsCanRunInsecureContent(*frame, document.securityOrigin(), m_url)) {
+             failAsynchronously();
+             return { };
+         }
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/Modules/websockets/WorkerThreadableWebSocketChannel.cpp webkitgtk-2.41.6/Source/WebCore/Modules/websockets/WorkerThreadableWebSocketChannel.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/Modules/websockets/WorkerThreadableWebSocketChannel.cpp	2023-04-10 03:02:52.473366000 -0500
++++ webkitgtk-2.41.6/Source/WebCore/Modules/websockets/WorkerThreadableWebSocketChannel.cpp	2023-08-06 10:46:31.335375462 -0500
+@@ -413,12 +413,9 @@ void WorkerThreadableWebSocketChannel::B
+ 
+         auto& document = downcast<Document>(context);
+         
+-        // FIXME: make this mixed content check equivalent to the document mixed content check currently in WebSocket::connect()
+-        if (auto* frame = document.frame()) {
+-            if (auto errorString = MixedContentChecker::checkForMixedContentInFrameTree(*frame, url)) {
+-                peer->fail(WTFMove(errorString).value());
+-                return;
+-            }
++        if (document.frame() && !MixedContentChecker::frameAndAncestorsCanRunInsecureContent(*document.frame(), document.securityOrigin(), url, MixedContentChecker::ShouldLogWarning::No)) {
++            peer->fail(makeString("The page at ", document.url().stringCenterEllipsizedToLength(), " was blocked from connecting insecurely to ", url.stringCenterEllipsizedToLength(), " either because the protocol is insecure or the page is embedded from an insecure page."));
++            return;
+         }
+ 
+         if (peer->connect(url, protocol) == ThreadableWebSocketChannel::ConnectStatus::KO)
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/PaintPhase.h webkitgtk-2.41.6/Source/WebCore/rendering/PaintPhase.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/PaintPhase.h	2023-05-09 04:03:36.029048000 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/PaintPhase.h	2023-08-06 10:46:40.442274222 -0500
+@@ -73,6 +73,7 @@ enum class PaintBehavior : uint32_t {
+     EventRegionIncludeForeground        = 1 << 14, // FIXME: Event region painting should use paint phases.
+     EventRegionIncludeBackground        = 1 << 15,
+     Snapshotting                        = 1 << 16, // Paint is updating external backing store and visits all content, including composited content and always completes image decoding of painted images. FIXME: Will be removed.
++    DontShowVisitedLinks                = 1 << 17,
+ };
+ 
+ } // namespace WebCore
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/RenderLayer.cpp webkitgtk-2.41.6/Source/WebCore/rendering/RenderLayer.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/RenderLayer.cpp	2023-07-03 02:41:42.582954600 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/RenderLayer.cpp	2023-08-06 10:46:40.443274212 -0500
+@@ -3296,6 +3296,9 @@ void RenderLayer::paintLayerContents(Gra
+         }
+         GraphicsContext& currentContext = filterContext ? *filterContext : context;
+ 
++        if (filterContext)
++            localPaintingInfo.paintBehavior.add(PaintBehavior::DontShowVisitedLinks);
++
+         // If this layer's renderer is a child of the subtreePaintRoot, we render unconditionally, which
+         // is done by passing a nil subtreePaintRoot down to our renderer (as if no subtreePaintRoot was ever set).
+         // Otherwise, our renderer tree may or may not contain the subtreePaintRoot root, so we pass that root along
+@@ -3729,6 +3732,9 @@ void RenderLayer::paintForegroundForFrag
+     constexpr OptionSet<PaintBehavior> flagsToCopy { PaintBehavior::ExcludeSelection, PaintBehavior::Snapshotting, PaintBehavior::DefaultAsynchronousImageDecode, PaintBehavior::CompositedOverflowScrollContent, PaintBehavior::ForceSynchronousImageDecode };
+     localPaintBehavior.add(localPaintingInfo.paintBehavior & flagsToCopy);
+ 
++    if (localPaintingInfo.paintBehavior & PaintBehavior::DontShowVisitedLinks)
++        localPaintBehavior.add(PaintBehavior::DontShowVisitedLinks);
++
+     GraphicsContextStateSaver stateSaver(context, false);
+     RegionContextStateSaver regionContextStateSaver(localPaintingInfo.regionContext);
+ 
+@@ -5812,6 +5818,7 @@ TextStream& operator<<(TextStream& ts, P
+     case PaintBehavior::EventRegionIncludeForeground: ts << "EventRegionIncludeForeground"; break;
+     case PaintBehavior::EventRegionIncludeBackground: ts << "EventRegionIncludeBackground"; break;
+     case PaintBehavior::Snapshotting: ts << "Snapshotting"; break;
++    case PaintBehavior::DontShowVisitedLinks: ts << "DontShowVisitedLinks"; break;
+     }
+ 
+     return ts;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/style/RenderStyle.cpp webkitgtk-2.41.6/Source/WebCore/rendering/style/RenderStyle.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/style/RenderStyle.cpp	2023-07-04 02:17:31.521223300 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/style/RenderStyle.cpp	2023-08-06 10:46:40.444274200 -0500
+@@ -2424,17 +2424,20 @@ Color RenderStyle::colorResolvingCurrent
+     return color.resolveColor(this->color());
+ }
+ 
+-Color RenderStyle::visitedDependentColor(CSSPropertyID colorProperty) const
++Color RenderStyle::visitedDependentColor(CSSPropertyID colorProperty, OptionSet<PaintBehavior> paintBehavior) const
+ {
+     Color unvisitedColor = colorResolvingCurrentColor(colorProperty, false);
+     if (insideLink() != InsideLink::InsideVisited)
+         return unvisitedColor;
+ 
++    if (paintBehavior.contains(PaintBehavior::DontShowVisitedLinks))
++        return unvisitedColor;
++
+ #if ENABLE(CSS_COMPOSITING)
+     if (isInSubtreeWithBlendMode())
+         return unvisitedColor;
+ #endif
+-    
++
+     Color visitedColor = colorResolvingCurrentColor(colorProperty, true);
+ 
+     // FIXME: Technically someone could explicitly specify the color transparent, but for now we'll just
+@@ -2449,12 +2452,12 @@ Color RenderStyle::visitedDependentColor
+     return visitedColor.colorWithAlpha(unvisitedColor.alphaAsFloat());
+ }
+ 
+-Color RenderStyle::visitedDependentColorWithColorFilter(CSSPropertyID colorProperty) const
++Color RenderStyle::visitedDependentColorWithColorFilter(CSSPropertyID colorProperty, OptionSet<PaintBehavior> paintBehavior) const
+ {
+     if (!hasAppleColorFilter())
+-        return visitedDependentColor(colorProperty);
++        return visitedDependentColor(colorProperty, paintBehavior);
+ 
+-    return colorByApplyingColorFilter(visitedDependentColor(colorProperty));
++    return colorByApplyingColorFilter(visitedDependentColor(colorProperty, paintBehavior));
+ }
+ 
+ Color RenderStyle::colorByApplyingColorFilter(const Color& color) const
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/style/RenderStyle.h webkitgtk-2.41.6/Source/WebCore/rendering/style/RenderStyle.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/style/RenderStyle.h	2023-07-03 02:41:42.590954800 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/style/RenderStyle.h	2023-08-06 10:46:40.444274200 -0500
+@@ -241,6 +241,9 @@ struct MasonryAutoFlow;
+ struct NamedGridAreaMap;
+ struct NamedGridLinesMap;
+ struct OrderedNamedGridLinesMap;
++
++enum class PaintBehavior : uint32_t;
++
+ struct ScrollSnapAlign;
+ struct ScrollSnapType;
+ struct ScrollbarGutter;
+@@ -1723,8 +1726,8 @@ public:
+     // Resolves the currentColor keyword, but must not be used for the "color" property which has a different semantic.
+     WEBCORE_EXPORT Color colorResolvingCurrentColor(const StyleColor&) const;
+ 
+-    WEBCORE_EXPORT Color visitedDependentColor(CSSPropertyID) const;
+-    WEBCORE_EXPORT Color visitedDependentColorWithColorFilter(CSSPropertyID) const;
++    WEBCORE_EXPORT Color visitedDependentColor(CSSPropertyID, OptionSet<PaintBehavior> paintBehavior = { }) const;
++    WEBCORE_EXPORT Color visitedDependentColorWithColorFilter(CSSPropertyID, OptionSet<PaintBehavior> paintBehavior = { }) const;
+ 
+     WEBCORE_EXPORT Color colorByApplyingColorFilter(const Color&) const;
+     WEBCORE_EXPORT Color colorWithColorFilter(const StyleColor&) const;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/StyledMarkedText.cpp webkitgtk-2.41.6/Source/WebCore/rendering/StyledMarkedText.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/StyledMarkedText.cpp	2023-06-20 07:22:55.807675000 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/StyledMarkedText.cpp	2023-08-06 10:46:40.443274212 -0500
+@@ -54,7 +54,7 @@ static StyledMarkedText resolveStyleForM
+             style.textStyles.fillColor = renderStyle->computedStrokeColor();
+             style.textStyles.strokeColor = renderStyle->computedStrokeColor();
+ 
+-            auto color = TextDecorationPainter::decorationColor(*renderStyle.get());
++            auto color = TextDecorationPainter::decorationColor(*renderStyle.get(), paintInfo.paintBehavior);
+             auto decorationStyle = renderStyle->textDecorationStyle();
+             auto decorations = renderStyle->textDecorationsInEffect();
+ 
+@@ -114,7 +114,7 @@ static StyledMarkedText resolveStyleForM
+ StyledMarkedText::Style StyledMarkedText::computeStyleForUnmarkedMarkedText(const RenderText& renderer, const RenderStyle& lineStyle, bool isFirstLine, const PaintInfo& paintInfo)
+ {
+     StyledMarkedText::Style style;
+-    style.textDecorationStyles = TextDecorationPainter::stylesForRenderer(renderer, lineStyle.textDecorationsInEffect(), isFirstLine);
++    style.textDecorationStyles = TextDecorationPainter::stylesForRenderer(renderer, lineStyle.textDecorationsInEffect(), isFirstLine, paintInfo.paintBehavior);
+     style.textStyles = computeTextPaintStyle(renderer.frame(), lineStyle, paintInfo);
+     style.textShadow = ShadowData::clone(paintInfo.forceTextColor() ? nullptr : lineStyle.textShadow());
+     return style;
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextDecorationPainter.cpp webkitgtk-2.41.6/Source/WebCore/rendering/TextDecorationPainter.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextDecorationPainter.cpp	2023-05-17 05:02:35.310242400 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/TextDecorationPainter.cpp	2023-08-06 10:46:40.444274200 -0500
+@@ -319,13 +319,13 @@ void TextDecorationPainter::paintLineThr
+         m_context.drawLineForText(rect, m_isPrinting, style == TextDecorationStyle::Double, strokeStyle);
+ }
+ 
+-static void collectStylesForRenderer(TextDecorationPainter::Styles& result, const RenderObject& renderer, OptionSet<TextDecorationLine> remainingDecorations, bool firstLineStyle, PseudoId pseudoId)
++static void collectStylesForRenderer(TextDecorationPainter::Styles& result, const RenderObject& renderer, OptionSet<TextDecorationLine> remainingDecorations, bool firstLineStyle, OptionSet<PaintBehavior> paintBehavior, PseudoId pseudoId)
+ {
+     auto extractDecorations = [&] (const RenderStyle& style, OptionSet<TextDecorationLine> decorations) {
+         if (decorations.isEmpty())
+             return;
+ 
+-        auto color = TextDecorationPainter::decorationColor(style);
++        auto color = TextDecorationPainter::decorationColor(style, paintBehavior);
+         auto decorationStyle = style.textDecorationStyle();
+ 
+         if (decorations.contains(TextDecorationLine::Underline)) {
+@@ -376,20 +376,20 @@ static void collectStylesForRenderer(Tex
+         extractDecorations(styleForRenderer(*current), remainingDecorations);
+ }
+ 
+-Color TextDecorationPainter::decorationColor(const RenderStyle& style)
++Color TextDecorationPainter::decorationColor(const RenderStyle& style, OptionSet<PaintBehavior> paintBehavior)
+ {
+-    return style.visitedDependentColorWithColorFilter(CSSPropertyTextDecorationColor);
++    return style.visitedDependentColorWithColorFilter(CSSPropertyTextDecorationColor, paintBehavior);
+ }
+ 
+-auto TextDecorationPainter::stylesForRenderer(const RenderObject& renderer, OptionSet<TextDecorationLine> requestedDecorations, bool firstLineStyle, PseudoId pseudoId) -> Styles
++auto TextDecorationPainter::stylesForRenderer(const RenderObject& renderer, OptionSet<TextDecorationLine> requestedDecorations, bool firstLineStyle, OptionSet<PaintBehavior> paintBehavior, PseudoId pseudoId) -> Styles
+ {
+     if (requestedDecorations.isEmpty())
+         return { };
+ 
+     Styles result;
+-    collectStylesForRenderer(result, renderer, requestedDecorations, false, pseudoId);
++    collectStylesForRenderer(result, renderer, requestedDecorations, false, paintBehavior, pseudoId);
+     if (firstLineStyle)
+-        collectStylesForRenderer(result, renderer, requestedDecorations, true, pseudoId);
++        collectStylesForRenderer(result, renderer, requestedDecorations, true, paintBehavior, pseudoId);
+     result.skipInk = renderer.style().textDecorationSkipInk();
+     return result;
+ }
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextDecorationPainter.h webkitgtk-2.41.6/Source/WebCore/rendering/TextDecorationPainter.h
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextDecorationPainter.h	2023-05-17 05:02:35.310242400 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/TextDecorationPainter.h	2023-08-06 10:46:40.444274200 -0500
+@@ -77,8 +77,8 @@ public:
+     };
+     void paintForegroundDecorations(const ForegroundDecorationGeometry&, const Styles&);
+ 
+-    static Color decorationColor(const RenderStyle&);
+-    static Styles stylesForRenderer(const RenderObject&, OptionSet<TextDecorationLine> requestedDecorations, bool firstLineStyle = false, PseudoId = PseudoId::None);
++    static Color decorationColor(const RenderStyle&, OptionSet<PaintBehavior> paintBehavior = { });
++    static Styles stylesForRenderer(const RenderObject&, OptionSet<TextDecorationLine> requestedDecorations, bool firstLineStyle = false, OptionSet<PaintBehavior> paintBehavior = { }, PseudoId = PseudoId::None);
+     static OptionSet<TextDecorationLine> textDecorationsInEffectForStyle(const TextDecorationPainter::Styles&);
+ 
+ private:
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextPaintStyle.cpp webkitgtk-2.41.6/Source/WebCore/rendering/TextPaintStyle.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/rendering/TextPaintStyle.cpp	2023-05-11 03:39:29.722726600 -0500
++++ webkitgtk-2.41.6/Source/WebCore/rendering/TextPaintStyle.cpp	2023-08-06 10:46:40.444274200 -0500
+@@ -106,7 +106,7 @@ TextPaintStyle computeTextPaintStyle(con
+         }
+     }
+ 
+-    paintStyle.fillColor = lineStyle.visitedDependentColorWithColorFilter(CSSPropertyWebkitTextFillColor);
++    paintStyle.fillColor = lineStyle.visitedDependentColorWithColorFilter(CSSPropertyWebkitTextFillColor, paintInfo.paintBehavior);
+ 
+     bool forceBackgroundToWhite = false;
+     if (frame.document() && frame.document()->printing()) {
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebCore/workers/WorkerAnimationController.cpp webkitgtk-2.41.6/Source/WebCore/workers/WorkerAnimationController.cpp
+--- webkitgtk-2.41.6.orig/Source/WebCore/workers/WorkerAnimationController.cpp	2022-06-27 05:22:03.381339800 -0500
++++ webkitgtk-2.41.6/Source/WebCore/workers/WorkerAnimationController.cpp	2023-08-06 10:46:45.333220039 -0500
+@@ -69,6 +69,7 @@ bool WorkerAnimationController::virtualH
+ void WorkerAnimationController::stop()
+ {
+     m_animationTimer.stop();
++    m_animationCallbacks.clear();
+ }
+ 
+ void WorkerAnimationController::suspend(ReasonForSuspension)
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/Shared/glib/DMABufRendererBufferMode.h webkitgtk-2.41.6/Source/WebKit/Shared/glib/DMABufRendererBufferMode.h
+--- webkitgtk-2.41.6.orig/Source/WebKit/Shared/glib/DMABufRendererBufferMode.h	1969-12-31 18:00:00.000000000 -0600
++++ webkitgtk-2.41.6/Source/WebKit/Shared/glib/DMABufRendererBufferMode.h	2023-08-06 10:46:52.267143443 -0500
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (C) 2023 Igalia S.L.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#pragma once
++
++#include <wtf/EnumTraits.h>
++
++namespace WebKit {
++
++enum class DMABufRendererBufferMode : uint8_t {
++    Hardware = 1 << 0,
++    SharedMemory = 1 << 1
++};
++
++} // namespace WebKit
++
++namespace WTF {
++
++template<> struct EnumTraits<WebKit::DMABufRendererBufferMode> {
++    using values = EnumValues<
++        WebKit::DMABufRendererBufferMode,
++        WebKit::DMABufRendererBufferMode::Hardware,
++        WebKit::DMABufRendererBufferMode::SharedMemory
++    >;
++};
++
++} // namespace WTF
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in webkitgtk-2.41.6/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in
+--- webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in	2023-07-03 02:41:42.602954900 -0500
++++ webkitgtk-2.41.6/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in	2023-08-06 10:46:29.216399083 -0500
+@@ -3909,6 +3909,7 @@ struct WebCore::NavigationRequester {
+     Ref<WebCore::SecurityOrigin> securityOrigin;
+     Ref<WebCore::SecurityOrigin> topOrigin;
+     WebCore::PolicyContainer policyContainer;
++    WebCore::ScriptExecutionContextIdentifier documentIdentifier;
+     std::optional<WebCore::GlobalFrameIdentifier> globalFrameIdentifier;
+ };
+ 
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebProcessCreationParameters.h webkitgtk-2.41.6/Source/WebKit/Shared/WebProcessCreationParameters.h
+--- webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebProcessCreationParameters.h	2023-06-15 03:13:17.392712400 -0500
++++ webkitgtk-2.41.6/Source/WebKit/Shared/WebProcessCreationParameters.h	2023-08-06 10:46:52.266143454 -0500
+@@ -57,6 +57,7 @@
+ #endif
+ 
+ #if PLATFORM(GTK)
++#include "DMABufRendererBufferMode.h"
+ #include "GtkSettingsState.h"
+ #endif
+ 
+@@ -219,7 +220,7 @@ struct WebProcessCreationParameters {
+ #endif
+ 
+ #if PLATFORM(GTK)
+-    bool useDMABufSurfaceForCompositing { false };
++    OptionSet<DMABufRendererBufferMode> dmaBufRendererBufferMode;
+     bool useSystemAppearanceForScrollbars { false };
+     GtkSettingsState gtkSettings;
+ #endif
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebProcessCreationParameters.serialization.in webkitgtk-2.41.6/Source/WebKit/Shared/WebProcessCreationParameters.serialization.in
+--- webkitgtk-2.41.6.orig/Source/WebKit/Shared/WebProcessCreationParameters.serialization.in	2023-06-15 03:13:17.392712400 -0500
++++ webkitgtk-2.41.6/Source/WebKit/Shared/WebProcessCreationParameters.serialization.in	2023-08-06 10:46:52.267143443 -0500
+@@ -173,7 +173,7 @@ struct WebKit::WebProcessCreationParamet
+ #endif
+ 
+ #if PLATFORM(GTK)
+-    bool useDMABufSurfaceForCompositing;
++    OptionSet<WebKit::DMABufRendererBufferMode> dmaBufRendererBufferMode;
+     bool useSystemAppearanceForScrollbars;
+     WebKit::GtkSettingsState gtkSettings;
+ #endif
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp webkitgtk-2.41.6/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp
+--- webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp	2023-07-03 02:41:42.610955000 -0500
++++ webkitgtk-2.41.6/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp	2023-08-06 10:46:52.267143443 -0500
+@@ -46,6 +46,7 @@
+ 
+ #if PLATFORM(GTK)
+ #include "AcceleratedBackingStoreDMABuf.h"
++#include "DMABufRendererBufferMode.h"
+ #include <WebCore/PlatformDisplaySurfaceless.h>
+ #include <gtk/gtk.h>
+ 
+@@ -158,6 +159,24 @@ static const char* openGLAPI()
+     return "OpenGL ES 2 (libepoxy)";
+ }
+ 
++#if PLATFORM(GTK)
++static String dmabufRendererWithSupportedBuffers()
++{
++    StringBuilder buffers;
++    buffers.append("DMABuf (Supported buffers: "_s);
++    auto mode = AcceleratedBackingStoreDMABuf::rendererBufferMode();
++    if (mode.contains(DMABufRendererBufferMode::Hardware))
++        buffers.append("Hardware"_s);
++    if (mode.contains(DMABufRendererBufferMode::SharedMemory)) {
++        if (mode.contains(DMABufRendererBufferMode::Hardware))
++            buffers.append(", ");
++        buffers.append("Shared Memory"_s);
++    }
++    buffers.append(')');
++    return buffers.toString();
++}
++#endif
++
+ void WebKitProtocolHandler::handleGPU(WebKitURISchemeRequest* request)
+ {
+     GString* html = g_string_new(
+@@ -324,11 +343,11 @@ void WebKitProtocolHandler::handleGPU(We
+         addTableRow(jsonObject, "API"_s, String::fromUTF8(openGLAPI()));
+ #if PLATFORM(WAYLAND)
+         if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::Wayland)
+-            addTableRow(hardwareAccelerationObject, "Renderer"_s, usingDMABufRenderer ? "DMABuf"_s : "WPE"_s);
++            addTableRow(hardwareAccelerationObject, "Renderer"_s, usingDMABufRenderer ? dmabufRendererWithSupportedBuffers() : "WPE"_s);
+ #endif
+ #if PLATFORM(X11)
+         if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11)
+-            addTableRow(hardwareAccelerationObject, "Renderer"_s, usingDMABufRenderer ? "DMABuf"_s : "XWindow"_s);
++            addTableRow(hardwareAccelerationObject, "Renderer"_s, usingDMABufRenderer ? dmabufRendererWithSupportedBuffers() : "XWindow"_s);
+ #endif
+         addTableRow(hardwareAccelerationObject, "Native interface"_s, uiProcessContextIsEGL() ? "EGL"_s : "None"_s);
+ 
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp webkitgtk-2.41.6/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp
+--- webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp	2023-06-15 04:16:56.666545000 -0500
++++ webkitgtk-2.41.6/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp	2023-08-06 10:46:52.267143443 -0500
+@@ -89,11 +89,11 @@ void WebProcessPool::platformInitializeW
+ #endif
+ 
+ #if PLATFORM(GTK)
+-    parameters.useDMABufSurfaceForCompositing = AcceleratedBackingStoreDMABuf::checkRequirements();
++    parameters.dmaBufRendererBufferMode = AcceleratedBackingStoreDMABuf::rendererBufferMode();
+ #endif
+ 
+ #if PLATFORM(WAYLAND)
+-    if (WebCore::PlatformDisplay::sharedDisplay().type() == WebCore::PlatformDisplay::Type::Wayland && !parameters.useDMABufSurfaceForCompositing) {
++    if (WebCore::PlatformDisplay::sharedDisplay().type() == WebCore::PlatformDisplay::Type::Wayland && parameters.dmaBufRendererBufferMode.isEmpty()) {
+         wpe_loader_init("libWPEBackend-fdo-1.0.so.1");
+         if (AcceleratedBackingStoreWayland::checkRequirements()) {
+             parameters.hostClientFileDescriptor = UnixFileDescriptor { wpe_renderer_host_create_client(), UnixFileDescriptor::Adopt };
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp webkitgtk-2.41.6/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp
+--- webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp	2023-06-22 02:33:51.403704600 -0500
++++ webkitgtk-2.41.6/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp	2023-08-06 10:46:52.267143443 -0500
+@@ -28,6 +28,7 @@
+ 
+ #include "AcceleratedBackingStoreDMABufMessages.h"
+ #include "AcceleratedSurfaceDMABufMessages.h"
++#include "DMABufRendererBufferMode.h"
+ #include "LayerTreeContext.h"
+ #include "ShareableBitmap.h"
+ #include "WebPageProxy.h"
+@@ -49,23 +50,32 @@
+ 
+ namespace WebKit {
+ 
+-bool AcceleratedBackingStoreDMABuf::checkRequirements()
++OptionSet<DMABufRendererBufferMode> AcceleratedBackingStoreDMABuf::rendererBufferMode()
+ {
+-    static bool available;
++    static OptionSet<DMABufRendererBufferMode> mode;
+     static std::once_flag onceFlag;
+     std::call_once(onceFlag, [] {
+         const char* disableDMABuf = getenv("WEBKIT_DISABLE_DMABUF_RENDERER");
+-        if (disableDMABuf && strcmp(disableDMABuf, "0")) {
+-            available = false;
++        if (disableDMABuf && strcmp(disableDMABuf, "0"))
++            return;
++
++        const char* platformExtensions = eglQueryString(nullptr, EGL_EXTENSIONS);
++        if (!WebCore::GLContext::isExtensionSupported(platformExtensions, "EGL_KHR_platform_gbm")
++            && !WebCore::GLContext::isExtensionSupported(platformExtensions, "EGL_MESA_platform_surfaceless")) {
+             return;
+         }
+ 
++        mode.add(DMABufRendererBufferMode::SharedMemory);
++
+         const auto& eglExtensions = WebCore::PlatformDisplay::sharedDisplay().eglExtensions();
+-        available = eglExtensions.KHR_image_base
+-            && eglExtensions.KHR_surfaceless_context
+-            && WebCore::GLContext::isExtensionSupported(eglQueryString(nullptr, EGL_EXTENSIONS), "EGL_MESA_platform_surfaceless");
++        if (eglExtensions.KHR_image_base && eglExtensions.EXT_image_dma_buf_import)
++            mode.add(DMABufRendererBufferMode::Hardware);
+     });
+-    return available;
++    return mode;
++}
++bool AcceleratedBackingStoreDMABuf::checkRequirements()
++{
++    return !rendererBufferMode().isEmpty();
+ }
+ 
+ std::unique_ptr<AcceleratedBackingStoreDMABuf> AcceleratedBackingStoreDMABuf::create(WebPageProxy& webPage)
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h webkitgtk-2.41.6/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h
+--- webkitgtk-2.41.6.orig/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h	2023-06-15 06:04:41.576788000 -0500
++++ webkitgtk-2.41.6/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h	2023-08-06 10:46:52.267143443 -0500
+@@ -32,6 +32,7 @@
+ #include <WebCore/RefPtrCairo.h>
+ #include <gtk/gtk.h>
+ #include <wtf/CompletionHandler.h>
++#include <wtf/OptionSet.h>
+ #include <wtf/glib/GRefPtr.h>
+ #include <wtf/unix/UnixFileDescriptor.h>
+ 
+@@ -54,10 +55,12 @@ namespace WebKit {
+ class ShareableBitmap;
+ class ShareableBitmapHandle;
+ class WebPageProxy;
++enum class DMABufRendererBufferMode : uint8_t;
+ 
+ class AcceleratedBackingStoreDMABuf final : public AcceleratedBackingStore, public IPC::MessageReceiver {
+     WTF_MAKE_NONCOPYABLE(AcceleratedBackingStoreDMABuf); WTF_MAKE_FAST_ALLOCATED;
+ public:
++    static OptionSet<DMABufRendererBufferMode> rendererBufferMode();
+     static bool checkRequirements();
+     static std::unique_ptr<AcceleratedBackingStoreDMABuf> create(WebPageProxy&);
+     ~AcceleratedBackingStoreDMABuf();
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp webkitgtk-2.41.6/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
+--- webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp	2023-06-15 04:16:56.682545000 -0500
++++ webkitgtk-2.41.6/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp	2023-08-06 10:46:52.267143443 -0500
+@@ -142,12 +142,15 @@ void WebProcess::platformInitializeWebPr
+ #endif
+ 
+ #if PLATFORM(GTK)
+-    if (parameters.useDMABufSurfaceForCompositing) {
++    m_dmaBufRendererBufferMode = parameters.dmaBufRendererBufferMode;
++    if (!m_dmaBufRendererBufferMode.isEmpty()) {
+ #if USE(GBM)
+-        const char* disableGBM = getenv("WEBKIT_DMABUF_RENDERER_DISABLE_GBM");
+-        if (!disableGBM || !strcmp(disableGBM, "0")) {
+-            if (auto* device = WebCore::GBMDevice::singleton().device())
+-                m_displayForCompositing = WebCore::PlatformDisplayGBM::create(device);
++        if (m_dmaBufRendererBufferMode.contains(DMABufRendererBufferMode::Hardware)) {
++            const char* disableGBM = getenv("WEBKIT_DMABUF_RENDERER_DISABLE_GBM");
++            if (!disableGBM || !strcmp(disableGBM, "0")) {
++                if (auto* device = WebCore::GBMDevice::singleton().device())
++                    m_displayForCompositing = WebCore::PlatformDisplayGBM::create(device);
++            }
+         }
+ #endif
+         if (!m_displayForCompositing)
+@@ -156,7 +159,7 @@ void WebProcess::platformInitializeWebPr
+ #endif
+ 
+ #if PLATFORM(WAYLAND)
+-    if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::Wayland && !parameters.isServiceWorkerProcess && !parameters.useDMABufSurfaceForCompositing) {
++    if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::Wayland && !parameters.isServiceWorkerProcess && m_dmaBufRendererBufferMode.isEmpty()) {
+         auto hostClientFileDescriptor = parameters.hostClientFileDescriptor.release();
+         if (hostClientFileDescriptor != -1) {
+             wpe_loader_init(parameters.implementationLibraryName.data());
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp webkitgtk-2.41.6/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp
+--- webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp	2023-06-21 05:10:13.006260600 -0500
++++ webkitgtk-2.41.6/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp	2023-08-06 10:46:52.267143443 -0500
+@@ -442,7 +442,7 @@ void AcceleratedSurfaceDMABuf::clientRes
+     auto& display = WebCore::PlatformDisplay::sharedDisplayForCompositing();
+     switch (display.type()) {
+     case WebCore::PlatformDisplay::Type::Surfaceless:
+-        if (display.eglExtensions().MESA_image_dma_buf_export)
++        if (display.eglExtensions().MESA_image_dma_buf_export && WebProcess::singleton().dmaBufRendererBufferMode().contains(DMABufRendererBufferMode::Hardware))
+             m_target = RenderTargetTexture::create(m_id, size);
+         else
+             m_target = RenderTargetSHMImage::create(m_id, size);
+diff -Naurp webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/WebProcess.h webkitgtk-2.41.6/Source/WebKit/WebProcess/WebProcess.h
+--- webkitgtk-2.41.6.orig/Source/WebKit/WebProcess/WebProcess.h	2023-06-21 05:10:13.006260600 -0500
++++ webkitgtk-2.41.6/Source/WebKit/WebProcess/WebProcess.h	2023-08-06 10:46:52.267143443 -0500
+@@ -416,6 +416,10 @@ public:
+     void revokeLaunchServicesSandboxExtension();
+ #endif
+ 
++#if PLATFORM(GTK)
++    const OptionSet<DMABufRendererBufferMode>& dmaBufRendererBufferMode() const { return m_dmaBufRendererBufferMode; }
++#endif
++
+ private:
+     WebProcess();
+     ~WebProcess();
+@@ -739,8 +743,9 @@ private:
+ 
+     WeakHashMap<WebCore::UserGestureToken, uint64_t> m_userGestureTokens;
+ 
+-#if PLATFORM(GTK) && USE(EGL)
++#if PLATFORM(GTK)
+     std::unique_ptr<WebCore::PlatformDisplay> m_displayForCompositing;
++    OptionSet<DMABufRendererBufferMode> m_dmaBufRendererBufferMode;
+ #endif
+ 
+     bool m_hasSuspendedPageProxy { false };
