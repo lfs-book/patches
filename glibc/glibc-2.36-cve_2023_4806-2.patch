@@ -1,0 +1,124 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111.site>
+Date:                    2023-09-13
+Initial Package Version: 2.36
+Upstream Status:         Applied
+Origin:
+  - https://sourceware.org/ml/libc-alpha/2023-September/151548.html
+  - Upstream commit ec6b95c3303c700eb89eebeda2d7264cc184a796
+Description:             Fixes a security vulnerability in Glibc-2.36 and
+                         2.37 as shipped by LFS 11.2 and 11.3.  This
+                         vulnerability allow denial of service with custom
+                         NSS modules and extremely rare conditions.  Glibc
+                         releases earlier than 2.36 are also affected but
+                         there is no fix available for earlier releases yet.
+
+diff --git a/sysdeps/posix/getaddrinfo.c b/sysdeps/posix/getaddrinfo.c
+index 6ae6744fe4..eb5ba59dac 100644
+--- a/sysdeps/posix/getaddrinfo.c
++++ b/sysdeps/posix/getaddrinfo.c
+@@ -120,6 +120,7 @@ struct gaih_result
+ {
+   struct gaih_addrtuple *at;
+   char *canon;
++  char *hname;
+   bool free_at;
+   bool got_ipv6;
+ };
+@@ -165,6 +166,7 @@ gaih_result_reset (struct gaih_result *res)
+   if (res->free_at)
+     free (res->at);
+   free (res->canon);
++  free (res->hname);
+   memset (res, 0, sizeof (*res));
+ }
+ 
+@@ -203,9 +205,8 @@ gaih_inet_serv (const char *servicename, const struct gaih_typeproto *tp,
+   return 0;
+ }
+ 
+-/* Convert struct hostent to a list of struct gaih_addrtuple objects.  h_name
+-   is not copied, and the struct hostent object must not be deallocated
+-   prematurely.  The new addresses are appended to the tuple array in RES.  */
++/* Convert struct hostent to a list of struct gaih_addrtuple objects.  The new
++   addresses are appended to the tuple array in RES.  */
+ static bool
+ convert_hostent_to_gaih_addrtuple (const struct addrinfo *req, int family,
+ 				   struct hostent *h, struct gaih_result *res)
+@@ -238,6 +239,15 @@ convert_hostent_to_gaih_addrtuple (const struct addrinfo *req, int family,
+   res->at = array;
+   res->free_at = true;
+ 
++  /* Duplicate h_name because it may get reclaimed when the underlying storage
++     is freed.  */
++  if (res->hname == NULL)
++    {
++      res->hname = __strdup (h->h_name);
++      if (res->hname == NULL)
++	return false;
++    }
++
+   /* Update the next pointers on reallocation.  */
+   for (size_t i = 0; i < old; i++)
+     array[i].next = array + i + 1;
+@@ -262,7 +272,6 @@ convert_hostent_to_gaih_addrtuple (const struct addrinfo *req, int family,
+ 	}
+       array[i].next = array + i + 1;
+     }
+-  array[0].name = h->h_name;
+   array[count - 1].next = NULL;
+ 
+   return true;
+@@ -324,15 +333,15 @@ gethosts (nss_gethostbyname3_r fct, int family, const char *name,
+    memory allocation failure.  The returned string is allocated on the
+    heap; the caller has to free it.  */
+ static char *
+-getcanonname (nss_action_list nip, struct gaih_addrtuple *at, const char *name)
++getcanonname (nss_action_list nip, const char *hname, const char *name)
+ {
+   nss_getcanonname_r *cfct = __nss_lookup_function (nip, "getcanonname_r");
+   char *s = (char *) name;
+   if (cfct != NULL)
+     {
+       char buf[256];
+-      if (DL_CALL_FCT (cfct, (at->name ?: name, buf, sizeof (buf),
+-			      &s, &errno, &h_errno)) != NSS_STATUS_SUCCESS)
++      if (DL_CALL_FCT (cfct, (hname ?: name, buf, sizeof (buf), &s, &errno,
++			      &h_errno)) != NSS_STATUS_SUCCESS)
+ 	/* If the canonical name cannot be determined, use the passed
+ 	   string.  */
+ 	s = (char *) name;
+@@ -740,6 +749,7 @@ get_nss_addresses (const char *name, const struct addrinfo *req,
+ 		    }
+ 		  no_inet6_data = no_data;
+ 		  inet6_status = status;
++
+ 		}
+ 	      if (req->ai_family == AF_INET
+ 		  || req->ai_family == AF_UNSPEC
+@@ -771,7 +781,7 @@ get_nss_addresses (const char *name, const struct addrinfo *req,
+ 		  if ((req->ai_flags & AI_CANONNAME) != 0
+ 		      && res->canon == NULL)
+ 		    {
+-		      char *canonbuf = getcanonname (nip, res->at, name);
++		      char *canonbuf = getcanonname (nip, res->hname, name);
+ 		      if (canonbuf == NULL)
+ 			{
+ 			  __resolv_context_put (res_ctx);
+
+X-Git-Url: https://sourceware.org/git/?p=glibc.git;a=blobdiff_plain;f=sysdeps%2Fposix%2Fgetaddrinfo.c;h=531124958d037733ccee13bf59f97ab4a36ffdd4;hp=47f421fddf7e1aff732763ea333b2469f241091a;hb=ec6b95c3303c700eb89eebeda2d7264cc184a796;hpb=5d00c201b9a2da768a79ea8d5311f257871c0b43
+
+diff --git a/sysdeps/posix/getaddrinfo.c b/sysdeps/posix/getaddrinfo.c
+index 47f421fddf..531124958d 100644
+--- a/sysdeps/posix/getaddrinfo.c
++++ b/sysdeps/posix/getaddrinfo.c
+@@ -1196,9 +1196,7 @@ free_and_return:
+   if (malloc_name)
+     free ((char *) name);
+   free (addrmem);
+-  if (res.free_at)
+-    free (res.at);
+-  free (res.canon);
++  gaih_result_reset (&res);
+ 
+   return result;
+ }
