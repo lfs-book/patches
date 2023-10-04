@@ -1,0 +1,47 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111.site>
+Date:                    2023-10-03
+Initial Package Version: 2.34
+Upstream Status:         Committed
+Origin:                  Upstream commit dcc367f148bc
+Description:             Fixes a security vulnerability in Glibc-2.34, 2.35,
+                         2.36, and 2.37 as shipped by LFS 11.0, 11.1, 11.2,
+                         and 11.3.  This vulnerability is trivially
+                         exploitable and allows local privilege escalation.
+
+X-Git-Url: https://sourceware.org/git/?p=glibc.git;a=blobdiff_plain;f=elf%2Fdl-tunables.c;h=837474b5044cb5d75a7810a645923aacbc5cc5a9;hp=8009e54ee5db32beb228e69b05352e80c809c42c;hb=dcc367f148bc92e7f3778a125f7a416b093964d9;hpb=c3b99f8328939533a9b6ac93e8ae7285e90fbdab
+
+diff --git a/elf/dl-tunables.c b/elf/dl-tunables.c
+index 8009e54ee5..837474b504 100644
+--- a/elf/dl-tunables.c
++++ b/elf/dl-tunables.c
+@@ -188,11 +188,7 @@ parse_tunables (char *tunestr, char *valstring)
+       /* If we reach the end of the string before getting a valid name-value
+ 	 pair, bail out.  */
+       if (p[len] == '\0')
+-	{
+-	  if (__libc_enable_secure)
+-	    tunestr[off] = '\0';
+-	  return;
+-	}
++	break;
+ 
+       /* We did not find a valid name-value pair before encountering the
+ 	 colon.  */
+@@ -252,9 +248,16 @@ parse_tunables (char *tunestr, char *valstring)
+ 	    }
+ 	}
+ 
+-      if (p[len] != '\0')
+-	p += len + 1;
++      /* We reached the end while processing the tunable string.  */
++      if (p[len] == '\0')
++	break;
++
++      p += len + 1;
+     }
++
++  /* Terminate tunestr before we leave.  */
++  if (__libc_enable_secure)
++    tunestr[off] = '\0';
+ }
+ #endif
