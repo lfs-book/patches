@@ -1,0 +1,285 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-10-16
+Initial Package Version: 2.53.17.1
+Origin:                  Upstream (in https://gitlab.com/frg/seamonkey-253-patches)
+Upstream Status:         Applied
+Description:             Fixes several CVEs in Seamonkey's bundled copy of libvpx,
+                         including CVE-2023-44488, CVE-2023-5217, CVE-2019-9232,
+                         CVE-2019-9325, CVE-2023-9371, and CVE-2023-9433.
+                         Thank you Ken for the original patches, yours are almost
+                         identical to what upstream has in the imminent 2.53.18
+                         release.
+
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/test/decode_api_test.cc seamonkey-2.53.17.1/media/libvpx/libvpx/test/decode_api_test.cc
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/test/decode_api_test.cc	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/test/decode_api_test.cc	2023-10-16 12:39:06.947145620 -0500
+@@ -138,8 +138,30 @@ TEST(DecodeAPI, Vp9InvalidDecode) {
+   EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
+ }
+ 
+-TEST(DecodeAPI, Vp9PeekSI) {
++void TestPeekInfo(const uint8_t *const data, uint32_t data_sz,
++                  uint32_t peek_size) {
+   const vpx_codec_iface_t *const codec = &vpx_codec_vp9_dx_algo;
++  // Verify behavior of vpx_codec_decode. vpx_codec_decode doesn't even get
++  // to decoder_peek_si_internal on frames of size < 8.
++  if (data_sz >= 8) {
++    vpx_codec_ctx_t dec;
++    EXPECT_EQ(VPX_CODEC_OK, vpx_codec_dec_init(&dec, codec, NULL, 0));
++    EXPECT_EQ((data_sz < peek_size) ? VPX_CODEC_UNSUP_BITSTREAM
++                                    : VPX_CODEC_CORRUPT_FRAME,
++              vpx_codec_decode(&dec, data, data_sz, NULL, 0));
++    vpx_codec_iter_t iter = NULL;
++    EXPECT_EQ(NULL, vpx_codec_get_frame(&dec, &iter));
++    EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
++  }
++
++  // Verify behavior of vpx_codec_peek_stream_info.
++  vpx_codec_stream_info_t si;
++  si.sz = sizeof(si);
++  EXPECT_EQ((data_sz < peek_size) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_OK,
++            vpx_codec_peek_stream_info(codec, data, data_sz, &si));
++}
++
++TEST(DecodeAPI, Vp9PeekStreamInfo) {
+   // The first 9 bytes are valid and the rest of the bytes are made up. Until
+   // size 10, this should return VPX_CODEC_UNSUP_BITSTREAM and after that it
+   // should return VPX_CODEC_CORRUPT_FRAME.
+@@ -150,24 +172,18 @@ TEST(DecodeAPI, Vp9PeekSI) {
+   };
+ 
+   for (uint32_t data_sz = 1; data_sz <= 32; ++data_sz) {
+-    // Verify behavior of vpx_codec_decode. vpx_codec_decode doesn't even get
+-    // to decoder_peek_si_internal on frames of size < 8.
+-    if (data_sz >= 8) {
+-      vpx_codec_ctx_t dec;
+-      EXPECT_EQ(VPX_CODEC_OK, vpx_codec_dec_init(&dec, codec, NULL, 0));
+-      EXPECT_EQ(
+-          (data_sz < 10) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_CORRUPT_FRAME,
+-          vpx_codec_decode(&dec, data, data_sz, NULL, 0));
+-      vpx_codec_iter_t iter = NULL;
+-      EXPECT_EQ(NULL, vpx_codec_get_frame(&dec, &iter));
+-      EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
+-    }
+-
+-    // Verify behavior of vpx_codec_peek_stream_info.
+-    vpx_codec_stream_info_t si;
+-    si.sz = sizeof(si);
+-    EXPECT_EQ((data_sz < 10) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_OK,
+-              vpx_codec_peek_stream_info(codec, data, data_sz, &si));
++    TestPeekInfo(data, data_sz, 10);
++  }
++}
++
++TEST(DecodeAPI, Vp9PeekStreamInfoTruncated) {
++  // This profile 1 header requires 10.25 bytes, ensure
++  // vpx_codec_peek_stream_info doesn't over read.
++  const uint8_t profile1_data[10] = { 0xa4, 0xe9, 0x30, 0x68, 0x53,
++                                      0xe9, 0x30, 0x68, 0x53, 0x04 };
++
++  for (uint32_t data_sz = 1; data_sz <= 10; ++data_sz) {
++    TestPeekInfo(profile1_data, data_sz, 11);
+   }
+ }
+ #endif  // CONFIG_VP9_DECODER
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/third_party/libwebm/mkvparser/mkvparser.cc seamonkey-2.53.17.1/media/libvpx/libvpx/third_party/libwebm/mkvparser/mkvparser.cc
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/third_party/libwebm/mkvparser/mkvparser.cc	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/third_party/libwebm/mkvparser/mkvparser.cc	2023-10-16 12:39:06.947145620 -0500
+@@ -5307,8 +5307,8 @@ long VideoTrack::Parse(Segment* pSegment
+ 
+   const long long stop = pos + s.size;
+ 
+-  Colour* colour = NULL;
+-  Projection* projection = NULL;
++  std::unique_ptr<Colour> colour_ptr;
++  std::unique_ptr<Projection> projection_ptr;
+ 
+   while (pos < stop) {
+     long long id, size;
+@@ -5357,11 +5357,19 @@ long VideoTrack::Parse(Segment* pSegment
+       if (rate <= 0)
+         return E_FILE_FORMAT_INVALID;
+     } else if (id == libwebm::kMkvColour) {
+-      if (!Colour::Parse(pReader, pos, size, &colour))
++      Colour* colour = NULL;
++      if (!Colour::Parse(pReader, pos, size, &colour)) {
+         return E_FILE_FORMAT_INVALID;
++      } else {
++        colour_ptr.reset(colour);
++      }
+     } else if (id == libwebm::kMkvProjection) {
+-      if (!Projection::Parse(pReader, pos, size, &projection))
++      Projection* projection = NULL;
++      if (!Projection::Parse(pReader, pos, size, &projection)) {
+         return E_FILE_FORMAT_INVALID;
++      } else {
++        projection_ptr.reset(projection);
++      }
+     }
+ 
+     pos += size;  // consume payload
+@@ -5392,8 +5400,8 @@ long VideoTrack::Parse(Segment* pSegment
+   pTrack->m_display_unit = display_unit;
+   pTrack->m_stereo_mode = stereo_mode;
+   pTrack->m_rate = rate;
+-  pTrack->m_colour = colour;
+-  pTrack->m_projection = projection;
++  pTrack->m_colour = colour_ptr.release();
++  pTrack->m_projection = projection_ptr.release();
+ 
+   pResult = pTrack;
+   return 0;  // success
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp8/decoder/dboolhuff.h seamonkey-2.53.17.1/media/libvpx/libvpx/vp8/decoder/dboolhuff.h
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp8/decoder/dboolhuff.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vp8/decoder/dboolhuff.h	2023-10-16 12:39:06.948145613 -0500
+@@ -76,7 +76,7 @@ static int vp8dx_decode_bool(BOOL_DECODE
+   }
+ 
+   {
+-    register int shift = vp8_norm[range];
++    const unsigned char shift = vp8_norm[(unsigned char)range];
+     range <<= shift;
+     value <<= shift;
+     count -= shift;
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp8/encoder/onyx_if.c seamonkey-2.53.17.1/media/libvpx/libvpx/vp8/encoder/onyx_if.c
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp8/encoder/onyx_if.c	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vp8/encoder/onyx_if.c	2023-10-16 12:39:06.948145613 -0500
+@@ -1449,6 +1449,11 @@ void vp8_change_config(VP8_COMP *cpi, VP
+   last_h = cpi->oxcf.Height;
+   prev_number_of_layers = cpi->oxcf.number_of_layers;
+ 
++  if (cpi->initial_width) {
++    // TODO(https://crbug.com/1486441): Allow changing thread counts; the
++    // allocation is done once in vp8_create_compressor().
++    oxcf->multi_threaded = cpi->oxcf.multi_threaded;
++  }
+   cpi->oxcf = *oxcf;
+ 
+   switch (cpi->oxcf.Mode) {
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/common/vp9_alloccommon.c seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/common/vp9_alloccommon.c
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/common/vp9_alloccommon.c	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/common/vp9_alloccommon.c	2023-10-16 12:39:06.948145613 -0500
+@@ -122,13 +122,6 @@ int vp9_alloc_context_buffers(VP9_COMMON
+     cm->free_mi(cm);
+     if (cm->alloc_mi(cm, new_mi_size)) goto fail;
+   }
+-
+-  if (cm->seg_map_alloc_size < cm->mi_rows * cm->mi_cols) {
+-    // Create the segmentation map structure and set to 0.
+-    free_seg_map(cm);
+-    if (alloc_seg_map(cm, cm->mi_rows * cm->mi_cols)) goto fail;
+-  }
+-
+   if (cm->above_context_alloc_cols < cm->mi_cols) {
+     vpx_free(cm->above_context);
+     cm->above_context = (ENTROPY_CONTEXT *)vpx_calloc(
+@@ -143,6 +136,12 @@ int vp9_alloc_context_buffers(VP9_COMMON
+     cm->above_context_alloc_cols = cm->mi_cols;
+   }
+ 
++  if (cm->seg_map_alloc_size < cm->mi_rows * cm->mi_cols) {
++    // Create the segmentation map structure and set to 0.
++    free_seg_map(cm);
++    if (alloc_seg_map(cm, cm->mi_rows * cm->mi_cols)) goto fail;
++  }
++
+   if (vp9_alloc_loop_filter(cm)) goto fail;
+ 
+   return 0;
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/encoder/vp9_encoder.c seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/encoder/vp9_encoder.c
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/encoder/vp9_encoder.c	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/encoder/vp9_encoder.c	2023-10-16 12:39:06.949145605 -0500
+@@ -1751,6 +1751,17 @@ static void alloc_copy_partition_data(VP
+   }
+ }
+ 
++static void free_copy_partition_data(VP9_COMP *cpi) {
++  vpx_free(cpi->prev_partition);
++  cpi->prev_partition = NULL;
++  vpx_free(cpi->prev_segment_id);
++  cpi->prev_segment_id = NULL;
++  vpx_free(cpi->prev_variance_low);
++  cpi->prev_variance_low = NULL;
++  vpx_free(cpi->copied_frame_cnt);
++  cpi->copied_frame_cnt = NULL;
++}
++
+ void vp9_change_config(struct VP9_COMP *cpi, const VP9EncoderConfig *oxcf) {
+   VP9_COMMON *const cm = &cpi->common;
+   RATE_CONTROL *const rc = &cpi->rc;
+@@ -1834,6 +1845,8 @@ void vp9_change_config(struct VP9_COMP *
+     new_mi_size = cm->mi_stride * calc_mi_size(cm->mi_rows);
+     if (cm->mi_alloc_size < new_mi_size) {
+       vp9_free_context_buffers(cm);
++      vp9_free_pc_tree(&cpi->td);
++      vpx_free(cpi->mbmi_ext_base);
+       alloc_compressor_data(cpi);
+       realloc_segmentation_maps(cpi);
+       cpi->initial_width = cpi->initial_height = 0;
+@@ -1849,8 +1862,18 @@ void vp9_change_config(struct VP9_COMP *
+     update_frame_size(cpi);
+ 
+   if (last_w != cpi->oxcf.width || last_h != cpi->oxcf.height) {
+-    memset(cpi->consec_zero_mv, 0,
+-           cm->mi_rows * cm->mi_cols * sizeof(*cpi->consec_zero_mv));
++    vpx_free(cpi->consec_zero_mv);
++    CHECK_MEM_ERROR(
++        cm, cpi->consec_zero_mv,
++        vpx_calloc(cm->mi_rows * cm->mi_cols, sizeof(*cpi->consec_zero_mv)));
++
++    vpx_free(cpi->skin_map);
++    CHECK_MEM_ERROR(
++        cm, cpi->skin_map,
++        vpx_calloc(cm->mi_rows * cm->mi_cols, sizeof(cpi->skin_map[0])));
++
++    free_copy_partition_data(cpi);
++    alloc_copy_partition_data(cpi);
+     if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ)
+       vp9_cyclic_refresh_reset_resize(cpi);
+     rc->rc_1_frame = 0;
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/vp9_dx_iface.c seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/vp9_dx_iface.c
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vp9/vp9_dx_iface.c	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vp9/vp9_dx_iface.c	2023-10-16 12:39:06.949145605 -0500
+@@ -97,7 +97,7 @@ static vpx_codec_err_t decoder_peek_si_i
+     const uint8_t *data, unsigned int data_sz, vpx_codec_stream_info_t *si,
+     int *is_intra_only, vpx_decrypt_cb decrypt_cb, void *decrypt_state) {
+   int intra_only_flag = 0;
+-  uint8_t clear_buffer[10];
++  uint8_t clear_buffer[11];
+ 
+   if (data + data_sz <= data) return VPX_CODEC_INVALID_PARAM;
+ 
+@@ -158,6 +158,9 @@ static vpx_codec_err_t decoder_peek_si_i
+         if (profile > PROFILE_0) {
+           if (!parse_bitdepth_colorspace_sampling(profile, &rb))
+             return VPX_CODEC_UNSUP_BITSTREAM;
++          // The colorspace info may cause vp9_read_frame_size() to need 11
++          // bytes.
++          if (data_sz < 11) return VPX_CODEC_UNSUP_BITSTREAM;
+         }
+         rb.bit_offset += REF_FRAMES;  // refresh_frame_flags
+         vp9_read_frame_size(&rb, (int *)&si->w, (int *)&si->h);
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vpx_dsp/bitreader_buffer.c seamonkey-2.53.17.1/media/libvpx/libvpx/vpx_dsp/bitreader_buffer.c
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vpx_dsp/bitreader_buffer.c	2020-10-20 14:17:58.000000000 -0500
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vpx_dsp/bitreader_buffer.c	2023-10-16 12:39:06.949145605 -0500
+@@ -23,7 +23,7 @@ int vpx_rb_read_bit(struct vpx_read_bit_
+     rb->bit_offset = off + 1;
+     return bit;
+   } else {
+-    rb->error_handler(rb->error_handler_data);
++    if (rb->error_handler != NULL) rb->error_handler(rb->error_handler_data);
+     return 0;
+   }
+ }
+diff -Naurp seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vpx_dsp/bitreader.h seamonkey-2.53.17.1/media/libvpx/libvpx/vpx_dsp/bitreader.h
+--- seamonkey-2.53.17.1.orig/media/libvpx/libvpx/vpx_dsp/bitreader.h	2020-02-17 17:37:58.000000000 -0600
++++ seamonkey-2.53.17.1/media/libvpx/libvpx/vpx_dsp/bitreader.h	2023-10-16 12:39:06.949145605 -0500
+@@ -94,7 +94,7 @@ static INLINE int vpx_read(vpx_reader *r
+   }
+ 
+   {
+-    register int shift = vpx_norm[range];
++    const unsigned char shift = vpx_norm[(unsigned char)range];
+     range <<= shift;
+     value <<= shift;
+     count -= shift;
