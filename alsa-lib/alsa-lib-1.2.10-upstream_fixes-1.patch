@@ -1,0 +1,298 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-10-20
+Initial Package Version: 1.2.10
+Origin:                  Upstream ("pcm: Fix segfault with 32bit libs",
+                                   "reshuffle included files to include config.h as first - v2", and
+                                   "seq: Fix typos in symbol version definitions")
+Upstream Status:         Applied
+Description:             Fixes segmentation faults on some systems due to
+                         definitions such as _FILE_OFFSET_BITS not being set
+                         prior to bringing in some system headers. Rearranging
+                         the header inclusion order causes inconsistent compile
+                         conditions depending on when config.h is included.
+                         This was a regression introduced in 1.2.10 and was
+                         fixed upstream by adjusting the header include order
+                         again.
+
+                         This patch also fixes another minor problem with the
+                         symbol version table (another regression from 1.2.10)
+
+diff -Naurp alsa-lib-1.2.10.orig/include/control.h alsa-lib-1.2.10/include/control.h
+--- alsa-lib-1.2.10.orig/include/control.h	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/include/control.h	2023-10-20 16:46:29.505236271 -0500
+@@ -413,6 +413,8 @@ int snd_ctl_pcm_prefer_subdevice(snd_ctl
+ int snd_ctl_rawmidi_next_device(snd_ctl_t *ctl, int * device);
+ int snd_ctl_rawmidi_info(snd_ctl_t *ctl, snd_rawmidi_info_t * info);
+ int snd_ctl_rawmidi_prefer_subdevice(snd_ctl_t *ctl, int subdev);
++#endif
++#ifdef __ALSA_UMP_H
+ int snd_ctl_ump_next_device(snd_ctl_t *ctl, int *device);
+ int snd_ctl_ump_endpoint_info(snd_ctl_t *ctl, snd_ump_endpoint_info_t *info);
+ int snd_ctl_ump_block_info(snd_ctl_t *ctl, snd_ump_block_info_t *info);
+diff -Naurp alsa-lib-1.2.10.orig/src/control/setup.c alsa-lib-1.2.10/src/control/setup.c
+--- alsa-lib-1.2.10.orig/src/control/setup.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/control/setup.c	2023-10-20 16:42:09.000879911 -0500
+@@ -29,13 +29,13 @@
+  *
+  */
+ 
++#include "local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <ctype.h>
+-#include "local.h"
+ 
+ #ifndef DOC_HIDDEN
+ typedef struct {
+diff -Naurp alsa-lib-1.2.10.orig/src/pcm/pcm_direct.c alsa-lib-1.2.10/src/pcm/pcm_direct.c
+--- alsa-lib-1.2.10.orig/src/pcm/pcm_direct.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/pcm/pcm_direct.c	2023-10-20 16:35:18.944735769 -0500
+@@ -18,7 +18,8 @@
+  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+  */
+-  
++
++#include "pcm_local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stddef.h>
+diff -Naurp alsa-lib-1.2.10.orig/src/pcm/pcm_dmix.c alsa-lib-1.2.10/src/pcm/pcm_dmix.c
+--- alsa-lib-1.2.10.orig/src/pcm/pcm_dmix.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/pcm/pcm_dmix.c	2023-10-20 16:35:39.027841168 -0500
+@@ -26,7 +26,7 @@
+  *
+  */
+   
+-#include "config.h"
++#include "pcm_local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stddef.h>
+diff -Naurp alsa-lib-1.2.10.orig/src/pcm/pcm_dshare.c alsa-lib-1.2.10/src/pcm/pcm_dshare.c
+--- alsa-lib-1.2.10.orig/src/pcm/pcm_dshare.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/pcm/pcm_dshare.c	2023-10-20 16:35:56.365932123 -0500
+@@ -25,7 +25,8 @@
+  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+  */
+-  
++
++#include "pcm_local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stddef.h>
+diff -Naurp alsa-lib-1.2.10.orig/src/pcm/pcm_dsnoop.c alsa-lib-1.2.10/src/pcm/pcm_dsnoop.c
+--- alsa-lib-1.2.10.orig/src/pcm/pcm_dsnoop.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/pcm/pcm_dsnoop.c	2023-10-20 16:36:10.288005131 -0500
+@@ -25,7 +25,8 @@
+  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+  */
+-  
++
++#include "pcm_local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stddef.h>
+diff -Naurp alsa-lib-1.2.10.orig/src/pcm/pcm_local.h alsa-lib-1.2.10/src/pcm/pcm_local.h
+--- alsa-lib-1.2.10.orig/src/pcm/pcm_local.h	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/pcm/pcm_local.h	2023-10-20 16:36:59.443262728 -0500
+@@ -20,6 +20,9 @@
+  *
+  */
+ 
++#ifndef __PCM_LOCAL_H
++#define __PCM_LOCAL_H
++
+ #include "config.h"
+ 
+ #include <stdio.h>
+@@ -1218,8 +1221,11 @@ static inline void snd_pcm_unlock(snd_pc
+ 		pthread_mutex_unlock(&pcm->lock);
+ }
+ #else /* THREAD_SAFE_API */
++
+ #define __snd_pcm_lock(pcm)		do {} while (0)
+ #define __snd_pcm_unlock(pcm)		do {} while (0)
+ #define snd_pcm_lock(pcm)		do {} while (0)
+ #define snd_pcm_unlock(pcm)		do {} while (0)
+ #endif /* THREAD_SAFE_API */
++
++#endif /* __PCM_LOCAL_H */
+diff -Naurp alsa-lib-1.2.10.orig/src/rawmidi/rawmidi.c alsa-lib-1.2.10/src/rawmidi/rawmidi.c
+--- alsa-lib-1.2.10.orig/src/rawmidi/rawmidi.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/rawmidi/rawmidi.c	2023-10-20 16:42:35.269016825 -0500
+@@ -144,12 +144,12 @@ This example shows open and read/write r
+  * Shows open and read/write rawmidi operations.
+  */
+  
++#include "rawmidi_local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <unistd.h>
+ #include <string.h>
+-#include "rawmidi_local.h"
+ 
+ /**
+  * \brief setup the default parameters
+diff -Naurp alsa-lib-1.2.10.orig/src/rawmidi/rawmidi_local.h alsa-lib-1.2.10/src/rawmidi/rawmidi_local.h
+--- alsa-lib-1.2.10.orig/src/rawmidi/rawmidi_local.h	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/rawmidi/rawmidi_local.h	2023-10-20 16:42:53.472111678 -0500
+@@ -19,10 +19,10 @@
+  *
+  */
+ 
++#include "local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <limits.h>
+-#include "local.h"
+ 
+ typedef struct {
+ 	int (*close)(snd_rawmidi_t *rawmidi);
+diff -Naurp alsa-lib-1.2.10.orig/src/rawmidi/rawmidi_virt.c alsa-lib-1.2.10/src/rawmidi/rawmidi_virt.c
+--- alsa-lib-1.2.10.orig/src/rawmidi/rawmidi_virt.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/rawmidi/rawmidi_virt.c	2023-10-20 16:43:17.913239018 -0500
+@@ -19,13 +19,11 @@
+  *
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
++#include "rawmidi_local.h"
+ #include <unistd.h>
+ #include <string.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+-#include "rawmidi_local.h"
+ #include "seq.h"
+ #include "seq_midi_event.h"
+ 
+diff -Naurp alsa-lib-1.2.10.orig/src/rawmidi/ump.c alsa-lib-1.2.10/src/rawmidi/ump.c
+--- alsa-lib-1.2.10.orig/src/rawmidi/ump.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/rawmidi/ump.c	2023-10-20 16:43:40.132354754 -0500
+@@ -4,10 +4,6 @@
+  * \brief Universal MIDI Protocol (UMP) Interface
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <limits.h>
+-#include "local.h"
+ #include "rawmidi_local.h"
+ #include "ump_local.h"
+ 
+diff -Naurp alsa-lib-1.2.10.orig/src/seq/seq.c alsa-lib-1.2.10/src/seq/seq.c
+--- alsa-lib-1.2.10.orig/src/seq/seq.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/seq/seq.c	2023-10-20 16:44:15.012536399 -0500
+@@ -777,8 +777,8 @@ void event_filter(snd_seq_t *seq, snd_se
+ 
+ */
+ 
+-#include <poll.h>
+ #include "seq_local.h"
++#include <poll.h>
+ 
+ /****************************************************************************
+  *                                                                          *
+diff -Naurp alsa-lib-1.2.10.orig/src/seq/seq_hw.c alsa-lib-1.2.10/src/seq/seq_hw.c
+--- alsa-lib-1.2.10.orig/src/seq/seq_hw.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/seq/seq_hw.c	2023-10-20 16:44:34.112635837 -0500
+@@ -20,9 +20,9 @@
+  *
+  */
+ 
++#include "seq_local.h"
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+-#include "seq_local.h"
+ 
+ #ifndef PIC
+ /* entry for static linking */
+diff -Naurp alsa-lib-1.2.10.orig/src/seq/seq_local.h alsa-lib-1.2.10/src/seq/seq_local.h
+--- alsa-lib-1.2.10.orig/src/seq/seq_local.h	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/seq/seq_local.h	2023-10-20 16:44:52.409731078 -0500
+@@ -23,10 +23,10 @@
+ #ifndef __SEQ_LOCAL_H
+ #define __SEQ_LOCAL_H
+ 
++#include "local.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <limits.h>
+-#include "local.h"
+ 
+ #define SND_SEQ_OBUF_SIZE	(16*1024)	/* default size */
+ #define SND_SEQ_IBUF_SIZE	500		/* in event_size aligned */
+diff -Naurp alsa-lib-1.2.10.orig/src/seq/seqmid.c alsa-lib-1.2.10/src/seq/seqmid.c
+--- alsa-lib-1.2.10.orig/src/seq/seqmid.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/seq/seqmid.c	2023-10-20 16:45:34.638950841 -0500
+@@ -20,14 +20,12 @@
+  *
+  */
+ 
+-#include <stdio.h>
+-#include <stdlib.h>
++#include "seq_local.h"
+ #include <unistd.h>
+ #include <string.h>
+ #include <fcntl.h>
+ #include <ctype.h>
+ #include <sys/ioctl.h>
+-#include "seq_local.h"
+ 
+ /**
+  * \brief queue controls - start/stop/continue
+diff -Naurp alsa-lib-1.2.10.orig/src/seq/seq_midi_event.c alsa-lib-1.2.10/src/seq/seq_midi_event.c
+--- alsa-lib-1.2.10.orig/src/seq/seq_midi_event.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/seq/seq_midi_event.c	2023-10-20 16:45:12.346834843 -0500
+@@ -28,10 +28,10 @@
+  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include "local.h"
+ #if HAVE_MALLOC_H
+ #include <malloc.h>
+ #endif
+-#include "local.h"
+ 
+ #ifndef DOC_HIDDEN
+ 
+diff -Naurp alsa-lib-1.2.10.orig/src/userfile.c alsa-lib-1.2.10/src/userfile.c
+--- alsa-lib-1.2.10.orig/src/userfile.c	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/userfile.c	2023-10-20 16:45:49.591028638 -0500
+@@ -18,7 +18,7 @@
+  *
+  */
+   
+-#include <config.h>
++#include "config.h"
+ #include <string.h>
+ #include <errno.h>
+ #include <assert.h>
+diff -Naurp alsa-lib-1.2.10.orig/src/Versions.in alsa-lib-1.2.10/src/Versions.in
+--- alsa-lib-1.2.10.orig/src/Versions.in	2023-09-01 10:35:48.000000000 -0500
++++ alsa-lib-1.2.10/src/Versions.in	2023-10-20 16:47:16.196479087 -0500
+@@ -158,13 +158,13 @@ ALSA_1.2.10 {
+     @SYMBOL_PREFIX@snd_ctl_ump_block_info;
+     @SYMBOL_PREFIX@snd_seq_ump_*;
+     @SYMBOL_PREFIX@snd_seq_client_info_get_midi_version;
+-    @SYMBOL_PREFIX@snd_seq_seq_client_info_get_ump_group_enabled;
++    @SYMBOL_PREFIX@snd_seq_client_info_get_ump_group_enabled;
+     @SYMBOL_PREFIX@snd_seq_client_info_get_ump_groupless_enabled;
+-    @SYMBOL_PREFIX@snd_seq_seq_client_get_ump_conversion;
++    @SYMBOL_PREFIX@snd_seq_client_get_ump_conversion;
+     @SYMBOL_PREFIX@snd_seq_client_info_set_midi_version;
+-    @SYMBOL_PREFIX@snd_seq_seq_client_info_set_ump_group_enabled;
++    @SYMBOL_PREFIX@snd_seq_client_info_set_ump_group_enabled;
+     @SYMBOL_PREFIX@snd_seq_client_info_set_ump_groupless_enabled;
+-    @SYMBOL_PREFIX@snd_seq_seq_client_set_ump_conversion;
++    @SYMBOL_PREFIX@snd_seq_client_set_ump_conversion;
+     @SYMBOL_PREFIX@snd_seq_get_ump_endpoint_info;
+     @SYMBOL_PREFIX@snd_seq_get_ump_block_info;
+     @SYMBOL_PREFIX@snd_seq_set_ump_endpoint_info;
