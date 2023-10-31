@@ -1,0 +1,312 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-10-30
+Initial Package Version: 3.6.1
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fixes several problems with the recent seccomp sandbox
+                         tightening as a result of CVE-2023-5557. In particular,
+                         this fixes crashes with a SIGSYS on i686, armhf, aarch64,
+                         ppc32, and ppc64le architectures, but also handles the
+                         netfilter syscalls on all architectures and prevents
+                         the open/openat() flags from being used, and disallows
+                         close/dup2/dup3() on standard I/O FDs.
+
+                         These are effectively !490, !496, !480, and !488
+                         upstream, and fixes issues #289, #285, #287, #288,
+                         #284, #283, #281, and #280 upstream.
+
+                         On all architectures, this patch will also output the
+                         syscall that was used when crashing with a SIGSYS.
+
+diff -Naurp tracker-miners-3.6.1.orig/src/libtracker-miners-common/tracker-seccomp.c tracker-miners-3.6.1/src/libtracker-miners-common/tracker-seccomp.c
+--- tracker-miners-3.6.1.orig/src/libtracker-miners-common/tracker-seccomp.c	2023-09-28 04:28:31.000000000 -0500
++++ tracker-miners-3.6.1/src/libtracker-miners-common/tracker-seccomp.c	2023-10-30 12:30:33.050839425 -0500
+@@ -36,6 +36,8 @@
+ #include <sys/socket.h>
+ #include <fcntl.h>
+ 
++#include <linux/netlink.h>
++
+ #ifdef HAVE_BTRFS_IOCTL
+ #include <linux/btrfs.h>
+ #endif
+@@ -47,19 +49,37 @@
+ #endif
+ 
+ #define ALLOW_RULE(call) G_STMT_START { \
+-	int allow_rule_syscall_number = seccomp_syscall_resolve_name (G_STRINGIFY (call)); \
++	int allow_rule_syscall_number = seccomp_syscall_resolve_name (#call); \
++	current_syscall = #call; \
+ 	if (allow_rule_syscall_number == __NR_SCMP_ERROR || \
+ 	    seccomp_rule_add (ctx, SCMP_ACT_ALLOW, allow_rule_syscall_number, 0) < 0) \
+ 		goto out; \
+ } G_STMT_END
+ 
+ #define ERROR_RULE(call, error) G_STMT_START { \
+-	int error_rule_syscall_number = seccomp_syscall_resolve_name (G_STRINGIFY (call)); \
++	int error_rule_syscall_number = seccomp_syscall_resolve_name (#call); \
++	current_syscall = #call; \
+ 	if (error_rule_syscall_number == __NR_SCMP_ERROR || \
+ 	    seccomp_rule_add (ctx, SCMP_ACT_ERRNO (error), error_rule_syscall_number, 0) < 0) \
+ 		goto out; \
+ } G_STMT_END
+ 
++#define CUSTOM_RULE(call, action, arg1) G_STMT_START { \
++	int custom_rule_syscall_number = seccomp_syscall_resolve_name (#call); \
++	current_syscall = #call; \
++	if (custom_rule_syscall_number == __NR_SCMP_ERROR || \
++	    seccomp_rule_add (ctx, action, custom_rule_syscall_number, 1, arg1) < 0) \
++		goto out; \
++} G_STMT_END
++
++#define CUSTOM_RULE_2ARG(call, action, arg1, arg2) G_STMT_START {	  \
++	int custom_rule_syscall_number = seccomp_syscall_resolve_name (#call); \
++	current_syscall = #call; \
++	if (custom_rule_syscall_number == __NR_SCMP_ERROR || \
++	    seccomp_rule_add (ctx, action, custom_rule_syscall_number, 2, arg1, arg2) < 0) \
++		goto out; \
++} G_STMT_END
++
+ static void
+ sigsys_handler (gint       signal,
+                 siginfo_t *info,
+@@ -96,6 +116,7 @@ gboolean
+ tracker_seccomp_init (void)
+ {
+ 	scmp_filter_ctx ctx;
++	const gchar *current_syscall = NULL;
+ 
+ 	if (!initialize_sigsys_handler ())
+ 		return FALSE;
+@@ -124,8 +145,9 @@ tracker_seccomp_init (void)
+ 	/* Process management */
+ 	ALLOW_RULE (exit_group);
+ 	ALLOW_RULE (getuid);
+-	ALLOW_RULE (getgid);
+ 	ALLOW_RULE (getuid32);
++	ALLOW_RULE (getgid);
++	ALLOW_RULE (getgid32);
+ 	ALLOW_RULE (getegid);
+ 	ALLOW_RULE (getegid32);
+ 	ALLOW_RULE (geteuid);
+@@ -149,6 +171,7 @@ tracker_seccomp_init (void)
+ 	ALLOW_RULE (lstat64);
+ 	ALLOW_RULE (statx);
+ 	ALLOW_RULE (fstatfs);
++	ALLOW_RULE (fstatfs64);
+ 	ALLOW_RULE (access);
+ 	ALLOW_RULE (faccessat);
+ 	ALLOW_RULE (faccessat2);
+@@ -161,6 +184,7 @@ tracker_seccomp_init (void)
+ 	ALLOW_RULE (time);
+ 	ALLOW_RULE (fsync);
+ 	ALLOW_RULE (umask);
++	ALLOW_RULE (chdir);
+ 	ERROR_RULE (fchown, EPERM);
+ 	/* Processes and threads */
+ 	ALLOW_RULE (clone);
+@@ -180,6 +204,7 @@ tracker_seccomp_init (void)
+ 	ALLOW_RULE (waitid);
+ 	ALLOW_RULE (waitpid);
+ 	ALLOW_RULE (wait4);
++	ALLOW_RULE (restart_syscall);
+ 	/* Main loops */
+ 	ALLOW_RULE (poll);
+ 	ALLOW_RULE (ppoll);
+@@ -202,8 +227,11 @@ tracker_seccomp_init (void)
+ 	ALLOW_RULE (clock_gettime64);
+ 	ALLOW_RULE (clock_getres);
+ 	ALLOW_RULE (gettimeofday);
++	ALLOW_RULE (timerfd_create);
+ 	/* Descriptors */
+-	ALLOW_RULE (close);
++	CUSTOM_RULE (close, SCMP_ACT_ALLOW, SCMP_CMP (0, SCMP_CMP_GT, STDERR_FILENO));
++	CUSTOM_RULE (dup2, SCMP_ACT_ALLOW, SCMP_CMP (1, SCMP_CMP_GT, STDERR_FILENO));
++	CUSTOM_RULE (dup3, SCMP_ACT_ALLOW, SCMP_CMP (1, SCMP_CMP_GT, STDERR_FILENO));
+ 	ALLOW_RULE (read);
+ 	ALLOW_RULE (lseek);
+ 	ALLOW_RULE (_llseek);
+@@ -213,8 +241,6 @@ tracker_seccomp_init (void)
+ 	ALLOW_RULE (write);
+ 	ALLOW_RULE (writev);
+ 	ALLOW_RULE (dup);
+-	ALLOW_RULE (dup2);
+-	ALLOW_RULE (dup3);
+ 	/* Needed by some GStreamer modules doing crazy stuff, less
+ 	 * scary thanks to the restriction below about sockets being
+ 	 * local.
+@@ -241,65 +267,43 @@ tracker_seccomp_init (void)
+ 	ERROR_RULE (setsockopt, EBADF);
+ 	ERROR_RULE (sched_getattr, EPERM);
+ 
++	/* Allow tgkill on self, for abort() and friends */
++	CUSTOM_RULE (tgkill, SCMP_ACT_ALLOW, SCMP_CMP(0, SCMP_CMP_EQ, getpid()));
++
+ 	/* Allow prlimit64, only if no new limits are being set */
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(prlimit64), 1,
+-	                      SCMP_CMP(2, SCMP_CMP_EQ, 0)) < 0)
+-		goto out;
+-
+-	/* Special requirements for socket/socketpair, only on AF_UNIX/AF_LOCAL */
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(socket), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, AF_UNIX)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(socket), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, AF_LOCAL)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ERRNO (EACCES), SCMP_SYS(socket), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, AF_NETLINK)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(socketpair), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, AF_UNIX)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(socketpair), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, AF_LOCAL)) < 0)
+-		goto out;
++	CUSTOM_RULE (prlimit64, SCMP_ACT_ALLOW, SCMP_CMP(2, SCMP_CMP_EQ, 0));
++
++	/* Special requirements for socket/socketpair, only on AF_UNIX/AF_LOCAL,
++	 * and AF_NETLINK/NETLINK_KOBJECT_UEVENT for udev.
++	 */
++	CUSTOM_RULE (socket, SCMP_ACT_ALLOW, SCMP_CMP(0, SCMP_CMP_EQ, AF_UNIX));
++	CUSTOM_RULE (socket, SCMP_ACT_ALLOW, SCMP_CMP(0, SCMP_CMP_EQ, AF_LOCAL));
++	CUSTOM_RULE_2ARG (socket, SCMP_ACT_ALLOW,
++	                  SCMP_CMP (0, SCMP_CMP_EQ, AF_NETLINK),
++	                  SCMP_CMP (2, SCMP_CMP_EQ, NETLINK_KOBJECT_UEVENT));
++
++	CUSTOM_RULE (socketpair, SCMP_ACT_ALLOW, SCMP_CMP(0, SCMP_CMP_EQ, AF_UNIX));
++	CUSTOM_RULE (socketpair, SCMP_ACT_ALLOW, SCMP_CMP(0, SCMP_CMP_EQ, AF_LOCAL));
+ 
+ #ifdef HAVE_BTRFS_IOCTL
+ 	/* Special requirements for btrfs, allowed for BTRFS_IOC_INO_LOOKUP */
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(ioctl), 1,
+-	                      SCMP_CMP(1, SCMP_CMP_EQ, BTRFS_IOC_INO_LOOKUP)) < 0)
+-		goto out;
++	CUSTOM_RULE (ioctl, SCMP_ACT_ALLOW, SCMP_CMP(1, SCMP_CMP_EQ, BTRFS_IOC_INO_LOOKUP));
+ #endif
+ 
+-	/* Special requirements for ioctl, allowed on stdout/stderr */
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(ioctl), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, 1)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(ioctl), 1,
+-	                      SCMP_CMP(0, SCMP_CMP_EQ, 2)) < 0)
+-		goto out;
+-
+ 	/* Special requirements for open/openat, allow O_RDONLY calls,
+          * but fail if write permissions are requested.
+ 	 */
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
+-	                      SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ERRNO (EACCES), SCMP_SYS(open), 1,
+-	                      SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY, O_WRONLY)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ERRNO (EACCES), SCMP_SYS(open), 1,
+-	                      SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_RDWR, O_RDWR)) < 0)
+-		goto out;
+-
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
+-	                      SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ERRNO (EACCES), SCMP_SYS(openat), 1,
+-	                      SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY, O_WRONLY)) < 0)
+-		goto out;
+-	if (seccomp_rule_add (ctx, SCMP_ACT_ERRNO (EACCES), SCMP_SYS(openat), 1,
+-	                      SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_RDWR, O_RDWR)) < 0)
+-		goto out;
++	CUSTOM_RULE (open, SCMP_ACT_ALLOW,
++	             SCMP_CMP (1, SCMP_CMP_MASKED_EQ,
++	                       O_WRONLY | O_RDWR | O_APPEND | O_CREAT | O_TRUNC | O_EXCL, 0));
++	CUSTOM_RULE (open, SCMP_ACT_ERRNO (EACCES), SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY, O_WRONLY));
++	CUSTOM_RULE (open, SCMP_ACT_ERRNO (EACCES), SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_RDWR, O_RDWR));
++
++	CUSTOM_RULE (openat, SCMP_ACT_ALLOW,
++	             SCMP_CMP (2, SCMP_CMP_MASKED_EQ,
++	                       O_WRONLY | O_RDWR | O_APPEND | O_CREAT | O_TRUNC | O_EXCL, 0));
++	CUSTOM_RULE (openat, SCMP_ACT_ERRNO (EACCES), SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY, O_WRONLY));
++	CUSTOM_RULE (openat, SCMP_ACT_ERRNO (EACCES), SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_RDWR, O_RDWR));
+ 
+ 	/* Syscalls may differ between libcs */
+ #if !defined(__GLIBC__)
+@@ -318,7 +322,7 @@ tracker_seccomp_init (void)
+ 	}
+ 
+ out:
+-	g_critical ("Failed to load seccomp rules.");
++	g_critical ("Failed to load seccomp rule for syscall '%s'", current_syscall);
+ 	seccomp_release (ctx);
+ 	return FALSE;
+ }
+diff -Naurp tracker-miners-3.6.1.orig/src/miners/fs/meson.build tracker-miners-3.6.1/src/miners/fs/meson.build
+--- tracker-miners-3.6.1.orig/src/miners/fs/meson.build	2023-09-28 04:28:31.000000000 -0500
++++ tracker-miners-3.6.1/src/miners/fs/meson.build	2023-10-30 12:31:35.084327005 -0500
+@@ -54,9 +54,10 @@ sources = [
+ ]
+ 
+ tracker_miner_fs_deps = [
+-     tracker_miners_common_dep,
+-     tracker_miner_dep,
+-     tracker_extract_dep
++    tracker_miners_common_dep,
++    tracker_miner_dep,
++    tracker_extract_dep,
++    gstreamer,
+ ]
+ 
+ executable('tracker-miner-fs-@0@'.format(tracker_api_major),
+diff -Naurp tracker-miners-3.6.1.orig/src/miners/fs/tracker-main.c tracker-miners-3.6.1/src/miners/fs/tracker-main.c
+--- tracker-miners-3.6.1.orig/src/miners/fs/tracker-main.c	2023-09-28 04:28:31.000000000 -0500
++++ tracker-miners-3.6.1/src/miners/fs/tracker-main.c	2023-10-30 12:31:35.085327013 -0500
+@@ -36,6 +36,8 @@
+ #include <glib-object.h>
+ #include <glib/gi18n.h>
+ 
++#include <gst/gst.h>
++
+ #include <libtracker-miners-common/tracker-common.h>
+ #include <libtracker-sparql/tracker-sparql.h>
+ 
+@@ -772,6 +774,11 @@ main (gint argc, gchar *argv[])
+ 	 */
+ 	raise_file_descriptor_limit ();
+ 
++	/* Preempt possible registry updates, before tracker-extract-3 deals
++	 * with gstreamer plugins.
++	 */
++	gst_init (NULL, NULL);
++
+ 	/* Translators: this messagge will apper immediately after the
+ 	 * usage string - Usage: COMMAND <THIS_MESSAGE>
+ 	 */
+diff -Naurp tracker-miners-3.6.1.orig/src/tracker-extract/tracker-main.c tracker-miners-3.6.1/src/tracker-extract/tracker-main.c
+--- tracker-miners-3.6.1.orig/src/tracker-extract/tracker-main.c	2023-09-28 04:28:31.000000000 -0500
++++ tracker-miners-3.6.1/src/tracker-extract/tracker-main.c	2023-10-30 12:31:35.085327013 -0500
+@@ -309,6 +309,8 @@ do_main (int argc, char *argv[])
+ 	TrackerDomainOntology *domain_ontology;
+ 	gchar *dbus_name, *miner_dbus_name;
+ 
++	g_setenv ("GST_REGISTRY_UPDATE", "no", TRUE);
++
+ 	bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
+ 	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+ 	textdomain (GETTEXT_PACKAGE);
+@@ -369,6 +371,9 @@ do_main (int argc, char *argv[])
+ 
+ 	tracker_content_identifier_cache_init ();
+ 
++	tracker_extract_module_manager_init ();
++	tracker_module_manager_load_modules ();
++
+ 	/* Set conditions when we use stand alone settings */
+ 	if (filename) {
+ 		return run_standalone ();
+@@ -380,8 +385,6 @@ do_main (int argc, char *argv[])
+ 		return EXIT_FAILURE;
+ 	}
+ 
+-	tracker_module_manager_load_modules ();
+-
+ 	miner_dbus_name = tracker_domain_ontology_get_domain (domain_ontology,
+ 	                                                      MINER_FS_NAME_SUFFIX);
+ 	sparql_connection = tracker_sparql_connection_bus_new (miner_dbus_name,
