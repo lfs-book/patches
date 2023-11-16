@@ -1,0 +1,113 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111.site>
+Date:                    2023-11-16
+Initial Package Version: 2.7.1
+Upstream Status:         N/A
+Origin:                  Self
+Description:             Fix signed integer overflows.  With the default
+                         CFLAGS they do not blow up the package, but with
+                         my optimization there are several test failures.
+                         These integer overflows can be easily detected with
+                         the sanitizer and fixing them allows all tests pass
+                         with -ffp-contract=off -fno-lto.  Generally we
+                         don't encourage building packages with custom
+                         CFLAGS, so this patch is only for reference and it
+                         won't be added into BLFS (unless with a future GCC
+                         version something start to blow up).
+
+diff --color -Naur gsl-2.7.1/multifit_nlinear/nielsen.c gsl-2.7.1-patched/multifit_nlinear/nielsen.c
+--- gsl-2.7.1/multifit_nlinear/nielsen.c	2018-11-15 05:27:10.000000000 +0800
++++ gsl-2.7.1-patched/multifit_nlinear/nielsen.c	2023-11-16 20:17:11.044744261 +0800
+@@ -95,7 +95,7 @@
+   *mu *= (double) *nu;
+ 
+   /* nu := 2*nu */
+-  *nu <<= 1;
++  *nu = (unsigned long)*nu << 1;
+ 
+   return GSL_SUCCESS;
+ }
+diff --color -Naur gsl-2.7.1/multilarge_nlinear/nielsen.c gsl-2.7.1-patched/multilarge_nlinear/nielsen.c
+--- gsl-2.7.1/multilarge_nlinear/nielsen.c	2019-05-30 03:32:57.000000000 +0800
++++ gsl-2.7.1-patched/multilarge_nlinear/nielsen.c	2023-11-16 20:16:03.478044085 +0800
+@@ -100,7 +100,7 @@
+   *mu *= (double) *nu;
+ 
+   /* nu := 2*nu */
+-  *nu <<= 1;
++  *nu = (unsigned long)*nu << 1;
+ 
+   return GSL_SUCCESS;
+ }
+diff --color -Naur gsl-2.7.1/randist/test.c gsl-2.7.1-patched/randist/test.c
+--- gsl-2.7.1/randist/test.c	2018-11-15 05:27:10.000000000 +0800
++++ gsl-2.7.1-patched/randist/test.c	2023-11-16 20:16:24.869939990 +0800
+@@ -858,13 +858,13 @@
+ double
+ test_binomial_max (void)
+ {
+-  return gsl_ran_binomial (r_global, 1e-8, 1<<31);
++  return gsl_ran_binomial (r_global, 1e-8, 1u<<31);
+ }
+ 
+ double
+ test_binomial_max_pdf (unsigned int n)
+ {
+-  return gsl_ran_binomial_pdf (n, 1e-8, 1<<31);
++  return gsl_ran_binomial_pdf (n, 1e-8, 1u<<31);
+ }
+ 
+ double
+diff --color -Naur gsl-2.7.1/rng/random.c gsl-2.7.1-patched/rng/random.c
+--- gsl-2.7.1/rng/random.c	2017-07-23 22:03:11.000000000 +0800
++++ gsl-2.7.1-patched/rng/random.c	2023-11-16 20:19:47.525303562 +0800
+@@ -123,7 +123,7 @@
+ {
+   long int k ;
+ 
+-  x[*i] += x[*j] ;
++  x[*i] += (unsigned long)x[*j] ;
+   k = (x[*i] >> 1) & 0x7FFFFFFF ;
+   
+   (*i)++ ;
+@@ -281,7 +281,7 @@
+   x[0] = s;
+ 
+   for (i = 1 ; i < n ; i++)
+-    x[i] = 1103515245 * x[i-1] + 12345 ;
++    x[i] = 1103515245ul * x[i-1] + 12345 ;
+ }
+ 
+ static void 
+@@ -295,7 +295,7 @@
+   x[0] = s;
+ 
+   for (i = 1 ; i < n ; i++)
+-    x[i] = 1103515145 * x[i-1] + 12345 ;
++    x[i] = 1103515145ul * x[i-1] + 12345 ;
+ }
+ 
+ static void 
+diff --color -Naur gsl-2.7.1/specfunc/hermite.c gsl-2.7.1-patched/specfunc/hermite.c
+--- gsl-2.7.1/specfunc/hermite.c	2019-08-08 01:24:05.000000000 +0800
++++ gsl-2.7.1-patched/specfunc/hermite.c	2023-11-16 20:17:58.134579816 +0800
+@@ -467,7 +467,7 @@
+       const double k = sqrt(0.5*n);
+       const size_t steps = (size_t) ceil(6.211 * sqrt(n));
+       const double dt = M_PI/steps;
+-      const double invn2 = 1.0/(n*n);
++      const double invn2 = 1.0/n/n;
+       double ex, ex_e, cs, cs_e, sn, sn2, t;
+       gsl_sf_result lngamma;
+   
+diff --color -Naur gsl-2.7.1/sys/pow_int.c gsl-2.7.1-patched/sys/pow_int.c
+--- gsl-2.7.1/sys/pow_int.c	2018-11-15 05:27:10.000000000 +0800
++++ gsl-2.7.1-patched/sys/pow_int.c	2023-11-16 20:14:13.294750837 +0800
+@@ -31,7 +31,7 @@
+ 
+   if(n < 0) {
+     x = 1.0/x;
+-    un = -n;
++    un = -(unsigned)n;
+   } else {
+     un = n;
+   }
