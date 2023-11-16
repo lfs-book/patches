@@ -1,0 +1,59 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscatch dot org>
+Date:                    2023-11-16
+Initial Package Version: 45.1
+Origin:                  Upstream
+Upstream Status:         Applied
+Description:             Fix crashes in gnome-shell-extensions when using the
+                         Workspace Indicator extension on a multi-monitor
+                         system. See the upstream issue at
+                         https://gitlab.gnome.org/GNOME/gnome-shell-extensions/-/issues/469
+                         for more details.
+
+diff -Naurp gnome-shell-extensions-45.1.orig/extensions/window-list/workspaceIndicator.js gnome-shell-extensions-45.1/extensions/window-list/workspaceIndicator.js
+--- gnome-shell-extensions-45.1.orig/extensions/window-list/workspaceIndicator.js	2023-10-31 18:39:41.244782400 -0500
++++ gnome-shell-extensions-45.1/extensions/window-list/workspaceIndicator.js	2023-11-16 15:20:06.724474257 -0600
+@@ -43,7 +43,6 @@ class WindowPreview extends St.Button {
+             },
+             'notify::minimized', this._updateVisible.bind(this),
+             this);
+-        this._updateVisible();
+ 
+         global.display.connectObject('notify::focus-window',
+             this._onFocusChanged.bind(this), this);
+@@ -55,6 +54,12 @@ class WindowPreview extends St.Button {
+         return this._window;
+     }
+ 
++    vfunc_map() {
++        super.vfunc_map();
++        // initialize visibility after being added to the stage
++        this.updateVisible();
++    }
++
+     _onFocusChanged() {
+         if (global.display.focus_window === this._window)
+             this.add_style_class_name('active');
+diff -Naurp gnome-shell-extensions-45.1.orig/extensions/workspace-indicator/extension.js gnome-shell-extensions-45.1/extensions/workspace-indicator/extension.js
+--- gnome-shell-extensions-45.1.orig/extensions/workspace-indicator/extension.js	2023-10-31 18:39:41.244782400 -0500
++++ gnome-shell-extensions-45.1/extensions/workspace-indicator/extension.js	2023-11-16 15:23:47.325154968 -0600
+@@ -49,7 +49,6 @@ class WindowPreview extends St.Button {
+             },
+             'notify::minimized', this._updateVisible.bind(this),
+             this);
+-        this._updateVisible();
+ 
+         global.display.connectObject('notify::focus-window',
+             this._onFocusChanged.bind(this), this);
+@@ -61,6 +60,12 @@ class WindowPreview extends St.Button {
+         return this._window;
+     }
+ 
++    vfunc_map() {
++        super.vfunc_map();
++        // initialize visibility after being added to the stage
++        setTimeout(() => this._updateVisible());
++    }
++
+     _onFocusChanged() {
+         if (global.display.focus_window === this._window)
+             this.add_style_class_name('active');
