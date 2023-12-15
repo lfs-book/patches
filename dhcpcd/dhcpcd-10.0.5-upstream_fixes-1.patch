@@ -1,0 +1,64 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2023-12-15
+Initial Package Version: 10.0.5
+Origin:                  Upstream (see BLFS Ticket #19001)
+Upstream Status:         Applied
+Description:             Fixes a problem that occurs when using the '-b' switch
+                         to run dhcpcd in the background. Note that this only
+                         affects builds which are running without privilege
+                         separation.
+
+diff -Naurp dhcpcd-10.0.5.orig/src/dhcpcd.c dhcpcd-10.0.5/src/dhcpcd.c
+--- dhcpcd-10.0.5.orig/src/dhcpcd.c	2023-11-10 08:25:12.000000000 -0600
++++ dhcpcd-10.0.5/src/dhcpcd.c	2023-12-15 12:32:33.183062253 -0600
+@@ -395,7 +395,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
+ 		logerr("write");
+ 	ctx->options |= DHCPCD_DAEMONISED;
+ 	// dhcpcd_fork_cb will close the socket
+-	shutdown(ctx->fork_fd, SHUT_RDWR);
+ #endif
+ }
+ 
+@@ -1877,8 +1876,6 @@ dhcpcd_fork_cb(void *arg, unsigned short
+ 	if (ctx->options & DHCPCD_FORKED) {
+ 		if (exit_code == EXIT_SUCCESS)
+ 			logdebugx("forked to background");
+-		else
+-			logerrx("exited with code %d", exit_code);
+ 		eloop_exit(ctx->eloop, exit_code);
+ 	} else
+ 		dhcpcd_signal_cb(exit_code, ctx);
+@@ -2738,8 +2735,19 @@ exit1:
+ 	if (ps_stopwait(&ctx) != EXIT_SUCCESS)
+ 		i = EXIT_FAILURE;
+ #endif
+-	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
++	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED)) {
+ 		loginfox(PACKAGE " exited");
++#ifdef USE_SIGNALS
++		/* Detach from the launch process.
++		 * This *should* happen after we stop the root process,
++		 * but for some reason non privsep builds get a zero length
++		 * read in dhcpcd_fork_cb(). */
++		if (ctx.fork_fd != -1) {
++			if (write(ctx.fork_fd, &i, sizeof(i)) == -1)
++				logerr("%s: write", __func__);
++		}
++#endif
++	}
+ #ifdef PRIVSEP
+ 	if (ps_root_stop(&ctx) == -1)
+ 		i = EXIT_FAILURE;
+@@ -2753,12 +2761,6 @@ exit1:
+ 	setproctitle_fini();
+ #endif
+ #ifdef USE_SIGNALS
+-	if (ctx.options & DHCPCD_STARTED) {
+-		/* Try to detach from the launch process. */
+-		if (ctx.fork_fd != -1 &&
+-		    write(ctx.fork_fd, &i, sizeof(i)) == -1)
+-			logerr("%s: write", __func__);
+-	}
+ 	if (ctx.options & (DHCPCD_FORKED | DHCPCD_PRIVSEP))
+ 		_exit(i); /* so atexit won't remove our pidfile */
+ #endif
