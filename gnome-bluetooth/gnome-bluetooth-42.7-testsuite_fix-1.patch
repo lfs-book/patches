@@ -1,0 +1,63 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111.site>
+Date:                    2024-01-21
+Initial Package Version: 42.7
+Upstream Status:         Applied
+Origin:                  Upstream (MR 175)
+Description:             Fixes test failures with dbusmock >= 0.30.0.
+
+From ab399c80284714a50fd972f56e05bcc025a2452f Mon Sep 17 00:00:00 2001
+From: Simon McVittie <smcv@debian.org>
+Date: Sat, 30 Dec 2023 10:50:35 +0000
+Subject: [PATCH] tests: Chain up to dbusmock parent class methods
+
+Otherwise dbusmock never gets a chance to clean up its temporary mock
+system bus. With dbusmock >= 0.30.0, it continues to run, holding
+stdout/stderr open, until the test times out.
+
+This requires correcting the signature of OopTests.setUp(): it isn't
+actually a class method.
+
+Resolves: https://gitlab.gnome.org/GNOME/gnome-bluetooth/-/issues/142
+Bug-Debian: https://bugs.debian.org/1058116
+Signed-off-by: Simon McVittie <smcv@debian.org>
+---
+ tests/integration-test.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/tests/integration-test.py b/tests/integration-test.py
+index 62efc241..64aab08c 100755
+--- a/tests/integration-test.py
++++ b/tests/integration-test.py
+@@ -53,8 +53,9 @@ except ImportError:
+ 
+ # Out-of-process tests
+ class OopTests(dbusmock.DBusTestCase):
+-    @classmethod
+     def setUp(self):
++        super().setUp()
++
+         if GNOME_BLUETOOTH_PRIV_UNAVAILABLE:
+             sys.stderr.write('Could not find GnomeBluetoothPriv gobject-introspection data in the build dir: %s\n' % str(e))
+             sys.exit(1)
+@@ -476,6 +477,7 @@ class Tests(dbusmock.DBusTestCase):
+ 
+     @classmethod
+     def setUpClass(cls):
++        super().setUpClass()
+         os.environ['G_MESSAGES_DEBUG'] = 'all'
+         os.environ['G_DEBUG'] = 'fatal_warnings'
+         cls.start_system_bus()
+@@ -496,8 +498,10 @@ class Tests(dbusmock.DBusTestCase):
+         cls.p_mock_bluez.wait()
+         cls.p_mock_upower.terminate()
+         cls.p_mock_upower.wait()
++        super().tearDownClass()
+ 
+     def setUp(self):
++        super().setUp()
+         self.obj_bluez.Reset()
+         self.dbusmock = dbus.Interface(self.obj_bluez, dbusmock.MOCK_IFACE)
+         self.dbusmock_bluez = dbus.Interface(self.obj_bluez, 'org.bluez.Mock')
+-- 
+GitLab
+
