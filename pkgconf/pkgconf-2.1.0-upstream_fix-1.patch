@@ -1,0 +1,67 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111.site>
+Date:                    2024-01-17
+Initial Package Version: 2.1.0
+Upstream Status:         Applied
+Origin:                  Upstream
+  - https://github.com/pkgconf/pkgconf/commit/b2f8386c32d1.patch
+  - https://github.com/pkgconf/pkgconf/commit/5825e2c6d608.patch
+Description:             Fix a regression causing some BLFS packages fail
+                         to build.
+
+From b2f8386c32d1cb4dfa8f51c619c0c2a56a3544d6 Mon Sep 17 00:00:00 2001
+From: Kai Pastor <dg0yt@darc.de>
+Date: Fri, 1 Dec 2023 21:50:46 +0100
+Subject: [PATCH] Fix --modversion output
+
+---
+ cli/main.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/cli/main.c b/cli/main.c
+index 5583bb75..4e1e2d32 100644
+--- a/cli/main.c
++++ b/cli/main.c
+@@ -333,7 +333,12 @@ apply_modversion(pkgconf_client_t *client, pkgconf_pkg_t *world, void *data, int
+ 			pkgconf_dependency_t *dep = world_iter->data;
+ 			pkgconf_pkg_t *pkg = dep->match;
+
+-			if (strcmp(pkg->why, queue_node->package))
++			const size_t name_len = strlen(pkg->why);
++			if (name_len > strlen(queue_node->package) ||
++			    strncmp(pkg->why, queue_node->package, name_len) ||
++			    (queue_node->package[name_len] != 0 &&
++			     !isspace(queue_node->package[name_len]) &&
++			     !PKGCONF_IS_OPERATOR_CHAR(queue_node->package[name_len])))
+ 				continue;
+
+ 			if (pkg->version != NULL) {
+
+From 5825e2c6d608ef74a97349e81d750ab95c53cf50 Mon Sep 17 00:00:00 2001
+From: Kai Pastor <dg0yt@darc.de>
+Date: Fri, 1 Dec 2023 22:12:20 +0100
+Subject: [PATCH] Fix crash on two-word expressions
+
+---
+ cli/main.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/cli/main.c b/cli/main.c
+index 4e1e2d32..ca8bf880 100644
+--- a/cli/main.c
++++ b/cli/main.c
+@@ -1405,6 +1405,15 @@ main(int argc, char *argv[])
+ 			pkgconf_queue_push(&pkgq, package);
+ 			pkg_optind++;
+ 		}
++		else if (argv[pkg_optind + 2] == NULL)
++		{
++			char packagebuf[PKGCONF_BUFSIZE];
++
++			snprintf(packagebuf, sizeof packagebuf, "%s %s", package, argv[pkg_optind + 1]);
++			pkg_optind += 2;
++
++			pkgconf_queue_push(&pkgq, packagebuf);
++		}
+ 		else
+ 		{
+ 			char packagebuf[PKGCONF_BUFSIZE];
