@@ -42,7 +42,7 @@ diff -Naurp openldap-2.6.2.orig/include/ldap_defaults.h openldap-2.6.2/include/l
  /* default ldapi:// socket */
  #ifndef LDAPI_SOCK
 -#define LDAPI_SOCK LDAP_RUNDIR LDAP_DIRSEP "run" LDAP_DIRSEP "ldapi"
-+#define LDAPI_SOCK LDAP_RUNDIR LDAP_DIRSEP "run" LDAP_DIRSEP "openldap" LDAP_DIRSEP "ldapi"
++#define LDAPI_SOCK "/run" LDAP_DIRSEP "openldap" LDAP_DIRSEP "ldapi"
 +
  #endif
  
