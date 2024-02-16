@@ -1,0 +1,301 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2024-02-16
+Initial Package Version: 3.22.0
+Upstream Status:         Applied
+Origin:                  Upstream
+Description:             Fixes multiple incompatibilities with the latest
+                         toolchain. It adds support for the fchmodat2() system
+                         call to valgrind (which was added in Linux 6.4 and
+                         then had support added to glibc in 2.39). Adding this
+                         will prevent test suite failures in several other
+                         packages due to the unrecognized system call. This
+                         patch also fixes some syntax warnings in the binding
+                         for GDB, and adapts Valgrind to the changes for x86 in
+                         binutils-2.39.
+                         Some relevant upstream bugs include:
+                         https://bugs.kde.org/show_bug.cgi?id=477198 and
+                         https://bugs.kde.org/show_bug.cgi?id=478624. Patches
+                         came from upstream, the commit numbers were:
+                         372d09fd9a8d76847c81092ebff71c80fd6c145d
+                         ca88e1c63178186a1f6a0d0b1a4ba4ee895af323
+                         0fbfbe05028ad18efda786a256a2738d2c231ed4
+                         d35005cef8ad8207542738812705ceabf137d7e0
+
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_gdbserver/valgrind-monitor-def.py valgrind-3.22.0/coregrind/m_gdbserver/valgrind-monitor-def.py
+--- valgrind-3.22.0.orig/coregrind/m_gdbserver/valgrind-monitor-def.py	2024-02-16 11:02:32.140895219 -0600
++++ valgrind-3.22.0/coregrind/m_gdbserver/valgrind-monitor-def.py	2024-02-16 11:04:14.587929054 -0600
+@@ -211,7 +211,7 @@ class Valgrind_ADDR_LEN_opt(Valgrind_Com
+ For compatibility reason with the Valgrind gdbserver monitor command,
+ we detect and accept usages such as 0x1234ABCD[10]."""
+     def invoke(self, arg_str : str, from_tty : bool) -> None:
+-        if re.fullmatch("^0x[0123456789ABCDEFabcdef]+\[[^\[\]]+\]$", arg_str):
++        if re.fullmatch(r"^0x[0123456789ABCDEFabcdef]+\[[^\[\]]+\]$", arg_str):
+             arg_str = arg_str.replace("[", " ")
+             arg_str = arg_str.replace("]", " ")
+         eval_execute_2(self, arg_str,
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/priv_syswrap-linux.h valgrind-3.22.0/coregrind/m_syswrap/priv_syswrap-linux.h
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/priv_syswrap-linux.h	2024-02-16 11:02:32.139895228 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/priv_syswrap-linux.h	2024-02-16 11:04:10.533966950 -0600
+@@ -331,6 +331,9 @@ DECL_TEMPLATE(linux, sys_openat2);
+ // Linux-specific (new in Linux 5.14)
+ DECL_TEMPLATE(linux, sys_memfd_secret);
+ 
++// Since Linux 6.6
++DECL_TEMPLATE(linux, sys_fchmodat2);
++
+ /* ---------------------------------------------------------------------
+    Wrappers for sockets and ipc-ery.  These are split into standalone
+    procedures because x86-linux hides them inside multiplexors
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-amd64-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-amd64-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-amd64-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-amd64-linux.c	2024-02-16 11:04:10.533966950 -0600
+@@ -886,6 +886,8 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
++
++   LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-arm64-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-arm64-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-arm64-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-arm64-linux.c	2024-02-16 11:04:10.533966950 -0600
+@@ -840,6 +840,8 @@ static SyscallTableEntry syscall_main_ta
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
++
++   LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+ };
+ 
+ 
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-arm-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-arm-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-arm-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-arm-linux.c	2024-02-16 11:04:10.533966950 -0600
+@@ -1059,6 +1059,8 @@ static SyscallTableEntry syscall_main_ta
+    LINX_(__NR_faccessat2,    sys_faccessat2),           // 439
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
++
++   LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+ };
+ 
+ 
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-linux.c	2024-02-16 11:02:32.139895228 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-linux.c	2024-02-16 11:04:10.534966940 -0600
+@@ -6059,6 +6059,17 @@ PRE(sys_fchmodat)
+    PRE_MEM_RASCIIZ( "fchmodat(path)", ARG2 );
+ }
+ 
++PRE(sys_fchmodat2)
++{
++   PRINT("sys_fchmodat2 ( %ld, %#" FMT_REGWORD "x(%s), %" FMT_REGWORD "u, %"
++	  FMT_REGWORD "u )",
++         SARG1, ARG2, (HChar*)(Addr)ARG2, ARG3, ARG4);
++   PRE_REG_READ4(long, "fchmodat2",
++                 int, dfd, const char *, path, vki_mode_t, mode,
++                 unsigned int, flags);
++   PRE_MEM_RASCIIZ( "fchmodat2(pathname)", ARG2 );
++}
++
+ PRE(sys_faccessat)
+ {
+    PRINT("sys_faccessat ( %ld, %#" FMT_REGWORD "x(%s), %ld )",
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-mips32-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-mips32-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-mips32-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-mips32-linux.c	2024-02-16 11:04:10.534966940 -0600
+@@ -1143,6 +1143,8 @@ static SyscallTableEntry syscall_main_ta
+    LINX_ (__NR_faccessat2,             sys_faccessat2),              // 439
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
++
++   LINX_(__NR_fchmodat2,               sys_fchmodat2),               // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) (UInt sysno)
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-mips64-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-mips64-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-mips64-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-mips64-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -820,6 +820,7 @@ static SyscallTableEntry syscall_main_ta
+    LINXY (__NR_close_range, sys_close_range),
+    LINX_ (__NR_faccessat2, sys_faccessat2),
+    LINXY(__NR_epoll_pwait2, sys_epoll_pwait2),
++   LINX_ (__NR_fchmodat2, sys_fchmodat2),
+ };
+ 
+ SyscallTableEntry * ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-nanomips-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-nanomips-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-nanomips-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-nanomips-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -829,6 +829,7 @@ static SyscallTableEntry syscall_main_ta
+    LINXY (__NR_close_range,            sys_close_range),
+    LINX_ (__NR_faccessat2,             sys_faccessat2),
+    LINXY (__NR_epoll_pwait2,           sys_epoll_pwait2),
++   LINX_ (__NR_fchmodat2,              sys_fchmodat2),
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) (UInt sysno)
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-ppc32-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-ppc32-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-ppc32-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -1063,6 +1063,8 @@ static SyscallTableEntry syscall_table[]
+    LINX_(__NR_faccessat2,        sys_faccessat2),       // 439
+ 
+    LINXY (__NR_epoll_pwait2,     sys_epoll_pwait2),      // 441
++
++   LINX_ (__NR_fchmodat2,        sys_fchmodat2),         // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-ppc64-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-ppc64-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-ppc64-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -1032,6 +1032,8 @@ static SyscallTableEntry syscall_table[]
+    LINX_(__NR_faccessat2,        sys_faccessat2),       // 439
+ 
+    LINXY (__NR_epoll_pwait2,     sys_epoll_pwait2),      // 441
++
++   LINX_ (__NR_fchmodat2,        sys_fchmodat2),         // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-s390x-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-s390x-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-s390x-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-s390x-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -873,6 +873,10 @@ static SyscallTableEntry syscall_table[]
+    LINX_(__NR_faccessat2,  sys_faccessat2),                           // 439
+ 
+    LINXY(__NR_epoll_pwait2, sys_epoll_pwait2),                        // 441
++
++   LINXY(__NR_memfd_secret, sys_memfd_secret),                        // 447
++
++   LINX_ (__NR_fchmodat2, sys_fchmodat2),                             // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-x86-linux.c valgrind-3.22.0/coregrind/m_syswrap/syswrap-x86-linux.c
+--- valgrind-3.22.0.orig/coregrind/m_syswrap/syswrap-x86-linux.c	2024-02-16 11:02:32.138895238 -0600
++++ valgrind-3.22.0/coregrind/m_syswrap/syswrap-x86-linux.c	2024-02-16 11:04:10.535966931 -0600
+@@ -1658,6 +1658,8 @@ static SyscallTableEntry syscall_table[]
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),     // 441
+ 
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
++
++   LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+ };
+ 
+ SyscallTableEntry* ML_(get_linux_syscall_entry) ( UInt sysno )
+diff -Naurp valgrind-3.22.0.orig/include/vki/vki-scnums-shared-linux.h valgrind-3.22.0/include/vki/vki-scnums-shared-linux.h
+--- valgrind-3.22.0.orig/include/vki/vki-scnums-shared-linux.h	2024-02-16 11:02:32.153895095 -0600
++++ valgrind-3.22.0/include/vki/vki-scnums-shared-linux.h	2024-02-16 11:04:10.535966931 -0600
+@@ -50,4 +50,6 @@
+ 
+ #define __NR_memfd_secret		447
+ 
++#define __NR_fchmodat2		452
++
+ #endif
+diff -Naurp valgrind-3.22.0.orig/none/tests/x86/gnu_binutils_nop.c valgrind-3.22.0/none/tests/x86/gnu_binutils_nop.c
+--- valgrind-3.22.0.orig/none/tests/x86/gnu_binutils_nop.c	1969-12-31 18:00:00.000000000 -0600
++++ valgrind-3.22.0/none/tests/x86/gnu_binutils_nop.c	2024-02-16 11:04:12.630947345 -0600
+@@ -0,0 +1,34 @@
++int main(void)
++{
++    // GNU binutils uses various opcodes as alternatives for nop
++    // the idea is that it is faster to execute one large opcode
++    // with no side-effects than multiple repetitions of the
++    // single byte 'nop'. This gives more choice when code
++    // needs to be padded.
++   
++   // the following is based on
++   // https://sourceware.org/cgit/binutils-gdb/tree/gas/config/tc-i386.c#n1256
++
++    // one byte
++    __asm__ __volatile__("nop");
++    // two bytes
++    __asm__ __volatile__("xchg %ax,%ax");
++    // three bytes
++    //__asm__ __volatile__("leal 0(%esi),%esi");
++    __asm__ __volatile__(".byte 0x8d,0x76,0x00");
++    // four bytes
++    //__asm__ __volatile__("leal 0(%esi,%eiz),%esi");
++    __asm__ __volatile__(".byte 0x8d,0x74,0x26,0x00");
++    // five bytes
++    //__asm__ __volatile__("leal %cs:0(%esi,%eiz),%esi");
++    __asm__ __volatile__(".byte 0x2e,0x8d,0x74,0x26,0x00");
++    // six bytes
++    //__asm__ __volatile__("leal 0L(%esi),%esi");
++    __asm__ __volatile__(".byte 0x8d,0xb6,0x00,0x00,0x00,0x00");
++    // seven bytes
++    //__asm__ __volatile__("leal 0L(%esi,%eiz),%esi");
++    __asm__ __volatile__(".byte 0x8d,0xb4,0x26,0x00,0x00,0x00,0x00");
++    // eight bytes
++    //__asm__ __volatile__("leal %cs:0L(%esi,%eiz),%esi");
++    __asm__ __volatile__(".byte 0x2e,0x8d,0xb4,0x26,0x00,0x00,0x00,0x00");
++}
+diff -Naurp valgrind-3.22.0.orig/none/tests/x86/gnu_binutils_nop.vgtest valgrind-3.22.0/none/tests/x86/gnu_binutils_nop.vgtest
+--- valgrind-3.22.0.orig/none/tests/x86/gnu_binutils_nop.vgtest	1969-12-31 18:00:00.000000000 -0600
++++ valgrind-3.22.0/none/tests/x86/gnu_binutils_nop.vgtest	2024-02-16 11:04:12.630947345 -0600
+@@ -0,0 +1,2 @@
++prog: gnu_binutils_nop
++vgopts: -q
+diff -Naurp valgrind-3.22.0.orig/none/tests/x86/Makefile.am valgrind-3.22.0/none/tests/x86/Makefile.am
+--- valgrind-3.22.0.orig/none/tests/x86/Makefile.am	2024-02-16 11:02:32.071895876 -0600
++++ valgrind-3.22.0/none/tests/x86/Makefile.am	2024-02-16 11:04:12.630947345 -0600
+@@ -52,6 +52,7 @@ EXTRA_DIST = \
+ 	fxtract.stdout.exp fxtract.stderr.exp fxtract.vgtest \
+ 	fxtract.stdout.exp-older-glibc \
+ 	getseg.stdout.exp getseg.stderr.exp getseg.vgtest \
++	gnu_binutils_nop.stderr.exp gnu_binutils_nop.vgtest \
+ 	incdec_alt.stdout.exp incdec_alt.stderr.exp incdec_alt.vgtest \
+ 	int.stderr.exp int.stdout.exp int.disabled \
+ 	$(addsuffix .stderr.exp,$(INSN_TESTS)) \
+@@ -100,6 +101,7 @@ check_PROGRAMS = \
+ 	fpu_lazy_eflags \
+ 	fxtract \
+ 	getseg \
++	gnu_binutils_nop \
+ 	incdec_alt \
+ 	$(INSN_TESTS) \
+ 	int \
+diff -Naurp valgrind-3.22.0.orig/VEX/priv/guest_x86_toIR.c valgrind-3.22.0/VEX/priv/guest_x86_toIR.c
+--- valgrind-3.22.0.orig/VEX/priv/guest_x86_toIR.c	2024-02-16 11:02:32.150895124 -0600
++++ valgrind-3.22.0/VEX/priv/guest_x86_toIR.c	2024-02-16 11:04:12.630947345 -0600
+@@ -8198,7 +8198,7 @@ DisResult disInstr_X86_WRK (
+          delta += 5;
+          goto decode_success;
+       }
+-      /* Don't barf on recent binutils padding,
++      /* Don't barf on recent (2010) binutils padding,
+          all variants of which are: nopw %cs:0x0(%eax,%eax,1)
+          66 2e 0f 1f 84 00 00 00 00 00
+          66 66 2e 0f 1f 84 00 00 00 00 00
+@@ -8222,6 +8222,26 @@ DisResult disInstr_X86_WRK (
+             goto decode_success;
+          }
+       }
++
++      /* bug478624 GNU binutils uses a leal of esi into itself with
++         a zero offset and CS prefix as an 8 byte no-op (Dec 2023).
++         Since the CS prefix is hardly ever used we don't do much
++         to decode it, just a few cases for conditional branches.
++         So add handling here with other pseudo-no-ops.
++       */
++      if (code[0] == 0x2E && code[1] == 0x8D) {
++         if (code[2] == 0x74 && code[3] == 0x26 && code[4] == 0x00) {
++            DIP("leal %%cs:0(%%esi,%%eiz,1),%%esi\n");
++            delta += 5;
++            goto decode_success;
++         }
++         if (code[2] == 0xB4 && code[3] == 0x26 && code[4] == 0x00
++             && code[5] == 0x00 && code[6] == 0x00 && code[7] == 0x00) {
++            DIP("leal %%cs:0(%%esi,%%eiz,1),%%esi\n");
++            delta += 8;
++            goto decode_success;
++         }
++      }
+ 
+       // Intel CET requires the following opcodes to be treated as NOPs
+       // with any prefix and ModRM, SIB and disp combination:
