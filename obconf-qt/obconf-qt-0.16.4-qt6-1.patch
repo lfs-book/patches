@@ -1,0 +1,318 @@
+Submitted By:            Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date:                    2040-04-22
+Initial Package Version: 0.16.4
+Upstream Status:         Unknown.
+Origin:                  https://github.com/lxqt/obconf-qt/pull/230
+Description:             Changes to make the package compatible with qt6.
+
+
+From f40055c4d6f0173e136cedb774d09c9bf8d7ec60 Mon Sep 17 00:00:00 2001
+From: Ian Farrell <ianfarrell47@gmail.com>
+Date: Thu, 18 Apr 2024 07:32:19 -0400
+Subject: [PATCH] Port to Qt6
+
+---
+ CMakeLists.txt     | 17 ++++++++---------
+ src/CMakeLists.txt |  4 ++--
+ src/desktops.cpp   | 25 ++++++++++++++++++-------
+ src/dock.cpp       |  1 -
+ src/margins.cpp    |  1 -
+ src/mouse.cpp      |  1 -
+ src/moveresize.cpp |  1 -
+ src/obconf-qt.cpp  | 31 +++++++++++++++++++------------
+ src/tree.cpp       | 10 +++++++---
+ src/windows.cpp    |  1 -
+ 10 files changed, 54 insertions(+), 38 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b525914..eff5934 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -13,12 +13,12 @@ include(GNUInstallDirs)
+ 
+ # Minimum Versions
+ set(GLIB_MINIMUM_VERSION "2.50.0")
+-set(LXQTBT_MINIMUM_VERSION "0.8.0")
+-set(QT_MINIMUM_VERSION "5.12.0")
++set(LXQTBT_MINIMUM_VERSION "2.0.0")
++set(QT_MINIMUM_VERSION "6.6.0")
+ 
+-set(OBCONFQT_MAJOR_VERSION 0)
+-set(OBCONFQT_MINOR_VERSION 16)
+-set(OBCONFQT_PATCH_VERSION 4)
++set(OBCONFQT_MAJOR_VERSION 1)
++set(OBCONFQT_MINOR_VERSION 0)
++set(OBCONFQT_PATCH_VERSION 0)
+ set(OBCONFQT_VERSION ${OBCONFQT_MAJOR_VERSION}.${OBCONFQT_MINOR_VERSION}.${OBCONFQT_PATCH_VERSION})
+ add_definitions("-DOBCONFQT_VERSION=\"${OBCONFQT_VERSION}\"")
+ 
+@@ -26,12 +26,11 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ set(CMAKE_AUTOMOC ON)
+ 
+-find_package(Qt5Widgets ${QT_MINIMUM_VERSION} REQUIRED)
+-find_package(Qt5X11Extras ${QT_MINIMUM_VERSION} REQUIRED)
+-find_package(Qt5LinguistTools ${QT_MINIMUM_VERSION} REQUIRED)
++find_package(Qt6Widgets ${QT_MINIMUM_VERSION} REQUIRED)
++find_package(Qt6LinguistTools ${QT_MINIMUM_VERSION} REQUIRED)
+ message(STATUS "Building with Qt${Qt5Core_VERSION}")
+ 
+-find_package(lxqt-build-tools ${LXQTBT_MINIMUM_VERSION} REQUIRED)
++find_package(lxqt2-build-tools ${LXQTBT_MINIMUM_VERSION} REQUIRED)
+ 
+ find_package(GLIB ${GLIB_MINIMUM_VERSION} REQUIRED)
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index b584a89..f5f5ff6 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -2,7 +2,7 @@
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQT_NO_KEYWORDS")
+ 
+ set(QTX_INCLUDE_DIRS "")
+-set(QTX_LIBRARIES Qt5::Widgets Qt5::X11Extras)
++set(QTX_LIBRARIES Qt6::Widgets)
+ 
+ include_directories(
+   ${QTX_INCLUDE_DIRS}
+@@ -31,7 +31,7 @@ set(obconf-qt_UIS
+   obconf.ui
+ )
+ 
+-qt5_wrap_ui(obconf-qt_UI_H ${obconf-qt_UIS})
++qt6_wrap_ui(obconf-qt_UI_H ${obconf-qt_UIS})
+ 
+ set_property(SOURCE ${obconf-qt_UI_H} PROPERTY SKIP_AUTOMOC ON)
+ 
+diff --git a/src/desktops.cpp b/src/desktops.cpp
+index 4ac9ef7..bed36a6 100644
+--- a/src/desktops.cpp
++++ b/src/desktops.cpp
+@@ -20,11 +20,11 @@
+     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+ 
++#include <QApplication>
+ #include "maindialog.h"
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ #include <X11/Xlib.h>
+ 
+ using namespace Obconf;
+@@ -123,26 +123,37 @@ void MainDialog::desktops_write_names() {
+   }
+ 
+   tree_apply();
++
++  auto x11NativeInterface = qApp->nativeInterface<QNativeInterface::QX11Application>();
++  auto display = x11NativeInterface->display();
++  auto appRootWindow = XDefaultRootWindow(x11NativeInterface->display());
++
+   /* make openbox re-set the property */
+-  XDeleteProperty(QX11Info::display(), QX11Info::appRootWindow(),
+-                  XInternAtom(QX11Info::display(), "_NET_DESKTOP_NAMES", False));
++  XDeleteProperty(display, appRootWindow,
++                  XInternAtom(display, "_NET_DESKTOP_NAMES", False));
+ }
+ 
+ void MainDialog::desktops_write_number() {
++
++  auto x11NativeInterface = qApp->nativeInterface<QNativeInterface::QX11Application>();
++  auto display = x11NativeInterface->display();
++  auto appRootWindow = XDefaultRootWindow(x11NativeInterface->display());
++
+   XEvent ce;
+   tree_set_int("desktops/number", num_desktops);
+   ce.xclient.type = ClientMessage;
+   ce.xclient.message_type =
+-    XInternAtom(QX11Info::display(), "_NET_NUMBER_OF_DESKTOPS", False);
+-  ce.xclient.display = QX11Info::display();
+-  ce.xclient.window = QX11Info::appRootWindow();
++    XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", False);
++  ce.xclient.display = display;
++  ce.xclient.window = appRootWindow;
+   ce.xclient.format = 32;
+   ce.xclient.data.l[0] = num_desktops;
+   ce.xclient.data.l[1] = 0;
+   ce.xclient.data.l[2] = 0;
+   ce.xclient.data.l[3] = 0;
+   ce.xclient.data.l[4] = 0;
+-  XSendEvent(QX11Info::display(), QX11Info::appRootWindow(), FALSE,
++
++  XSendEvent(display, appRootWindow, FALSE,
+              SubstructureNotifyMask | SubstructureRedirectMask,
+              &ce);
+ }
+diff --git a/src/dock.cpp b/src/dock.cpp
+index c3f794e..0228dc6 100644
+--- a/src/dock.cpp
++++ b/src/dock.cpp
+@@ -24,7 +24,6 @@
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ // FIXME: how to support XCB or Wayland?
+ #include <X11/Xlib.h>
+ 
+diff --git a/src/margins.cpp b/src/margins.cpp
+index 1e4f9ff..315b0e2 100644
+--- a/src/margins.cpp
++++ b/src/margins.cpp
+@@ -24,7 +24,6 @@
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ // FIXME: how to support XCB or Wayland?
+ #include <X11/Xlib.h>
+ 
+diff --git a/src/mouse.cpp b/src/mouse.cpp
+index 29dc19d..ffa2c10 100644
+--- a/src/mouse.cpp
++++ b/src/mouse.cpp
+@@ -24,7 +24,6 @@
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ // FIXME: how to support XCB or Wayland?
+ #include <X11/Xlib.h>
+ 
+diff --git a/src/moveresize.cpp b/src/moveresize.cpp
+index cf3996a..61cd921 100644
+--- a/src/moveresize.cpp
++++ b/src/moveresize.cpp
+@@ -24,7 +24,6 @@
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ // FIXME: how to support XCB or Wayland?
+ #include <X11/Xlib.h>
+ 
+diff --git a/src/obconf-qt.cpp b/src/obconf-qt.cpp
+index 0d5b442..d77ac16 100644
+--- a/src/obconf-qt.cpp
++++ b/src/obconf-qt.cpp
+@@ -24,7 +24,6 @@
+ #include <QTranslator>
+ #include <QLibraryInfo>
+ #include <QLocale>
+-#include <QX11Info>
+ #include <QMessageBox>
+ #include "maindialog.h"
+ #include <X11/Xlib.h>
+@@ -124,7 +123,8 @@ static gboolean get_all(Window win, Atom prop, Atom type, gint size,
+   gint ret_size;
+   gulong ret_items, bytes_left;
+ 
+-  res = XGetWindowProperty(QX11Info::display(), win, prop, 0l, G_MAXLONG,
++  auto display = qApp->nativeInterface<QNativeInterface::QX11Application>()->display();
++  res = XGetWindowProperty(display, win, prop, 0l, G_MAXLONG,
+                            FALSE, type, &ret_type, &ret_size,
+                            &ret_items, &bytes_left, &xdata);
+ 
+@@ -163,7 +163,8 @@ static gboolean prop_get_string_utf8(Window win, Atom prop, gchar** ret) {
+   gchar* str;
+   guint num;
+ 
+-  if(get_all(win, prop, XInternAtom(QX11Info::display(), "UTF8_STRING", 0), 8, (guchar**)&raw, &num)) {
++  auto display = qApp->nativeInterface<QNativeInterface::QX11Application>()->display();
++  if(get_all(win, prop, XInternAtom(display, "UTF8_STRING", 0), 8, (guchar**)&raw, &num)) {
+     str = g_strndup(raw, num); /* grab the first string from the list */
+     g_free(raw);
+ 
+@@ -180,18 +181,19 @@ static gboolean prop_get_string_utf8(Window win, Atom prop, gchar** ret) {
+ 
+ int main(int argc, char** argv) {
+   QApplication app(argc, argv);
+-  app.setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+ 
+   // load translations
+   QTranslator qtTranslator, translator;
+ 
+   // install the translations built-into Qt itself
+-  qtTranslator.load(QStringLiteral("qt_") + QLocale::system().name(), QLibraryInfo::location(QLibraryInfo::TranslationsPath));
+-  app.installTranslator(&qtTranslator);
++  if(qtTranslator.load(QStringLiteral("qt_") + QLocale::system().name(), QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
++    app.installTranslator(&qtTranslator);
++  }
+ 
+   // install our own tranlations
+-  translator.load(QStringLiteral("obconf-qt_") + QLocale::system().name(), QStringLiteral(PACKAGE_DATA_DIR) + QStringLiteral("/translations"));
+-  app.installTranslator(&translator);
++  if(translator.load(QStringLiteral("obconf-qt_") + QLocale::system().name(), QStringLiteral(PACKAGE_DATA_DIR) + QStringLiteral("/translations"))) {
++    app.installTranslator(&translator);
++  }
+ 
+   // load configurations
+ 
+@@ -204,12 +206,17 @@ int main(int argc, char** argv) {
+ 
+   paths = obt_paths_new();
+   parse_i = obt_xml_instance_new();
+-  int screen = QX11Info::appScreen();
+-  rrinst = RrInstanceNew(QX11Info::display(), screen);
++
++  auto x11NativeInterface = qApp->nativeInterface<QNativeInterface::QX11Application>();
++  auto display = x11NativeInterface->display();
++  auto appRootWindow = XDefaultRootWindow(x11NativeInterface->display());
++
++  int screen = DefaultScreen(display);
++  rrinst = RrInstanceNew(display, screen);
+   if(!obc_config_file) {
+     gchar* p;
+-    if(prop_get_string_utf8(QX11Info::appRootWindow(screen),
+-                            XInternAtom(QX11Info::display(), "_OB_CONFIG_FILE", 0), &p)) {
++    if(prop_get_string_utf8(appRootWindow,
++                            XInternAtom(display, "_OB_CONFIG_FILE", 0), &p)) {
+       obc_config_file = g_filename_from_utf8(p, -1, NULL, NULL, NULL);
+       g_free(p);
+     }
+diff --git a/src/tree.cpp b/src/tree.cpp
+index 261bfcb..368816f 100644
+--- a/src/tree.cpp
++++ b/src/tree.cpp
+@@ -16,7 +16,7 @@
+    See the COPYING file for a copy of the GNU General Public License.
+ */
+ 
+-#include <QX11Info>
++#include <QApplication>
+ #include <QMessageBox>
+ 
+ #include "tree.h"
+@@ -115,12 +115,16 @@ void tree_apply()
+     g_free(p);
+ 
+     if (!err) {
++        auto x11NativeInterface = qApp->nativeInterface<QNativeInterface::QX11Application>();
++        auto display = x11NativeInterface->display();
++        auto appRootWindow = XDefaultRootWindow(x11NativeInterface->display());
++
+         XEvent ce;
+ 
+         ce.xclient.type = ClientMessage;
+-        ce.xclient.display = QX11Info::display();
++        ce.xclient.display = display;
+         ce.xclient.message_type = XInternAtom(ce.xclient.display, "_OB_CONTROL", false);
+-        Window root = QX11Info::appRootWindow();
++        Window root = appRootWindow;
+         ce.xclient.window = root;
+         ce.xclient.format = 32;
+         ce.xclient.data.l[0] = 1; /* reconfigure */
+diff --git a/src/windows.cpp b/src/windows.cpp
+index 354bec5..ce16080 100644
+--- a/src/windows.cpp
++++ b/src/windows.cpp
+@@ -24,7 +24,6 @@
+ #include <obrender/render.h>
+ #include "tree.h"
+ 
+-#include <QX11Info>
+ // FIXME: how to support XCB or Wayland?
+ #include <X11/Xlib.h>
+ 
