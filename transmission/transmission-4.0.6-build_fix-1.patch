@@ -1,0 +1,41 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2024-05-31
+Initial Package Version: 4.0.6
+Upstream Status:         Applied (commit a72a93764e556da6b45d086162e8bc941277ab0d)
+Origin:                  Upstream
+Description:             Fixes a problem when running CMakeLists.txt where the
+                         miniupnp package was updated, but CMakeLists.txt was
+                         not updated to account for the recent changes to the
+                         name of the library provided by that package.
+
+diff -Naurp transmission-4.0.6.orig/CMakeLists.txt transmission-4.0.6/CMakeLists.txt
+--- transmission-4.0.6.orig/CMakeLists.txt	2024-05-28 20:38:35.000000000 -0500
++++ transmission-4.0.6/CMakeLists.txt	2024-05-31 14:59:38.163311664 -0500
+@@ -502,7 +502,13 @@ if(NOT USE_SYSTEM_NATPMP)
+             NATPMP_STATICLIB)
+ endif()
+ 
+-tr_add_external_auto_library(MINIUPNPC miniupnpc miniupnpc
++if(WIN32)
++    # https://github.com/miniupup/miniupnp/pull/304
++    set(TR_MINIUPNPC_LIBNAME libminiupnpc)
++else()
++    set(TR_MINIUPNPC_LIBNAME miniupnpc)
++endif()
++tr_add_external_auto_library(MINIUPNPC miniupnp/miniupnpc ${TR_MINIUPNPC_LIBNAME}
+     TARGET miniupnpc::libminiupnpc
+     CMAKE_ARGS
+         -DUPNPC_BUILD_STATIC=ON
+@@ -513,9 +519,10 @@ if(NOT USE_SYSTEM_MINIUPNPC)
+         INTERFACE
+             MINIUPNP_STATICLIB)
+ 
+-    set(MINIUPNPC_VERSION 1.9)
+-    set(MINIUPNPC_API_VERSION 12)
++    set(MINIUPNPC_VERSION 2.2)
++    set(MINIUPNPC_API_VERSION 17)
+ endif()
++unset(TR_MINIUPNPC_LIBNAME)
+ 
+ target_compile_definitions(miniupnpc::libminiupnpc
+     INTERFACE
