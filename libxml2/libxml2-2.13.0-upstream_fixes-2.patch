@@ -1,0 +1,458 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
+Date:                    2024-06-15
+Initial Package Version: 2.13.0
+Upstream Status:         Applied
+Origin:                  Upstream Git repo (see From lines below)
+Description:             Fix an issue breaking the --path option of
+                         xmllint and xsltproc, an issue breaking some
+                         valid xpointer attributes in xi:include elements,
+                         an issue causing runtime crash in apps using
+                         raptor, and an issue causing some packages
+                         (for example shared-mime-info) fail to build.
+
+From 2608baaf92c7e3b90469cefdadb47cbde6039518 Mon Sep 17 00:00:00 2001
+From: Nick Wellnhofer <wellnhofer@aevum.de>
+Date: Fri, 14 Jun 2024 19:42:40 +0200
+Subject: [PATCH] parser: Make failure to load main document a warning
+
+Revert the change that made failures to load the main document an error.
+
+This fixes the --path option of xmllint and xsltproc.
+
+Should fix #733.
+---
+ parserInternals.c                 | 10 +++++-----
+ python/tests/error.py             |  2 +-
+ python/tests/input_callback.py    |  6 +++---
+ python/tests/tstLastError.py      |  2 +-
+ result/XInclude/fallback.xml.err  |  2 +-
+ result/XInclude/fallback2.xml.err |  4 ++--
+ result/XInclude/fallback4.xml.err |  2 +-
+ result/XInclude/fallback5.xml.err | 32 +++++++++++++++----------------
+ result/XInclude/fallback6.xml.err |  4 ++--
+ result/XInclude/fallback7.xml.err |  2 +-
+ result/XInclude/ns1.xml.err       |  2 +-
+ result/schemas/import1_0_0.err    |  2 +-
+ 12 files changed, 35 insertions(+), 35 deletions(-)
+
+diff --git a/parserInternals.c b/parserInternals.c
+index 6c6c82f81..be751008c 100644
+--- a/parserInternals.c
++++ b/parserInternals.c
+@@ -180,12 +180,12 @@ xmlCtxtErrIO(xmlParserCtxtPtr ctxt, int code, const char *uri)
+         return;
+ 
+     /*
+-     * Don't report a well-formedness error if an external entity could
+-     * not be found. We assume that inputNr is zero for the document
+-     * entity which is somewhat fragile.
++     * Only report a warning if a file could not be found. This should
++     * only be done for external entities, but the external entity loader
++     * of xsltproc can try multiple paths and assumes that ENOENT doesn't
++     * raise an error and aborts parsing.
+      */
+-    if ((ctxt->inputNr > 0) &&
+-        ((code == XML_IO_ENOENT) ||
++    if (((code == XML_IO_ENOENT) ||
+          (code == XML_IO_NETWORK_ATTEMPT) ||
+          (code == XML_IO_UNKNOWN))) {
+         if (ctxt->validate == 0)
+diff --git a/python/tests/error.py b/python/tests/error.py
+index 6c8da9990..6668b729b 100755
+--- a/python/tests/error.py
++++ b/python/tests/error.py
+@@ -10,7 +10,7 @@ import libxml2
+ # Memory debug specific
+ libxml2.debugMemory(1)
+ 
+-expect='--> I/O --> error : --> failed to load "missing.xml": No such file or directory\n'
++expect='--> I/O --> warning : --> failed to load "missing.xml": No such file or directory\n'
+ err=""
+ def callback(ctx, str):
+      global err
+diff --git a/python/tests/input_callback.py b/python/tests/input_callback.py
+index 35a51695c..b24c5c852 100755
+--- a/python/tests/input_callback.py
++++ b/python/tests/input_callback.py
+@@ -90,7 +90,7 @@ run_test(desc="Loading entity without custom callback",
+         docpath=startURL, catalog=None,
+         exp_status="not loaded", exp_err=[
+             (-1, "I/O "),
+-            (-1, "error : "),
++            (-1, "warning : "),
+             (-1, "failed to load \"py://strings/xml/sample.xml\": No such file or directory\n")
+             ])
+ 
+@@ -121,7 +121,7 @@ run_test(desc="Retry loading document after unregistering callback",
+         docpath=startURL, catalog=catURL,
+         exp_status="not loaded", exp_err=[
+             (-1, "I/O "),
+-            (-1, "error : "),
++            (-1, "warning : "),
+             (-1, "failed to load \"py://strings/xml/sample.xml\": No such file or directory\n")
+             ])
+ 
+@@ -141,7 +141,7 @@ run_test(desc="Loading using standard i/o after unregistering all callbacks",
+         docpath="tst.xml", catalog=None,
+         exp_status="not loaded", exp_err=[
+             (-1, "I/O "),
+-            (-1, "error : "),
++            (-1, "warning : "),
+             (-1, "failed to load \"tst.xml\": No such file or directory\n")
+             ])
+ 
+diff --git a/python/tests/tstLastError.py b/python/tests/tstLastError.py
+index 35f5eb3d9..a07999501 100755
+--- a/python/tests/tstLastError.py
++++ b/python/tests/tstLastError.py
+@@ -60,7 +60,7 @@ class TestCase(unittest.TestCase):
+                         domain=libxml2.XML_FROM_IO,
+                         code=libxml2.XML_IO_ENOENT,
+                         message='failed to load "dummy.xml": No such file or directory\n',
+-                        level=libxml2.XML_ERR_FATAL,
++                        level=libxml2.XML_ERR_WARNING,
+                         file=None,
+                         line=0)
+ 
+diff --git a/result/XInclude/fallback.xml.err b/result/XInclude/fallback.xml.err
+index fa6b9e1ad..3239da075 100644
+--- a/result/XInclude/fallback.xml.err
++++ b/result/XInclude/fallback.xml.err
+@@ -1 +1 @@
+-I/O error : failed to load "test/XInclude/docs/something.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/something.xml": No such file or directory
+diff --git a/result/XInclude/fallback2.xml.err b/result/XInclude/fallback2.xml.err
+index d405ac200..288ed212d 100644
+--- a/result/XInclude/fallback2.xml.err
++++ b/result/XInclude/fallback2.xml.err
+@@ -1,2 +1,2 @@
+-I/O error : failed to load "test/XInclude/docs/b.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/c.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/b.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/c.xml": No such file or directory
+diff --git a/result/XInclude/fallback4.xml.err b/result/XInclude/fallback4.xml.err
+index e27a7e6fb..251567760 100644
+--- a/result/XInclude/fallback4.xml.err
++++ b/result/XInclude/fallback4.xml.err
+@@ -1 +1 @@
+-I/O error : failed to load "test/XInclude/docs/c.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/c.xml": No such file or directory
+diff --git a/result/XInclude/fallback5.xml.err b/result/XInclude/fallback5.xml.err
+index 4ec1892d7..f30bc6974 100644
+--- a/result/XInclude/fallback5.xml.err
++++ b/result/XInclude/fallback5.xml.err
+@@ -1,16 +1,16 @@
+-I/O error : failed to load "test/XInclude/docs/a01.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a02.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a03.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a04.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a05.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a06.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a07.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a08.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a09.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a10.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a11.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a12.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a13.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a14.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a15.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/a16.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a01.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a02.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a03.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a04.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a05.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a06.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a07.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a08.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a09.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a10.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a11.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a12.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a13.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a14.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a15.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/a16.xml": No such file or directory
+diff --git a/result/XInclude/fallback6.xml.err b/result/XInclude/fallback6.xml.err
+index d405ac200..288ed212d 100644
+--- a/result/XInclude/fallback6.xml.err
++++ b/result/XInclude/fallback6.xml.err
+@@ -1,2 +1,2 @@
+-I/O error : failed to load "test/XInclude/docs/b.xml": No such file or directory
+-I/O error : failed to load "test/XInclude/docs/c.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/b.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/docs/c.xml": No such file or directory
+diff --git a/result/XInclude/fallback7.xml.err b/result/XInclude/fallback7.xml.err
+index 3861279f5..5acd3cccf 100644
+--- a/result/XInclude/fallback7.xml.err
++++ b/result/XInclude/fallback7.xml.err
+@@ -1 +1 @@
+-I/O error : failed to load "test/XInclude/without-reader/404.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/without-reader/404.xml": No such file or directory
+diff --git a/result/XInclude/ns1.xml.err b/result/XInclude/ns1.xml.err
+index ef202341b..d750bc3db 100644
+--- a/result/XInclude/ns1.xml.err
++++ b/result/XInclude/ns1.xml.err
+@@ -1 +1 @@
+-I/O error : failed to load "test/XInclude/without-reader/b.xml": No such file or directory
++I/O warning : failed to load "test/XInclude/without-reader/b.xml": No such file or directory
+diff --git a/result/schemas/import1_0_0.err b/result/schemas/import1_0_0.err
+index aafb61070..f780244a8 100644
+--- a/result/schemas/import1_0_0.err
++++ b/result/schemas/import1_0_0.err
+@@ -1,4 +1,4 @@
+-I/O error : failed to load "test/schemas/import1_0bc.imp": No such file or directory
++I/O warning : failed to load "test/schemas/import1_0bc.imp": No such file or directory
+ ./test/schemas/import1_0.xsd:11: element import: Schemas parser warning : Element '{http://www.w3.org/2001/XMLSchema}import': Failed to locate a schema at location 'test/schemas/import1_0bc.imp'. Skipping the import.
+ ./test/schemas/import1_0.xsd:16: element import: Schemas parser warning : Element '{http://www.w3.org/2001/XMLSchema}import': Skipping import of schema located at 'test/schemas/import1_0b.imp' for the namespace 'http://BAR', since this namespace was already imported with the schema located at 'test/schemas/import1_0.imp'.
+ ./test/schemas/import1_0.xsd:26: element element: Schemas parser error : Element '{http://www.w3.org/2001/XMLSchema}element', attribute 'ref': The QName value '{http://BAR}bar.B' does not resolve to a(n) element declaration.
+-- 
+GitLab
+
+From 1aa37db04cf09bcdd0172333eb67bb6597ee75f6 Mon Sep 17 00:00:00 2001
+From: Nick Wellnhofer <wellnhofer@aevum.de>
+Date: Fri, 14 Jun 2024 20:44:45 +0200
+Subject: [PATCH] xinclude: Don't raise error on empty nodeset
+
+xmlXPtrEval returning NULL means an empty nodeset if no error code is
+set.
+
+See #733.
+---
+ xinclude.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/xinclude.c b/xinclude.c
+index c177b9396..f338b9943 100644
+--- a/xinclude.c
++++ b/xinclude.c
+@@ -1213,7 +1213,7 @@ loaded:
+ #endif
+         }
+ 	xptr = xmlXPtrEval(fragment, ctxt->xpctxt);
+-	if (xptr == NULL) {
++	if (ctxt->xpctxt->lastError.code != XML_ERR_OK) {
+             if (ctxt->xpctxt->lastError.code == XML_ERR_NO_MEMORY)
+                 xmlXIncludeErrMemory(ctxt);
+             else
+@@ -1222,6 +1222,8 @@ loaded:
+                                fragment);
+             goto error;
+ 	}
++        if (xptr == NULL)
++            goto done;
+ 	switch (xptr->type) {
+ 	    case XPATH_UNDEFINED:
+ 	    case XPATH_BOOLEAN:
+@@ -1293,6 +1295,7 @@ loaded:
+     }
+ #endif
+ 
++done:
+     ret = 0;
+ 
+ error:
+-- 
+GitLab
+
+From 039ce1e82162a31854740e208fd8da6d756bf547 Mon Sep 17 00:00:00 2001
+From: Nick Wellnhofer <wellnhofer@aevum.de>
+Date: Fri, 14 Jun 2024 16:41:43 +0200
+Subject: [PATCH] parser: Pass global object to sax->setDocumentLocator
+
+Revert part of commit c011e760.
+
+Fixes #732.
+---
+ HTMLparser.c | 11 ++++-------
+ parser.c     | 18 ++++++------------
+ 2 files changed, 10 insertions(+), 19 deletions(-)
+
+diff --git a/HTMLparser.c b/HTMLparser.c
+index 4add63473..ac14301d8 100644
+--- a/HTMLparser.c
++++ b/HTMLparser.c
+@@ -4753,12 +4753,9 @@ htmlParseDocument(htmlParserCtxtPtr ctxt) {
+     if ((ctxt == NULL) || (ctxt->input == NULL))
+ 	return(-1);
+
+-    /*
+-     * Document locator is unused. Only for backward compatibility.
+-     */
+     if ((ctxt->sax) && (ctxt->sax->setDocumentLocator)) {
+-        xmlSAXLocator copy = xmlDefaultSAXLocator;
+-        ctxt->sax->setDocumentLocator(ctxt->userData, &copy);
++        ctxt->sax->setDocumentLocator(ctxt->userData,
++                (xmlSAXLocator *) &xmlDefaultSAXLocator);
+     }
+
+     xmlDetectEncoding(ctxt);
+@@ -5297,8 +5294,8 @@ htmlParseTryOrFinish(htmlParserCtxtPtr ctxt, int terminate) {
+                     avail = in->end - in->cur;
+ 		}
+                 if ((ctxt->sax) && (ctxt->sax->setDocumentLocator)) {
+-                    xmlSAXLocator copy = xmlDefaultSAXLocator;
+-                    ctxt->sax->setDocumentLocator(ctxt->userData, &copy);
++                    ctxt->sax->setDocumentLocator(ctxt->userData,
++                            (xmlSAXLocator *) &xmlDefaultSAXLocator);
+                 }
+ 		if ((ctxt->sax) && (ctxt->sax->startDocument) &&
+ 	            (!ctxt->disableSAX))
+diff --git a/parser.c b/parser.c
+index f1f002b85..54f6683f8 100644
+--- a/parser.c
++++ b/parser.c
+@@ -10496,12 +10496,9 @@ xmlParseDocument(xmlParserCtxtPtr ctxt) {
+      */
+     xmlCtxtInitializeLate(ctxt);
+
+-    /*
+-     * Document locator is unused. Only for backward compatibility.
+-     */
+     if ((ctxt->sax) && (ctxt->sax->setDocumentLocator)) {
+-        xmlSAXLocator copy = xmlDefaultSAXLocator;
+-        ctxt->sax->setDocumentLocator(ctxt->userData, &copy);
++        ctxt->sax->setDocumentLocator(ctxt->userData,
++                (xmlSAXLocator *) &xmlDefaultSAXLocator);
+     }
+
+     xmlDetectEncoding(ctxt);
+@@ -10626,12 +10623,9 @@ xmlParseExtParsedEnt(xmlParserCtxtPtr ctxt) {
+
+     xmlCtxtInitializeLate(ctxt);
+
+-    /*
+-     * Document locator is unused. Only for backward compatibility.
+-     */
+     if ((ctxt->sax) && (ctxt->sax->setDocumentLocator)) {
+-        xmlSAXLocator copy = xmlDefaultSAXLocator;
+-        ctxt->sax->setDocumentLocator(ctxt->userData, &copy);
++        ctxt->sax->setDocumentLocator(ctxt->userData,
++                (xmlSAXLocator *) &xmlDefaultSAXLocator);
+     }
+
+     xmlDetectEncoding(ctxt);
+@@ -11095,8 +11089,8 @@ xmlParseTryOrFinish(xmlParserCtxtPtr ctxt, int terminate) {
+ 		    }
+ 		}
+                 if ((ctxt->sax) && (ctxt->sax->setDocumentLocator)) {
+-                    xmlSAXLocator copy = xmlDefaultSAXLocator;
+-                    ctxt->sax->setDocumentLocator(ctxt->userData, &copy);
++                    ctxt->sax->setDocumentLocator(ctxt->userData,
++                            (xmlSAXLocator *) &xmlDefaultSAXLocator);
+                 }
+                 if ((ctxt->sax) && (ctxt->sax->startDocument) &&
+                     (!ctxt->disableSAX))
+--
+GitLab
+
+From 387f0c784fadb84daa79a30166f611c2b800d5d8 Mon Sep 17 00:00:00 2001
+From: Nick Wellnhofer <wellnhofer@aevum.de>
+Date: Wed, 6 Dec 2023 18:35:30 +0100
+Subject: [PATCH] include: Readd circular dependency between tree.h and
+ parser.h
+
+There are dozens of downstream projects that only include tree.h but use
+declarations from parser.h. This broke after the recent cleanup of
+circular dependencies.
+
+Make tree.h include parser.h again. This is a hack but doesn't change
+the include directory struture.
+
+This commit only made it into the 2.12 branch but wasn't applied to
+master, so the issue turned up in 2.13.0 again.
+
+Should fix #734.
+---
+ include/libxml/entities.h |  2 ++
+ include/libxml/parser.h   |  2 ++
+ include/libxml/tree.h     | 11 +++++++++++
+ include/libxml/valid.h    |  2 ++
+ include/libxml/xmlIO.h    |  2 ++
+ 5 files changed, 19 insertions(+)
+
+diff --git a/include/libxml/entities.h b/include/libxml/entities.h
+index 96029ba1a..26a8bc424 100644
+--- a/include/libxml/entities.h
++++ b/include/libxml/entities.h
+@@ -12,7 +12,9 @@
+ #define __XML_ENTITIES_H__
+ 
+ #include <libxml/xmlversion.h>
++#define XML_TREE_INTERNALS
+ #include <libxml/tree.h>
++#undef XML_TREE_INTERNALS
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/include/libxml/parser.h b/include/libxml/parser.h
+index ead922e9e..0231fd7e9 100644
+--- a/include/libxml/parser.h
++++ b/include/libxml/parser.h
+@@ -11,7 +11,9 @@
+ #define __XML_PARSER_H__
+ 
+ #include <libxml/xmlversion.h>
++#define XML_TREE_INTERNALS
+ #include <libxml/tree.h>
++#undef XML_TREE_INTERNALS
+ #include <libxml/dict.h>
+ #include <libxml/hash.h>
+ #include <libxml/valid.h>
+diff --git a/include/libxml/tree.h b/include/libxml/tree.h
+index dca203182..409edcb64 100644
+--- a/include/libxml/tree.h
++++ b/include/libxml/tree.h
+@@ -9,6 +9,15 @@
+  * Author: Daniel Veillard
+  */
+ 
++#ifndef XML_TREE_INTERNALS
++
++/*
++ * Emulate circular dependency for backward compatibility
++ */
++#include <libxml/parser.h>
++
++#else /* XML_TREE_INTERNALS */
++
+ #ifndef __XML_TREE_H__
+ #define __XML_TREE_H__
+ 
+@@ -1374,3 +1383,5 @@ XML_DEPRECATED XMLPUBFUN int
+ 
+ #endif /* __XML_TREE_H__ */
+ 
++#endif /* XML_TREE_INTERNALS */
++
+diff --git a/include/libxml/valid.h b/include/libxml/valid.h
+index 361e9655e..b9db720e6 100644
+--- a/include/libxml/valid.h
++++ b/include/libxml/valid.h
+@@ -13,7 +13,9 @@
+ 
+ #include <libxml/xmlversion.h>
+ #include <libxml/xmlerror.h>
++#define XML_TREE_INTERNALS
+ #include <libxml/tree.h>
++#undef XML_TREE_INTERNALS
+ #include <libxml/list.h>
+ #include <libxml/xmlautomata.h>
+ #include <libxml/xmlregexp.h>
+diff --git a/include/libxml/xmlIO.h b/include/libxml/xmlIO.h
+index 81f850e2a..eeefd13a3 100644
+--- a/include/libxml/xmlIO.h
++++ b/include/libxml/xmlIO.h
+@@ -13,7 +13,9 @@
+ #include <stdio.h>
+ #include <libxml/xmlversion.h>
+ #include <libxml/encoding.h>
++#define XML_TREE_INTERNALS
+ #include <libxml/tree.h>
++#undef XML_TREE_INTERNALS
+ 
+ #ifdef __cplusplus
+ extern "C" {
+-- 
+GitLab
