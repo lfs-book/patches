@@ -1,0 +1,68 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2024-06-17
+Initial Package Version: 24.1.5
+Origin:                  Upstream
+Upstream Status:         Applied (https://github.com/intel/media-driver/commit/e77144df9ae0d7c0b984e2be2c076ca386892eb7)
+Description:             Fixes building intel-media-drver with GCC 14 by
+                         adapting to C++ 20 changes.
+
+diff -Naurp media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen11/hw/vdbox/mhw_vdbox_vdenc_g11_X.h media-driver-intel-media-24.1.5/media_driver/agnostic/gen11/hw/vdbox/mhw_vdbox_vdenc_g11_X.h
+--- media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen11/hw/vdbox/mhw_vdbox_vdenc_g11_X.h	2024-03-12 23:35:31.000000000 -0500
++++ media-driver-intel-media-24.1.5/media_driver/agnostic/gen11/hw/vdbox/mhw_vdbox_vdenc_g11_X.h	2024-06-17 13:05:59.974661199 -0500
+@@ -210,7 +210,7 @@ public:
+     //!
+     //! \brief  Constructor
+     //!
+-    MhwVdboxVdencInterfaceG11<TVdencCmds>(PMOS_INTERFACE osInterface) : MhwVdboxVdencInterfaceGeneric<TVdencCmds>(osInterface)
++    MhwVdboxVdencInterfaceG11(PMOS_INTERFACE osInterface) : MhwVdboxVdencInterfaceGeneric<TVdencCmds>(osInterface)
+     {
+         MHW_FUNCTION_ENTER;
+ 
+diff -Naurp media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen8/hw/vdbox/mhw_vdbox_mfx_g8_X.h media-driver-intel-media-24.1.5/media_driver/agnostic/gen8/hw/vdbox/mhw_vdbox_mfx_g8_X.h
+--- media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen8/hw/vdbox/mhw_vdbox_mfx_g8_X.h	2024-03-12 23:35:31.000000000 -0500
++++ media-driver-intel-media-24.1.5/media_driver/agnostic/gen8/hw/vdbox/mhw_vdbox_mfx_g8_X.h	2024-06-17 13:05:59.974661199 -0500
+@@ -105,7 +105,7 @@ protected:
+     //!
+     //! \brief  Constructor
+     //!
+-    MhwVdboxMfxInterfaceG8<TMfxCmds>(
++    MhwVdboxMfxInterfaceG8(
+         PMOS_INTERFACE osInterface,
+         MhwMiInterface *miInterface,
+         MhwCpInterface *cpInterface,
+diff -Naurp media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_hcp_g9_X.h media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_hcp_g9_X.h
+--- media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_hcp_g9_X.h	2024-03-12 23:35:31.000000000 -0500
++++ media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_hcp_g9_X.h	2024-06-17 13:05:59.974661199 -0500
+@@ -120,7 +120,7 @@ protected:
+     //!
+     //! \brief  Constructor
+     //!
+-    MhwVdboxHcpInterfaceG9<THcpCmds>(
++    MhwVdboxHcpInterfaceG9(
+         PMOS_INTERFACE osInterface,
+         MhwMiInterface *miInterface,
+         MhwCpInterface *cpInterface,
+diff -Naurp media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_mfx_g9_X.h media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_mfx_g9_X.h
+--- media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_mfx_g9_X.h	2024-03-12 23:35:31.000000000 -0500
++++ media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_mfx_g9_X.h	2024-06-17 13:05:59.975661206 -0500
+@@ -86,7 +86,7 @@ protected:
+     //!
+     //! \brief  Constructor
+     //!
+-    MhwVdboxMfxInterfaceG9<TMfxCmds>(
++    MhwVdboxMfxInterfaceG9(
+         PMOS_INTERFACE osInterface,
+         MhwMiInterface *miInterface,
+         MhwCpInterface *cpInterface,
+diff -Naurp media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_vdenc_g9_X.h media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_vdenc_g9_X.h
+--- media-driver-intel-media-24.1.5.orig/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_vdenc_g9_X.h	2024-03-12 23:35:31.000000000 -0500
++++ media-driver-intel-media-24.1.5/media_driver/agnostic/gen9/hw/vdbox/mhw_vdbox_vdenc_g9_X.h	2024-06-17 13:05:59.975661206 -0500
+@@ -51,7 +51,7 @@ protected:
+     //!
+     //! \brief  Constructor
+     //!
+-    MhwVdboxVdencInterfaceG9<TVdencCmds>(PMOS_INTERFACE osInterface) : MhwVdboxVdencInterfaceGeneric<TVdencCmds>(osInterface)
++    MhwVdboxVdencInterfaceG9(PMOS_INTERFACE osInterface) : MhwVdboxVdencInterfaceGeneric<TVdencCmds>(osInterface)
+     {
+         MHW_FUNCTION_ENTER;
+ 
