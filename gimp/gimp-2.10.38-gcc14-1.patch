@@ -1,0 +1,61 @@
+Submitted By: Ken Moffat <ken at linuxfromscratch dot org>
+Date: 2024-07-12
+Initial Package Version: 2.10.38
+Upstream Status: Uncertain, probably backports
+Origin: gentoo, to fix FTBFS with gcc-14.
+
+https://bugs.gentoo.org/919282
+
+https://gitlab.gnome.org/GNOME/gimp/-/commit/51311f913d9f417d121f59b83d560c7b4b853d1c
+
+From 51311f913d9f417d121f59b83d560c7b4b853d1c Mon Sep 17 00:00:00 2001
+From: Simon Budig <simon@budig.de>
+Date: Sat, 20 May 2023 22:25:40 +0200
+Subject: [PATCH] metadata: shut up a weird warning
+
+---
+ plug-ins/metadata/metadata-editor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/plug-ins/metadata/metadata-editor.c b/plug-ins/metadata/metadata-editor.c
+index a3992e40ddc..5bf6ef709f1 100644
+--- a/plug-ins/metadata/metadata-editor.c
++++ b/plug-ins/metadata/metadata-editor.c
+@@ -2846,7 +2846,7 @@ metadata_dialog_editor_set_metadata (GExiv2Metadata  *metadata,
+                             }
+                           else
+                             {
+-                              if (! g_strv_contains (values, equiv_values[evi]))
++                              if (! g_strv_contains ((const gchar * const *) values, equiv_values[evi]))
+                                 {
+                                   gchar *tmpvalue;
+ 
+-- 
+GitLab
+
+https://gitlab.gnome.org/GNOME/gimp/-/commit/a2458f1528e5733574bb26ff5452b1329116e6db
+
+From a2458f1528e5733574bb26ff5452b1329116e6db Mon Sep 17 00:00:00 2001
+From: Simon Budig <simon@budig.de>
+Date: Sat, 20 May 2023 18:40:41 +0200
+Subject: [PATCH] file-tiff-load: fix mismatching variable type
+
+---
+ plug-ins/file-tiff/file-tiff-load.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/plug-ins/file-tiff/file-tiff-load.c b/plug-ins/file-tiff/file-tiff-load.c
+index 0aafbaec5fd..a26e7af2752 100644
+--- a/plug-ins/file-tiff/file-tiff-load.c
++++ b/plug-ins/file-tiff/file-tiff-load.c
+@@ -1297,8 +1297,8 @@ load_image (GFile        *file,
+ 
+       /* any resolution info in the file? */
+       {
+-        gfloat   xres = 72.0;
+-        gfloat   yres = 72.0;
++        gdouble   xres = 72.0;
++        gdouble   yres = 72.0;
+         gushort  read_unit;
+         GimpUnit unit = GIMP_UNIT_PIXEL; /* invalid unit */
+ 
