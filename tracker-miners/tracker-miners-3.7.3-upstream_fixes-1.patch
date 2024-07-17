@@ -1,0 +1,78 @@
+Submitted By:            Xi Ruoyao <xry111 AT xry111 DOT site>
+Date:                    2024-07-17
+Initial Package Version: 3.7.3
+Upstream Status:         Applied
+Origin:                  Upstream (see From lines below for commit ID)
+Description:             Fixes one issue with the TIFF extractor, and
+                         anothor issue with the Landlock sandbox.
+
+From b9f143b58fc0000f6ee4297f0bf438ee19a17ea3 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Thu, 20 Jun 2024 12:43:59 +0200
+Subject: [PATCH] tracker-extract: Fix focal length extraction from Tiff files
+
+Use the right EXIF tag to get this metadata. Also fix the tiff-photo-1
+test to check for the (now correct) nmm:focalLength property value.
+
+Closes: https://gitlab.gnome.org/GNOME/localsearch/-/issues/341
+---
+ src/tracker-extract/tracker-extract-tiff.c                      | 2 +-
+ .../data/extractor-content/images/tiff-photo-1.expected.json    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/tracker-extract/tracker-extract-tiff.c b/src/tracker-extract/tracker-extract-tiff.c
+index 06b23ff3a..49baae735 100644
+--- a/src/tracker-extract/tracker-extract-tiff.c
++++ b/src/tracker-extract/tracker-extract-tiff.c
+@@ -399,7 +399,7 @@ tracker_extract_get_metadata (TrackerExtractInfo  *info,
+ 
+ 			ed->metering_mode = get_metering_mode (image);
+ 			ed->flash = get_flash (image);
+-			ed->focal_length = tag_to_string (image, EXIFTAG_DATETIMEORIGINAL, TAG_TYPE_DOUBLE);
++			ed->focal_length = tag_to_string (image, EXIFTAG_FOCALLENGTH, TAG_TYPE_DOUBLE);
+ 			ed->white_balance = get_white_balance (image);
+ 			/* ed->software = tag_to_string (image, EXIFTAG_SOFTWARE, TAG_TYPE_STRING); */
+ 		}
+diff --git a/tests/functional-tests/data/extractor-content/images/tiff-photo-1.expected.json b/tests/functional-tests/data/extractor-content/images/tiff-photo-1.expected.json
+index 35cc87449..c89b72c80 100644
+--- a/tests/functional-tests/data/extractor-content/images/tiff-photo-1.expected.json
++++ b/tests/functional-tests/data/extractor-content/images/tiff-photo-1.expected.json
+@@ -44,7 +44,7 @@
+                     "@type" : "nfo:Equipment",
+                     "nfo:manufacturer" : "Apple"
+                 },
+-                "nmm:focalLength" : "0.000000",
++                "nmm:focalLength" : "4.120000",
+                 "nmm:flash" : {
+                     "@id" : "nmm:flash-off"
+                 },
+-- 
+GitLab
+
+From cbcb528341e835026caf50bf980f145541bbf705 Mon Sep 17 00:00:00 2001
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Wed, 17 Jul 2024 15:38:39 +0800
+Subject: [PATCH] landlock: Allow reading /run/blkid/blkid.tab
+
+blkid_get_cache() (called in tracker-file-utils.c) reads this file.
+---
+ src/libtracker-miners-common/tracker-landlock.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/libtracker-miners-common/tracker-landlock.c b/src/libtracker-miners-common/tracker-landlock.c
+index 28b41d6c7..56df01bb2 100644
+--- a/src/libtracker-miners-common/tracker-landlock.c
++++ b/src/libtracker-miners-common/tracker-landlock.c
+@@ -225,6 +225,9 @@ tracker_landlock_init (const gchar * const *indexed_folders)
+ 		{ "/etc/fonts/",
+ 		  LANDLOCK_ACCESS_FS_READ_FILE |
+ 		  LANDLOCK_ACCESS_FS_READ_DIR },
++		/* Necessary for blkid_get_cache() */
++		{ "/run/blkid/blkid.tab",
++		  LANDLOCK_ACCESS_FS_READ_FILE },
+ 	};
+ 	TrackerLandlockRule homedir_rules[] = {
+ 		/* Disable file access to sensitive folders the extractor has
+--
+GitLab
+
