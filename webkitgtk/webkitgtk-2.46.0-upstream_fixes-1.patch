@@ -1,0 +1,908 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
+Date:                    2024-09-18
+Initial Package Version: 2.46.0
+Origin:                  Upstream (see cherry picked from lines below)
+Upstream Status:         Applied
+Description:             Fix build failure with gstreamer built with
+                         -D gst_debug=false, and two video playback
+                         issues.
+
+From ec114856b8af38a48a73f74868cf25a6404c1a72 Mon Sep 17 00:00:00 2001
+From: Carlos Bentzen <cadubentzen@igalia.com>
+Date: Tue, 10 Sep 2024 07:13:38 -0700
+Subject: [PATCH 1/3] [GStreamer] Build fails with GST_DISABLE_GST_DEBUG and
+ -Werror=unused https://bugs.webkit.org/show_bug.cgi?id=279435
+
+Reviewed by Philippe Normand.
+
+Add [[maybe_unused]]'s and #ifndef guards where missing.
+
+* Source/WebCore/Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp:
+(WebCore::GStreamerDataChannelHandler::onMessageData):
+* Source/WebCore/Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp:
+(WebCore::GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend):
+(WebCore::GStreamerPeerConnectionBackend::~GStreamerPeerConnectionBackend):
+* Source/WebCore/platform/audio/gstreamer/AudioDecoderGStreamer.cpp:
+(WebCore::GStreamerInternalAudioDecoder::decode):
+* Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp:
+(WebCore::AudioDestinationGStreamer::notifyStartupResult):
+(WebCore::AudioDestinationGStreamer::notifyStopResult):
+* Source/WebCore/platform/audio/gstreamer/PlatformRawAudioDataGStreamer.cpp:
+(WebCore::PlatformRawAudioData::copyTo):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp:
+(WebCore::webkitGstSetElementStateSynchronously):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.cpp:
+(WebCore::GStreamerRegistryScanner::isCodecSupported const):
+(WebCore::GStreamerRegistryScanner::configurationNameForLogging const):
+(WebCore::GStreamerRegistryScanner::isConfigurationSupported const):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.h:
+* Source/WebCore/platform/graphics/gstreamer/GStreamerSinksWorkarounds.cpp:
+(WebCore::AppSinkFlushCapsWorkaroundProbe::probe):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp:
+(WebKitVideoSinkProbe::doProbe):
+(webKitVideoSinkSetMediaPlayerPrivate):
+* Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+(WebCore::MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer):
+(WebCore::MediaPlayerPrivateGStreamer::mediaPlayerWillBeDestroyed):
+(WebCore::MediaPlayerPrivateGStreamer::updateTracks):
+(WebCore::MediaPlayerPrivateGStreamer::handleMessage):
+(WebCore::MediaPlayerPrivateGStreamer::updateVideoOrientation):
+(WebCore::MediaPlayerPrivateGStreamer::attemptToDecryptWithInstance):
+(WebCore::MediaPlayerPrivateGStreamer::attemptToDecryptWithLocalInstance):
+(WebCore::MediaPlayerPrivateGStreamer::supportsKeySystem):
+* Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp:
+(WebCore::retrieveTemporalIndex):
+* Source/WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp:
+(webkitWebSrcReset):
+(stopLoaderIfNeeded):
+(CachedResourceStreamingClient::dataReceived):
+* Source/WebCore/platform/graphics/gstreamer/mse/AppendPipeline.cpp:
+(WebCore::AppendPipeline::handleErrorSyncMessage):
+(WebCore::AppendPipeline::consumeAppsinksAvailableSamples):
+(WebCore::createOptionalParserForFormat):
+(WebCore::appendPipelineAppsinkPadEventProbe):
+(WebCore::appendPipelineDemuxerBlackHolePadProbe):
+* Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp:
+* Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.h:
+* Source/WebCore/platform/graphics/gstreamer/mse/WebKitMediaSourceGStreamer.cpp:
+(dumpPipeline):
+(webKitMediaSrcActivateMode):
+(webKitMediaSrcLoop):
+* Source/WebCore/platform/gstreamer/GStreamerElementHarness.cpp:
+(WebCore::GStreamerElementHarness::GStreamerElementHarness):
+* Source/WebCore/platform/gstreamer/VideoEncoderPrivateGStreamer.cpp:
+(videoEncoderFindForFormat):
+* Source/WebCore/platform/mediarecorder/MediaRecorderPrivateGStreamer.cpp:
+(WebCore::MediaRecorderPrivateBackend::preparePipeline):
+* Source/WebCore/platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp:
+(webkitMediaStreamSrcPadProbeCb):
+(webkitMediaStreamSrcCharacteristicsChanged):
+* Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDevice.cpp:
+(webkitMockDeviceCreateElement):
+* Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp:
+(webkitMockDeviceProviderProbe):
+
+Canonical link: https://commits.webkit.org/283413@main
+
+(cherry picked from commit f5cd6dd027cac497f6bb2035a093b66f6234a257)
+---
+ .../gstreamer/GStreamerDataChannelHandler.cpp |  3 +-
+ .../GStreamerPeerConnectionBackend.cpp        |  8 +++++
+ .../audio/gstreamer/AudioDecoderGStreamer.cpp |  2 +-
+ .../gstreamer/AudioDestinationGStreamer.cpp   |  6 ++++
+ .../PlatformRawAudioDataGStreamer.cpp         |  8 +++--
+ .../graphics/gstreamer/GStreamerCommon.cpp    |  5 ++++
+ .../gstreamer/GStreamerRegistryScanner.cpp    | 30 +++++++++++--------
+ .../gstreamer/GStreamerRegistryScanner.h      |  2 +-
+ .../gstreamer/GStreamerSinksWorkarounds.cpp   |  2 +-
+ .../gstreamer/GStreamerVideoSinkCommon.cpp    |  6 +++-
+ .../gstreamer/MediaPlayerPrivateGStreamer.cpp | 18 ++++++-----
+ .../gstreamer/VideoEncoderGStreamer.cpp       |  2 ++
+ .../gstreamer/WebKitWebSourceGStreamer.cpp    |  6 ++--
+ .../graphics/gstreamer/mse/AppendPipeline.cpp | 12 ++++----
+ .../mse/MediaPlayerPrivateGStreamerMSE.cpp    |  4 ++-
+ .../mse/MediaPlayerPrivateGStreamerMSE.h      |  2 +-
+ .../mse/WebKitMediaSourceGStreamer.cpp        | 20 ++++++-------
+ .../gstreamer/GStreamerElementHarness.cpp     |  4 +--
+ .../VideoEncoderPrivateGStreamer.cpp          |  2 +-
+ .../MediaRecorderPrivateGStreamer.cpp         |  2 +-
+ .../gstreamer/GStreamerMediaStreamSource.cpp  |  6 ++--
+ .../gstreamer/GStreamerMockDevice.cpp         |  2 +-
+ .../gstreamer/GStreamerMockDeviceProvider.cpp |  2 +-
+ 23 files changed, 96 insertions(+), 58 deletions(-)
+
+diff --git a/Source/WebCore/Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp b/Source/WebCore/Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp
+index ba9adacece4..e4270fb6c77 100644
+--- a/Source/WebCore/Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp
++++ b/Source/WebCore/Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp
+@@ -344,8 +344,7 @@ void GStreamerDataChannelHandler::bufferedAmountChanged()
+ 
+ void GStreamerDataChannelHandler::onMessageData(GBytes* bytes)
+ {
+-    auto size = g_bytes_get_size(bytes);
+-    DC_DEBUG("Incoming data of size: %zu", size);
++    DC_DEBUG("Incoming data of size: %zu", g_bytes_get_size(bytes));
+     Locker locker { m_clientLock };
+ 
+     if (!m_client) {
+diff --git a/Source/WebCore/Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp b/Source/WebCore/Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp
+index 51b4f3bab32..141c14988ae 100644
+--- a/Source/WebCore/Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp
++++ b/Source/WebCore/Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp
+@@ -48,6 +48,9 @@ namespace WebCore {
+ GST_DEBUG_CATEGORY(webkit_webrtc_pc_backend_debug);
+ #define GST_CAT_DEFAULT webkit_webrtc_pc_backend_debug
+ 
++WTF_MAKE_TZONE_ALLOCATED_IMPL(WebRTCLogObserver);
++
++#ifndef GST_DISABLE_GST_DEBUG
+ class WebRTCLogObserver : public WebCoreLogObserver {
+ public:
+     GstDebugCategory* debugCategory() const final
+@@ -65,6 +68,7 @@ WebRTCLogObserver& webrtcLogObserverSingleton()
+     static NeverDestroyed<WebRTCLogObserver> sharedInstance;
+     return sharedInstance;
+ }
++#endif // GST_DISABLE_GST_DEBUG
+ 
+ static std::unique_ptr<PeerConnectionBackend> createGStreamerPeerConnectionBackend(RTCPeerConnection& peerConnection)
+ {
+@@ -88,6 +92,7 @@ GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection
+ {
+     disableICECandidateFiltering();
+ 
++#if !RELEASE_LOG_DISABLED && !defined(GST_DISABLE_GST_DEBUG)
+     // PeerConnectionBackend relies on the Document logger, so to prevent duplicate messages in case
+     // more than one PeerConnection is created, we register a single observer.
+     auto& logObserver = webrtcLogObserverSingleton();
+@@ -95,12 +100,15 @@ GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection
+ 
+     auto logIdentifier = makeString(hex(reinterpret_cast<uintptr_t>(this->logIdentifier())));
+     GST_INFO_OBJECT(m_endpoint->pipeline(), "WebCore logs identifier for this pipeline is: %s", logIdentifier.ascii().data());
++#endif
+ }
+ 
+ GStreamerPeerConnectionBackend::~GStreamerPeerConnectionBackend()
+ {
++#if !RELEASE_LOG_DISABLED && !defined(GST_DISABLE_GST_DEBUG)
+     auto& logObserver = webrtcLogObserverSingleton();
+     logObserver.removeWatch(logger());
++#endif
+ }
+ 
+ void GStreamerPeerConnectionBackend::suspend()
+diff --git a/Source/WebCore/platform/audio/gstreamer/AudioDecoderGStreamer.cpp b/Source/WebCore/platform/audio/gstreamer/AudioDecoderGStreamer.cpp
+index 9b79e961dc6..fd3312ebdef 100644
+--- a/Source/WebCore/platform/audio/gstreamer/AudioDecoderGStreamer.cpp
++++ b/Source/WebCore/platform/audio/gstreamer/AudioDecoderGStreamer.cpp
+@@ -287,7 +287,7 @@ GStreamerInternalAudioDecoder::GStreamerInternalAudioDecoder(const String& codec
+     });
+ }
+ 
+-void GStreamerInternalAudioDecoder::decode(std::span<const uint8_t> frameData, bool isKeyFrame, int64_t timestamp, std::optional<uint64_t> duration, AudioDecoder::DecodeCallback&& callback)
++void GStreamerInternalAudioDecoder::decode(std::span<const uint8_t> frameData, [[maybe_unused]] bool isKeyFrame, int64_t timestamp, std::optional<uint64_t> duration, AudioDecoder::DecodeCallback&& callback)
+ {
+     GST_DEBUG_OBJECT(m_harness->element(), "Decoding%s frame", isKeyFrame ? " key" : "");
+ 
+diff --git a/Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp b/Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp
+index 3292bd6f441..ca0f1de51a7 100644
+--- a/Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp
++++ b/Source/WebCore/platform/audio/gstreamer/AudioDestinationGStreamer.cpp
+@@ -256,6 +256,9 @@ void AudioDestinationGStreamer::notifyStartupResult(bool success)
+         notifyIsPlaying(true);
+ 
+     callOnMainThreadAndWait([this, completionHandler = WTFMove(m_startupCompletionHandler), success]() mutable {
++#ifdef GST_DISABLE_GST_DEBUG
++        UNUSED_VARIABLE(this);
++#endif
+         GST_DEBUG_OBJECT(m_pipeline.get(), "Has start completion handler: %s", boolForPrinting(!!completionHandler));
+         if (completionHandler)
+             completionHandler(success);
+@@ -268,6 +271,9 @@ void AudioDestinationGStreamer::notifyStopResult(bool success)
+         notifyIsPlaying(false);
+ 
+     callOnMainThreadAndWait([this, completionHandler = WTFMove(m_stopCompletionHandler), success]() mutable {
++#ifdef GST_DISABLE_GST_DEBUG
++        UNUSED_VARIABLE(this);
++#endif
+         GST_DEBUG_OBJECT(m_pipeline.get(), "Has stop completion handler: %s", boolForPrinting(!!completionHandler));
+         if (completionHandler)
+             completionHandler(success);
+diff --git a/Source/WebCore/platform/audio/gstreamer/PlatformRawAudioDataGStreamer.cpp b/Source/WebCore/platform/audio/gstreamer/PlatformRawAudioDataGStreamer.cpp
+index eb867199380..25dcd9a74b6 100644
+--- a/Source/WebCore/platform/audio/gstreamer/PlatformRawAudioDataGStreamer.cpp
++++ b/Source/WebCore/platform/audio/gstreamer/PlatformRawAudioDataGStreamer.cpp
+@@ -189,13 +189,15 @@ void PlatformRawAudioData::copyTo(std::span<uint8_t> destination, AudioSampleFor
+ {
+     auto& self = *reinterpret_cast<PlatformRawAudioDataGStreamer*>(this);
+ 
+-    auto [sourceFormat, sourceLayout] = convertAudioSampleFormatToGStreamerFormat(self.format());
++    [[maybe_unused]] auto [sourceFormat, sourceLayout] = convertAudioSampleFormatToGStreamerFormat(self.format());
+     auto [destinationFormat, destinationLayout] = convertAudioSampleFormatToGStreamerFormat(format);
+-
+     auto sourceOffset = frameOffset.value_or(0);
+-    const char* destinationFormatDescription = gst_audio_format_to_string(destinationFormat);
+ 
++#ifndef GST_DISABLE_GST_DEBUG
++    const char* destinationFormatDescription = gst_audio_format_to_string(destinationFormat);
+     GST_TRACE("Copying %s data at planeIndex %zu, destination format is %s, source offset: %zu", gst_audio_format_to_string(sourceFormat), planeIndex, destinationFormatDescription, sourceOffset);
++#endif
++
+     GST_TRACE("Input caps: %" GST_PTR_FORMAT, gst_sample_get_caps(self.sample()));
+ 
+     GstMappedAudioBuffer mappedBuffer(self.sample(), GST_MAP_READ);
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
+index aeda1f69953..9d400a86365 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
+@@ -915,9 +915,14 @@ bool webkitGstSetElementStateSynchronously(GstElement* pipeline, GstState target
+ 
+     auto cleanup = makeScopeExit([bus = GRefPtr<GstBus>(bus), pipeline, targetState] {
+         gst_bus_disable_sync_message_emission(bus.get());
++#ifdef GST_DISABLE_GST_DEBUG
++        UNUSED_VARIABLE(pipeline);
++        UNUSED_VARIABLE(targetState);
++#else
+         GstState currentState;
+         auto result = gst_element_get_state(pipeline, &currentState, nullptr, 0);
+         GST_DEBUG_OBJECT(pipeline, "Task finished, result: %s, target state reached: %s", gst_element_state_change_return_get_name(result), boolForPrinting(currentState == targetState));
++#endif
+     });
+ 
+     result = gst_element_set_state(pipeline, targetState);
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.cpp
+index 4f0f69c87c8..73aa1fe6bb2 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.cpp
+@@ -765,8 +765,10 @@ GStreamerRegistryScanner::CodecLookupResult GStreamerRegistryScanner::isCodecSup
+         }
+     }
+ 
+-    const char* configLogString = configurationNameForLogging(configuration);
+-    GST_LOG("Checked %s %s codec \"%s\" supported %s", shouldCheckForHardwareUse ? "hardware" : "software", configLogString, codecName.utf8().data(), boolForPrinting(result.isSupported));
++#ifndef GST_DISABLE_GST_DEBUG
++    ASCIILiteral configLogString = configurationNameForLogging(configuration);
++    GST_LOG("Checked %s %s codec \"%s\" supported %s", shouldCheckForHardwareUse ? "hardware" : "software", configLogString.characters(), codecName.utf8().data(), boolForPrinting(result.isSupported));
++#endif
+     return result;
+ }
+ 
+@@ -960,33 +962,33 @@ GStreamerRegistryScanner::CodecLookupResult GStreamerRegistryScanner::isAVC1Code
+     return areCapsSupported(configuration, h264Caps, shouldCheckForHardwareUse);
+ }
+ 
+-const char* GStreamerRegistryScanner::configurationNameForLogging(Configuration configuration) const
++ASCIILiteral GStreamerRegistryScanner::configurationNameForLogging(Configuration configuration) const
+ {
+-    const char* configLogString = "";
+-
+     switch (configuration) {
+     case Configuration::Encoding:
+-        configLogString = "encoding";
+-        break;
++        return "encoding"_s;
+     case Configuration::Decoding:
+-        configLogString = "decoding";
+-        break;
++        return "decoding"_s;
+     }
+-    return configLogString;
++    return ""_s;
+ }
+ 
+ GStreamerRegistryScanner::RegistryLookupResult GStreamerRegistryScanner::isConfigurationSupported(Configuration configuration, const MediaConfiguration& mediaConfiguration) const
+ {
+     bool isSupported = false;
+     bool isUsingHardware = false;
+-    const char* configLogString = configurationNameForLogging(configuration);
++#ifndef GST_DISABLE_GST_DEBUG
++    ASCIILiteral configLogString = configurationNameForLogging(configuration);
++#endif
+ 
+     if (mediaConfiguration.video) {
+         auto& videoConfiguration = mediaConfiguration.video.value();
+-        GST_DEBUG("Checking %s support for video configuration: \"%s\" size: %ux%u bitrate: %" G_GUINT64_FORMAT " framerate: %f", configLogString,
++#ifndef GST_DISABLE_GST_DEBUG
++        GST_DEBUG("Checking %s support for video configuration: \"%s\" size: %ux%u bitrate: %" G_GUINT64_FORMAT " framerate: %f", configLogString.characters(),
+             videoConfiguration.contentType.utf8().data(),
+             videoConfiguration.width, videoConfiguration.height,
+             videoConfiguration.bitrate, videoConfiguration.framerate);
++#endif
+ 
+         auto contentType = ContentType(videoConfiguration.contentType);
+         isSupported = isContainerTypeSupported(configuration, contentType.containerType());
+@@ -997,9 +999,11 @@ GStreamerRegistryScanner::RegistryLookupResult GStreamerRegistryScanner::isConfi
+ 
+     if (mediaConfiguration.audio) {
+         auto& audioConfiguration = mediaConfiguration.audio.value();
+-        GST_DEBUG("Checking %s support for audio configuration: \"%s\" %s channels, bitrate: %" G_GUINT64_FORMAT " samplerate: %u", configLogString,
++#ifndef GST_DISABLE_GST_DEBUG
++        GST_DEBUG("Checking %s support for audio configuration: \"%s\" %s channels, bitrate: %" G_GUINT64_FORMAT " samplerate: %u", configLogString.characters(),
+             audioConfiguration.contentType.utf8().data(), audioConfiguration.channels.utf8().data(),
+             audioConfiguration.bitrate.value_or(0), audioConfiguration.samplerate.value_or(0));
++#endif
+         auto contentType = ContentType(audioConfiguration.contentType);
+         isSupported = isContainerTypeSupported(configuration, contentType.containerType());
+     }
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.h
+index 20f22d3879c..2ea9a57d12c 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.h
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerRegistryScanner.h
+@@ -173,7 +173,7 @@ private:
+     CodecLookupResult isAVC1CodecSupported(Configuration, const String& codec, bool shouldCheckForHardwareUse) const;
+     CodecLookupResult isHEVCCodecSupported(Configuration, const String& codec, bool shouldCheckForHardwareUse) const;
+ 
+-    const char* configurationNameForLogging(Configuration) const;
++    ASCIILiteral configurationNameForLogging(Configuration) const;
+     bool supportsFeatures(const String& features) const;
+ 
+ #if USE(GSTREAMER_WEBRTC)
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerSinksWorkarounds.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerSinksWorkarounds.cpp
+index 7b1c8399d9f..16b7a6d117e 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerSinksWorkarounds.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerSinksWorkarounds.cpp
+@@ -268,7 +268,7 @@ private:
+             GRefPtr<GstCaps> caps = adoptGRef(gst_pad_get_current_caps(pad));
+             GST_DEBUG_OBJECT(pad, "Sending stored pad caps to appsink: %" GST_PTR_FORMAT, caps.get());
+             // This will cause a recursive call to appsinkWorkaroundProbe() which will also set `needsResendCaps` to false.
+-            bool wereCapsSent = gst_pad_send_event(pad, gst_event_new_caps(caps.get()));
++            [[maybe_unused]] bool wereCapsSent = gst_pad_send_event(pad, gst_event_new_caps(caps.get()));
+             GST_DEBUG_OBJECT(pad, "wereCapsSent = %s. Returning from the probe so that the buffer is sent: %" GST_PTR_FORMAT, boolForPrinting(wereCapsSent), info->data);
+         }
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
+index b2ddaad303e..5b95fb4649d 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
+@@ -43,7 +43,7 @@ public:
+         delete static_cast<WebKitVideoSinkProbe*>(userData);
+     }
+ 
+-    static GstPadProbeReturn doProbe(GstPad* pad, GstPadProbeInfo* info, gpointer userData)
++    static GstPadProbeReturn doProbe([[maybe_unused]] GstPad* pad, GstPadProbeInfo* info, gpointer userData)
+     {
+         auto* self = static_cast<WebKitVideoSinkProbe*>(userData);
+         auto* player = self->m_player;
+@@ -143,15 +143,19 @@ void webKitVideoSinkSetMediaPlayerPrivate(GstElement* appSink, MediaPlayerPrivat
+ 
+     g_signal_connect(appSink, "new-sample", G_CALLBACK(+[](GstElement* sink, MediaPlayerPrivateGStreamer* player) -> GstFlowReturn {
+         GRefPtr<GstSample> sample = adoptGRef(gst_app_sink_pull_sample(GST_APP_SINK(sink)));
++#ifndef GST_DISABLE_GST_DEBUG
+         GstBuffer* buffer = gst_sample_get_buffer(sample.get());
+         GST_TRACE_OBJECT(sink, "new-sample with PTS=%" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(buffer)));
++#endif
+         player->triggerRepaint(WTFMove(sample));
+         return GST_FLOW_OK;
+     }), player);
+     g_signal_connect(appSink, "new-preroll", G_CALLBACK(+[](GstElement* sink, MediaPlayerPrivateGStreamer* player) -> GstFlowReturn {
+         GRefPtr<GstSample> sample = adoptGRef(gst_app_sink_pull_preroll(GST_APP_SINK(sink)));
++#ifndef GST_DISABLE_GST_DEBUG
+         GstBuffer* buffer = gst_sample_get_buffer(sample.get());
+         GST_DEBUG_OBJECT(sink, "new-preroll with PTS=%" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(buffer)));
++#endif
+         player->triggerRepaint(WTFMove(sample));
+         return GST_FLOW_OK;
+     }), player);
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+index 84ae9d2bc34..cffcc59cb88 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -140,6 +140,7 @@ using namespace std;
+ 
+ static const FloatSize s_holePunchDefaultFrameSize(1280, 720);
+ 
++#ifndef GST_DISABLE_GST_DEBUG
+ class MediaLogObserver : public WebCoreLogObserver {
+ public:
+     GstDebugCategory* debugCategory() const final
+@@ -157,6 +158,7 @@ MediaLogObserver& mediaLogObserverSingleton()
+     static NeverDestroyed<MediaLogObserver> sharedInstance;
+     return sharedInstance;
+ }
++#endif // GST_DISABLE_GST_DEBUG
+ 
+ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
+     : m_notifier(MainThreadNotifier<MainThreadNotification>::create())
+@@ -183,7 +185,7 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
+     , m_loader(player->createResourceLoader())
+ {
+ 
+-#if !RELEASE_LOG_DISABLED
++#if !RELEASE_LOG_DISABLED && !defined(GST_DISABLE_GST_DEBUG)
+     // MediaPlayer relies on the Document logger, so to prevent duplicate messages in case
+     // more than one MediaPlayer is created, we register a single observer.
+     if (auto player = m_player.get()) {
+@@ -343,7 +345,7 @@ void MediaPlayerPrivateGStreamer::registerMediaEngine(MediaEngineRegistrar regis
+ void MediaPlayerPrivateGStreamer::mediaPlayerWillBeDestroyed()
+ {
+     GST_DEBUG_OBJECT(m_pipeline.get(), "Parent MediaPlayer is about to be destroyed");
+-#if !RELEASE_LOG_DISABLED
++#if !RELEASE_LOG_DISABLED && !defined(GST_DISABLE_GST_DEBUG)
+     if (auto player = m_player.get()) {
+         auto& logObserver = mediaLogObserverSingleton();
+         logObserver.removeWatch(player->mediaPlayerLogger());
+@@ -1576,7 +1578,7 @@ void MediaPlayerPrivateGStreamer::playbin3SendSelectStreamsIfAppropriate()
+     g_list_free_full(streams, reinterpret_cast<GDestroyNotify>(g_free));
+ }
+ 
+-void MediaPlayerPrivateGStreamer::updateTracks(const GRefPtr<GstObject>& collectionOwner)
++void MediaPlayerPrivateGStreamer::updateTracks([[maybe_unused]] const GRefPtr<GstObject>& collectionOwner)
+ {
+     ASSERT(!m_isLegacyPlaybin);
+ 
+@@ -2162,7 +2164,7 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
+         if (m_isLegacyPlaybin)
+             break;
+ 
+-#ifndef GST_DISABLE_DEBUG
++#ifndef GST_DISABLE_GST_DEBUG
+         GST_DEBUG_OBJECT(m_pipeline.get(), "Received STREAMS_SELECTED message selecting the following streams:");
+         unsigned numStreams = gst_message_streams_selected_get_size(message);
+         for (unsigned i = 0; i < numStreams; i++) {
+@@ -3650,7 +3652,7 @@ void MediaPlayerPrivateGStreamer::updateVideoOrientation(const GstTagList* tagLi
+         m_videoSize = m_videoSize.transposedSize();
+ 
+     GST_DEBUG_OBJECT(pipeline(), "Enqueuing and waiting for main-thread task to call sizeChanged()...");
+-    bool sizeChangedProcessed = m_sinkTaskQueue.enqueueTaskAndWait<AbortableTaskQueue::Void>([weakThis = ThreadSafeWeakPtr { *this }, this] {
++    [[maybe_unused]] bool sizeChangedProcessed = m_sinkTaskQueue.enqueueTaskAndWait<AbortableTaskQueue::Void>([weakThis = ThreadSafeWeakPtr { *this }, this] {
+         RefPtr self = weakThis.get();
+         if (!self)
+             return AbortableTaskQueue::Void();
+@@ -4458,7 +4460,7 @@ void MediaPlayerPrivateGStreamer::cdmInstanceDetached(CDMInstance& instance)
+     gst_element_set_context(GST_ELEMENT(m_pipeline.get()), context.get());
+ }
+ 
+-void MediaPlayerPrivateGStreamer::attemptToDecryptWithInstance(CDMInstance& instance)
++void MediaPlayerPrivateGStreamer::attemptToDecryptWithInstance([[maybe_unused]] CDMInstance& instance)
+ {
+     ASSERT(m_cdmInstance == &instance);
+     GST_TRACE("instance %p, current stored %p", &instance, m_cdmInstance.get());
+@@ -4467,7 +4469,7 @@ void MediaPlayerPrivateGStreamer::attemptToDecryptWithInstance(CDMInstance& inst
+ 
+ void MediaPlayerPrivateGStreamer::attemptToDecryptWithLocalInstance()
+ {
+-    bool wasEventHandled = gst_element_send_event(pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_new_empty("attempt-to-decrypt")));
++    [[maybe_unused]] bool wasEventHandled = gst_element_send_event(pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_new_empty("attempt-to-decrypt")));
+     GST_DEBUG("attempting to decrypt, event handled %s", boolForPrinting(wasEventHandled));
+ }
+ 
+@@ -4496,7 +4498,7 @@ bool MediaPlayerPrivateGStreamer::waitingForKey() const
+ }
+ #endif
+ 
+-bool MediaPlayerPrivateGStreamer::supportsKeySystem(const String& keySystem, const String& mimeType)
++bool MediaPlayerPrivateGStreamer::supportsKeySystem(const String& keySystem, [[maybe_unused]] const String& mimeType)
+ {
+     bool result = false;
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
+index 202646f868b..7b0423f8c50 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
+@@ -187,8 +187,10 @@ static std::optional<unsigned> retrieveTemporalIndex(const GRefPtr<GstSample>& s
+         GST_TRACE("Looking-up layer id in %" GST_PTR_FORMAT, metaStructure);
+         return gstStructureGet<unsigned>(metaStructure, "layer-id"_s);
+     }
++#ifndef GST_DISABLE_GST_DEBUG
+     auto name = gstStructureGetName(structure);
+     GST_TRACE("Retrieval of temporal index from encoded format %s is not yet supported.", reinterpret_cast<const char*>(name.rawCharacters()));
++#endif
+ #endif
+     return { };
+ }
+diff --git a/Source/WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp
+index a08aca4ae0f..e0946652d88 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp
+@@ -260,7 +260,7 @@ enum class ResetType {
+     Hard
+ };
+ 
+-static void webkitWebSrcReset(WebKitWebSrc* src, DataMutexLocker<WebKitWebSrcPrivate::StreamingMembers>& members, ResetType resetType)
++static void webkitWebSrcReset([[maybe_unused]] WebKitWebSrc* src, DataMutexLocker<WebKitWebSrcPrivate::StreamingMembers>& members, ResetType resetType)
+ {
+     GST_DEBUG_OBJECT(src, "Resetting internal state");
+     gst_adapter_clear(members->adapter.get());
+@@ -418,7 +418,7 @@ static void restartLoaderIfNeeded(WebKitWebSrc* src, DataMutexLocker<WebKitWebSr
+ }
+ 
+ 
+-static void stopLoaderIfNeeded(WebKitWebSrc* src, DataMutexLocker<WebKitWebSrcPrivate::StreamingMembers>& members)
++static void stopLoaderIfNeeded([[maybe_unused]] WebKitWebSrc* src, DataMutexLocker<WebKitWebSrcPrivate::StreamingMembers>& members)
+ {
+     ASSERT(isMainThread());
+ 
+@@ -1163,9 +1163,11 @@ void CachedResourceStreamingClient::dataReceived(PlatformMediaResource&, const S
+     // sending time from the receiving time, it is better to ignore it.
+     if (!members->downloadStartTime.isNaN()) {
+         members->totalDownloadedBytes += data.size();
++#ifndef GST_DISABLE_GST_DEBUG
+         double timeSinceStart = (WallTime::now() - members->downloadStartTime).seconds();
+         GST_TRACE_OBJECT(src.get(), "R%u: downloaded %" G_GUINT64_FORMAT " bytes in %f seconds =~ %1.0f bytes/second", m_requestNumber, members->totalDownloadedBytes, timeSinceStart
+             , timeSinceStart ? members->totalDownloadedBytes / timeSinceStart : 0);
++#endif
+     } else {
+         members->downloadStartTime = WallTime::now();
+     }
+diff --git a/Source/WebCore/platform/graphics/gstreamer/mse/AppendPipeline.cpp b/Source/WebCore/platform/graphics/gstreamer/mse/AppendPipeline.cpp
+index 12c8568a8bd..885b190fca0 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/mse/AppendPipeline.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/mse/AppendPipeline.cpp
+@@ -253,7 +253,7 @@ void AppendPipeline::handleErrorConditionFromStreamingThread()
+     });
+ }
+ 
+-void AppendPipeline::handleErrorSyncMessage(GstMessage* message)
++void AppendPipeline::handleErrorSyncMessage([[maybe_unused]] GstMessage* message)
+ {
+     ASSERT(!isMainThread());
+     GST_WARNING_OBJECT(pipeline(), "Demuxing error: %" GST_PTR_FORMAT, message);
+@@ -553,7 +553,7 @@ void AppendPipeline::consumeAppsinksAvailableSamples()
+     ASSERT(isMainThread());
+ 
+     GRefPtr<GstSample> sample;
+-    int batchedSampleCount = 0;
++    [[maybe_unused]] int batchedSampleCount = 0;
+     for (std::unique_ptr<Track>& track : m_tracks) {
+         while ((sample = adoptGRef(gst_app_sink_try_pull_sample(GST_APP_SINK(track->appsink.get()), 0)))) {
+             appsinkNewSample(*track, WTFMove(sample));
+@@ -680,7 +680,7 @@ void AppendPipeline::handleAppsinkNewSampleFromStreamingThread(GstElement*)
+     }
+ }
+ 
+-GRefPtr<GstElement> createOptionalParserForFormat(GstBin* bin, const AtomString& trackStringId, const GstCaps* caps)
++GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, const AtomString& trackStringId, const GstCaps* caps)
+ {
+     // Parser elements have either or both of two functions:
+     //
+@@ -1065,7 +1065,7 @@ static GstPadProbeReturn appendPipelinePadProbeDebugInformation(GstPad* pad, Gst
+ #endif
+ 
+ #if ENABLE(ENCRYPTED_MEDIA)
+-static GstPadProbeReturn appendPipelineAppsinkPadEventProbe(GstPad* pad, GstPadProbeInfo* info, struct PadProbeInformation *padProbeInformation)
++static GstPadProbeReturn appendPipelineAppsinkPadEventProbe([[maybe_unused]] GstPad* pad, GstPadProbeInfo* info, struct PadProbeInformation *padProbeInformation)
+ {
+     ASSERT(GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM);
+     GstEvent* event = gst_pad_probe_info_get_event(info);
+@@ -1085,11 +1085,13 @@ static GstPadProbeReturn appendPipelineAppsinkPadEventProbe(GstPad* pad, GstPadP
+ }
+ #endif
+ 
+-static GstPadProbeReturn appendPipelineDemuxerBlackHolePadProbe(GstPad* pad, GstPadProbeInfo* info, gpointer)
++static GstPadProbeReturn appendPipelineDemuxerBlackHolePadProbe([[maybe_unused]] GstPad* pad, [[maybe_unused]] GstPadProbeInfo* info, gpointer)
+ {
+     ASSERT(GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER);
++#ifndef GST_DISABLE_GST_DEBUG
+     GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+     GST_TRACE_OBJECT(pad, "buffer of size %" G_GSIZE_FORMAT " ignored", gst_buffer_get_size(buffer));
++#endif
+     return GST_PAD_PROBE_DROP;
+ }
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
+index ced22af6f17..f774dffd62f 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
+@@ -59,6 +59,7 @@
+ #include <wtf/text/MakeString.h>
+ #include <wtf/text/StringToIntegerConversion.h>
+ 
++#ifndef GST_DISABLE_GST_DEBUG
+ static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
+ {
+     switch (readyState) {
+@@ -70,6 +71,7 @@ static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
+     default: return "(unknown)";
+     }
+ }
++#endif // GST_DISABLE_GST_DEBUG
+ 
+ GST_DEBUG_CATEGORY(webkit_mse_debug);
+ #define GST_CAT_DEFAULT webkit_mse_debug
+@@ -199,7 +201,7 @@ void MediaPlayerPrivateGStreamerMSE::checkPlayingConsistency()
+     }
+ }
+ 
+-#ifndef GST_DISABLE_DEBUG
++#ifndef GST_DISABLE_GST_DEBUG
+ void MediaPlayerPrivateGStreamerMSE::setShouldDisableSleep(bool shouldDisableSleep)
+ {
+     // This method is useful only for logging purpose. The actual sleep disabler is managed by HTMLMediaElement.
+diff --git a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.h b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.h
+index f4fd72132f1..f50ef632372 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.h
++++ b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.h
+@@ -89,7 +89,7 @@ public:
+ #endif
+ 
+     void checkPlayingConsistency() final;
+-#ifndef GST_DISABLE_DEBUG
++#ifndef GST_DISABLE_GST_DEBUG
+     void setShouldDisableSleep(bool) final;
+ #endif
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/mse/WebKitMediaSourceGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/mse/WebKitMediaSourceGStreamer.cpp
+index 76c309ed96a..7d2259f0490 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/mse/WebKitMediaSourceGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/mse/WebKitMediaSourceGStreamer.cpp
+@@ -212,12 +212,9 @@ static GRefPtr<GstElement> findPipeline(GRefPtr<GstElement> element)
+ }
+ #endif // GST_DISABLE_GST_DEBUG
+ 
+-static void dumpPipeline(ASCIILiteral description, const RefPtr<Stream>& stream)
++static void dumpPipeline([[maybe_unused]] ASCIILiteral description, [[maybe_unused]] const RefPtr<Stream>& stream)
+ {
+-#ifdef GST_DISABLE_GST_DEBUG
+-    [[maybe_unused]] description;
+-    [[maybe_unused]] stream;
+-#else
++#ifndef GST_DISABLE_GST_DEBUG
+     auto pipeline = findPipeline(GRefPtr<GstElement>(GST_ELEMENT(stream->source)));
+     auto fileName = makeString(span(GST_OBJECT_NAME(pipeline.get())), '-', stream->track->stringId(), '-', description);
+     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, fileName.utf8().data());
+@@ -399,7 +396,7 @@ static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, const AtomStrin
+     source->priv->streams.remove(name);
+ }
+ 
+-static gboolean webKitMediaSrcActivateMode(GstPad* pad, GstObject* source, GstPadMode mode, gboolean active)
++static gboolean webKitMediaSrcActivateMode(GstPad* pad, [[maybe_unused]] GstObject* source, GstPadMode mode, gboolean active)
+ {
+     if (mode != GST_PAD_MODE_PUSH) {
+         GST_ERROR_OBJECT(source, "Unexpected pad mode in WebKitMediaSrc");
+@@ -493,7 +490,7 @@ static void webKitMediaSrcLoop(void* userData)
+ 
+     if (!streamingMembers->hasPushedStreamCollectionEvent) {
+         GST_DEBUG_OBJECT(pad, "Pushing STREAM_COLLECTION event.");
+-        bool wasStreamCollectionSent = gst_pad_push_event(stream->pad.get(), gst_event_new_stream_collection(stream->source->priv->collection.get()));
++        [[maybe_unused]] bool wasStreamCollectionSent = gst_pad_push_event(stream->pad.get(), gst_event_new_stream_collection(stream->source->priv->collection.get()));
+         streamingMembers->hasPushedStreamCollectionEvent = true;
+         GST_DEBUG_OBJECT(pad, "STREAM_COLLECTION event has been pushed, %s was returned.", boolForPrinting(wasStreamCollectionSent));
+         // Initial events like this must go through, flushes (including tearing down the element) is not allowed until
+@@ -518,7 +515,7 @@ static void webKitMediaSrcLoop(void* userData)
+         GRefPtr<GstEvent> event = adoptGRef(gst_event_new_caps(streamingMembers->pendingInitialCaps.get()));
+ 
+         GST_DEBUG_OBJECT(pad, "Pushing initial CAPS event: %" GST_PTR_FORMAT, streamingMembers->pendingInitialCaps.get());
+-        bool wasCapsEventSent = gst_pad_push_event(pad, event.leakRef());
++        [[maybe_unused]] bool wasCapsEventSent = gst_pad_push_event(pad, event.leakRef());
+         GST_DEBUG_OBJECT(pad, "Pushed initial CAPS event, %s was returned.", boolForPrinting(wasCapsEventSent));
+ 
+         streamingMembers->previousCaps = WTFMove(streamingMembers->pendingInitialCaps);
+@@ -565,7 +562,7 @@ static void webKitMediaSrcLoop(void* userData)
+     // omit the flush (see webKitMediaSrcFlush) we actually emit the updated, correct segment.
+     if (streamingMembers->doesNeedSegmentEvent) {
+         GST_DEBUG_OBJECT(pad, "Need new SEGMENT event, pushing it: %" GST_SEGMENT_FORMAT, &streamingMembers->segment);
+-        bool result = gst_pad_push_event(pad, gst_event_new_segment(&streamingMembers->segment));
++        [[maybe_unused]] bool result = gst_pad_push_event(pad, gst_event_new_segment(&streamingMembers->segment));
+         GST_DEBUG_OBJECT(pad, "SEGMENT event pushed, result = %s.", boolForPrinting(result));
+         ASSERT(result);
+         streamingMembers->doesNeedSegmentEvent = false;
+@@ -579,8 +576,11 @@ static void webKitMediaSrcLoop(void* userData)
+             streamingMembers->previousCaps = gst_sample_get_caps(sample.get());
+             // This CAPS event may block, so we release the lock and reevaluate later if there's been a flush in the meantime.
+             streamingMembers.runUnlocked([&stream, &sample, &pad]() {
++#ifdef GST_DISABLE_GST_DEBUG
++                UNUSED_VARIABLE(pad);
++#endif
+                 GST_DEBUG_OBJECT(pad, "Pushing new CAPS event: %" GST_PTR_FORMAT, gst_sample_get_caps(sample.get()));
+-                bool result = gst_pad_push_event(stream->pad.get(), gst_event_new_caps(gst_sample_get_caps(sample.get())));
++                [[maybe_unused]] bool result = gst_pad_push_event(stream->pad.get(), gst_event_new_caps(gst_sample_get_caps(sample.get())));
+                 GST_DEBUG_OBJECT(pad, "CAPS event pushed, result = %s.", boolForPrinting(result));
+                 ASSERT(result);
+             });
+diff --git a/Source/WebCore/platform/gstreamer/GStreamerElementHarness.cpp b/Source/WebCore/platform/gstreamer/GStreamerElementHarness.cpp
+index 11fa8a9d207..80cb0db6732 100644
+--- a/Source/WebCore/platform/gstreamer/GStreamerElementHarness.cpp
++++ b/Source/WebCore/platform/gstreamer/GStreamerElementHarness.cpp
+@@ -111,7 +111,7 @@ GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element,
+ 
+     if (hasSometimesSrcPad) {
+         GST_DEBUG_OBJECT(m_element.get(), "Expecting output buffers on sometimes src pad(s).");
+-        g_signal_connect(m_element.get(), "pad-added", reinterpret_cast<GCallback>(+[](GstElement* element, GstPad* pad, gpointer userData) {
++        g_signal_connect(m_element.get(), "pad-added", reinterpret_cast<GCallback>(+[]([[maybe_unused]] GstElement* element, GstPad* pad, gpointer userData) {
+             GST_DEBUG_OBJECT(element, "Pad added: %" GST_PTR_FORMAT, pad);
+             auto& harness = *reinterpret_cast<GStreamerElementHarness*>(userData);
+             RefPtr<GStreamerElementHarness> downstreamHarness;
+@@ -128,7 +128,7 @@ GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element,
+             harness.dumpGraph("pad-added"_s);
+         }), this);
+ 
+-        g_signal_connect(m_element.get(), "pad-removed", reinterpret_cast<GCallback>(+[](GstElement* element, GstPad* pad, gpointer userData) {
++        g_signal_connect(m_element.get(), "pad-removed", reinterpret_cast<GCallback>(+[]([[maybe_unused]] GstElement* element, GstPad* pad, gpointer userData) {
+             GST_DEBUG_OBJECT(element, "Pad removed: %" GST_PTR_FORMAT, pad);
+             auto& harness = *reinterpret_cast<GStreamerElementHarness*>(userData);
+             harness.m_outputStreams.removeAllMatching([pad = GRefPtr<GstPad>(pad)](auto& item) -> bool {
+diff --git a/Source/WebCore/platform/gstreamer/VideoEncoderPrivateGStreamer.cpp b/Source/WebCore/platform/gstreamer/VideoEncoderPrivateGStreamer.cpp
+index f0043640a06..7f16a3d4123 100644
+--- a/Source/WebCore/platform/gstreamer/VideoEncoderPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/gstreamer/VideoEncoderPrivateGStreamer.cpp
+@@ -451,7 +451,7 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
+     return true;
+ }
+ 
+-EncoderId videoEncoderFindForFormat(WebKitVideoEncoder* self, const GRefPtr<GstCaps>& caps)
++EncoderId videoEncoderFindForFormat([[maybe_unused]] WebKitVideoEncoder* self, const GRefPtr<GstCaps>& caps)
+ {
+     if (!caps)
+         return None;
+diff --git a/Source/WebCore/platform/mediarecorder/MediaRecorderPrivateGStreamer.cpp b/Source/WebCore/platform/mediarecorder/MediaRecorderPrivateGStreamer.cpp
+index 2dfe879d9ac..0ce99017fb9 100644
+--- a/Source/WebCore/platform/mediarecorder/MediaRecorderPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/mediarecorder/MediaRecorderPrivateGStreamer.cpp
+@@ -368,7 +368,7 @@ bool MediaRecorderPrivateBackend::preparePipeline()
+     }), this);
+ 
+     m_signalAdapter = adoptGRef(gst_transcoder_get_sync_signal_adapter(m_transcoder.get()));
+-    g_signal_connect(m_signalAdapter.get(), "warning", G_CALLBACK(+[](GstTranscoder*, GError* error, GstStructure* details) {
++    g_signal_connect(m_signalAdapter.get(), "warning", G_CALLBACK(+[](GstTranscoder*, [[maybe_unused]] GError* error, [[maybe_unused]] GstStructure* details) {
+         GST_WARNING("%s details: %" GST_PTR_FORMAT, error->message, details);
+     }), nullptr);
+ 
+diff --git a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp
+index b12ce973f85..8f593454de3 100644
+--- a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp
++++ b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp
+@@ -329,7 +329,7 @@ public:
+         trackEnded(m_track);
+     }
+ 
+-    void pushSample(GRefPtr<GstSample>&& sample, const ASCIILiteral logMessage)
++    void pushSample(GRefPtr<GstSample>&& sample, [[maybe_unused]] const ASCIILiteral logMessage)
+     {
+         ASSERT(m_src);
+         if (!m_src || !m_isObserving)
+@@ -961,7 +961,7 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(ProbeData);
+ static GstPadProbeReturn webkitMediaStreamSrcPadProbeCb(GstPad* pad, GstPadProbeInfo* info, ProbeData* data)
+ {
+     GstEvent* event = GST_PAD_PROBE_INFO_EVENT(info);
+-    WebKitMediaStreamSrc* self = WEBKIT_MEDIA_STREAM_SRC_CAST(data->element.get());
++    [[maybe_unused]] WebKitMediaStreamSrc* self = WEBKIT_MEDIA_STREAM_SRC_CAST(data->element.get());
+ 
+     GST_DEBUG_OBJECT(self, "Event %" GST_PTR_FORMAT, event);
+     switch (GST_EVENT_TYPE(event)) {
+@@ -1077,7 +1077,7 @@ void webkitMediaStreamSrcSignalEndOfStream(WebKitMediaStreamSrc* self)
+     self->priv->sources.clear();
+ }
+ 
+-void webkitMediaStreamSrcCharacteristicsChanged(WebKitMediaStreamSrc* self)
++void webkitMediaStreamSrcCharacteristicsChanged([[maybe_unused]] WebKitMediaStreamSrc* self)
+ {
+     GST_DEBUG_OBJECT(self, "MediaStream characteristics changed");
+ }
+diff --git a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDevice.cpp b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDevice.cpp
+index 4c341903f14..faffdd56915 100644
+--- a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDevice.cpp
++++ b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDevice.cpp
+@@ -38,7 +38,7 @@ GST_DEBUG_CATEGORY_STATIC(webkitGstMockDeviceDebug);
+ #define webkit_mock_device_provider_parent_class parent_class
+ WEBKIT_DEFINE_TYPE_WITH_CODE(GStreamerMockDevice, webkit_mock_device, GST_TYPE_DEVICE, GST_DEBUG_CATEGORY_INIT(webkitGstMockDeviceDebug, "webkitmockdevice", 0, "Mock Device"))
+ 
+-static GstElement* webkitMockDeviceCreateElement(GstDevice* device, const char* name)
++static GstElement* webkitMockDeviceCreateElement([[maybe_unused]] GstDevice* device, const char* name)
+ {
+     GST_INFO_OBJECT(device, "Creating source element for device %s", name);
+     auto* element = makeGStreamerElement("appsrc", name);
+diff --git a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp
+index 2d02971d2a1..3e01be3a017 100644
+--- a/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp
++++ b/Source/WebCore/platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp
+@@ -38,7 +38,7 @@ GST_DEBUG_CATEGORY_STATIC(webkitGstMockDeviceProviderDebug);
+ #define webkit_mock_device_provider_parent_class parent_class
+ WEBKIT_DEFINE_TYPE_WITH_CODE(GStreamerMockDeviceProvider, webkit_mock_device_provider, GST_TYPE_DEVICE_PROVIDER, GST_DEBUG_CATEGORY_INIT(webkitGstMockDeviceProviderDebug, "webkitmockdeviceprovider", 0, "Mock Device Provider"))
+ 
+-static GList* webkitMockDeviceProviderProbe(GstDeviceProvider* provider)
++static GList* webkitMockDeviceProviderProbe([[maybe_unused]] GstDeviceProvider* provider)
+ {
+     if (!MockRealtimeMediaSourceCenter::mockRealtimeMediaSourceCenterEnabled()) {
+         GST_INFO_OBJECT(provider, "Mock capture sources are disabled, returning empty device list");
+-- 
+2.46.1
+
+From 24b7dfc9db056b6a61c23ffe9abeed8ca3539fc1 Mon Sep 17 00:00:00 2001
+From: Philippe Normand <philn@igalia.com>
+Date: Wed, 18 Sep 2024 02:30:05 -0700
+Subject: [PATCH 2/3] [GStreamer][DMABuf] Disable DMABuf video sink by default
+ https://bugs.webkit.org/show_bug.cgi?id=279819
+
+Reviewed by Xabier Rodriguez-Calvar.
+
+In its current form this sink and the associated rendering logic in the TextureMapper are prone to
+memory leaks and increased file descriptors usage. There is a plan to rework this but it was too
+late for the 2.46 release.
+
+* Source/WebCore/platform/graphics/gstreamer/DMABufVideoSinkGStreamer.cpp:
+(webKitDMABufVideoSinkIsEnabled):
+* Tools/Scripts/webkitpy/port/glib.py:
+(GLibPort.setup_environ_for_server):
+
+Canonical link: https://commits.webkit.org/283833@main
+
+(cherry picked from commit 8a57ce9951630763ce4616d88e4a37016260a38b)
+---
+ .../gstreamer/DMABufVideoSinkGStreamer.cpp         | 14 +++++++-------
+ Tools/Scripts/webkitpy/port/glib.py                |  2 +-
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/gstreamer/DMABufVideoSinkGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/DMABufVideoSinkGStreamer.cpp
+index 7628893b6ac..5d8d75bbdf6 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/DMABufVideoSinkGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/DMABufVideoSinkGStreamer.cpp
+@@ -175,22 +175,22 @@ static void webkit_dmabuf_video_sink_class_init(WebKitDMABufVideoSinkClass* klas
+ 
+ bool webKitDMABufVideoSinkIsEnabled()
+ {
+-    static bool s_disabled = false;
++    static bool s_enabled = false;
+ #if USE(GBM)
+     static std::once_flag s_flag;
+     std::call_once(s_flag, [&] {
+-        const char* value = g_getenv("WEBKIT_GST_DMABUF_SINK_DISABLED");
++        const char* value = g_getenv("WEBKIT_GST_DMABUF_SINK_ENABLED");
+         auto valueSpan = span(value);
+-        s_disabled = value && (equalLettersIgnoringASCIICase(valueSpan, "true"_s) || equalLettersIgnoringASCIICase(valueSpan, "1"_s));
+-        if (!s_disabled && !DRMDeviceManager::singleton().mainGBMDeviceNode(DRMDeviceManager::NodeType::Render)) {
++        s_enabled = value && (equalLettersIgnoringASCIICase(valueSpan, "true"_s) || equalLettersIgnoringASCIICase(valueSpan, "1"_s));
++        if (s_enabled && !DRMDeviceManager::singleton().mainGBMDeviceNode(DRMDeviceManager::NodeType::Render)) {
+             WTFLogAlways("Unable to access the GBM device, disabling DMABuf video sink.");
+-            s_disabled = true;
++            s_enabled = false;
+         }
+     });
+ #else
+-    s_disabled = true;
++    s_enabled = false;
+ #endif
+-    return !s_disabled;
++    return s_enabled;
+ }
+ 
+ bool webKitDMABufVideoSinkProbePlatform()
+-- 
+2.46.1
+
+From b55b55c3987226eb16999e0630f3eb8ac19e1191 Mon Sep 17 00:00:00 2001
+From: Carlos Bentzen <cadubentzen@igalia.com>
+Date: Wed, 18 Sep 2024 00:59:56 -0700
+Subject: [PATCH 3/3] [GStreamer][MSE] Playbin3's "element-setup" isn't called
+ for uridecodebin3 https://bugs.webkit.org/show_bug.cgi?id=279820
+
+Reviewed by Philippe Normand.
+
+Since GStreamer 1.22, playbin3 creates uridecodebin3 in its _init() function.
+This is before the "element-setup" signal can be configured.
+
+Not getting the signal for uridecodebin3 means we weren't setting "buffer-size"
+on uridecodebin3, and not calling the platform quirks for uridecodebin3.
+
+Fix this by explicitly getting the uridecodebin3 and call configureElement on
+it if we are on GStreamer >= 1.22.
+
+* Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+(WebCore::MediaPlayerPrivateGStreamer::createGSTPlayBin):
+
+Canonical link: https://commits.webkit.org/283830@main
+
+(cherry picked from commit 61cf3c8e032af32f397fad34ff5599d8291e8b30)
+---
+ .../graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp      | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+index cffcc59cb88..2d6276b3dd5 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -3119,6 +3119,12 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
+ 
+     g_object_set(m_pipeline.get(), "mute", static_cast<gboolean>(player->muted()), nullptr);
+ 
++    // From GStreamer 1.22.0, uridecodebin3 is created in playbin3's _init(), so "element-setup" isn't called with it.
++    if (!m_isLegacyPlaybin && webkitGstCheckVersion(1, 22, 0)) {
++        if (auto uriDecodeBin3 = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline.get()), "uridecodebin3")))
++            configureElement(uriDecodeBin3.get());
++    }
++
+     g_signal_connect(GST_BIN_CAST(m_pipeline.get()), "element-setup", G_CALLBACK(+[](GstBin*, GstElement* element, MediaPlayerPrivateGStreamer* player) {
+         player->configureElement(element);
+     }), this);
+-- 
+2.46.1
+
