@@ -1,0 +1,134 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2024-10-07
+Initial Package Version: 2.0210
+Upstream Status:         Pull Request
+Origin:                  Upstream PR
+Description:             This patch fixes several issues that were exposed with
+                         the upgrade to libxml2-2.13. This mostly fixes issues
+                         with output expectations.
+
+diff -Naurp XML-LibXML-2.0210.orig/t/02parse.t XML-LibXML-2.0210/t/02parse.t
+--- XML-LibXML-2.0210.orig/t/02parse.t	2019-12-03 00:05:07.000000000 -0600
++++ XML-LibXML-2.0210/t/02parse.t	2024-10-07 13:07:13.260944636 -0500
+@@ -884,7 +884,12 @@ EOXML
+         eval {
+            $doc2    = $parser->parse_string( $xmldoc );
+         };
+-        isnt($@, '', "error parsing $xmldoc");
++        # https://gitlab.gnome.org/GNOME/libxml2/-/commit/b717abdd
++        if (XML::LibXML::LIBXML_RUNTIME_VERSION() < 21300) {
++           isnt($@, '', "error parsing $xmldoc");
++        } else {
++           is ( $doc2->documentElement()->firstChild()->nodeName(), "foo" );
++        }
+ 
+         $parser->validation(1);
+ 
+diff -Naurp XML-LibXML-2.0210.orig/t/08findnodes.t XML-LibXML-2.0210/t/08findnodes.t
+--- XML-LibXML-2.0210.orig/t/08findnodes.t	2016-05-30 04:01:59.000000000 -0500
++++ XML-LibXML-2.0210/t/08findnodes.t	2024-10-07 13:08:16.630327416 -0500
+@@ -123,7 +123,13 @@ my $docstring = q{
+ my @ns = $root->findnodes('namespace::*');
+ # TEST
+ 
+-is(scalar(@ns), 2, ' TODO : Add test name' );
++# https://gitlab.gnome.org/GNOME/libxml2/-/commit/aca16fb3
++# fixed xmlCopyNamespace with XML namespace.
++if (XML::LibXML::LIBXML_RUNTIME_VERSION() < 21300) {
++   is(scalar(@ns), 2, ' TODO : Add test name' );
++} else {
++   is(scalar(@ns), 3, ' TODO : Add test name' );
++}
+ 
+ # bad xpaths
+ # TEST:$badxpath=4;
+diff -Naurp XML-LibXML-2.0210.orig/t/19die_on_invalid_utf8_rt_58848.t XML-LibXML-2.0210/t/19die_on_invalid_utf8_rt_58848.t
+--- XML-LibXML-2.0210.orig/t/19die_on_invalid_utf8_rt_58848.t	2016-05-30 04:01:59.000000000 -0500
++++ XML-LibXML-2.0210/t/19die_on_invalid_utf8_rt_58848.t	2024-10-07 13:08:43.175487761 -0500
+@@ -16,7 +16,7 @@ use XML::LibXML;
+     my $err = $@;
+ 
+     # TEST
+-    like ("$err", qr{parser error : Input is not proper UTF-8},
++    like ("$err", qr{not proper UTF-8|Invalid bytes in character encoding},
+         'Parser error.',
+     );
+ }
+diff -Naurp XML-LibXML-2.0210.orig/t/25relaxng.t XML-LibXML-2.0210/t/25relaxng.t
+--- XML-LibXML-2.0210.orig/t/25relaxng.t	2019-12-03 00:07:49.000000000 -0600
++++ XML-LibXML-2.0210/t/25relaxng.t	2024-10-07 13:09:16.607689705 -0500
+@@ -132,7 +132,7 @@ print "# 6 check that no_network => 1 wo
+ {
+     my $rng = eval { XML::LibXML::RelaxNG->new( location => $netfile, no_network => 1 ) };
+     # TEST
+-    like( $@, qr{I/O error : Attempt to load network entity}, 'RNG from file location with external import and no_network => 1 throws an exception.' );
++    like( $@, qr{Attempt to load network entity}, 'RNG from file location with external import and no_network => 1 throws an exception.' );
+     # TEST
+     ok( !defined $rng, 'RNG from file location with external import and no_network => 1 is not loaded.' );
+ }
+@@ -152,7 +152,7 @@ print "# 6 check that no_network => 1 wo
+ </grammar>
+ EOF
+     # TEST
+-    like( $@, qr{I/O error : Attempt to load network entity}, 'RNG from buffer with external import and no_network => 1 throws an exception.' );
++    like( $@, qr{Attempt to load network entity}, 'RNG from buffer with external import and no_network => 1 throws an exception.' );
+     # TEST
+     ok( !defined $rng, 'RNG from buffer with external import and no_network => 1 is not loaded.' );
+ }
+diff -Naurp XML-LibXML-2.0210.orig/t/26schema.t XML-LibXML-2.0210/t/26schema.t
+--- XML-LibXML-2.0210.orig/t/26schema.t	2019-12-03 00:18:44.000000000 -0600
++++ XML-LibXML-2.0210/t/26schema.t	2024-10-07 13:09:40.126831769 -0500
+@@ -117,7 +117,7 @@ EOF
+ {
+     my $schema = eval { XML::LibXML::Schema->new( location => $netfile, no_network => 1 ) };
+     # TEST
+-    like( $@, qr{I/O error : Attempt to load network entity}, 'Schema from file location with external import and no_network => 1 throws an exception.' );
++    like( $@, qr{Attempt to load network entity}, 'Schema from file location with external import and no_network => 1 throws an exception.' );
+     # TEST
+     ok( !defined $schema, 'Schema from file location with external import and no_network => 1 is not loaded.' );
+ }
+@@ -129,7 +129,7 @@ EOF
+ </xsd:schema>
+ EOF
+     # TEST
+-    like( $@, qr{I/O error : Attempt to load network entity}, 'Schema from buffer with external import and no_network => 1 throws an exception.' );
++    like( $@, qr{Attempt to load network entity}, 'Schema from buffer with external import and no_network => 1 throws an exception.' );
+     # TEST
+     ok( !defined $schema, 'Schema from buffer with external import and no_network => 1 is not loaded.' );
+ }
+diff -Naurp XML-LibXML-2.0210.orig/t/60error_prev_chain.t XML-LibXML-2.0210/t/60error_prev_chain.t
+--- XML-LibXML-2.0210.orig/t/60error_prev_chain.t	2016-05-30 04:01:59.000000000 -0500
++++ XML-LibXML-2.0210/t/60error_prev_chain.t	2024-10-07 13:10:45.279225318 -0500
+@@ -16,13 +16,11 @@ use XML::LibXML;
+ 
+ {
+     my $parser = XML::LibXML->new();
+-    $parser->validation(0);
+-    $parser->load_ext_dtd(0);
+ 
+     eval
+     {
+         local $^W = 0;
+-        $parser->parse_file('example/JBR-ALLENtrees.htm');
++        $parser->parse_string('<doc>&ldquo;&nbsp;&rdquo;</doc>');
+     };
+ 
+     my $err = $@;
+@@ -31,7 +29,7 @@ use XML::LibXML;
+     if( $err && !ref($err) ) {
+       plan skip_all => 'The local libxml library does not support errors as objects to $@';
+     }
+-    plan tests => 1;
++    plan tests => 2;
+ 
+     while (defined($err) && $count < 200)
+     {
+@@ -44,6 +42,8 @@ use XML::LibXML;
+ 
+     # TEST
+     ok ((!$err), "Reached the end of the chain.");
++    # TEST
++    is ($count, 3, "Correct number of errors reported")
+ }
+ 
+ =head1 COPYRIGHT & LICENSE
