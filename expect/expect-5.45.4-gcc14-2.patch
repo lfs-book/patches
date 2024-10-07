@@ -1,0 +1,1721 @@
+Submitted By:            Xi Ruoyao <xry111@xry111.site>
+Date:                    2024-04-07
+Initial Package Version: 5.45.4
+Upstream Status:         Submitted (for a long time), but the upstream seems
+                         inactive
+Origin:                  Fedora & Self:
+                         - Fedora expect-5.45.4-covscan-fixes.patch
+                         - Fedora expect-c99.patch
+                         - Fedora expect-configure-c99.patch
+                           - We are directly patching configure instead of
+                             patching configure.in like Fedora.  It's
+                             generally not a good idea, but better than
+                             adding autoconf into chapter 7 or bloating this
+                             patch into 100+ KiB (with a full regeneration
+                             of the configure script).
+Description:             Fix some build failure caused by the pre-C99 syntax
+                         no longer allowed by GCC 14 in the default C99
+                         mode.
+
+Updated by:              Xi Ruoyao
+Date:                    2024-10-01
+
+diff -Naur expect5.45.4/configure expect5.45.4.new/configure
+--- expect5.45.4/configure	2018-02-04 04:43:58.000000000 -0600
++++ expect5.45.4.new/configure	2024-10-01 16:59:11.097617176 -0500
+@@ -7994,7 +7994,6 @@
+ {
+ extern long timezone;
+ 	    timezone += 1;
+-	    exit (0);
+   ;
+   return 0;
+ }
+@@ -8030,7 +8029,6 @@
+ {
+ extern time_t timezone;
+ 		timezone += 1;
+-		exit (0);
+   ;
+   return 0;
+ }
+@@ -8791,7 +8789,7 @@
+ $as_echo_n "checking for memcpy... " >&6; }
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+-
++#include <string.h>
+ int
+ main ()
+ {
+@@ -8831,7 +8829,7 @@
+ /* end confdefs.h.  */
+ 
+ #include <sys/wait.h>
+-main() {
++int main() {
+ #ifndef WNOHANG
+ 	return 0;
+ #else
+@@ -8867,7 +8865,7 @@
+ 
+ #include <stdio.h>
+ #include <sys/wait.h>
+-main() {
++int main() {
+ #ifdef WNOHANG
+ 	FILE *fp = fopen("wnohang","w");
+ 	fprintf(fp,"%d",WNOHANG);
+@@ -8935,7 +8933,9 @@
+ /* end confdefs.h.  */
+ 
+ #include <signal.h>
+-#define RETSIGTYPE $retsigtype
++#include <stdlib.h>
++#include <unistd.h>
++#include <sys/wait.h>
+ 
+ int signal_rearms = 0;
+ 
+@@ -8952,7 +8952,7 @@
+ signal_rearms++;
+ }
+ 
+-main()
++int main()
+ {
+ 	signal(SIGINT,parent_sigint_handler);
+ 
+@@ -9234,10 +9234,9 @@
+ /* end confdefs.h.  */
+ 
+ #include <sgtty.h>
+-main()
++int main()
+ {
+   struct sgttyb tmp;
+-  exit(0);
+ }
+ _ACEOF
+ if ac_fn_c_try_run "$LINENO"; then :
+@@ -9274,10 +9273,9 @@
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ #include <termio.h>
+-  main()
++  int main()
+   {
+     struct termio tmp;
+-    exit(0);
+   }
+ _ACEOF
+ if ac_fn_c_try_run "$LINENO"; then :
+@@ -9312,10 +9310,9 @@
+ #  include <inttypes.h>
+ #  endif
+ #  include <termios.h>
+-  main()
++  int main()
+   {
+     struct termios tmp;
+-    exit(0);
+   }
+ _ACEOF
+ if ac_fn_c_try_run "$LINENO"; then :
+@@ -9350,7 +9347,7 @@
+ #include <inttypes.h>
+ #endif
+ #include <termios.h>
+-main() {
++int main() {
+ #if defined(TCGETS) || defined(TCGETA)
+ 	return 0;
+ #else
+@@ -9388,7 +9385,7 @@
+ #include <inttypes.h>
+ #endif
+ #include <termios.h>
+-main() {
++int main() {
+ #ifdef TIOCGWINSZ
+ 	return 0;
+ #else
+@@ -9423,7 +9420,7 @@
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+-main(){
++int main(){
+ #ifdef CRAY
+ 	return 0;
+ #else
+@@ -9565,12 +9562,10 @@
+ 
+ extern char *tzname[2];
+ extern int daylight;
+-main()
++int main()
+ {
+   int *x = &daylight;
+   char **y = tzname;
+-
+-  exit(0);
+ }
+ _ACEOF
+ if ac_fn_c_try_run "$LINENO"; then :
+diff -Naur expect5.45.4/Dbg.c expect5.45.4.new/Dbg.c
+--- expect5.45.4/Dbg.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/Dbg.c	2024-10-01 16:59:25.703446257 -0500
+@@ -362,7 +362,7 @@
+ 	static char buf_basic[DEFAULT_WIDTH+1];	/* basic buffer */
+ 	static char *buf = buf_basic;
+ 	int space;		/* space remaining in buf */
+-	int len;
++	Tcl_Size len;
+ 	char *bufp;
+ 	int proc;		/* if current command is "proc" */
+ 	int arg_index;
+@@ -398,7 +398,7 @@
+ #if TCL_MAJOR_VERSION >= 8
+ 					      -1,
+ #endif
+-				&elementPtr,&nextPtr,(int *)0,(int *)0);
++				&elementPtr,&nextPtr,NULL,NULL);
+ 			if (*elementPtr == '\0') wrap = TRUE;
+ 			else if (*nextPtr == '\0') wrap = FALSE;
+ 			else wrap = TRUE;
+@@ -443,7 +443,7 @@
+ {
+     char **argv;
+     int argc;
+-    int len;
++    Tcl_Size len;
+     argv = (char **)ckalloc(objc+1 * sizeof(char *));
+     for (argc=0 ; argc<objc ; argc++) {
+ 	argv[argc] = Tcl_GetStringFromObj(objv[argc],&len);
+diff -Naur expect5.45.4/exp_chan.c expect5.45.4.new/exp_chan.c
+--- expect5.45.4/exp_chan.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_chan.c	2024-10-01 16:59:25.703446257 -0500
+@@ -40,34 +40,33 @@
+ extern int		expSetBlockModeProc _ANSI_ARGS_((int fd, int mode));
+ static int		ExpBlockModeProc _ANSI_ARGS_((ClientData instanceData,
+ 			    int mode));
+-static int		ExpCloseProc _ANSI_ARGS_((ClientData instanceData,
+-			    Tcl_Interp *interp));
++static int		ExpClose2Proc _ANSI_ARGS_((ClientData instanceData,
++			    Tcl_Interp *interp, int flags));
+ static int		ExpInputProc _ANSI_ARGS_((ClientData instanceData,
+ 		            char *buf, int toRead, int *errorCode));
+ static int		ExpOutputProc _ANSI_ARGS_((
+-			    ClientData instanceData, char *buf, int toWrite,
++			    ClientData instanceData, const char *buf, int toWrite,
+                             int *errorCode));
+ static void		ExpWatchProc _ANSI_ARGS_((ClientData instanceData,
+ 		            int mask));
+ static int		ExpGetHandleProc _ANSI_ARGS_((ClientData instanceData,
+ 		            int direction, ClientData *handlePtr));
++void			exp_background_channelhandler _ANSI_ARGS_((ClientData,
++		            int));
+ 
+ /*
+  * This structure describes the channel type structure for Expect-based IO:
+  */
+ 
+ Tcl_ChannelType expChannelType = {
+-    "exp",				/* Type name. */
+-    ExpBlockModeProc,			/* Set blocking/nonblocking mode.*/
+-    ExpCloseProc,			/* Close proc. */
+-    ExpInputProc,			/* Input proc. */
+-    ExpOutputProc,			/* Output proc. */
+-    NULL,				/* Seek proc. */
+-    NULL,				/* Set option proc. */
+-    NULL,				/* Get option proc. */
+-    ExpWatchProc,			/* Initialize notifier. */
+-    ExpGetHandleProc,			/* Get OS handles out of channel. */
+-    NULL,				/* Close2 proc */
++    .typeName = "exp",
++    .version = TCL_CHANNEL_VERSION_5,
++    .inputProc = ExpInputProc,
++    .outputProc = ExpOutputProc,
++    .watchProc = ExpWatchProc,
++    .getHandleProc = ExpGetHandleProc,
++    .close2Proc = ExpClose2Proc,
++    .blockModeProc = ExpBlockModeProc,
+ };
+ 
+ typedef struct ThreadSpecificData {
+@@ -258,7 +257,7 @@
+ static int
+ ExpOutputProc(instanceData, buf, toWrite, errorCodePtr)
+     ClientData instanceData;		/* Exp state. */
+-    char *buf;				/* The data buffer. */
++    const char *buf;				/* The data buffer. */
+     int toWrite;			/* How many bytes to write? */
+     int *errorCodePtr;			/* Where to store error code. */
+ {
+@@ -309,10 +308,14 @@
+ 
+ /*ARGSUSED*/
+ static int
+-ExpCloseProc(instanceData, interp)
+-    ClientData instanceData;	/* Exp state. */
+-    Tcl_Interp *interp;		/* For error reporting - unused. */
++ExpClose2Proc(
++    ClientData instanceData,	/* Exp state. */
++    Tcl_Interp *interp,		/* For error reporting - unused. */
++    int flags)
+ {
++    if (flags & (TCL_CLOSE_READ | TCL_CLOSE_WRITE))
++	return EINVAL;
++
+     ExpState *esPtr = (ExpState *) instanceData;
+     ExpState **nextPtrPtr;
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -499,7 +502,7 @@
+ int
+ expWriteChars(esPtr,buffer,lenBytes)
+      ExpState *esPtr;
+-     char *buffer;
++     const char *buffer;
+      int lenBytes;
+ {
+   int rc;
+diff -Naur expect5.45.4/exp_clib.c expect5.45.4.new/exp_clib.c
+--- expect5.45.4/exp_clib.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_clib.c	2024-10-01 16:59:11.098617164 -0500
+@@ -37,6 +37,14 @@
+ # endif
+ #endif
+ 
++#ifdef HAVE_UNISTD_H
++# include <unistd.h>
++#endif
++
++//#ifdef HAVE_SYS_WAIT_H
++# include <sys/wait.h>
++//#endif
++
+ #ifdef HAVE_SYS_FCNTL_H
+ #  include <sys/fcntl.h>
+ #else
+@@ -1734,6 +1742,7 @@
+ #define sysreturn(x)	return(errno = x, -1)
+ 
+ void exp_init_pty();
++void exp_init_tty();
+ 
+ /*
+    The following functions are linked from the Tcl library.  They
+@@ -2253,6 +2262,7 @@
+ 		argv[i] = va_arg(args,char *);
+ 		if (!argv[i]) break;
+ 	}
++	va_end(args);
+ 	i = exp_spawnv(argv[0],argv+1);
+ 	free((char *)argv);
+ 	return(i);
+@@ -2726,6 +2736,7 @@
+ 		/* Ultrix 4.2 compiler refuses enumerations comparison!? */
+ 		if ((int)type < 0 || (int)type >= (int)exp_bogus) {
+ 			fprintf(stderr,"bad type (set %d) in exp_expectl\n",i);
++			va_end(args);
+ 			sysreturn(EINVAL);
+ 		}
+ 
+@@ -2791,6 +2802,7 @@
+ 		/* Ultrix 4.2 compiler refuses enumerations comparison!? */
+ 		if ((int)type < 0 || (int)type >= (int)exp_bogus) {
+ 			fprintf(stderr,"bad type (set %d) in exp_expectl\n",i);
++			va_end(args);
+ 			sysreturn(EINVAL);
+ 		}
+ 
+diff -Naur expect5.45.4/exp_command.c expect5.45.4.new/exp_command.c
+--- expect5.45.4/exp_command.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_command.c	2024-10-01 16:59:25.703446257 -0500
+@@ -191,7 +191,7 @@
+ {
+     static char *user_spawn_id = "exp0";
+ 
+-    char *name = exp_get_var(interp,SPAWN_ID_VARNAME);
++    const char *name = exp_get_var(interp,SPAWN_ID_VARNAME);
+     if (!name) name = user_spawn_id;
+ 
+     return expStateFromChannelName(interp,name,opened,adjust,any,SPAWN_ID_VARNAME);
+@@ -203,7 +203,7 @@
+     ExpState *esPtr,
+     int open,
+     int adjust,
+-    char *msg)
++    const char *msg)
+ {
+     if (open && !esPtr->open) {
+ 	exp_error(interp,"%s: spawn id %s not open",msg,esPtr->name);
+@@ -216,11 +216,11 @@
+ ExpState *
+ expStateFromChannelName(
+     Tcl_Interp *interp,
+-    char *name,
++    const char *name,
+     int open,
+     int adjust,
+     int any,
+-    char *msg)
++    const char *msg)
+ {
+     ExpState *esPtr;
+     Tcl_Channel channel;
+@@ -284,7 +284,7 @@
+ }
+ 
+ int
+-exp_trap_off(char *name)
++exp_trap_off(const char *name)
+ {
+ #ifdef HAVE_PTYTRAP
+     ExpState *esPtr;
+@@ -357,7 +357,7 @@
+ 	     */
+ 
+ 	    ThreadSpecificData* tsdPtr = TCL_TSD_INIT(&dataKey);
+-	    char*               cName  = Tcl_GetChannelName(esPtr->chan_orig->channel_orig);
++	    const char*         cName  = Tcl_GetChannelName(esPtr->chan_orig->channel_orig);
+ 	    Tcl_HashEntry*      entry  = Tcl_FindHashEntry(&tsdPtr->origins,cName);
+ 	    ExpOrigin*          orig   = (ExpOrigin*) Tcl_GetHashValue(entry);
+ 
+@@ -575,7 +575,7 @@
+ Exp_SpawnObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     ExpState *esPtr = 0;
+@@ -1370,7 +1370,7 @@
+ Exp_ExpPidObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     char *chanName = 0;
+@@ -1420,7 +1420,7 @@
+ Exp_GetpidDeprecatedObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     expDiagLog("getpid is deprecated, use pid\r\n");
+@@ -1433,7 +1433,7 @@
+ Exp_SleepObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     double s;
+@@ -1491,7 +1491,7 @@
+ slow_write(
+     Tcl_Interp *interp,
+     ExpState *esPtr,
+-    char *buffer,
++    const char *buffer,
+     int rembytes,
+     struct slow_arg *arg)
+ {
+@@ -1499,7 +1499,7 @@
+ 
+     while (rembytes > 0) {
+ 	int i, bytelen, charlen;
+-	char *p;
++	const char *p;
+ 
+ 	p = buffer;
+ 	charlen = (arg->size<rembytes?arg->size:rembytes);
+@@ -1599,10 +1599,10 @@
+ human_write(
+     Tcl_Interp *interp,
+     ExpState *esPtr,
+-    char *buffer,
++    const char *buffer,
+     struct human_arg *arg)
+ {
+-    char *sp;
++    const char *sp;
+     int size;
+     float t;
+     float alpha;
+@@ -1837,8 +1837,8 @@
+ {
+     struct ExpState *esPtr;
+     char *p = i->value;
+-    int argc;
+-    char **argv;
++    Tcl_Size argc;
++    const char **argv;
+     int j;
+ 
+     if (Tcl_SplitList(NULL, p, &argc, &argv) != TCL_OK) goto error;
+@@ -1864,7 +1864,7 @@
+     Tcl_Interp *interp,
+     struct exp_i *i)
+ {
+-    char *p;	/* string representation of list of spawn ids */
++    const char *p;	/* string representation of list of spawn ids */
+ 
+     if (i->direct == EXP_INDIRECT) {
+ 	p = Tcl_GetVar(interp,i->variable,TCL_GLOBAL_ONLY);
+@@ -1916,7 +1916,7 @@
+ Exp_SendLogObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     static char* options[] = { "--", NULL };
+@@ -1960,7 +1960,7 @@
+ Exp_SendObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -1976,8 +1976,8 @@
+ #define SEND_STYLE_BREAK	0x20
+     int send_style = SEND_STYLE_PLAIN;
+     int want_cooked = TRUE;
+-    char *string;		/* string to send */
+-    int len = -1;		/* length of string to send */
++    const char *string;		/* string to send */
++    Tcl_Size len = -1;		/* length of string to send */
+     int zeros;		/* count of how many ascii zeros to send */
+ 
+     char *chanName = 0;
+@@ -2158,7 +2158,7 @@
+ Exp_LogFileObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     static char resultbuf[1000];
+@@ -2291,7 +2291,7 @@
+ Exp_LogUserObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int old_loguser = expLogUserGet();
+@@ -2323,7 +2323,7 @@
+ Exp_DebugObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int now = FALSE;	/* soon if FALSE, now if TRUE */
+@@ -2393,7 +2393,7 @@
+ Exp_ExpInternalObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int newChannel = FALSE;
+@@ -2473,7 +2473,7 @@
+ Exp_ExitObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int value = 0;
+@@ -2486,7 +2486,7 @@
+ 	    objc--;
+ 	    objv++;
+ 	    if (objc) {
+-		int len;
++		Tcl_Size len;
+ 		char* act = Tcl_GetStringFromObj (objv[0], &len);
+ 
+ 		if (exp_onexit_action)
+@@ -2529,7 +2529,7 @@
+ Exp_ConfigureObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])	/* Argument objects. */
+ {
+     /* Magic configuration stuff. */
+@@ -2570,7 +2570,7 @@
+ Exp_CloseObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[]) 	/* Argument objects. */
+ {
+     int onexec_flag = FALSE;	/* true if -onexec seen */
+@@ -2708,7 +2708,7 @@
+ Exp_StraceObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     static int trace_level = 0;
+@@ -2862,7 +2862,7 @@
+ Exp_WaitObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     char *chanName = 0;
+@@ -3075,7 +3075,7 @@
+ Exp_ForkObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int rc;
+@@ -3109,7 +3109,7 @@
+ Exp_DisconnectObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -3219,7 +3219,7 @@
+ Exp_OverlayObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int newfd, oldfd;
+@@ -3310,7 +3310,7 @@
+ Exp_InterpreterObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     Tcl_Obj *eofObj = 0;
+@@ -3358,7 +3358,7 @@
+ Exp_ExpContinueObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     if (objc == 1) {
+@@ -3378,7 +3378,7 @@
+ Exp_InterReturnObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])
+ {
+     /* let Tcl's return command worry about args */
+@@ -3399,7 +3399,7 @@
+ Exp_OpenObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     ExpState *esPtr;
+@@ -3517,7 +3517,7 @@
+ 		!(Tcl_FindHashEntry(&globalNsPtr->cmdTable,c->name) ||
+ 			Tcl_FindHashEntry(&currNsPtr->cmdTable,c->name))) {
+ 	    if (c->objproc)
+-		Tcl_CreateObjCommand(interp,c->name,
++		Tcl_CreateObjCommand2(interp,c->name,
+ 			c->objproc,c->data,exp_deleteObjProc);
+ 	    else
+ 		Tcl_CreateCommand(interp,c->name,c->proc,
+@@ -3529,7 +3529,7 @@
+ 		&& !(c->flags & EXP_NOPREFIX)) {
+ 	    sprintf(cmdnamebuf,"exp_%s",c->name);
+ 	    if (c->objproc)
+-		Tcl_CreateObjCommand(interp,cmdnamebuf,c->objproc,c->data,
++		Tcl_CreateObjCommand2(interp,cmdnamebuf,c->objproc,c->data,
+ 			exp_deleteObjProc);
+ 	    else
+ 		Tcl_CreateCommand(interp,cmdnamebuf,c->proc,
+diff -Naur expect5.45.4/exp_command.h expect5.45.4.new/exp_command.h
+--- expect5.45.4/exp_command.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_command.h	2024-10-01 16:59:25.703446257 -0500
+@@ -24,10 +24,11 @@
+ #endif
+ 
+ #include <tclPort.h>
++#include "expect.h"
+ 
+ #define EXP_CHANNELNAMELEN (16 + TCL_INTEGER_SPACE)
+ 
+-EXTERN char *		exp_get_var _ANSI_ARGS_((Tcl_Interp *,char *));
++EXTERN const char *		exp_get_var _ANSI_ARGS_((Tcl_Interp *,char *));
+ 
+ EXTERN int exp_default_match_max;
+ EXTERN int exp_default_parity;
+@@ -210,7 +211,7 @@
+ #define EXP_INDIRECT	2
+ 
+ EXTERN void		expAdjust _ANSI_ARGS_((ExpState *));
+-EXTERN int		expWriteChars _ANSI_ARGS_((ExpState *,char *,int));
++EXTERN int		expWriteChars _ANSI_ARGS_((ExpState *,const char *,int));
+ EXTERN int		expWriteCharsUni _ANSI_ARGS_((ExpState *,Tcl_UniChar *,int));
+ EXTERN void		exp_buffer_shuffle _ANSI_ARGS_((Tcl_Interp *,ExpState *,int,char *,char *));
+ EXTERN int		exp_close _ANSI_ARGS_((Tcl_Interp *,ExpState *));
+@@ -218,7 +219,7 @@
+ EXTERN void		exp_ecmd_remove_fd_direct_and_indirect 
+ 				_ANSI_ARGS_((Tcl_Interp *,int));
+ EXTERN void		exp_trap_on _ANSI_ARGS_((int));
+-EXTERN int		exp_trap_off _ANSI_ARGS_((char *));
++EXTERN int		exp_trap_off _ANSI_ARGS_((const char *));
+ 
+ EXTERN void		exp_strftime(char *format, const struct tm *timeptr,Tcl_DString *dstring);
+ 
+@@ -308,7 +309,7 @@
+ 
+ struct exp_cmd_data {
+ 	char		*name;
+-	Tcl_ObjCmdProc	*objproc;
++	Tcl_ObjCmdProc2	*objproc;
+ 	Tcl_CmdProc	*proc;
+ 	ClientData	data;
+ 	int 		flags;
+@@ -323,9 +324,9 @@
+ EXTERN void		exp_init_interact_cmds _ANSI_ARGS_((Tcl_Interp *));
+ EXTERN void		exp_init_tty_cmds();
+ 
+-EXTERN ExpState *	expStateCheck _ANSI_ARGS_((Tcl_Interp *,ExpState *,int,int,char *));
++EXTERN ExpState *	expStateCheck _ANSI_ARGS_((Tcl_Interp *,ExpState *,int,int,const char *));
+ EXTERN ExpState *       expStateCurrent _ANSI_ARGS_((Tcl_Interp *,int,int,int));
+-EXTERN ExpState *       expStateFromChannelName _ANSI_ARGS_((Tcl_Interp *,char *,int,int,int,char *));
++EXTERN ExpState *       expStateFromChannelName _ANSI_ARGS_((Tcl_Interp *,const char *,int,int,int,const char *));
+ EXTERN void		expStateFree _ANSI_ARGS_((ExpState *));
+ 
+ EXTERN ExpState *	expCreateChannel _ANSI_ARGS_((Tcl_Interp *,int,int,int));
+diff -Naur expect5.45.4/expect.c expect5.45.4.new/expect.c
+--- expect5.45.4/expect.c	2018-02-04 03:58:22.000000000 -0600
++++ expect5.45.4.new/expect.c	2024-10-01 16:59:25.704446245 -0500
+@@ -163,8 +163,8 @@
+ static char *exp_indirect_update2( /* 2-part Tcl variable names */
+     ClientData clientData,
+     Tcl_Interp *interp,	/* Interpreter containing variable. */
+-    char *name1,	/* Name of variable. */
+-    char *name2,	/* Second part of variable name. */
++    const char *name1,	/* Name of variable. */
++    const char *name2,	/* Second part of variable name. */
+     int flags);		/* Information about what happened. */
+ 
+ #ifdef SIMPLE_EVENT
+@@ -285,7 +285,8 @@
+     CONST char *p;
+     CONST char *next;
+     int rc;
+-    int bytesLeft, numWords;
++    Tcl_Size bytesLeft;
++    int numWords;
+     Tcl_Parse parse;
+ 
+     /*
+@@ -325,8 +326,9 @@
+ 		 numWords--, tokenPtr += (tokenPtr->numComponents + 1)) {
+ 		/* FUTURE: Save token information, do substitution later */
+ 
+-		Tcl_Obj* w = Tcl_EvalTokens(interp, tokenPtr+1,
++		rc = Tcl_EvalTokensStandard(interp, tokenPtr+1,
+ 			tokenPtr->numComponents);
++		Tcl_Obj* w = (rc == TCL_OK ? Tcl_GetObjResult(interp) : NULL);
+ 		/* w has refCount 1 here, if not NULL */
+ 		if (w == NULL) {
+ 		    Tcl_DecrRefCount (res);
+@@ -335,7 +337,7 @@
+ 
+ 		}
+ 		Tcl_ListObjAppendElement (interp, res, w);
+-		Tcl_DecrRefCount (w); /* Local reference goes away */
++		Tcl_ResetResult (interp); /* Local reference goes away */
+ 	    }
+ 	}
+ 
+@@ -490,7 +492,7 @@
+ 		{
+ 		    Tcl_Obj* g;
+ 		    Tcl_UniChar* str;
+-		    int strlen;
++		    Tcl_Size strlen;
+ 
+ 		    str = Tcl_GetUnicodeFromObj (objv[i], &strlen);
+ 		    g = exp_retoglob (str, strlen);
+@@ -852,7 +854,7 @@
+ 	expDiagLog("\"? ");
+ 
+ 	if (e->gate) {
+-	    int plen;
++	    Tcl_Size plen;
+ 	    Tcl_UniChar* pat = Tcl_GetUnicodeFromObj(e->gate,&plen);
+ 
+ 	    expDiagLog("Gate \"");
+@@ -915,7 +917,7 @@
+ 	expDiagLogU(expPrintify(Tcl_GetString(e->pat)));
+ 	expDiagLog("\"? ");
+ 	if (str) {
+-	    int plen;
++	    Tcl_Size plen;
+ 	    Tcl_UniChar* pat = Tcl_GetUnicodeFromObj(e->pat,&plen);
+ 
+ 	    match = Exp_StringCaseMatch(str,numchars, pat, plen,
+@@ -932,7 +934,7 @@
+ 	}
+ 	expDiagLogU(no);
+     } else if (e->use == PAT_EXACT) {
+-	int patLength;
++	Tcl_Size patLength;
+ 	char *pat = Tcl_GetStringFromObj(e->pat, &patLength);
+ 	Tcl_UniChar *p;
+ 
+@@ -1384,7 +1386,7 @@
+ Exp_ExpectGlobalObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int result = TCL_OK;
+@@ -2042,12 +2044,12 @@
+ This allows the user to localize them if desired, and also to
+ avoid having to put "global" in procedure definitions.
+ */
+-char *
++const char *
+ exp_get_var(
+     Tcl_Interp *interp,
+     char *var)
+ {
+-    char *val;
++    const char *val;
+ 
+     if (NULL != (val = Tcl_GetVar(interp,var,0 /* local */)))
+ 	return(val);
+@@ -2121,8 +2123,8 @@
+ exp_indirect_update2(
+     ClientData clientData,
+     Tcl_Interp *interp,	/* Interpreter containing variable. */
+-    char *name1,	/* Name of variable. */
+-    char *name2,	/* Second part of variable name. */
++    const char *name1,	/* Name of variable. */
++    const char *name2,	/* Second part of variable name. */
+     int flags)		/* Information about what happened. */
+ {
+ 	char *msg;
+@@ -2525,7 +2527,7 @@
+ Exp_ExpectObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int cc;			/* number of chars returned in a single read */
+@@ -2782,7 +2784,7 @@
+ Exp_TimestampObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+ 	char *format = 0;
+@@ -2962,7 +2964,7 @@
+ Exp_MatchMaxObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int size = -1;
+@@ -3008,7 +3010,7 @@
+ Exp_RemoveNullsObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int value = -1;
+@@ -3052,7 +3054,7 @@
+ Exp_ParityObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int parity;
+@@ -3091,7 +3093,7 @@
+ Exp_CloseOnEofObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST objv[])		/* Argument objects. */
+ {
+     int close_on_eof;
+diff -Naur expect5.45.4/expect.h expect5.45.4.new/expect.h
+--- expect5.45.4/expect.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/expect.h	2024-10-01 16:59:25.704446245 -0500
+@@ -12,273 +12,23 @@
+ #define _EXPECT_H
+ 
+ #include <stdio.h>
++#include <stdarg.h>
+ #include <setjmp.h>
+-
+-/*
+- * tcl.h --
+- *
+- *	This header file describes the externally-visible facilities
+- *	of the Tcl interpreter.
+- *
+- * Copyright (c) 1987-1994 The Regents of the University of California.
+- * Copyright (c) 1994-1997 Sun Microsystems, Inc.
+- * Copyright (c) 1993-1996 Lucent Technologies.
+- * Copyright (c) 1998-1999 Scriptics Corporation.
+- *
+- * See the file "license.terms" for information on usage and redistribution
+- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+- *
+- * RCS: @(#) $Id: expect.h,v 5.32 2010/07/01 00:53:49 eee Exp $
+- */
+-
+-#ifndef _TCL
+-#define _TCL
+-
+-#ifndef __WIN32__
+-#   if defined(_WIN32) || defined(WIN32)
+-#	define __WIN32__
+-#   endif
+-#endif
+-
+-#ifdef __WIN32__
+-#   ifndef STRICT
+-#	define STRICT
+-#   endif
+-#   ifndef USE_PROTOTYPE
+-#	define USE_PROTOTYPE 1
+-#   endif
+-#   ifndef HAS_STDARG
+-#	define HAS_STDARG 1
+-#   endif
+-#   ifndef USE_PROTOTYPE
+-#	define USE_PROTOTYPE 1
+-#   endif
+-
+-/*
+- * Under Windows we need to call Tcl_Alloc in all cases to avoid competing
+- * C run-time library issues.
+- */
+-
+-#   ifndef USE_TCLALLOC
+-#	define USE_TCLALLOC 1
+-#   endif
+-#endif /* __WIN32__ */
+-
+-/*
+- * The following definitions set up the proper options for Macintosh
+- * compilers.  We use this method because there is no autoconf equivalent.
+- */
+-
+-#ifdef MAC_TCL
+-#   ifndef HAS_STDARG
+-#	define HAS_STDARG 1
+-#   endif
+-#   ifndef USE_TCLALLOC
+-#	define USE_TCLALLOC 1
+-#   endif
+-#   ifndef NO_STRERROR
+-#	define NO_STRERROR 1
+-#   endif
+-#endif
+-
+-/*
+- * Utility macros: STRINGIFY takes an argument and wraps it in "" (double
+- * quotation marks), JOIN joins two arguments.
+- */
+-
+-#define VERBATIM(x) x
+-#ifdef _MSC_VER
+-# define STRINGIFY(x) STRINGIFY1(x)
+-# define STRINGIFY1(x) #x
+-# define JOIN(a,b) JOIN1(a,b)
+-# define JOIN1(a,b) a##b
+-#else
+-# ifdef RESOURCE_INCLUDED
+-#  define STRINGIFY(x) STRINGIFY1(x)
+-#  define STRINGIFY1(x) #x
+-#  define JOIN(a,b) JOIN1(a,b)
+-#  define JOIN1(a,b) a##b
+-# else
+-#  ifdef __STDC__
+-#   define STRINGIFY(x) #x
+-#   define JOIN(a,b) a##b
+-#  else
+-#   define STRINGIFY(x) "x"
+-#   define JOIN(a,b) VERBATIM(a)VERBATIM(b)
+-#  endif
+-# endif
+-#endif
+-
+-/* 
+- * A special definition used to allow this header file to be included 
+- * in resource files so that they can get obtain version information from
+- * this file.  Resource compilers don't like all the C stuff, like typedefs
+- * and procedure declarations, that occur below.
+- */
+-
+-#ifndef RESOURCE_INCLUDED
+-
+-#ifndef BUFSIZ
+-#include <stdio.h>
+-#endif
+-
+-/*
+- * Definitions that allow Tcl functions with variable numbers of
+- * arguments to be used with either varargs.h or stdarg.h.  TCL_VARARGS
+- * is used in procedure prototypes.  TCL_VARARGS_DEF is used to declare
+- * the arguments in a function definiton: it takes the type and name of
+- * the first argument and supplies the appropriate argument declaration
+- * string for use in the function definition.  TCL_VARARGS_START
+- * initializes the va_list data structure and returns the first argument.
+- */
+-
+-#if defined(__STDC__) || defined(HAS_STDARG)
+-#   include <stdarg.h>
+-
+-#   define TCL_VARARGS(type, name) (type name, ...)
+-#   define TCL_VARARGS_DEF(type, name) (type name, ...)
+-#   define TCL_VARARGS_START(type, name, list) (va_start(list, name), name)
+-#else
+-#   include <varargs.h>
+-
+-#   ifdef __cplusplus
+-#	define TCL_VARARGS(type, name) (type name, ...)
+-#	define TCL_VARARGS_DEF(type, name) (type va_alist, ...)
+-#   else
+-#	define TCL_VARARGS(type, name) ()
+-#	define TCL_VARARGS_DEF(type, name) (va_alist)
+-#   endif
+-#   define TCL_VARARGS_START(type, name, list) \
+-	(va_start(list), va_arg(list, type))
+-#endif
+-
+-/*
+- * Macros used to declare a function to be exported by a DLL.
+- * Used by Windows, maps to no-op declarations on non-Windows systems.
+- * The default build on windows is for a DLL, which causes the DLLIMPORT
+- * and DLLEXPORT macros to be nonempty. To build a static library, the
+- * macro STATIC_BUILD should be defined.
+- */
+-
+-#ifdef STATIC_BUILD
+-# define DLLIMPORT
+-# define DLLEXPORT
+-#else
+-# if defined(__WIN32__) && (defined(_MSC_VER) || (defined(__GNUC__) && defined(__declspec)))
+-#   define DLLIMPORT __declspec(dllimport)
+-#   define DLLEXPORT __declspec(dllexport)
+-# else
+-#  define DLLIMPORT
+-#  define DLLEXPORT
+-# endif
+-#endif
+-
+-/*
+- * These macros are used to control whether functions are being declared for
+- * import or export.  If a function is being declared while it is being built
+- * to be included in a shared library, then it should have the DLLEXPORT
+- * storage class.  If is being declared for use by a module that is going to
+- * link against the shared library, then it should have the DLLIMPORT storage
+- * class.  If the symbol is beind declared for a static build or for use from a
+- * stub library, then the storage class should be empty.
+- *
+- * The convention is that a macro called BUILD_xxxx, where xxxx is the
+- * name of a library we are building, is set on the compile line for sources
+- * that are to be placed in the library.  When this macro is set, the
+- * storage class will be set to DLLEXPORT.  At the end of the header file, the
+- * storage class will be reset to DLLIMPORt.
+- */
+-
+-#undef TCL_STORAGE_CLASS
+-#ifdef BUILD_tcl
+-# define TCL_STORAGE_CLASS DLLEXPORT
+-#else
+-# ifdef USE_TCL_STUBS
+-#  define TCL_STORAGE_CLASS
+-# else
+-#  define TCL_STORAGE_CLASS DLLIMPORT
+-# endif
+-#endif
+-
+-/*
+- * Definitions that allow this header file to be used either with or
+- * without ANSI C features like function prototypes.  */
++#include <tcl.h>
+ 
+ #undef _ANSI_ARGS_
+ #undef CONST
+-
+-#if ((defined(__STDC__) || defined(SABER)) && !defined(NO_PROTOTYPE)) || defined(__cplusplus) || defined(USE_PROTOTYPE)
+-#   define _USING_PROTOTYPES_ 1
+-#   define _ANSI_ARGS_(x)	x
+-#   define CONST const
+-#else
+-#   define _ANSI_ARGS_(x)	()
+-#   define CONST
+-#endif
+-
+-#ifdef __cplusplus
+-#   define EXTERN extern "C" TCL_STORAGE_CLASS
+-#else
+-#   define EXTERN extern TCL_STORAGE_CLASS
+-#endif
+-
+-/*
+- * Macro to use instead of "void" for arguments that must have
+- * type "void *" in ANSI C;  maps them to type "char *" in
+- * non-ANSI systems.
+- */
+-#ifndef __WIN32__
+-#ifndef VOID
+-#   ifdef __STDC__
+-#       define VOID void
+-#   else
+-#       define VOID char
+-#   endif
+-#endif
+-#else /* __WIN32__ */
+-/*
+- * The following code is copied from winnt.h
+- */
+-#ifndef VOID
+-#define VOID void
+-typedef char CHAR;
+-typedef short SHORT;
+-typedef long LONG;
+-#endif
+-#endif /* __WIN32__ */
+-
+-/*
+- * Miscellaneous declarations.
+- */
+-
+-#ifndef NULL
+-#define NULL 0
+-#endif
+-
+-typedef struct Tcl_RegExp_ *Tcl_RegExp;
+-
+-/*
+- * These function have been renamed. The old names are deprecated, but we
+- * define these macros for backwards compatibilty.
+- */
+-
+-#define Tcl_Ckalloc Tcl_Alloc
+-#define Tcl_Ckfree Tcl_Free
+-#define Tcl_Ckrealloc Tcl_Realloc
+-#define Tcl_Return Tcl_SetResult
+-#define Tcl_TildeSubst Tcl_TranslateFileName
+-
+-#endif /* RESOURCE_INCLUDED */
+-
+-#undef TCL_STORAGE_CLASS
+-#define TCL_STORAGE_CLASS DLLIMPORT
+-
+-#endif /* _TCL */
+-
+-/*
+- * end of tcl.h definitions
+- */
+-
++#undef CONST84
++#undef TCL_VARARGS
++#undef TCL_VARARGS_DEF
++#undef TCL_VARARGS_START
++
++#define _ANSI_ARGS_(x)	x
++#define CONST const
++#define CONST84 const
++#define TCL_VARARGS(type, name) (type name, ...)
++#define TCL_VARARGS_DEF(type, name) (type name, ...)
++#define TCL_VARARGS_START(type, name, list) (va_start(list, name), name)
+ 
+ /*
+  * regexp definitions - from tcl8.0/tclRegexp.h
+diff -Naur expect5.45.4/expect_tcl.h expect5.45.4.new/expect_tcl.h
+--- expect5.45.4/expect_tcl.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/expect_tcl.h	2024-10-01 16:59:25.704446245 -0500
+@@ -13,7 +13,7 @@
+ #define _EXPECT_TCL_H
+ 
+ #include <stdio.h>
+-#include "expect_comm.h"
++#include "expect.h"
+ 
+ /*
+  * This is a convenience macro used to initialize a thread local storage ptr.
+@@ -44,7 +44,7 @@
+ EXTERN int	exp_interpret_cmdfilename _ANSI_ARGS_((Tcl_Interp *,char *));
+ EXTERN void	exp_interpret_rcfiles _ANSI_ARGS_((Tcl_Interp *,int my_rc,int sys_rc));
+ 
+-EXTERN char *	exp_cook _ANSI_ARGS_((char *s,int *len));
++EXTERN const char *	exp_cook _ANSI_ARGS_((const char *s,Tcl_Size *len));
+ 
+ EXTERN void	expCloseOnExec _ANSI_ARGS_((int));
+ 
+diff -Naur expect5.45.4/exp_inter.c expect5.45.4.new/exp_inter.c
+--- expect5.45.4/exp_inter.c	2018-02-04 04:12:26.000000000 -0600
++++ expect5.45.4.new/exp_inter.c	2024-10-01 16:59:25.704446245 -0500
+@@ -696,8 +696,8 @@
+ inter_updateproc(
+     ClientData clientData,
+     Tcl_Interp *interp,	/* Interpreter containing variable. */
+-    char *name1,	/* Name of variable. */
+-    char *name2,	/* Second part of variable name. */
++    const char *name1,	/* Name of variable. */
++    const char *name2,	/* Second part of variable name. */
+     int flags)		/* Information about what happened. */
+ {
+ 	exp_configure_count++;
+@@ -714,7 +714,7 @@
+ Exp_InteractObjCmd(
+     ClientData clientData,
+     Tcl_Interp *interp,
+-    int objc,
++    Tcl_Size objc,
+     Tcl_Obj *CONST initial_objv[])		/* Argument objects. */
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+diff -Naur expect5.45.4/exp_int.h expect5.45.4.new/exp_int.h
+--- expect5.45.4/exp_int.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_int.h	2024-10-01 16:59:25.703446257 -0500
+@@ -20,6 +20,7 @@
+ #endif
+ 
+ #include <errno.h>
++#include "expect.h"
+ 
+ void	exp_console_set     _ANSI_ARGS_((void));
+ void	expDiagLogPtrSet    _ANSI_ARGS_((void (*)_ANSI_ARGS_((char *))));
+@@ -27,8 +28,8 @@
+ void	expDiagLogPtrX      _ANSI_ARGS_((char *,int));
+ void	expDiagLogPtrStr    _ANSI_ARGS_((char *,char *));
+ void	expDiagLogPtrStrStr _ANSI_ARGS_((char *,char *,char *));
+-void	expErrnoMsgSet      _ANSI_ARGS_((char * (*) _ANSI_ARGS_((int))));
+-char * expErrnoMsg    _ANSI_ARGS_((int));
++void	expErrnoMsgSet      _ANSI_ARGS_((const char * (*) _ANSI_ARGS_((int))));
++const char * expErrnoMsg    _ANSI_ARGS_((int));
+ 
+ #ifdef NO_STDLIB_H
+ #  include "../compat/stdlib.h"
+diff -Naur expect5.45.4/exp_log.c expect5.45.4.new/exp_log.c
+--- expect5.45.4/exp_log.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_log.c	2024-10-01 16:59:25.704446245 -0500
+@@ -110,7 +110,7 @@
+ 
+ void
+ expLogDiagU(buf)
+-char *buf;
++const char *buf;
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+ 
+@@ -174,7 +174,10 @@
+     force_stdout = TCL_VARARGS_START(int,arg1,args);
+     fmt = va_arg(args,char *);
+ 
+-    if ((!tsdPtr->logUser) && (!force_stdout) && (!tsdPtr->logAll)) return;
++    if ((!tsdPtr->logUser) && (!force_stdout) && (!tsdPtr->logAll)) {
++	va_end(args);
++	return;
++    }
+ 
+     (void) vsprintf(bigbuf,fmt,args);
+     expDiagWriteBytes(bigbuf,-1);
+@@ -188,7 +191,7 @@
+ /* use this function for logging the parent/child conversation */
+ void
+ expStdoutLogU(buf,force_stdout)
+-char *buf;
++const char *buf;
+ int force_stdout;	/* override value of logUser */
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -237,7 +240,7 @@
+ /*ARGSUSED*/
+ void
+ expErrorLogU(buf)
+-char *buf;
++const char *buf;
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+ 
+@@ -398,7 +401,7 @@
+ /* write 8-bit bytes */
+ void
+ expDiagWriteBytes(str,len)
+-char *str;
++const char *str;
+ int len;
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -411,7 +414,7 @@
+ /* write UTF chars */
+ void
+ expDiagWriteChars(str,len)
+-char *str;
++const char *str;
+ int len;
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+@@ -630,7 +633,7 @@
+ /* in diagnostic mode, "expect -d" */
+ static char *
+ expPrintifyReal(s)
+-char *s;
++const char *s;
+ {
+ 	static int destlen = 0;
+ 	static char *dest = 0;
+@@ -723,7 +726,7 @@
+ 
+ char *
+ expPrintify(s) /* INTL */
+-char *s;
++const char *s;
+ {
+     ThreadSpecificData *tsdPtr = TCL_TSD_INIT(&dataKey);
+ 
+diff -Naur expect5.45.4/exp_log.h expect5.45.4.new/exp_log.h
+--- expect5.45.4/exp_log.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_log.h	2024-10-01 16:59:25.704446245 -0500
+@@ -1,10 +1,12 @@
+ /* exp_log.h */
+ 
++#include "expect.h"
++
+ extern void		expErrorLog _ANSI_ARGS_(TCL_VARARGS(char *,fmt));
+-extern void		expErrorLogU _ANSI_ARGS_((char *));
++extern void		expErrorLogU _ANSI_ARGS_((const char *));
+ 
+ extern void		expStdoutLog _ANSI_ARGS_(TCL_VARARGS(int,force_stdout));
+-extern void		expStdoutLogU _ANSI_ARGS_((char *buf, int force_stdout));
++extern void		expStdoutLogU _ANSI_ARGS_((const char *buf, int force_stdout));
+ 
+ EXTERN void		expDiagInit _ANSI_ARGS_((void));
+ EXTERN int		expDiagChannelOpen _ANSI_ARGS_((Tcl_Interp *,char *));
+@@ -13,13 +15,13 @@
+ EXTERN char *		expDiagFilename _ANSI_ARGS_((void));
+ EXTERN int		expDiagToStderrGet _ANSI_ARGS_((void));
+ EXTERN void		expDiagToStderrSet _ANSI_ARGS_((int));
+-EXTERN void		expDiagWriteBytes _ANSI_ARGS_((char *,int));
+-EXTERN void		expDiagWriteChars _ANSI_ARGS_((char *,int));
++EXTERN void		expDiagWriteBytes _ANSI_ARGS_((const char *,int));
++EXTERN void		expDiagWriteChars _ANSI_ARGS_((const char *,int));
+ EXTERN void		expDiagWriteObj _ANSI_ARGS_((Tcl_Obj *));
+ EXTERN void		expDiagLog _ANSI_ARGS_(TCL_VARARGS(char *,fmt));
+ EXTERN void		expDiagLogU _ANSI_ARGS_((char *));
+ 
+-EXTERN char *		expPrintify _ANSI_ARGS_((char *));
++EXTERN char *		expPrintify _ANSI_ARGS_((const char *));
+ EXTERN char *		expPrintifyUni _ANSI_ARGS_((Tcl_UniChar *,int));
+ EXTERN char *		expPrintifyObj _ANSI_ARGS_((Tcl_Obj *));
+ EXTERN void		expPrintf _ANSI_ARGS_(TCL_VARARGS(char *,fmt));
+@@ -38,7 +40,7 @@
+ EXTERN int		expLogAllGet _ANSI_ARGS_((void));
+ EXTERN void		expLogToStdoutSet _ANSI_ARGS_((int));
+ EXTERN int		expLogToStdoutGet _ANSI_ARGS_((void));
+-EXTERN void		expLogDiagU _ANSI_ARGS_((char *));
++EXTERN void		expLogDiagU _ANSI_ARGS_((const char *));
+ EXTERN int		expWriteBytesAndLogIfTtyU _ANSI_ARGS_((ExpState *,Tcl_UniChar *,int));
+ 
+ EXTERN int		expLogUserGet _ANSI_ARGS_((void));
+diff -Naur expect5.45.4/exp_main_sub.c expect5.45.4.new/exp_main_sub.c
+--- expect5.45.4/exp_main_sub.c	2018-02-04 04:43:58.000000000 -0600
++++ expect5.45.4.new/exp_main_sub.c	2024-10-01 16:59:25.704446245 -0500
+@@ -57,6 +57,7 @@
+ int exp_interactive =  FALSE;
+ int exp_buffer_command_input = FALSE;/* read in entire cmdfile at once */
+ int exp_fgets();
++int exp_tty_cooked_echo(Tcl_Interp *interp, exp_tty *tty_old, int *was_raw, int *was_echo);
+ 
+ Tcl_Interp *exp_interp;	/* for use by signal handlers who can't figure out */
+ 			/* the interpreter directly */
+@@ -226,7 +227,7 @@
+ Tcl_Interp *interp;
+ int check_for_nostack;
+ {
+-	char *msg;
++	const char *msg;
+ 
+ 	/* if errorInfo has something, print it */
+     /* else use what's in the interp result */
+@@ -252,7 +253,7 @@
+ 	/* no \n at end, since ccmd will already have one. */
+ 	/* Actually, this is not true if command is last in */
+ 	/* file and has no newline after it, oh well */
+-	expErrorLogU(exp_cook(msg,(int *)0));
++	expErrorLogU(exp_cook(msg,NULL));
+ 	expErrorLogU("\r\n");
+ }
+ 
+@@ -393,7 +394,7 @@
+ 	    case TCL_OK:
+ 	        str = Tcl_GetStringResult(interp);
+ 		if (*str != 0) {
+-		    expStdoutLogU(exp_cook(str,(int *)0),1);
++		    expStdoutLogU(exp_cook(str,NULL),1);
+ 		    expStdoutLogU("\r\n",1);
+ 		}
+ 		continue;
+@@ -542,7 +543,7 @@
+       return TCL_ERROR;
+     }
+ #else
+-    if (Tcl_InitStubs(interp, "8.1", 0) == NULL) {
++    if (Tcl_InitStubs(interp, "9.0", 0) == NULL) {
+       return TCL_ERROR;
+     }
+ #endif
+@@ -712,7 +713,7 @@
+ 			exp_cmdlinecmds = TRUE;
+ 			rc = Tcl_Eval(interp,optarg);
+ 			if (rc != TCL_OK) {
+-			    expErrorLogU(exp_cook(Tcl_GetVar(interp,"errorInfo",TCL_GLOBAL_ONLY),(int *)0));
++			    expErrorLogU(exp_cook(Tcl_GetVar(interp,"errorInfo",TCL_GLOBAL_ONLY),NULL));
+ 			    expErrorLogU("\r\n");
+ 			}
+ 			break;
+@@ -860,7 +861,8 @@
+ 		expDiagLog("set argv0 \"%s\"\r\n",exp_argv0);
+ 	}
+ 
+-	args = Tcl_Merge(argc-optind,argv+optind);
++	/* TODO: Is the cast safe? */
++	args = Tcl_Merge(argc-optind,(const char **)(argv+optind));
+ 	expDiagLogU("set argv \"");
+ 	expDiagLogU(args);
+ 	expDiagLogU("\"\r\n");
+diff -Naur expect5.45.4/exp_pty.c expect5.45.4.new/exp_pty.c
+--- expect5.45.4/exp_pty.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_pty.c	2024-10-01 16:59:25.704446245 -0500
+@@ -351,9 +351,9 @@
+   (*expDiagLogPtrVal)(buf);
+ }
+ 
+-static char *		(*expErrnoMsgVal) _ANSI_ARGS_((int));
++static const char *		(*expErrnoMsgVal) _ANSI_ARGS_((int));
+ 
+-char *
++const char *
+ expErrnoMsg(errorNo)
+ int errorNo;
+ {
+@@ -362,7 +362,7 @@
+ 
+ void
+ expErrnoMsgSet(fn)
+-     char * (*fn) _ANSI_ARGS_((int));
++     const char * (*fn) _ANSI_ARGS_((int));
+ {
+   expErrnoMsgVal = fn;
+ }
+diff -Naur expect5.45.4/exp_trap.c expect5.45.4.new/exp_trap.c
+--- expect5.45.4/exp_trap.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_trap.c	2024-10-01 16:59:25.704446245 -0500
+@@ -147,7 +147,7 @@
+ 		Tcl_AsyncMark(async_handler);
+ 	} else {
+ 		got_sig = -1;
+-		for (i=1;i<NSIG;i++) {
++		for (int i=1;i<NSIG;i++) {
+ 			if (traps[i].mark) {
+ 				got_sig = i;
+ 				Tcl_AsyncMark(async_handler);
+@@ -304,11 +304,10 @@
+ Tcl_Obj *CONST objv[];
+ {
+ 	char *action = 0;
+-	int n;		/* number of signals in list */
++	Tcl_Size n;		/* number of signals in list */
+ 	Tcl_Obj **list;	/* list of signals */
+ 	char *arg;
+ 	int len;	/* length of action */
+-	int i;
+ 	int show_name = FALSE;	/* if user asked for current sig by name */
+ 	int show_number = FALSE;/* if user asked for current sig by number */
+ 	int show_max = FALSE;	/* if user asked for NSIG-1 */
+@@ -382,7 +381,7 @@
+ 	  return TCL_ERROR;
+ 	}
+ 
+-	for (i=0;i<n;i++) {
++	for (Tcl_Size i=0;i<n;i++) {
+ 	  char *s;
+ 	  int sig;
+ 
+@@ -509,7 +508,7 @@
+ 
+ 		if (eip) {
+ 		  /* odd that Tcl doesn't have a call that does all this at once */
+-		  int len;
++		  Tcl_Size len;
+ 		  char *s = Tcl_GetStringFromObj(eip,&len);
+ 		  Tcl_AddObjErrorInfo(interp,s,len);
+ 		  Tcl_DecrRefCount(eip);
+diff -Naur expect5.45.4/exp_tty.c expect5.45.4.new/exp_tty.c
+--- expect5.45.4/exp_tty.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_tty.c	2024-10-01 16:59:25.704446245 -0500
+@@ -277,10 +277,10 @@
+ /* to write send_user strings without always putting in \r. */
+ /* If len == 0, use strlen to compute it */
+ /* NB: if terminal is not in raw mode, nothing is done. */
+-char *
++const char *
+ exp_cook(
+-    char *s,
+-    int *len)	/* current and new length of s */
++    const char *s,
++    Tcl_Size *len)	/* current and new length of s */
+ {
+ 	static int destlen = 0;
+ 	static char *dest = 0;
+@@ -316,7 +316,7 @@
+ exec_stty(
+     Tcl_Interp *interp,
+     int argc,
+-    char **argv,
++    const char **argv,
+     int devtty)		/* if true, redirect to /dev/tty */
+ {
+ 	int i;
+@@ -370,7 +370,7 @@
+     ClientData clientData,
+     Tcl_Interp *interp,
+     int argc,
+-    char **argv)
++    const char **argv)
+ {
+ 	/* redirection symbol is not counted as a stty arg in terms */
+ 	/* of recognition. */
+@@ -382,11 +382,11 @@
+ 	int cooked = FALSE;
+ 	int was_raw, was_echo;
+ 
+-	char **redirect;	/* location of "<" */
+-	char *infile = 0;
++	const char **redirect;	/* location of "<" */
++	const char *infile = 0;
+ 	int fd;			/* (slave) fd of infile */
+ 	int master = -1;	/* master fd of infile */
+-	char **argv0 = argv;
++	const char **argv0 = argv;
+ 
+ 	for (argv=argv0+1;*argv;argv++) {
+ 		if (argv[0][0] == '<') {
+@@ -507,7 +507,7 @@
+ 		/* a different tty */
+ 
+ 		/* temporarily zap redirect */
+-		char *redirect_save = *redirect;
++		const char *redirect_save = *redirect;
+ 		*redirect = 0;
+ 
+ 		for (argv=argv0+1;*argv;argv++) {
+@@ -569,7 +569,7 @@
+     ClientData clientData,
+     Tcl_Interp *interp,
+     int argc,
+-    char **argv)
++    const char **argv)
+ {
+ 	int result = TCL_OK;
+ 	RETSIGTYPE (*old)();	/* save old sigalarm handler */
+diff -Naur expect5.45.4/exp_win.c expect5.45.4.new/exp_win.c
+--- expect5.45.4/exp_win.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_win.c	2024-10-01 16:59:25.704446245 -0500
+@@ -78,7 +78,7 @@
+ static exp_winsize winsize = {0, 0};
+ static exp_winsize win2size = {0, 0};
+ 
+-int exp_window_size_set(fd)
++void exp_window_size_set(fd)
+ int fd;
+ {
+ #ifdef TIOCSWINSZ
+@@ -89,7 +89,7 @@
+ #endif
+ }
+ 
+-int exp_window_size_get(fd)
++void exp_window_size_get(fd)
+ int fd;
+ {
+ #ifdef TIOCGWINSZ
+@@ -106,7 +106,7 @@
+ 
+ void
+ exp_win_rows_set(rows)
+-char *rows;
++const char *rows;
+ {
+ 	winsize.rows = atoi(rows);
+ 	exp_window_size_set(exp_dev_tty);
+@@ -123,7 +123,7 @@
+ 
+ void
+ exp_win_columns_set(columns)
+-char *columns;
++const char *columns;
+ {
+ 	winsize.columns = atoi(columns);
+ 	exp_window_size_set(exp_dev_tty);
+@@ -142,7 +142,7 @@
+  * separate copy of everything above - used for handling user stty requests
+  */
+ 
+-int exp_win2_size_set(fd)
++void exp_win2_size_set(fd)
+ int fd;
+ {
+ #ifdef TIOCSWINSZ
+@@ -153,7 +153,7 @@
+ #endif
+ }
+ 
+-int exp_win2_size_get(fd)
++void exp_win2_size_get(fd)
+ int fd;
+ {
+ #ifdef TIOCGWINSZ
+@@ -167,7 +167,7 @@
+ void
+ exp_win2_rows_set(fd,rows)
+ int fd;
+-char *rows;
++const char *rows;
+ {
+ 	exp_win2_size_get(fd);
+ 	win2size.rows = atoi(rows);
+@@ -191,7 +191,7 @@
+ void
+ exp_win2_columns_set(fd,columns)
+ int fd;
+-char *columns;
++const char *columns;
+ {
+ 	exp_win2_size_get(fd);
+ 	win2size.columns = atoi(columns);
+diff -Naur expect5.45.4/exp_win.h expect5.45.4.new/exp_win.h
+--- expect5.45.4/exp_win.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/exp_win.h	2024-10-01 16:59:25.704446245 -0500
+@@ -6,17 +6,17 @@
+ would appreciate credit if you use this file or parts of it.
+ */
+ 
+-#include <tcl.h> /* For _ANSI_ARGS_ */
++#include "expect.h" /* For _ANSI_ARGS_ */
+ 
+-int exp_window_size_set();
+-int exp_window_size_get();
++void exp_window_size_set();
++void exp_window_size_get();
+ 
+-void  exp_win_rows_set    _ANSI_ARGS_ ((char* rows));
++void  exp_win_rows_set    _ANSI_ARGS_ ((const char* rows));
+ char* exp_win_rows_get    _ANSI_ARGS_ ((void));
+-void  exp_win_columns_set _ANSI_ARGS_ ((char* columns));
++void  exp_win_columns_set _ANSI_ARGS_ ((const char* columns));
+ char* exp_win_columns_get _ANSI_ARGS_ ((void));
+ 
+-void  exp_win2_rows_set    _ANSI_ARGS_ ((int fd, char* rows));
++void  exp_win2_rows_set    _ANSI_ARGS_ ((int fd, const char* rows));
+ char* exp_win2_rows_get    _ANSI_ARGS_ ((int fd));
+-void  exp_win2_columns_set _ANSI_ARGS_ ((int fd, char* columns));
++void  exp_win2_columns_set _ANSI_ARGS_ ((int fd, const char* columns));
+ char* exp_win2_columns_get _ANSI_ARGS_ ((int fd));
+diff -Naur expect5.45.4/pty_termios.c expect5.45.4.new/pty_termios.c
+--- expect5.45.4/pty_termios.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/pty_termios.c	2024-10-01 16:59:11.098617164 -0500
+@@ -105,6 +105,7 @@
+ 
+ void expDiagLog();
+ void expDiagLogPtr();
++char *expErrnoMsg(int errorNo);
+ 
+ #include <errno.h>
+ /*extern char *sys_errlist[];*/
+@@ -189,6 +190,7 @@
+ #endif /* HAVE_SCO_CLIST_PTYS */
+ 
+ #ifdef HAVE_OPENPTY
++#include <pty.h>
+ static char master_name[64];
+ static char slave_name[64];
+ #endif
+diff -Naur expect5.45.4/retoglob.c expect5.45.4.new/retoglob.c
+--- expect5.45.4/retoglob.c	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/retoglob.c	2024-10-01 16:59:25.704446245 -0500
+@@ -100,7 +100,7 @@
+ #define CHOPC(c) {while (*str != (c) && strlen) CHOP(1) ;}
+ #define EMIT(c)  {lastsz = 1; *nexto++ = (c);}
+ #define EMITX(c) {lastsz++;   *nexto++ = (c);}
+-#define MATCH(lit) ((strlen >= (sizeof (lit)/sizeof (Tcl_UniChar))) && (0 == Tcl_UniCharNcmp (str,(lit),sizeof(lit)/sizeof (Tcl_UniChar))))
++#define MATCH(lit) ((strlen >= (sizeof (lit)/sizeof (Tcl_UniChar))) && (0 == memcmp (str,(lit),sizeof(lit))))
+ #define MATCHC(c) (strlen && (*str == (c)))
+ #define PUSHPAREN {*nextp++ = nexto;}
+ #define UNEMIT {nexto -= lastsz; lastsz = -1;}
+diff -Naur expect5.45.4/tcldbg.h expect5.45.4.new/tcldbg.h
+--- expect5.45.4/tcldbg.h	2018-02-02 13:15:52.000000000 -0600
++++ expect5.45.4.new/tcldbg.h	2024-10-01 16:59:25.704446245 -0500
+@@ -12,7 +12,7 @@
+ #ifndef _NIST_DBG
+ #define _NIST_DBG
+ 
+-#include "tcl.h"
++#include "expect.h"
+ 
+ typedef int (Dbg_InterProc) _ANSI_ARGS_((Tcl_Interp *interp, ClientData data));
+ typedef int (Dbg_IgnoreFuncsProc) _ANSI_ARGS_((
