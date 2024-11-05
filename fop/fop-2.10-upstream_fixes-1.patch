@@ -1,0 +1,36 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2024-11-05
+Initial Package Version: 2.10
+Origin:                  Upstream (commit 49e0e9ae)
+Upstream Status:         Applied
+Description:             Fixes building fop with Java 23 by adjusting types in
+                         the code for the KnuthSequence layout support in fop.
+
+diff -Naurp fop-2.10.orig/fop-core/src/main/java/org/apache/fop/layoutmgr/KnuthSequence.java fop-2.10/fop-core/src/main/java/org/apache/fop/layoutmgr/KnuthSequence.java
+--- fop-2.10.orig/fop-core/src/main/java/org/apache/fop/layoutmgr/KnuthSequence.java	2024-11-05 11:11:30.454000000 -0600
++++ fop-2.10/fop-core/src/main/java/org/apache/fop/layoutmgr/KnuthSequence.java	2024-11-05 11:12:19.822000000 -0600
+@@ -134,20 +134,20 @@ public abstract class KnuthSequence<T ex
+     /**
+      * @return the last element of this sequence.
+      */
+-    public ListElement getLast() {
++    public T getLast() {
+         return (isEmpty()
+                 ? null
+-                : (ListElement) ListUtil.getLast(this));
++                : ListUtil.getLast(this));
+     }
+ 
+     /**
+      * Remove the last element of this sequence.
+      * @return the removed element.
+      */
+-    public ListElement removeLast() {
++    public T removeLast() {
+         return (isEmpty()
+                 ? null
+-                : (ListElement) ListUtil.removeLast(this));
++                : ListUtil.removeLast(this));
+     }
+ 
+     /**
