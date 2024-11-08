@@ -1,6 +1,6 @@
 Submitted By:            Xi Ruoyao <xry111@mengyan1223.wang>
 Date:                    2024-11-08
-Initial Package Version: 2.43
+Initial Package Version: 2.43.1
 Upstream Status:         Committed
 Origin:                  Upstream (see the From line for commit hash)
 Description:             Fix a bug causing unnecessary relink with
