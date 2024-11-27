@@ -1,0 +1,43 @@
+Submitted by:            Xi Ruoyao (xry111  AT linuxfromscratch_DOT_org)
+Date:                    2024-09-17
+Initial Package Version: 1.24.9
+Upstream Status:         Unknown
+Origin:                  Self
+Description:             Fixes build with x265-4.1.
+
+From e3224ff5239ed25ac99620edf01f66499793e552 Mon Sep 17 00:00:00 2001
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Tue, 26 Nov 2024 21:34:25 +0800
+Subject: [PATCH] x265: Allow building with x265-4.1
+
+In x265-4.1 masteringDisplayColorVolume is changed from a pointer to a
+character array embedded in struct x265_param.
+
+Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/7968>
+---
+ subprojects/gst-plugins-bad/ext/x265/gstx265enc.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c b/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
+index e6aa973ac7cc..0b5ae3b1cdda 100644
+--- a/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
++++ b/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
+@@ -948,8 +948,14 @@ gst_x265_enc_init_encoder_locked (GstX265Enc * encoder)
+        * HEVC uses gbr order
+        * See spec D.3.28 display_primaries_x and display_primaries_y
+        */
++#if X265_BUILD < 214
+       encoder->x265param.masteringDisplayColorVolume =
+-          g_strdup_printf ("G(%hu,%hu)B(%hu,%hu)R(%hu,%hu)WP(%hu,%hu)L(%u,%u)",
++          g_strdup_printf (
++#else
++      snprintf(encoder->x265param.masteringDisplayColorVolume,
++          X265_MAX_STRING_SIZE,
++#endif
++          "G(%hu,%hu)B(%hu,%hu)R(%hu,%hu)WP(%hu,%hu)L(%u,%u)",
+           minfo.display_primaries[1].x, minfo.display_primaries[1].y,
+           minfo.display_primaries[2].x, minfo.display_primaries[2].y,
+           minfo.display_primaries[0].x, minfo.display_primaries[0].y,
+-- 
+GitLab
+
