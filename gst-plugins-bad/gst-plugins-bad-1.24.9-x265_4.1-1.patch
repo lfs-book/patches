@@ -1,11 +1,11 @@
-Submitted by:            Xi Ruoyao (xry111  AT linuxfromscratch_DOT_org)
-Date:                    2024-09-17
+Submitted by:            Xi Ruoyao (xry111 at xry111 dot site)
+Date:                    2024-11-28
 Initial Package Version: 1.24.9
-Upstream Status:         Unknown
-Origin:                  Self
+Upstream Status:         Applied
+Origin:                  Upstream Git repository (see From line for SHA)
 Description:             Fixes build with x265-4.1.
 
-From e3224ff5239ed25ac99620edf01f66499793e552 Mon Sep 17 00:00:00 2001
+From ee3802cf71b386194e2a6318765e0547b37f52c8 Mon Sep 17 00:00:00 2001
 From: Xi Ruoyao <xry111@xry111.site>
 Date: Tue, 26 Nov 2024 21:34:25 +0800
 Subject: [PATCH] x265: Allow building with x265-4.1
@@ -15,23 +15,26 @@ character array embedded in struct x265_param.
 
 Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/7968>
 ---
- subprojects/gst-plugins-bad/ext/x265/gstx265enc.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ subprojects/gst-plugins-bad/ext/x265/gstx265enc.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c b/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
-index e6aa973ac7cc..0b5ae3b1cdda 100644
---- a/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
-+++ b/subprojects/gst-plugins-bad/ext/x265/gstx265enc.c
-@@ -948,8 +948,14 @@ gst_x265_enc_init_encoder_locked (GstX265Enc * encoder)
+[The paths below are manually modified to apply the patch with -p1 for
+ a separate gst-plugins-bad package (instead of the gstreamer monorepo).]
+
+diff --git a/ext/x265/gstx265enc.c b/ext/x265/gstx265enc.c
+index e6aa973ac7cc..ee72389720ef 100644
+--- a/ext/x265/gstx265enc.c
++++ b/ext/x265/gstx265enc.c
+@@ -948,8 +948,13 @@ gst_x265_enc_init_encoder_locked (GstX265Enc * encoder)
         * HEVC uses gbr order
         * See spec D.3.28 display_primaries_x and display_primaries_y
         */
-+#if X265_BUILD < 214
-       encoder->x265param.masteringDisplayColorVolume =
+-      encoder->x265param.masteringDisplayColorVolume =
 -          g_strdup_printf ("G(%hu,%hu)B(%hu,%hu)R(%hu,%hu)WP(%hu,%hu)L(%u,%u)",
-+          g_strdup_printf (
++#if X265_BUILD < 214
++      encoder->x265param.masteringDisplayColorVolume = g_strdup_printf (
 +#else
-+      snprintf(encoder->x265param.masteringDisplayColorVolume,
++      snprintf (encoder->x265param.masteringDisplayColorVolume,
 +          X265_MAX_STRING_SIZE,
 +#endif
 +          "G(%hu,%hu)B(%hu,%hu)R(%hu,%hu)WP(%hu,%hu)L(%u,%u)",
