@@ -1,0 +1,73 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
+Date:                    2024-02-20
+Initial Package Version: 4.21.4
+Upstream Status:         Committed
+Origin:                  Upstream (see the From line below for commit ID)
+Description:             Makes the test suite work on Linux-6.13 (to be
+                         specific, kernel commit 5b0af621c3f6).  Note
+                         that the comment in the patch blames
+                         "Glibc-2.40" but it's just incorrect.
+
+From 2c44022c512e302e8a3787ca17188213f112e182 Mon Sep 17 00:00:00 2001
+From: Andreas Schneider <asn@samba.org>
+Date: Wed, 22 Jan 2025 15:37:07 +0100
+Subject: [PATCH] third_party: Update socket_wrapper to version 1.4.4
+
+Signed-off-by: Andreas Schneider <asn@samba.org>
+Reviewed-by: Volker Lendecke <vl@samba.org>
+
+Autobuild-User(master): Volker Lendecke <vl@samba.org>
+Autobuild-Date(master): Thu Jan 23 11:28:32 UTC 2025 on atb-devel-224
+---
+ buildtools/wafsamba/samba_third_party.py    | 2 +-
+ third_party/socket_wrapper/socket_wrapper.c | 7 +++++++
+ third_party/socket_wrapper/wscript          | 2 +-
+ 3 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/buildtools/wafsamba/samba_third_party.py b/buildtools/wafsamba/samba_third_party.py
+index d6fe609c8960..0387328daecc 100644
+--- a/buildtools/wafsamba/samba_third_party.py
++++ b/buildtools/wafsamba/samba_third_party.py
+@@ -24,7 +24,7 @@ Build.BuildContext.CHECK_CMOCKA = CHECK_CMOCKA
+ 
+ @conf
+ def CHECK_SOCKET_WRAPPER(conf):
+-    return conf.CHECK_BUNDLED_SYSTEM_PKG('socket_wrapper', minversion='1.4.3')
++    return conf.CHECK_BUNDLED_SYSTEM_PKG('socket_wrapper', minversion='1.4.4')
+ Build.BuildContext.CHECK_SOCKET_WRAPPER = CHECK_SOCKET_WRAPPER
+ 
+ @conf
+diff --git a/third_party/socket_wrapper/socket_wrapper.c b/third_party/socket_wrapper/socket_wrapper.c
+index 37799c82419f..db20eac4ba22 100644
+--- a/third_party/socket_wrapper/socket_wrapper.c
++++ b/third_party/socket_wrapper/socket_wrapper.c
+@@ -5110,6 +5110,13 @@ static int swrap_setsockopt(int s, int level, int optname,
+ 	}
+ 
+ 	if (level == SOL_SOCKET) {
++		/*
++		 * SO_REUSEPORT is not supported on a unix socket. glibc 2.40
++		 * returns ENOTSUPP now.
++		 */
++		if (optname == SO_REUSEPORT) {
++			return 0;
++		}
+ 		return libc_setsockopt(s,
+ 				       level,
+ 				       optname,
+diff --git a/third_party/socket_wrapper/wscript b/third_party/socket_wrapper/wscript
+index cdd34938ba3b..370f6fc30705 100644
+--- a/third_party/socket_wrapper/wscript
++++ b/third_party/socket_wrapper/wscript
+@@ -2,7 +2,7 @@
+ 
+ import os
+ 
+-VERSION = "1.4.3"
++VERSION = "1.4.4"
+ 
+ 
+ def configure(conf):
+-- 
+GitLab
+
