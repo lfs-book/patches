@@ -1,3 +1,10 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2025-03-07
+Initial Package Version: 25.2.1.2
+Origin:                  Upstream
+Upstream Status:         Committed
+Description:             Fix PDF imports with system poppler >= 25.02.0
+
 From 406afe11711df9fcabbc829fcff00aef2f44c1d9 Mon Sep 17 00:00:00 2001
 From: Robin Candau <robincandau@protonmail.com>
 Date: Thu, 27 Feb 2025 10:26:53 +0100
