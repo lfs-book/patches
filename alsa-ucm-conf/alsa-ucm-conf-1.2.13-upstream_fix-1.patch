@@ -1,6 +1,6 @@
 Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
 Date:                    2025-04-14
-Initial Package Version: 1.12.13
+Initial Package Version: 1.2.13
 Origin:                  Upstream (see the From line for revision)
 Upstream Status:         Applied
 Description:             Fixes "alsactl init" failure on machines using
