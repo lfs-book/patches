@@ -1,0 +1,42 @@
+Submitted By: Bruce Dubbs <bdubbs at linuxfromscratch dot org>
+Date: 2025-05-21
+Initial Package Version: 5.3-rc1
+Upstream Status: Submitted
+Origin: Self with input from Xi Ruoyao
+Description: Disallow trying to typedef bool when using the C standard
+             library c23 or later.
+
+diff -Naur bash-5.3-rc1.orig/bashansi.h bash-5.3-rc1/bashansi.h
+--- bash-5.3-rc1.orig/bashansi.h	2024-03-25 11:17:49.000000000 -0500
++++ bash-5.3-rc1/bashansi.h	2025-05-21 15:15:56.269730519 -0500
+@@ -35,17 +35,21 @@
+ #  include "ansi_stdlib.h"
+ #endif /* !HAVE_STDLIB_H */
+ 
+-/* If bool is not a compiler builtin, prefer stdbool.h if we have it */
+-#if !defined (HAVE_C_BOOL)
+-#  if defined (HAVE_STDBOOL_H)
+-#    include <stdbool.h>
+-#  else
+-#    undef bool
++/* Explicitly check __STDC_VERSION__ here in addition to HAVE_C_BOOL:
++   in cross-compilation build tools does not include config.h.*/
++#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L 
++   /* If bool is not a compiler builtin, prefer stdbool.h if we have it */
++#  if !defined (HAVE_C_BOOL)
++#    if defined (HAVE_STDBOOL_H)
++#      include <stdbool.h>
++#    else
++#      undef bool
+ typedef unsigned char bool;
+-#    define true 1
+-#    define false 0
++#      define true 1
++#      define false 0
++#    endif
+ #  endif
+-#endif
++#endif /* __STDC_VERSION__ < 202311L */
+ 
+ /* Include <stddef.h>, or define substitutes (config.h handles ptrdiff_t). */
+ #ifdef HAVE_STDDEF_H
