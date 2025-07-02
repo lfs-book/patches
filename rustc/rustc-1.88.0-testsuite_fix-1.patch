@@ -1,0 +1,286 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
+Date:                    2025-07-02
+Initial Package Version: 1.88.0
+Upstream Status:         No longer needed with PR 141684.
+Origin:                  Self
+Description:             Patch the shipped oniguruma package (used for
+                         tests) and make the build system not to verify the
+                         checksum of it.
+
+diff --color -Naur rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/regparse.c rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/regparse.c
+--- rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/regparse.c	2025-04-01 05:37:24.000000000 +0800
++++ rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/regparse.c	2025-04-23 17:34:06.448938470 +0800
+@@ -547,8 +547,10 @@
+ } st_str_end_key;
+ 
+ static int
+-str_end_cmp(st_str_end_key* x, st_str_end_key* y)
++str_end_cmp(st_data_t ax, st_data_t ay)
+ {
++  st_str_end_key* x = (st_str_end_key* )ax;
++  st_str_end_key* y = (st_str_end_key* )ay;
+   UChar *p, *q;
+   int c;
+ 
+@@ -568,8 +570,9 @@
+ }
+ 
+ static int
+-str_end_hash(st_str_end_key* x)
++str_end_hash(st_data_t ax)
+ {
++  st_str_end_key* x = (st_str_end_key* )ax;
+   UChar *p;
+   unsigned val = 0;
+ 
+@@ -634,8 +637,10 @@
+ } st_callout_name_key;
+ 
+ static int
+-callout_name_table_cmp(st_callout_name_key* x, st_callout_name_key* y)
++callout_name_table_cmp(st_data_t ax, st_data_t ay)
+ {
++  st_callout_name_key* x = (st_callout_name_key* )ax;
++  st_callout_name_key* y = (st_callout_name_key* )ay;
+   UChar *p, *q;
+   int c;
+ 
+@@ -657,8 +662,9 @@
+ }
+ 
+ static int
+-callout_name_table_hash(st_callout_name_key* x)
++callout_name_table_hash(st_data_t ax)
+ {
++  st_callout_name_key* x = (st_callout_name_key* )ax;
+   UChar *p;
+   unsigned int val = 0;
+ 
+@@ -786,8 +792,13 @@
+ #endif /* ONIG_DEBUG */
+ 
+ static int
+-i_free_name_entry(UChar* key, NameEntry* e, void* arg ARG_UNUSED)
++i_free_name_entry(st_data_t akey, st_data_t ae, st_data_t arg ARG_UNUSED)
+ {
++  UChar* key;
++  NameEntry* e;
++
++  key = (UChar* )akey;
++  e = (NameEntry* )ae;
+   xfree(e->name);
+   if (IS_NOT_NULL(e->back_refs)) xfree(e->back_refs);
+   xfree(key);
+@@ -843,8 +854,14 @@
+ } INamesArg;
+ 
+ static int
+-i_names(UChar* key ARG_UNUSED, NameEntry* e, INamesArg* arg)
++i_names(st_data_t key ARG_UNUSED, st_data_t ae, st_data_t aarg)
+ {
++  NameEntry* e;
++  INamesArg* arg;
++
++  e = (NameEntry* )ae;
++  arg = (INamesArg* )aarg;
++
+   int r = (*(arg->func))(e->name,
+                          e->name + e->name_len,
+                          e->back_num,
+@@ -876,9 +893,14 @@
+ }
+ 
+ static int
+-i_renumber_name(UChar* key ARG_UNUSED, NameEntry* e, GroupNumMap* map)
++i_renumber_name(st_data_t key ARG_UNUSED, st_data_t ae, st_data_t amap)
+ {
+   int i;
++  NameEntry* e;
++  GroupNumMap* map;
++
++  e = (NameEntry* )ae;
++  map = (GroupNumMap* )amap;
+ 
+   if (e->back_num > 1) {
+     for (i = 0; i < e->back_num; i++) {
+@@ -1367,9 +1389,14 @@
+ #ifdef USE_ST_LIBRARY
+ 
+ static int
+-i_free_callout_name_entry(st_callout_name_key* key, CalloutNameEntry* e,
+-                          void* arg ARG_UNUSED)
++i_free_callout_name_entry(st_data_t akey, st_data_t ae, st_data_t arg ARG_UNUSED)
+ {
++  st_callout_name_key* key;
++  CalloutNameEntry* e;
++
++  key = (st_callout_name_key* )akey;
++  e = (CalloutNameEntry* )ae;
++
+   if (IS_NOT_NULL(e)) {
+     xfree(e->name);
+   }
+@@ -1863,10 +1890,14 @@
+ #define CALLOUT_TAG_LIST_FLAG_TAG_EXIST     (1<<0)
+ 
+ static int
+-i_callout_callout_list_set(UChar* key, CalloutTagVal e, void* arg)
++i_callout_callout_list_set(st_data_t key ARG_UNUSED, st_data_t ae, st_data_t arg)
+ {
+   int num;
+-  RegexExt* ext = (RegexExt* )arg;
++  CalloutTagVal e;
++  RegexExt* ext;
++
++  e   = (CalloutTagVal )ae;
++  ext = (RegexExt* )arg;
+ 
+   num = (int )e - 1;
+   ext->callout_list[num].flag |= CALLOUT_TAG_LIST_FLAG_TAG_EXIST;
+@@ -1919,8 +1950,11 @@
+ }
+ 
+ static int
+-i_free_callout_tag_entry(UChar* key, CalloutTagVal e, void* arg ARG_UNUSED)
++i_free_callout_tag_entry(st_data_t akey, st_data_t e ARG_UNUSED, st_data_t arg ARG_UNUSED)
+ {
++  UChar* key;
++
++  key = (UChar* )akey;
+   xfree(key);
+   return ST_DELETE;
+ }
+diff --color -Naur rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/st.c rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/st.c
+--- rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/st.c	2025-04-01 05:37:24.000000000 +0800
++++ rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/st.c	2025-04-23 17:42:15.644356019 +0800
+@@ -32,18 +32,18 @@
+      *
+      */
+ 
+-static int numcmp(long, long);
+-static int numhash(long);
++static int numcmp(st_data_t, st_data_t);
++static int numhash(st_data_t);
+ static struct st_hash_type type_numhash = {
+     numcmp,
+     numhash,
+ };
+ 
+-/* extern int strcmp(const char *, const char *); */
+-static int strhash(const char *);
++static int str_cmp(st_data_t, st_data_t);
++static int str_hash(st_data_t);
+ static struct st_hash_type type_strhash = {
+-    strcmp,
+-    strhash,
++    str_cmp,
++    str_hash,
+ };
+ 
+ static void rehash(st_table *);
+@@ -487,7 +487,7 @@
+ int
+ st_foreach(table, func, arg)
+      st_table *table;
+-     int (*func)();
++     int (*func)(st_data_t, st_data_t, st_data_t);
+      st_data_t arg;
+ {
+   st_table_entry *ptr, *last, *tmp;
+@@ -535,9 +535,17 @@
+ }
+ 
+ static int
+-strhash(string)
+-     register const char *string;
++str_cmp(st_data_t a1, st_data_t a2)
+ {
++  const char* s1 = (const char* )a1;
++  const char* s2 = (const char* )a2;
++  return strcmp(s1, s2);
++}
++
++static int
++strhash(st_data_t astring)
++{
++  const char *string = (const char* )astring;
+   register int c;
+ 
+ #ifdef HASH_ELFHASH
+@@ -574,15 +582,13 @@
+ }
+ 
+ static int
+-numcmp(x, y)
+-     long x, y;
++numcmp(st_data_t x, st_data_t y)
+ {
+   return x != y;
+ }
+ 
+ static int
+-numhash(n)
+-     long n;
++numhash(st_data_t n)
+ {
+   return n;
+ }
+diff --color -Naur rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/st.h rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/st.h
+--- rustc-1.86.0-src.orig/vendor/onig_sys-69.8.1/oniguruma/src/st.h	2025-04-01 05:37:24.000000000 +0800
++++ rustc-1.86.0-src/vendor/onig_sys-69.8.1/oniguruma/src/st.h	2025-04-23 17:34:06.454836782 +0800
+@@ -16,8 +16,8 @@
+ typedef struct st_table st_table;
+ 
+ struct st_hash_type {
+-    int (*compare)();
+-    int (*hash)();
++    int (*compare)(st_data_t, st_data_t);
++    int (*hash)(st_data_t);
+ };
+ 
+ struct st_table {
+@@ -34,13 +34,6 @@
+ #ifndef _
+ # define _(args) args
+ #endif
+-#ifndef ANYARGS
+-# ifdef __cplusplus
+-#   define ANYARGS ...
+-# else
+-#   define ANYARGS
+-# endif
+-#endif
+ 
+ st_table *st_init_table _((struct st_hash_type *));
+ st_table *st_init_table_with_size _((struct st_hash_type *, int));
+@@ -52,7 +45,7 @@
+ int st_delete_safe _((st_table *, st_data_t *, st_data_t *, st_data_t));
+ int st_insert _((st_table *, st_data_t, st_data_t));
+ int st_lookup _((st_table *, st_data_t, st_data_t *));
+-int st_foreach _((st_table *, int (*)(ANYARGS), st_data_t));
++int st_foreach _((st_table *, int (*)(st_data_t, st_data_t, st_data_t), st_data_t));
+ void st_add_direct _((st_table *, st_data_t, st_data_t));
+ void st_free_table _((st_table *));
+ void st_cleanup_safe _((st_table *, st_data_t));
+diff --color -Naur rustc-1.86.0-src.orig/src/tools/rustbook/Cargo.lock rustc-1.86.0-src/src/tools/rustbook/Cargo.lock
+--- rustc-1.86.0-src.orig/src/tools/rustbook/Cargo.lock	2025-04-01 05:37:24.000000000 +0800
++++ rustc-1.86.0-src/src/tools/rustbook/Cargo.lock	2025-04-23 17:22:07.566705464 +0800
+@@ -1019,8 +1019,6 @@
+ [[package]]
+ name = "onig_sys"
+ version = "69.8.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7b829e3d7e9cc74c7e315ee8edb185bf4190da5acde74afd7fc59c35b1f086e7"
+ dependencies = [
+  "cc",
+  "pkg-config",
+diff --color -Naur rustc-1.86.0-src.orig/src/tools/rustbook/Cargo.toml rustc-1.86.0-src/src/tools/rustbook/Cargo.toml
+--- rustc-1.86.0-src.orig/src/tools/rustbook/Cargo.toml	2025-04-01 05:37:24.000000000 +0800
++++ rustc-1.86.0-src/src/tools/rustbook/Cargo.toml	2025-04-23 17:18:03.098703825 +0800
+@@ -17,3 +17,6 @@
+ version = "0.4.44"
+ default-features = false
+ features = ["search"]
++
++[patch.crates-io]
++onig_sys = { path = "../../../vendor/onig_sys-69.8.1" }
