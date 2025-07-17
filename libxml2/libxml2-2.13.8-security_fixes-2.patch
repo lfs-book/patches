@@ -1,0 +1,366 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2025-06-21
+Updated Date:            2025-07-17
+Initial Package Version: 2.13.8
+Upstream Status:         Applied
+Origin:                  Upstream commit ad346c9a
+Additional patches from: Upstream commits 5e9ec5c, 62048278a, 81cef8c5, and
+                         2491c632a.
+Description              Fixes CVE-2025-6021, an integer overflow leading to a
+                         buffer overflow in the xmlBuildQName() function. Most
+                         applications in BLFS are not impacted, but some are -
+                         notably PHP, and WINE in Zeckma's GLFS book. A minor
+                         modification was added to include <stdint.h> so that
+                         SIZE_MAX was defined.
+Updated Description:     On July 17th, 2025, this patch was updated to include
+                         fixes for CVE-2025-6170, CVE-2025-49795, CVE-2025-49794,
+                         and CVE-2025-45976. These vulnerabilities are known to
+                         cause crashes and potential arbitrary code execution
+                         when processing crafted XML files.
+
+diff -Naurp libxml2-2.13.8.orig/debugXML.c libxml2-2.13.8/debugXML.c
+--- libxml2-2.13.8.orig/debugXML.c	2025-04-17 06:51:36.000000000 -0500
++++ libxml2-2.13.8/debugXML.c	2025-07-17 11:12:44.392278859 -0500
+@@ -1033,6 +1033,10 @@ xmlCtxtDumpOneNode(xmlDebugCtxtPtr ctxt,
+     xmlCtxtGenericNodeCheck(ctxt, node);
+ }
+ 
++#define MAX_PROMPT_SIZE     500
++#define MAX_ARG_SIZE        400
++#define MAX_COMMAND_SIZE    100
++
+ /**
+  * xmlCtxtDumpNode:
+  * @output:  the FILE * for the output
+@@ -2795,10 +2799,10 @@ void
+ xmlShell(xmlDocPtr doc, const char *filename, xmlShellReadlineFunc input,
+          FILE * output)
+ {
+-    char prompt[500] = "/ > ";
++    char prompt[MAX_PROMPT_SIZE] = "/ > ";
+     char *cmdline = NULL, *cur;
+-    char command[100];
+-    char arg[400];
++    char command[MAX_COMMAND_SIZE];
++    char arg[MAX_ARG_SIZE];
+     int i;
+     xmlShellCtxtPtr ctxt;
+     xmlXPathObjectPtr list;
+@@ -2856,7 +2860,8 @@ xmlShell(xmlDocPtr doc, const char *file
+             cur++;
+         i = 0;
+         while ((*cur != ' ') && (*cur != '\t') &&
+-               (*cur != '\n') && (*cur != '\r')) {
++               (*cur != '\n') && (*cur != '\r') &&
++               (i < (MAX_COMMAND_SIZE - 1))) {
+             if (*cur == 0)
+                 break;
+             command[i++] = *cur++;
+@@ -2871,7 +2876,7 @@ xmlShell(xmlDocPtr doc, const char *file
+         while ((*cur == ' ') || (*cur == '\t'))
+             cur++;
+         i = 0;
+-        while ((*cur != '\n') && (*cur != '\r') && (*cur != 0)) {
++        while ((*cur != '\n') && (*cur != '\r') && (*cur != 0) && (i < (MAX_ARG_SIZE-1))) {
+             if (*cur == 0)
+                 break;
+             arg[i++] = *cur++;
+diff -Naurp libxml2-2.13.8.orig/parser.c libxml2-2.13.8/parser.c
+--- libxml2-2.13.8.orig/parser.c	2025-04-17 06:51:37.000000000 -0500
++++ libxml2-2.13.8/parser.c	2025-07-17 11:13:45.151974880 -0500
+@@ -2671,14 +2671,13 @@ xmlParseCharRef(xmlParserCtxtPtr ctxt) {
+         xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
+                 "xmlParseCharRef: character reference out of bounds\n",
+ 	        val);
+-    } else if (IS_CHAR(val)) {
+-        return(val);
+-    } else {
++        val = 0xFFFD;
++    } else if (!IS_CHAR(val)) {
+         xmlFatalErrMsgInt(ctxt, XML_ERR_INVALID_CHAR,
+                           "xmlParseCharRef: invalid xmlChar value %d\n",
+ 	                  val);
+     }
+-    return(0);
++    return(val);
+ }
+ 
+ /**
+diff -Naurp libxml2-2.13.8.orig/result/schematron/cve-2025-49794_0.err libxml2-2.13.8/result/schematron/cve-2025-49794_0.err
+--- libxml2-2.13.8.orig/result/schematron/cve-2025-49794_0.err	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/result/schematron/cve-2025-49794_0.err	2025-07-17 11:13:21.703092617 -0500
+@@ -0,0 +1,2 @@
++./test/schematron/cve-2025-49794_0.xml:2: element boo0: schematron error : /librar0/boo0 line 2:  
++./test/schematron/cve-2025-49794_0.xml fails to validate
+diff -Naurp libxml2-2.13.8.orig/result/schematron/cve-2025-49796_0.err libxml2-2.13.8/result/schematron/cve-2025-49796_0.err
+--- libxml2-2.13.8.orig/result/schematron/cve-2025-49796_0.err	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/result/schematron/cve-2025-49796_0.err	2025-07-17 11:13:21.703092617 -0500
+@@ -0,0 +1,2 @@
++./test/schematron/cve-2025-49796_0.xml:2: element boo0: schematron error : /librar0/boo0 line 2:  
++./test/schematron/cve-2025-49796_0.xml fails to validate
+diff -Naurp libxml2-2.13.8.orig/result/schematron/zvon16_0.err libxml2-2.13.8/result/schematron/zvon16_0.err
+--- libxml2-2.13.8.orig/result/schematron/zvon16_0.err	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/result/schematron/zvon16_0.err	2025-07-17 11:13:05.136175486 -0500
+@@ -0,0 +1,3 @@
++XPath error : Unregistered function
++./test/schematron/zvon16_0.xml:2: element book: schematron error : /library/book line 2: Book 
++./test/schematron/zvon16_0.xml fails to validate
+diff -Naurp libxml2-2.13.8.orig/result/scripts/long_command libxml2-2.13.8/result/scripts/long_command
+--- libxml2-2.13.8.orig/result/scripts/long_command	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/result/scripts/long_command	2025-07-17 11:12:44.392278859 -0500
+@@ -0,0 +1,8 @@
++/ > b > b > Object is a Node Set :
++Set contains 1 nodes:
++1  ELEMENT a:c
++b > Unknown command This_is_a_really_long_command_string_designed_to_test_the_limits_of_the_memory_that_stores_the_comm
++b > b > Unknown command ess_currents_of_time_and_existence
++b > <?xml version="1.0"?>
++<a xmlns:a="bar"><b xmlns:a="foo">Navigating_the_labyrinthine_corridors_of_human_cognition_one_often_encounters_the_perplexing_paradox_that_the_more_we_delve_into_the_intricate_dance_of_neural_pathways_and_synaptic_firings_the_further_we_seem_to_stray_from_a_truly_holistic_understanding_of_consciousness_a_phenomenon_that_remains_as_elusive_as_a_moonbeam_caught_in_a_spiderweb_yet_undeniably_shapes_every_fleeting_thought_every_prof</b></a>
++b > 
+\ No newline at end of file
+diff -Naurp libxml2-2.13.8.orig/schematron.c libxml2-2.13.8/schematron.c
+--- libxml2-2.13.8.orig/schematron.c	2025-04-17 06:51:37.000000000 -0500
++++ libxml2-2.13.8/schematron.c	2025-07-17 11:13:21.703092617 -0500
+@@ -1414,27 +1414,15 @@ exit:
+  *                                                                      *
+  ************************************************************************/
+ 
+-static xmlNodePtr
++static xmlXPathObjectPtr
+ xmlSchematronGetNode(xmlSchematronValidCtxtPtr ctxt,
+                      xmlNodePtr cur, const xmlChar *xpath) {
+-    xmlNodePtr node = NULL;
+-    xmlXPathObjectPtr ret;
+-
+     if ((ctxt == NULL) || (cur == NULL) || (xpath == NULL))
+         return(NULL);
+ 
+     ctxt->xctxt->doc = cur->doc;
+     ctxt->xctxt->node = cur;
+-    ret = xmlXPathEval(xpath, ctxt->xctxt);
+-    if (ret == NULL)
+-        return(NULL);
+-
+-    if ((ret->type == XPATH_NODESET) &&
+-        (ret->nodesetval != NULL) && (ret->nodesetval->nodeNr > 0))
+-        node = ret->nodesetval->nodeTab[0];
+-
+-    xmlXPathFreeObject(ret);
+-    return(node);
++    return(xmlXPathEval(xpath, ctxt->xctxt));
+ }
+ 
+ /**
+@@ -1480,25 +1468,40 @@ xmlSchematronFormatReport(xmlSchematronV
+             (child->type == XML_CDATA_SECTION_NODE))
+             ret = xmlStrcat(ret, child->content);
+         else if (IS_SCHEMATRON(child, "name")) {
++            xmlXPathObject *obj = NULL;
+             xmlChar *path;
+ 
+             path = xmlGetNoNsProp(child, BAD_CAST "path");
+ 
+             node = cur;
+             if (path != NULL) {
+-                node = xmlSchematronGetNode(ctxt, cur, path);
+-                if (node == NULL)
+-                    node = cur;
++                obj = xmlSchematronGetNode(ctxt, cur, path);
++                if ((obj != NULL) &&
++                    (obj->type == XPATH_NODESET) &&
++                    (obj->nodesetval != NULL) &&
++                    (obj->nodesetval->nodeNr > 0))
++                    node = obj->nodesetval->nodeTab[0];
+                 xmlFree(path);
+             }
+ 
+-            if ((node->ns == NULL) || (node->ns->prefix == NULL))
+-                ret = xmlStrcat(ret, node->name);
+-            else {
+-                ret = xmlStrcat(ret, node->ns->prefix);
+-                ret = xmlStrcat(ret, BAD_CAST ":");
+-                ret = xmlStrcat(ret, node->name);
++            switch (node->type) {
++                case XML_ELEMENT_NODE:
++                case XML_ATTRIBUTE_NODE:
++                    if ((node->ns == NULL) || (node->ns->prefix == NULL))
++                        ret = xmlStrcat(ret, node->name);
++                    else {
++                        ret = xmlStrcat(ret, node->ns->prefix);
++                        ret = xmlStrcat(ret, BAD_CAST ":");
++                        ret = xmlStrcat(ret, node->name);
++                    }
++                    break;
++
++                /* TODO: handle other node types */
++                default:
++                    break;
+             }
++
++            xmlXPathFreeObject(obj);
+         } else if (IS_SCHEMATRON(child, "value-of")) {
+             xmlChar *select;
+             xmlXPathObjectPtr eval;
+@@ -1506,6 +1509,11 @@ xmlSchematronFormatReport(xmlSchematronV
+             select = xmlGetNoNsProp(child, BAD_CAST "select");
+             comp = xmlXPathCtxtCompile(ctxt->xctxt, select);
+             eval = xmlXPathCompiledEval(comp, ctxt->xctxt);
++            if (eval == NULL) {
++                xmlXPathFreeCompExpr(comp);
++                xmlFree(select);
++                return ret;
++            }
+ 
+             switch (eval->type) {
+             case XPATH_NODESET: {
+diff -Naurp libxml2-2.13.8.orig/test/schematron/cve-2025-49794_0.xml libxml2-2.13.8/test/schematron/cve-2025-49794_0.xml
+--- libxml2-2.13.8.orig/test/schematron/cve-2025-49794_0.xml	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/cve-2025-49794_0.xml	2025-07-17 11:13:21.703092617 -0500
+@@ -0,0 +1,6 @@
++<librar0>
++    <boo0 t="">
++        <author></author>
++    </boo0>
++    <ins></ins>
++</librar0>
+diff -Naurp libxml2-2.13.8.orig/test/schematron/cve-2025-49794.sct libxml2-2.13.8/test/schematron/cve-2025-49794.sct
+--- libxml2-2.13.8.orig/test/schematron/cve-2025-49794.sct	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/cve-2025-49794.sct	2025-07-17 11:13:21.703092617 -0500
+@@ -0,0 +1,10 @@
++<sch:schema xmlns:sch="http://purl.oclc.org/dsdl/schematron">
++    <sch:pattern id="">
++        <sch:rule context="boo0">
++            <sch:report test="not(0)">
++                <sch:name path="&#9;e|namespace::*|e"/>
++            </sch:report>
++            <sch:report test="0"></sch:report>
++        </sch:rule>
++    </sch:pattern>
++</sch:schema>
+diff -Naurp libxml2-2.13.8.orig/test/schematron/cve-2025-49796_0.xml libxml2-2.13.8/test/schematron/cve-2025-49796_0.xml
+--- libxml2-2.13.8.orig/test/schematron/cve-2025-49796_0.xml	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/cve-2025-49796_0.xml	2025-07-17 11:13:21.704092612 -0500
+@@ -0,0 +1,3 @@
++<librar0>
++    <boo0/>
++</librar0>
+diff -Naurp libxml2-2.13.8.orig/test/schematron/cve-2025-49796.sct libxml2-2.13.8/test/schematron/cve-2025-49796.sct
+--- libxml2-2.13.8.orig/test/schematron/cve-2025-49796.sct	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/cve-2025-49796.sct	2025-07-17 11:13:21.703092617 -0500
+@@ -0,0 +1,9 @@
++<sch:schema xmlns:sch="http://purl.oclc.org/dsdl/schematron">
++    <sch:pattern id="">
++        <sch:rule context="boo0">
++            <sch:report test="not(0)">
++                <sch:name path="/"/>
++            </sch:report>
++        </sch:rule>
++    </sch:pattern>
++</sch:schema>
+diff -Naurp libxml2-2.13.8.orig/test/schematron/zvon16_0.xml libxml2-2.13.8/test/schematron/zvon16_0.xml
+--- libxml2-2.13.8.orig/test/schematron/zvon16_0.xml	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/zvon16_0.xml	2025-07-17 11:13:05.136175486 -0500
+@@ -0,0 +1,5 @@
++<library>
++	<book title="Test Book" id="bk101">
++		<author>Test Author</author>
++	</book>
++</library>
+diff -Naurp libxml2-2.13.8.orig/test/schematron/zvon16.sct libxml2-2.13.8/test/schematron/zvon16.sct
+--- libxml2-2.13.8.orig/test/schematron/zvon16.sct	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/schematron/zvon16.sct	2025-07-17 11:13:05.136175486 -0500
+@@ -0,0 +1,7 @@
++<sch:schema xmlns:sch="http://purl.oclc.org/dsdl/schematron">
++	<sch:pattern id="TestPattern">
++		<sch:rule context="book">
++			<sch:report test="not(@available)">Book <sch:value-of select="falae()"/> test</sch:report>
++		</sch:rule>
++	</sch:pattern>
++</sch:schema>
+diff -Naurp libxml2-2.13.8.orig/test/scripts/long_command.script libxml2-2.13.8/test/scripts/long_command.script
+--- libxml2-2.13.8.orig/test/scripts/long_command.script	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/scripts/long_command.script	2025-07-17 11:12:44.392278859 -0500
+@@ -0,0 +1,6 @@
++cd a/b
++set <a:c/>
++xpath //*[namespace-uri()="foo"]
++This_is_a_really_long_command_string_designed_to_test_the_limits_of_the_memory_that_stores_the_command_please_dont_crash foo
++set Navigating_the_labyrinthine_corridors_of_human_cognition_one_often_encounters_the_perplexing_paradox_that_the_more_we_delve_into_the_intricate_dance_of_neural_pathways_and_synaptic_firings_the_further_we_seem_to_stray_from_a_truly_holistic_understanding_of_consciousness_a_phenomenon_that_remains_as_elusive_as_a_moonbeam_caught_in_a_spiderweb_yet_undeniably_shapes_every_fleeting_thought_every_profound_emotion_and_every_grand_aspiration_that_propels_our_species_ever_onward_through_the_relentless_currents_of_time_and_existence
++save -
+diff -Naurp libxml2-2.13.8.orig/test/scripts/long_command.xml libxml2-2.13.8/test/scripts/long_command.xml
+--- libxml2-2.13.8.orig/test/scripts/long_command.xml	1969-12-31 18:00:00.000000000 -0600
++++ libxml2-2.13.8/test/scripts/long_command.xml	2025-07-17 11:12:44.392278859 -0500
+@@ -0,0 +1 @@
++<a xmlns:a="bar"><b xmlns:a="foo"/></a>
+diff -Naurp libxml2-2.13.8.orig/testparser.c libxml2-2.13.8/testparser.c
+--- libxml2-2.13.8.orig/testparser.c	2025-04-17 06:51:37.000000000 -0500
++++ libxml2-2.13.8/testparser.c	2025-07-17 11:13:45.152974874 -0500
+@@ -125,6 +125,24 @@ testCFileIO(void) {
+     return err;
+ }
+ 
++static int
++testInvalidCharRecovery(void) {
++    const char *xml = "<doc>&#x10;</doc>";
++    xmlDoc *doc;
++    int err = 0;
++
++    doc = xmlReadDoc(BAD_CAST xml, NULL, NULL, XML_PARSE_RECOVER);
++
++    if (strcmp((char *) doc->children->children->content, "\x10") != 0) {
++        fprintf(stderr, "Failed to recover from invalid char ref\n");
++        err = 1;
++    }
++
++    xmlFreeDoc(doc);
++
++    return err;
++}
++
+ #ifdef LIBXML_VALID_ENABLED
+ static void
+ testSwitchDtdExtSubset(void *vctxt, const xmlChar *name ATTRIBUTE_UNUSED,
+@@ -767,6 +785,7 @@ main(void) {
+     err |= testUnsupportedEncoding();
+     err |= testNodeGetContent();
+     err |= testCFileIO();
++    err |= testInvalidCharRecovery();
+ #ifdef LIBXML_VALID_ENABLED
+     err |= testSwitchDtd();
+ #endif
+diff -Naurp libxml2-2.13.8.orig/tree.c libxml2-2.13.8/tree.c
+--- libxml2-2.13.8.orig/tree.c	2025-04-17 06:51:37.000000000 -0500
++++ libxml2-2.13.8/tree.c	2025-07-17 11:11:50.342546086 -0500
+@@ -23,6 +23,7 @@
+ #include <limits.h>
+ #include <ctype.h>
+ #include <stdlib.h>
++#include <stdint.h>
+ 
+ #ifdef LIBXML_ZLIB_ENABLED
+ #include <zlib.h>
+@@ -167,10 +168,10 @@ xmlGetParameterEntityFromDtd(const xmlDt
+ xmlChar *
+ xmlBuildQName(const xmlChar *ncname, const xmlChar *prefix,
+ 	      xmlChar *memory, int len) {
+-    int lenn, lenp;
++    size_t lenn, lenp;
+     xmlChar *ret;
+ 
+-    if (ncname == NULL) return(NULL);
++    if ((ncname == NULL) || (len < 0)) return(NULL);
+     if (prefix == NULL) return((xmlChar *) ncname);
+ 
+ #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+@@ -181,8 +182,10 @@ xmlBuildQName(const xmlChar *ncname, con
+ 
+     lenn = strlen((char *) ncname);
+     lenp = strlen((char *) prefix);
++    if (lenn >= SIZE_MAX - lenp - 1)
++       return(NULL);
+ 
+-    if ((memory == NULL) || (len < lenn + lenp + 2)) {
++    if ((memory == NULL) || ((size_t) len < lenn + lenp + 2)) {
+ 	ret = (xmlChar *) xmlMallocAtomic(lenn + lenp + 2);
+ 	if (ret == NULL)
+ 	    return(NULL);
