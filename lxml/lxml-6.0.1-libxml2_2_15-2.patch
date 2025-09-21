@@ -1,0 +1,531 @@
+Submitted By:            Xi Ruoyao <xry111@xry111.site>
+Date:                    2025-09-21
+Initial Package Version: 6.0.1
+Upstream Status:         Applied
+Origin:                  Upstream + Self (regenerated .c files with Cython to avoid a hard dependency on Cython)
+Description:             Fix build failure with libxml2 >= 2.15.
+
+diff --color -Naur lxml-6.0.1.orig/src/lxml/builder.c lxml-6.0.1/src/lxml/builder.c
+--- lxml-6.0.1.orig/src/lxml/builder.c	2025-08-22 05:44:09.000000000 +0800
++++ lxml-6.0.1/src/lxml/builder.c	2025-09-21 17:59:11.517199747 +0800
+@@ -9,6 +9,9 @@
+                 "0"
+             ]
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "/usr/include/libxml2",
+             "src",
+diff --color -Naur lxml-6.0.1.orig/src/lxml/_elementpath.c lxml-6.0.1/src/lxml/_elementpath.c
+--- lxml-6.0.1.orig/src/lxml/_elementpath.c	2025-08-22 05:44:09.000000000 +0800
++++ lxml-6.0.1/src/lxml/_elementpath.c	2025-09-21 17:59:11.483672746 +0800
+@@ -9,6 +9,9 @@
+                 "0"
+             ]
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "/usr/include/libxml2",
+             "src",
+diff --color -Naur lxml-6.0.1.orig/src/lxml/etree.c lxml-6.0.1/src/lxml/etree.c
+--- lxml-6.0.1.orig/src/lxml/etree.c	2025-08-22 05:44:14.000000000 +0800
++++ lxml-6.0.1/src/lxml/etree.c	2025-09-21 17:59:57.271886647 +0800
+@@ -66,9 +66,12 @@
+             "src/lxml/xslt.pxi",
+             "src/lxml/xsltext.pxi"
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+-            "src/lxml/includes",
+             "src/lxml",
++            "src/lxml/includes",
+             "/usr/include/libxml2",
+             "src"
+         ],
+@@ -2169,7 +2172,7 @@
+   size_t last;
+ };
+ 
+-/* "src/lxml/proxy.pxi":594
++/* "src/lxml/proxy.pxi":597
+  * # adopt an xmlDoc from an external libxml2 document source
+  * 
+  * cdef _Document _adoptForeignDoc(xmlDoc* c_doc, _BaseParser parser=None, bint is_owned=True):             # <<<<<<<<<<<<<<
+@@ -35157,7 +35160,7 @@
+  *                 _fixThreadDictPtr(&c_element.content.prefix, c_src_dict, c_dict)
+  *             c_attribute = c_element.attributes             # <<<<<<<<<<<<<<
+  *             while c_attribute:
+- *                 _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)
++ *                 if tree.LIBXML_VERSION < 21500:
+ */
+       __pyx_t_3 = __pyx_v_c_element->attributes;
+       __pyx_v_c_attribute = __pyx_t_3;
+@@ -35166,8 +35169,8 @@
+  *                 _fixThreadDictPtr(&c_element.content.prefix, c_src_dict, c_dict)
+  *             c_attribute = c_element.attributes
+  *             while c_attribute:             # <<<<<<<<<<<<<<
+- *                 _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)
+- *                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)
++ *                 if tree.LIBXML_VERSION < 21500:
++ *                     # libxml2 2.15 no longer stores default values in the dict.
+ */
+       while (1) {
+         __pyx_t_2 = (__pyx_v_c_attribute != 0);
+@@ -35176,23 +35179,42 @@
+         /* "src/lxml/proxy.pxi":577
+  *             c_attribute = c_element.attributes
+  *             while c_attribute:
+- *                 _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
++ *                 if tree.LIBXML_VERSION < 21500:             # <<<<<<<<<<<<<<
++ *                     # libxml2 2.15 no longer stores default values in the dict.
++ *                     # See https://gitlab.gnome.org/GNOME/libxml2/-/commit/24628f25
++*/
++        __pyx_t_2 = (LIBXML_VERSION < 0x53FC);
++        if (__pyx_t_2) {
++
++          /* "src/lxml/proxy.pxi":580
++ *                     # libxml2 2.15 no longer stores default values in the dict.
++ *                     # See https://gitlab.gnome.org/GNOME/libxml2/-/commit/24628f25
++ *                     _fixThreadDictPtr(<const_xmlChar**>&c_attribute.defaultValue, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+  *                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)
+ */
+-        __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_attribute->defaultValue), __pyx_v_c_src_dict, __pyx_v_c_dict);
++          __pyx_f_4lxml_5etree__fixThreadDictPtr(((const xmlChar **)(&__pyx_v_c_attribute->defaultValue)), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-        /* "src/lxml/proxy.pxi":578
++          /* "src/lxml/proxy.pxi":577
++ *             c_attribute = c_element.attributes
+  *             while c_attribute:
+- *                 _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)
++ *                 if tree.LIBXML_VERSION < 21500:             # <<<<<<<<<<<<<<
++ *                     # libxml2 2.15 no longer stores default values in the dict.
++ *                     # See https://gitlab.gnome.org/GNOME/libxml2/-/commit/24628f25
++*/
++        }
++
++        /* "src/lxml/proxy.pxi":581
++ *                     # See https://gitlab.gnome.org/GNOME/libxml2/-/commit/24628f25
++ *                     _fixThreadDictPtr(<const_xmlChar**>&c_attribute.defaultValue, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+  *                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)
+ */
+         __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_attribute->name), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-        /* "src/lxml/proxy.pxi":579
+- *                 _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)
++        /* "src/lxml/proxy.pxi":582
++ *                     _fixThreadDictPtr(<const_xmlChar**>&c_attribute.defaultValue, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+  *                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)
+@@ -35200,7 +35222,7 @@
+ */
+         __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_attribute->prefix), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-        /* "src/lxml/proxy.pxi":580
++        /* "src/lxml/proxy.pxi":583
+  *                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+@@ -35209,7 +35231,7 @@
+ */
+         __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_attribute->elem), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-        /* "src/lxml/proxy.pxi":581
++        /* "src/lxml/proxy.pxi":584
+  *                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)
+  *                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)
+  *                 c_attribute = c_attribute.nexth             # <<<<<<<<<<<<<<
+@@ -35230,7 +35252,7 @@
+       break;
+       case XML_ENTITY_DECL:
+ 
+-      /* "src/lxml/proxy.pxi":583
++      /* "src/lxml/proxy.pxi":586
+  *                 c_attribute = c_attribute.nexth
+  *         elif c_node.type == tree.XML_ENTITY_DECL:
+  *             c_entity = <tree.xmlEntity*>c_node             # <<<<<<<<<<<<<<
+@@ -35239,7 +35261,7 @@
+ */
+       __pyx_v_c_entity = ((xmlEntity *)__pyx_v_c_node);
+ 
+-      /* "src/lxml/proxy.pxi":584
++      /* "src/lxml/proxy.pxi":587
+  *         elif c_node.type == tree.XML_ENTITY_DECL:
+  *             c_entity = <tree.xmlEntity*>c_node
+  *             _fixThreadDictPtr(&c_entity.name, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+@@ -35248,7 +35270,7 @@
+ */
+       __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_entity->name), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-      /* "src/lxml/proxy.pxi":585
++      /* "src/lxml/proxy.pxi":588
+  *             c_entity = <tree.xmlEntity*>c_node
+  *             _fixThreadDictPtr(&c_entity.name, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(&c_entity.ExternalID, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+@@ -35257,7 +35279,7 @@
+ */
+       __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_entity->ExternalID), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-      /* "src/lxml/proxy.pxi":586
++      /* "src/lxml/proxy.pxi":589
+  *             _fixThreadDictPtr(&c_entity.name, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(&c_entity.ExternalID, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(&c_entity.SystemID, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+@@ -35266,7 +35288,7 @@
+ */
+       __pyx_f_4lxml_5etree__fixThreadDictPtr((&__pyx_v_c_entity->SystemID), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-      /* "src/lxml/proxy.pxi":587
++      /* "src/lxml/proxy.pxi":590
+  *             _fixThreadDictPtr(&c_entity.ExternalID, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(&c_entity.SystemID, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(<const_xmlChar**>&c_entity.content, c_src_dict, c_dict)             # <<<<<<<<<<<<<<
+@@ -35275,7 +35297,7 @@
+ */
+       __pyx_f_4lxml_5etree__fixThreadDictPtr(((const xmlChar **)(&__pyx_v_c_entity->content)), __pyx_v_c_src_dict, __pyx_v_c_dict);
+ 
+-      /* "src/lxml/proxy.pxi":582
++      /* "src/lxml/proxy.pxi":585
+  *                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)
+  *                 c_attribute = c_attribute.nexth
+  *         elif c_node.type == tree.XML_ENTITY_DECL:             # <<<<<<<<<<<<<<
+@@ -35286,7 +35308,7 @@
+       default: break;
+     }
+ 
+-    /* "src/lxml/proxy.pxi":588
++    /* "src/lxml/proxy.pxi":591
+  *             _fixThreadDictPtr(&c_entity.SystemID, c_src_dict, c_dict)
+  *             _fixThreadDictPtr(<const_xmlChar**>&c_entity.content, c_src_dict, c_dict)
+  *         c_node = c_node.next             # <<<<<<<<<<<<<<
+@@ -35308,7 +35330,7 @@
+   /* function exit code */
+ }
+ 
+-/* "src/lxml/proxy.pxi":594
++/* "src/lxml/proxy.pxi":597
+  * # adopt an xmlDoc from an external libxml2 document source
+  * 
+  * cdef _Document _adoptForeignDoc(xmlDoc* c_doc, _BaseParser parser=None, bint is_owned=True):             # <<<<<<<<<<<<<<
+@@ -35345,7 +35367,7 @@
+     }
+   }
+ 
+-  /* "src/lxml/proxy.pxi":599
++  /* "src/lxml/proxy.pxi":602
+  *     dereference into lxml proxy objects.
+  *     """
+  *     if c_doc is NULL:             # <<<<<<<<<<<<<<
+@@ -35355,7 +35377,7 @@
+   __pyx_t_1 = (__pyx_v_c_doc == NULL);
+   if (unlikely(__pyx_t_1)) {
+ 
+-    /* "src/lxml/proxy.pxi":600
++    /* "src/lxml/proxy.pxi":603
+  *     """
+  *     if c_doc is NULL:
+  *         raise ValueError("Illegal document provided: NULL")             # <<<<<<<<<<<<<<
+@@ -35371,14 +35393,14 @@
+       __pyx_t_2 = __Pyx_PyObject_FastCall(__pyx_t_4, __pyx_callargs+__pyx_t_5, (2-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+       __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+-      if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 600, __pyx_L1_error)
++      if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 603, __pyx_L1_error)
+       __Pyx_GOTREF(__pyx_t_2);
+     }
+     __Pyx_Raise(__pyx_t_2, 0, 0, 0);
+     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+-    __PYX_ERR(5, 600, __pyx_L1_error)
++    __PYX_ERR(5, 603, __pyx_L1_error)
+ 
+-    /* "src/lxml/proxy.pxi":599
++    /* "src/lxml/proxy.pxi":602
+  *     dereference into lxml proxy objects.
+  *     """
+  *     if c_doc is NULL:             # <<<<<<<<<<<<<<
+@@ -35387,7 +35409,7 @@
+ */
+   }
+ 
+-  /* "src/lxml/proxy.pxi":601
++  /* "src/lxml/proxy.pxi":604
+  *     if c_doc is NULL:
+  *         raise ValueError("Illegal document provided: NULL")
+  *     if c_doc.type not in (tree.XML_DOCUMENT_NODE, tree.XML_HTML_DOCUMENT_NODE):             # <<<<<<<<<<<<<<
+@@ -35406,7 +35428,7 @@
+   __pyx_t_6 = __pyx_t_1;
+   if (__pyx_t_6) {
+ 
+-    /* "src/lxml/proxy.pxi":602
++    /* "src/lxml/proxy.pxi":605
+  *         raise ValueError("Illegal document provided: NULL")
+  *     if c_doc.type not in (tree.XML_DOCUMENT_NODE, tree.XML_HTML_DOCUMENT_NODE):
+  *         doc_type = c_doc.type             # <<<<<<<<<<<<<<
+@@ -35416,7 +35438,7 @@
+     __pyx_t_7 = __pyx_v_c_doc->type;
+     __pyx_v_doc_type = __pyx_t_7;
+ 
+-    /* "src/lxml/proxy.pxi":603
++    /* "src/lxml/proxy.pxi":606
+  *     if c_doc.type not in (tree.XML_DOCUMENT_NODE, tree.XML_HTML_DOCUMENT_NODE):
+  *         doc_type = c_doc.type
+  *         if is_owned:             # <<<<<<<<<<<<<<
+@@ -35425,7 +35447,7 @@
+ */
+     if (__pyx_v_is_owned) {
+ 
+-      /* "src/lxml/proxy.pxi":604
++      /* "src/lxml/proxy.pxi":607
+  *         doc_type = c_doc.type
+  *         if is_owned:
+  *             tree.xmlFreeDoc(c_doc)             # <<<<<<<<<<<<<<
+@@ -35434,7 +35456,7 @@
+ */
+       xmlFreeDoc(__pyx_v_c_doc);
+ 
+-      /* "src/lxml/proxy.pxi":603
++      /* "src/lxml/proxy.pxi":606
+  *     if c_doc.type not in (tree.XML_DOCUMENT_NODE, tree.XML_HTML_DOCUMENT_NODE):
+  *         doc_type = c_doc.type
+  *         if is_owned:             # <<<<<<<<<<<<<<
+@@ -35443,7 +35465,7 @@
+ */
+     }
+ 
+-    /* "src/lxml/proxy.pxi":605
++    /* "src/lxml/proxy.pxi":608
+  *         if is_owned:
+  *             tree.xmlFreeDoc(c_doc)
+  *         raise ValueError(f"Illegal document provided: expected XML or HTML, found {doc_type}")             # <<<<<<<<<<<<<<
+@@ -35453,9 +35475,9 @@
+     __pyx_t_4 = NULL;
+     __Pyx_INCREF(__pyx_builtin_ValueError);
+     __pyx_t_3 = __pyx_builtin_ValueError; 
+-    __pyx_t_8 = __Pyx_PyUnicode_From_xmlElementType(__pyx_v_doc_type, 0, ' ', 'd'); if (unlikely(!__pyx_t_8)) __PYX_ERR(5, 605, __pyx_L1_error)
++    __pyx_t_8 = __Pyx_PyUnicode_From_xmlElementType(__pyx_v_doc_type, 0, ' ', 'd'); if (unlikely(!__pyx_t_8)) __PYX_ERR(5, 608, __pyx_L1_error)
+     __Pyx_GOTREF(__pyx_t_8);
+-    __pyx_t_9 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Illegal_document_provided_expect, __pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(5, 605, __pyx_L1_error)
++    __pyx_t_9 = __Pyx_PyUnicode_Concat(__pyx_mstate_global->__pyx_kp_u_Illegal_document_provided_expect, __pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(5, 608, __pyx_L1_error)
+     __Pyx_GOTREF(__pyx_t_9);
+     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+     __pyx_t_5 = 1;
+@@ -35465,14 +35487,14 @@
+       __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+-      if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 605, __pyx_L1_error)
++      if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 608, __pyx_L1_error)
+       __Pyx_GOTREF(__pyx_t_2);
+     }
+     __Pyx_Raise(__pyx_t_2, 0, 0, 0);
+     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+-    __PYX_ERR(5, 605, __pyx_L1_error)
++    __PYX_ERR(5, 608, __pyx_L1_error)
+ 
+-    /* "src/lxml/proxy.pxi":601
++    /* "src/lxml/proxy.pxi":604
+  *     if c_doc is NULL:
+  *         raise ValueError("Illegal document provided: NULL")
+  *     if c_doc.type not in (tree.XML_DOCUMENT_NODE, tree.XML_HTML_DOCUMENT_NODE):             # <<<<<<<<<<<<<<
+@@ -35481,7 +35503,7 @@
+ */
+   }
+ 
+-  /* "src/lxml/proxy.pxi":607
++  /* "src/lxml/proxy.pxi":610
+  *         raise ValueError(f"Illegal document provided: expected XML or HTML, found {doc_type}")
+  * 
+  *     cdef xmlNode* c_node = <xmlNode*>c_doc             # <<<<<<<<<<<<<<
+@@ -35490,7 +35512,7 @@
+ */
+   __pyx_v_c_node = ((xmlNode *)__pyx_v_c_doc);
+ 
+-  /* "src/lxml/proxy.pxi":609
++  /* "src/lxml/proxy.pxi":612
+  *     cdef xmlNode* c_node = <xmlNode*>c_doc
+  * 
+  *     if is_owned:             # <<<<<<<<<<<<<<
+@@ -35499,7 +35521,7 @@
+ */
+   if (__pyx_v_is_owned) {
+ 
+-    /* "src/lxml/proxy.pxi":610
++    /* "src/lxml/proxy.pxi":613
+  * 
+  *     if is_owned:
+  *         tree.BEGIN_FOR_EACH_FROM(<xmlNode*>c_doc, c_node, 1)             # <<<<<<<<<<<<<<
+@@ -35508,7 +35530,7 @@
+ */
+     BEGIN_FOR_EACH_FROM(((xmlNode *)__pyx_v_c_doc), __pyx_v_c_node, 1);
+ 
+-    /* "src/lxml/proxy.pxi":611
++    /* "src/lxml/proxy.pxi":614
+  *     if is_owned:
+  *         tree.BEGIN_FOR_EACH_FROM(<xmlNode*>c_doc, c_node, 1)
+  *         c_node._private = NULL             # <<<<<<<<<<<<<<
+@@ -35517,7 +35539,7 @@
+ */
+     __pyx_v_c_node->_private = NULL;
+ 
+-    /* "src/lxml/proxy.pxi":612
++    /* "src/lxml/proxy.pxi":615
+  *         tree.BEGIN_FOR_EACH_FROM(<xmlNode*>c_doc, c_node, 1)
+  *         c_node._private = NULL
+  *         tree.END_FOR_EACH_FROM(c_node)             # <<<<<<<<<<<<<<
+@@ -35526,7 +35548,7 @@
+ */
+     END_FOR_EACH_FROM(__pyx_v_c_node);
+ 
+-    /* "src/lxml/proxy.pxi":609
++    /* "src/lxml/proxy.pxi":612
+  *     cdef xmlNode* c_node = <xmlNode*>c_doc
+  * 
+  *     if is_owned:             # <<<<<<<<<<<<<<
+@@ -35536,7 +35558,7 @@
+     goto __pyx_L6;
+   }
+ 
+-  /* "src/lxml/proxy.pxi":615
++  /* "src/lxml/proxy.pxi":618
+  *     else:
+  *         # create a fresh copy that lxml owns
+  *         c_doc = tree.xmlCopyDoc(c_doc, 1)             # <<<<<<<<<<<<<<
+@@ -35546,7 +35568,7 @@
+   /*else*/ {
+     __pyx_v_c_doc = xmlCopyDoc(__pyx_v_c_doc, 1);
+ 
+-    /* "src/lxml/proxy.pxi":616
++    /* "src/lxml/proxy.pxi":619
+  *         # create a fresh copy that lxml owns
+  *         c_doc = tree.xmlCopyDoc(c_doc, 1)
+  *         if c_doc is NULL:             # <<<<<<<<<<<<<<
+@@ -35556,16 +35578,16 @@
+     __pyx_t_6 = (__pyx_v_c_doc == NULL);
+     if (unlikely(__pyx_t_6)) {
+ 
+-      /* "src/lxml/proxy.pxi":617
++      /* "src/lxml/proxy.pxi":620
+  *         c_doc = tree.xmlCopyDoc(c_doc, 1)
+  *         if c_doc is NULL:
+  *             raise MemoryError()             # <<<<<<<<<<<<<<
+  * 
+  *     return _documentFactory(c_doc, parser)
+ */
+-      PyErr_NoMemory(); __PYX_ERR(5, 617, __pyx_L1_error)
++      PyErr_NoMemory(); __PYX_ERR(5, 620, __pyx_L1_error)
+ 
+-      /* "src/lxml/proxy.pxi":616
++      /* "src/lxml/proxy.pxi":619
+  *         # create a fresh copy that lxml owns
+  *         c_doc = tree.xmlCopyDoc(c_doc, 1)
+  *         if c_doc is NULL:             # <<<<<<<<<<<<<<
+@@ -35576,19 +35598,19 @@
+   }
+   __pyx_L6:;
+ 
+-  /* "src/lxml/proxy.pxi":619
++  /* "src/lxml/proxy.pxi":622
+  *             raise MemoryError()
+  * 
+  *     return _documentFactory(c_doc, parser)             # <<<<<<<<<<<<<<
+ */
+   __Pyx_XDECREF((PyObject *)__pyx_r);
+-  __pyx_t_2 = ((PyObject *)__pyx_f_4lxml_5etree__documentFactory(__pyx_v_c_doc, __pyx_v_parser)); if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 619, __pyx_L1_error)
++  __pyx_t_2 = ((PyObject *)__pyx_f_4lxml_5etree__documentFactory(__pyx_v_c_doc, __pyx_v_parser)); if (unlikely(!__pyx_t_2)) __PYX_ERR(5, 622, __pyx_L1_error)
+   __Pyx_GOTREF(__pyx_t_2);
+   __pyx_r = ((struct LxmlDocument *)__pyx_t_2);
+   __pyx_t_2 = 0;
+   goto __pyx_L0;
+ 
+-  /* "src/lxml/proxy.pxi":594
++  /* "src/lxml/proxy.pxi":597
+  * # adopt an xmlDoc from an external libxml2 document source
+  * 
+  * cdef _Document _adoptForeignDoc(xmlDoc* c_doc, _BaseParser parser=None, bint is_owned=True):             # <<<<<<<<<<<<<<
+diff --color -Naur lxml-6.0.1.orig/src/lxml/html/diff.c lxml-6.0.1/src/lxml/html/diff.c
+--- lxml-6.0.1.orig/src/lxml/html/diff.c	2025-08-22 05:44:14.000000000 +0800
++++ lxml-6.0.1/src/lxml/html/diff.c	2025-09-21 17:59:14.678421443 +0800
+@@ -9,6 +9,9 @@
+                 "0"
+             ]
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "/usr/include/libxml2",
+             "src",
+diff --color -Naur lxml-6.0.1.orig/src/lxml/html/_difflib.c lxml-6.0.1/src/lxml/html/_difflib.c
+--- lxml-6.0.1.orig/src/lxml/html/_difflib.c	2025-08-22 05:44:14.000000000 +0800
++++ lxml-6.0.1/src/lxml/html/_difflib.c	2025-09-21 17:59:14.567423087 +0800
+@@ -9,6 +9,9 @@
+                 "0"
+             ]
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "/usr/include/libxml2",
+             "src",
+diff --color -Naur lxml-6.0.1.orig/src/lxml/objectify.c lxml-6.0.1/src/lxml/objectify.c
+--- lxml-6.0.1.orig/src/lxml/objectify.c	2025-08-22 05:44:15.000000000 +0800
++++ lxml-6.0.1/src/lxml/objectify.c	2025-09-21 17:59:57.998879070 +0800
+@@ -43,6 +43,9 @@
+             "src/lxml/includes/xslt.pxd",
+             "src/lxml/objectpath.pxi"
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "src/lxml/includes",
+             "/usr/include/libxml2",
+diff --color -Naur lxml-6.0.1.orig/src/lxml/proxy.pxi lxml-6.0.1/src/lxml/proxy.pxi
+--- lxml-6.0.1.orig/src/lxml/proxy.pxi	2025-08-22 05:42:26.000000000 +0800
++++ lxml-6.0.1/src/lxml/proxy.pxi	2025-09-21 17:48:17.157146662 +0800
+@@ -574,7 +574,10 @@
+                 _fixThreadDictPtr(&c_element.content.prefix, c_src_dict, c_dict)
+             c_attribute = c_element.attributes
+             while c_attribute:
+-                _fixThreadDictPtr(&c_attribute.defaultValue, c_src_dict, c_dict)
++                if tree.LIBXML_VERSION < 21500:
++                    # libxml2 2.15 no longer stores default values in the dict.
++                    # See https://gitlab.gnome.org/GNOME/libxml2/-/commit/24628f25
++                    _fixThreadDictPtr(<const_xmlChar**>&c_attribute.defaultValue, c_src_dict, c_dict)
+                 _fixThreadDictPtr(&c_attribute.name, c_src_dict, c_dict)
+                 _fixThreadDictPtr(&c_attribute.prefix, c_src_dict, c_dict)
+                 _fixThreadDictPtr(&c_attribute.elem, c_src_dict, c_dict)
+diff --color -Naur lxml-6.0.1.orig/src/lxml/sax.c lxml-6.0.1/src/lxml/sax.c
+--- lxml-6.0.1.orig/src/lxml/sax.c	2025-08-22 05:44:16.000000000 +0800
++++ lxml-6.0.1/src/lxml/sax.c	2025-09-21 17:59:15.129870032 +0800
+@@ -9,6 +9,9 @@
+                 "0"
+             ]
+         ],
++        "extra_compile_args": [
++            "-w"
++        ],
+         "include_dirs": [
+             "/usr/include/libxml2",
+             "src",
+diff --color -Naur lxml-6.0.1.orig/src/lxml.egg-info/SOURCES.txt lxml-6.0.1/src/lxml.egg-info/SOURCES.txt
+--- lxml-6.0.1.orig/src/lxml.egg-info/SOURCES.txt	2025-08-22 05:46:20.000000000 +0800
++++ lxml-6.0.1/src/lxml.egg-info/SOURCES.txt	2025-09-21 18:00:08.948610989 +0800
+@@ -10,6 +10,7 @@
+ buildlibxml.py
+ pyproject.toml
+ requirements.txt
++setup.cfg
+ setup.py
+ setupinfo.py
+ test.py
