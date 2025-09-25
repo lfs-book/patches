@@ -1,0 +1,447 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2025-08-06
+Updated Date:            2025-09-25
+Initial Package Version: 7.1
+Origin:                  Fedora and Arch Linux (Arch Linux PKGBUILD)
+Upstream Status:         Abandoned
+Description:             Fixes several bugs in dvd+rw-tools with newer versions
+                         of glibc and the kernel that can lead to failed burns
+                         and wasted media. This also fixes problems with burning
+                         Blu-Ray discs, and with using Teac DVD drives. There
+                         is also an issue fixed by this patch that can lead to
+                         reloads happening on some drives unexpectedly after a
+                         successful burn. This also fixes compiling with newer
+                         versions of glibc and the kernel. A new man page was
+                         also added by one of the patches.
+Update Description:      Rediffed the patch to fix whitespace issues.
+
+diff -Naurp dvd+rw-tools-7.1.orig/dvd+rw-format.1 dvd+rw-tools-7.1/dvd+rw-format.1
+--- dvd+rw-tools-7.1.orig/dvd+rw-format.1	1969-12-31 18:00:00.000000000 -0600
++++ dvd+rw-tools-7.1/dvd+rw-format.1	2025-08-06 15:24:52.394500633 -0500
+@@ -0,0 +1,132 @@
++.TH DVD+RW\-FORMAT 1 "24 Aug 2012" "dvd+rw\-tools 7.1"
++.SH NAME
++dvd+rw\-format \- formatting and blanking DVD and BD media program.
++.SH SYNOPSIS
++.B dvd+rw\-format
++[\fB\-force\fP[\fB\=full\fP]]
++[\fB\-lead\-out|\-blank\fP[\fB\=full\fP]]
++[\fB\-ssa\fP[\fB\=none|default|max|XXXm\fP]]
++.I /dev/dvd
++
++.SH DESCRIPTION
++\fBdvd+rw\-format\fP is a part of \fBdvd+rw\-tools\fP suite and allows to
++format virgin DVD+RW or BD\-RE media for the first use or blank already
++written DVD\-RW.
++Typical use cases of using \fBdvd+rw\-format\fP is formatting DVD\-RW to
++make them over\-writable, blanking used DVD\-RW to make them sequentially
++writable from scratch, formatting BD\-RE and DVD\-RAM with custom
++spare area sizes or re\-formatting BD\-RE and DVD\-RAM to change their spare
++size.
++It is not possible to format CD\-RW by \fBdvd+rw\-format\fP,
++you can use \fBcdrskin\fP, \fBxorriso\fP or \fBwodim\fP utilities to blank
++them or cdrwtool to format them instead, see section \fBEXAMPLES\fP.
++
++A DVD\-RW accepts two disc modes: the \fISequential Recording\fP
++and the \fIRestricted Overwrite\fP. If a DVD\-RW medium is in the latter one,
++it will behave much like DVD+RW.
++By default DVD\-RW discs are in Sequential Recording mode, but
++can be put into Restricted Overwrite mode using \fBdvd+rw\-format\fP
++when no options given.
++Be aware, that only \-blank=full, which lasts as long as full writing,
++makes a used sequential DVD\-RW capable of performing multi\-session,
++while fast blanked DVD\-RW can only do Disk\-At\-Once.
++
++Virgin DVD\-RW can be directly written without
++the need of a formatting operation, however a non\-virgin DVD\-RW in
++Sequential Recording mode needs to be blanked before writing a new
++initial session. Since a DVD\-RW medium in the Restricted Overwrite
++mode behaves much like DVD+RW, it  can be written again without prior
++formatting the media.
++
++Virgin BD\-RE and DVD+RW media may be initially formatted prior
++usage. Any\-time later, \fBgrowisofs\fP program will take care of formatting
++it automatically whenever appropriate, while further formatting is not
++recommended, however it is possible.
++
++.SH OPTIONS
++.TP
++.BI \-force[\=full]
++Perform formatting even if the medium is formatted already. This is not
++recommended for BD\-RE and DVD+RW media, since they need to be
++formatted only once. Use \fB\-format=full\fP to perform full (lengthy)
++reformat in case of DVD\-RAM or (lengthy) Full Certification in case of
++BD\-RE.
++.TP
++.BI \-lead\-out
++Relocates the lead\-out next to outermost written sector as well as makes
++sure there is no virgin surface before it. This can make the medium more
++compatible with some DVD players. Previously written data is not
++affected by this operation. 
++.TP
++.BI \-blank[\=full]
++Wipe data from DVD\-RW media. Data on BD\-RE and DVD+RW will we overwritten
++automatically, so there is no need to blank them explicitly.
++Use \fB\-blank\=full\fP to change DVD\-RW back to Sequential Recording mode.
++.TP
++.BI \-ssa[\=none|default|max|XXXm]
++Grow, eliminate, reset to default or maximize \fISupplementary Spare Area\fP.
++
++.SH EXAMPLES
++Actual device names vary from one operating system to another. We use
++\fI/dev/dvd\fP as a collective name or as symbolic link to the actual
++device if you wish. Under Linux it will most likely be a
++device such as "/dev/sr0" or "/dev/hda" for older Linux 2.6.
++
++To blank a CD\-RW, you have to use another utility, e.g. wodim:
++
++        \fBwodim\fP \fBblank=fast\fP \-immed dev=\fI/dev/cdrom\fP
++        \fBcdrskin\fP \fBblank=all|fast|as_needed\fP \-immed dev=\fI/dev/cdrom\fP
++        \fBxorriso\fP \fB\-outdev\fP \fI/dev/cdrom\fP \fB\-blank all|fast|as_needed\fP
++        
++To format CD\-RW, you can use cdrwtool:
++
++        \fBcdrwtool\fP \fB\-d\fP \fI/dev/cdrom\fP \fB\-q\fP
++
++To blank a DVD\-RW and put in the incremental sequential mode, run:
++
++        \fBdvd+rw\-format\fP \fB\-blank=full\fP \fI/dev/dvd\fP
++
++To blank a DVD\-RW and put in the Restricted Overwrite mode, run:
++
++        \fBdvd+rw\-format\fP \fB\-force\fP \fI/dev/dvd\fP
++
++To overwrite data of BD\-RE, DVD+RW, DVD\-RW or DVD\-RAM run:
++
++        \fBgrowisofs\fP \fB\-Z\fP \fI/dev/dvd\fP\=\fI/dev/zero\fP
++
++To blank a DVD\-RAM, you can use:
++
++        \fBdd\fP if\=\fI/dev/zero\fP of\=\fI/dev/dvd\fP
++
++To relocate lead\-out sector, run:
++
++        \fBdvd+rw\-format\fP \fB\-lead\-out\fP \fI/dev/dvd\fP
++        
++.SH NOTES
++Note that DVD+RW re\-formatting procedure does not substitute for
++blanking. If you want to nullify the media, e.g. for privacy reasons,
++do it explicitly with 'growisofs \-Z \fI/dev/dvd\fP\=\fB/dev/zero\fP'.
++
++When growisofs "runs into" blank Blu\-ray Disc media or BD\-RE,
++it gets pre\-formatted with minimal spare area size of 256MB.
++
++.SH SEE ALSO
++Most up\-to\-date information on dvd+rw\-tools is available at
++http://fy.chalmers.se/~appro/linux/DVD+RW/.
++.PP
++.BR growisofs (1),
++.BR cdrskin (1),
++.BR xorriso (1),
++.BR wodim (1),
++.BR cdrwtool (1)
++
++.SH AUTHORS
++Andy Polyakov <appro@fy.chalmers.se> stands for programming and on\-line
++information.
++
++This manpage was created by Honza Horak <hhorak@redhat.com> and consulted by
++Thomas Schmitt <scdbackup@gmx.net>.
++
++.SH LICENSE
++\fBdvd+rw\-format\fP is distributed under GNU GPL.
++
+diff -Naurp dvd+rw-tools-7.1.orig/dvd+rw-format.cpp dvd+rw-tools-7.1/dvd+rw-format.cpp
+--- dvd+rw-tools-7.1.orig/dvd+rw-format.cpp	2008-03-01 05:48:44.000000000 -0600
++++ dvd+rw-tools-7.1/dvd+rw-format.cpp	2025-08-06 15:18:13.518108219 -0500
+@@ -247,7 +247,7 @@ int main (int argc, char *argv[])
+ 	alarm(1);
+ 	while ((waitpid(pid,&i,0) != pid) && !WIFEXITED(i)) ;
+ 	if (WEXITSTATUS(i) == 0) fprintf (stderr,"\n");
+-	exit (0);
++	exit (WEXITSTATUS(i));
+     }
+ #endif
+ 
+diff -Naurp dvd+rw-tools-7.1.orig/growisofs.1 dvd+rw-tools-7.1/growisofs.1
+--- dvd+rw-tools-7.1.orig/growisofs.1	2008-03-01 04:40:06.000000000 -0600
++++ dvd+rw-tools-7.1/growisofs.1	2025-08-06 15:24:52.394500633 -0500
+@@ -113,7 +113,7 @@ recordings.
+ Actual device names vary from one operating system to another. We use
+ \fI/dev/dvd\fP as a collective name or as symbolic link to the actual
+ device if you wish. Under Linux it will most likely be an ide\-scsi
+-device  such as "/dev/scd0." Under NetBSD/OpenBSD it has to be a
++device  such as "/dev/sr0." Under NetBSD/OpenBSD it has to be a
+ \fIcharacter\fP SCSI CD\-ROM device such as "/dev/rcd0c." Under Solaris
+ it also has to be a \fIcharacter\fP SCSI/ATAPI CD\-ROM device, e.g.
+ "/dev/rdsk/c0t1d0s2" or "/vol/dev/aliases/cdrom0." And likewise in
+@@ -210,11 +210,19 @@ DVD\-RAM or Blu\-ray Disc, as volumes ar
+ When growisofs "runs into" blank Blu\-ray Disc media, BD\-RE or BD\-R,
+ it gets pre-formatted with minimal spare area size of 256MB.
+ 
++A DVD\-RW accepts two disc modes: the \fISequential Recording\fP
++and the \fIRestricted Overwrite\fP. If a DVD\-RW medium is in the later one,
++it will behave much like DVD+RW.
++By default DVD\-RW discs are in Sequential Recording mode, but
++can be put into Restricted Overwrite mode using \fBdvd+rw\-format\fP.
++See \fBdvd+rw\-format (1)\fP for more info.
++
+ .SH SEE ALSO
+ Most up-to-date information on dvd+rw\-tools is available at
+ http://fy.chalmers.se/~appro/linux/DVD+RW/.
+ .PP
+-The manpage for \fBmkisofs\fP.
++.BR mkisofs (1),
++.BR dvd+rw\-format (1)
+ 
+ .SH AUTHORS
+ Andy Polyakov <appro@fy.chalmers.se> stands for programming and on-line
+diff -Naurp dvd+rw-tools-7.1.orig/growisofs.c dvd+rw-tools-7.1/growisofs.c
+--- dvd+rw-tools-7.1.orig/growisofs.c	2008-03-04 03:15:03.000000000 -0600
++++ dvd+rw-tools-7.1/growisofs.c	2025-08-06 15:32:50.114354083 -0500
+@@ -439,6 +439,7 @@
+ #include <time.h>
+ #include <string.h>
+ #include <fcntl.h>
++#include <sys/sysmacros.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <assert.h>
+@@ -535,7 +536,7 @@ typedef ssize_t (*pwrite64_t)(int,const
+  */
+ int        get_mmc_profile	(void *fd);
+ int        plusminus_r_C_parm	(void *fd,char *C_parm);
+-pwrite64_t poor_mans_setup	(void *fd,off64_t leadout);
++pwrite64_t poor_mans_setup	(void *fd,off64_t leadout, unsigned int lbreak);
+ char      *plusminus_locale	();
+ int        __1x			();
+ /*
+@@ -2447,7 +2448,7 @@ int builtin_dd (int infd,int outfd,off64
+ 			    goto out;
+ 			}
+ 			if (!progress.final) progress.final = tracksize;
+-			tracksize = layer_break*CD_BLOCK*2;
++			//tracksize = layer_break*CD_BLOCK*2;
+ 		    }
+ 		}
+ 		else if (capacity > outoff)
+@@ -2648,7 +2649,7 @@ int builtin_dd (int infd,int outfd,off64
+ 	 * further details on poor_mans_setup
+ 	 */
+ 	pwrite64_method = poor_mans_setup (ioctl_handle,
+-					   outoff+tracksize);
++					   outoff+tracksize, (unsigned int)layer_break);
+     }
+ 
+     if (!progress.final)
+@@ -3433,8 +3434,15 @@ int main (int argc, char *argv[])
+ 	else if (isatty (0)) warn_for_isofs |= 2;
+ 
+ 	if (no_tty_check || (warn_for_isofs&2))
+-	    fprintf (stderr,"WARNING: %s already carries isofs!\n",in_device),
++	{
++	    fprintf (stderr,"WARNING: %s already carries isofs!\n",in_device);
++		/* we cannot re-write a DVD-RW media in Sequential mode */
++		if ((int)(mmc_profile&0xFFFF) == 0x14)
++			fprintf (stderr,"FATAL: DVD-RW medium is in Sequential mode, you "
++				            "need to blank it before writing again.\n"),
++			exit(FATAL_START(EBUSY));
+ 	    printf ("About to execute '");
++	}
+ 	else
+ 	    fprintf (stderr,"FATAL: %s already carries isofs!\n",in_device),
+ 	    exit(FATAL_START(EBUSY));
+diff -Naurp dvd+rw-tools-7.1.orig/growisofs_mmc.cpp dvd+rw-tools-7.1/growisofs_mmc.cpp
+--- dvd+rw-tools-7.1.orig/growisofs_mmc.cpp	2008-03-04 11:47:49.000000000 -0600
++++ dvd+rw-tools-7.1/growisofs_mmc.cpp	2025-08-06 15:35:40.026549486 -0500
+@@ -138,7 +138,7 @@ int media_reload (char *name=NULL,struct
+ 		cmd[0] = 0x1B;		// START/STOP UNIT
+ 		cmd[4] = 0x2;		// "Eject"
+ 		cmd[5] = 0;
+-		if (cmd.transport()) return 1;
++		cmd.transport();
+ 	    }
+ #if defined(__sun) || defined(sun)
+ 	    else if (volmgt_running())
+@@ -410,7 +410,7 @@ static unsigned int get_2k_capacity (Scs
+ 	    }
+ 
+ 	    nwa = 0;
+-	    if (buf[7]&1 && !bdr_plus_pow)	// NWA_V
++	    if (buf[7]&1)	// NWA_V
+ 	    {	nwa  = buf[12]<<24;
+ 		nwa |= buf[13]<<16;
+ 		nwa |= buf[14]<<8;
+@@ -540,7 +540,7 @@ ssize_t poor_mans_pwrite64 (int fd,const
+ 	// own higher HZ value and disrespects the user-land one.
+ 	// Sending them down as milliseconds is just safer...
+ 	//
+-	if (!(errcode=cmd.transport (WRITE,(void *)buff,size)))
++	if (!(errcode=cmd.transport (WRITE,(void *)buff,nbl*2048)))
+ 	    break;
+ 
+ 	//--- WRITE failed ---//
+@@ -756,6 +756,8 @@ static void bd_r_format (Scsi_Command &c
+ 
+     wait_for_unit (cmd);
+ 
++    bdr_plus_pow = 1;
++
+     cmd[0] = 0x35;	// FLUSH CACHE
+     cmd[9] = 0;
+     cmd.transport();
+@@ -1612,7 +1614,7 @@ static int minus_r_reserve_track (Scsi_C
+   return 0;
+ }
+ 
+-static void plus_r_dl_split (Scsi_Command &cmd,off64_t size)
++static void plus_r_dl_split (Scsi_Command &cmd,off64_t size,unsigned int lbreak)
+ { int           err;
+   unsigned int  blocks,split;
+   unsigned char dvd_20[4+8];
+@@ -1640,14 +1642,21 @@ static void plus_r_dl_split (Scsi_Comman
+     blocks += 15, blocks &= ~15;
+ 
+     if (blocks <= split)
+-	fprintf (stderr,":-( more than 50%% of space will be *wasted*!\n"
+-			"    use single layer media for this recording\n"),
+-	exit (FATAL_START(EMEDIUMTYPE));
+-
+-    blocks /= 16;
+-    blocks += 1;
+-    blocks /= 2;
+-    blocks *= 16;
++   	fprintf (stderr,":-( more than 50%% of space will be *wasted*!\n");
++
++
++    if (lbreak)
++    {
++       blocks = lbreak;
++    }
++    else
++    {
++       blocks /= 16;
++       blocks += 1;
++       blocks /= 2;
++       blocks *= 16;
++    
++    }
+ 
+     fprintf (stderr,"%s: splitting layers at %u blocks\n",
+ 		    ioctl_device,blocks);
+@@ -2010,7 +2019,7 @@ void ram_reload ()
+ typedef ssize_t (*pwrite64_t)(int,const void *,size_t,off64_t);
+ 
+ extern "C"
+-pwrite64_t poor_mans_setup (void *fd,off64_t leadout)
++pwrite64_t poor_mans_setup (void *fd,off64_t leadout,unsigned int lbreak)
+ { Scsi_Command cmd(ioctl_handle=fd);
+   int err,profile=mmc_profile&0xFFFF;
+ 
+@@ -2059,7 +2068,7 @@ pwrite64_t poor_mans_setup (void *fd,off
+ 	case 0x2B:	// DVD+R Double Layer
+ 	    plusminus_pages_setup(cmd,profile);
+ 	    if (profile==0x2B && next_track==1 && dvd_compat && leadout)
+-		plus_r_dl_split (cmd,leadout);
++		plus_r_dl_split (cmd,leadout,lbreak);
+ 	    atexit (plus_r_finalize);
+ 	    if (next_wr_addr)
+ 	    {	atsignals (no_r_finalize);
+diff -Naurp dvd+rw-tools-7.1.orig/Makefile dvd+rw-tools-7.1/Makefile
+--- dvd+rw-tools-7.1.orig/Makefile	2008-02-27 07:11:27.000000000 -0600
++++ dvd+rw-tools-7.1/Makefile	2025-08-06 15:24:52.395500628 -0500
+@@ -22,6 +22,7 @@ pkg:
+ 		$(DIST)/Makefile.m4		\
+ 		$(DIST)/dvd+rw-tools.spec	\
+ 		$(DIST)/growisofs.1		\
++		$(DIST)/dvd+rw-format.1		\
+ 		$(DIST)/transport.hxx		\
+ 		$(DIST)/mp.h			\
+ 		$(DIST)/win32err.h		\
+diff -Naurp dvd+rw-tools-7.1.orig/Makefile.m4 dvd+rw-tools-7.1/Makefile.m4
+--- dvd+rw-tools-7.1.orig/Makefile.m4	2008-03-02 11:17:09.000000000 -0600
++++ dvd+rw-tools-7.1/Makefile.m4	2025-08-06 15:24:52.395500628 -0500
+@@ -32,6 +32,7 @@ BIN_MODE?=0755
+ install:	dvd+rw-tools
+ 	install -o root -m $(BIN_MODE) $(CHAIN) /usr/bin
+ 	install -o root -m 0644 growisofs.1 /usr/share/man/man1
++	install -o root -m 0644 dvd+rw-format.1 /usr/share/man/man1
+ ])
+ 
+ ifelse(OS,MINGW32,[
+@@ -68,6 +69,7 @@ BIN_MODE?=04755
+ install:	dvd+rw-tools
+ 	install -o root -m $(BIN_MODE) $(CHAIN) /usr/local/bin
+ 	install -o root -m 0644 growisofs.1 /usr/local/man/man1
++	install -o root -m 0644 dvd+rw-format.1 /usr/local/man/man1
+ ])
+ 
+ ifelse(OS,SunOS,[
+@@ -103,6 +105,7 @@ LDLIBS=-lvolmgt -lrt -lpthread -ldl
+ install:	dvd+rw-tools
+ 	/usr/ucb/install -o root -m 04755 $(CHAIN) /usr/local/bin
+ 	/usr/ucb/install -o root -m 0644 growisofs.1 /usr/local/man/man1
++	/usr/ucb/install -o root -m 0644 dvd+rw-format.1 /usr/local/man/man1
+ ])
+ 
+ ifelse(OS,HP-UX,[
+@@ -141,6 +144,7 @@ LDLIBS=-lrt -lpthread
+ install:	dvd+rw-tools
+ 	/usr/sbin/install -o -f /usr/local/bin  $(CHAIN)
+ 	/usr/sbin/install -o -f /usr/local/man/man1 growisofs.1
++	/usr/sbin/install -o -f /usr/local/man/man1 dvd+rw-format.1
+ ])
+ 
+ ifelse(OS,IRIX,[
+@@ -178,6 +182,7 @@ BIN_MODE=04755	# set-root-uid
+ install:	dvd+rw-tools
+ 	/sbin/install -u root -m $(BIN_MODE) $(CHAIN) /usr/local/bin
+ 	/sbin/install -u root -m 0644 growisofs.1 /usr/local/man/man1
++	/sbin/install -u root -m 0644 dvd+rw-format.1 /usr/local/man/man1
+ ])
+ 
+ ifelse(OS,Linux,[
+@@ -202,6 +207,7 @@ install:	dvd+rw-tools
+ 	install $(minus_o) -m $(bin_mode) $(CHAIN) $(prefix)/bin
+ 	[[ -d $(manprefix)/man1 ]] || mkdir -p $(manprefix)/man1
+ 	install $(minus_o) -m 0644 growisofs.1 $(manprefix)/man1
++	install $(minus_o) -m 0644 dvd+rw-format.1 $(manprefix)/man1
+ 	-[[ -f rpl8 ]] && install $(minus_o) -m $(bin_mode) rpl8 $(prefix)/bin; :
+ 	-[[ -f btcflash ]] && install $(minus_o) -m $(bin_mode) btcflash $(prefix)/bin; :
+ ])
+diff -Naurp dvd+rw-tools-7.1.orig/transport.hxx dvd+rw-tools-7.1/transport.hxx
+--- dvd+rw-tools-7.1.orig/transport.hxx	2008-03-01 04:34:43.000000000 -0600
++++ dvd+rw-tools-7.1/transport.hxx	2025-08-06 15:34:42.792822096 -0500
+@@ -11,6 +11,7 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
++#include <limits.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+@@ -123,7 +124,7 @@ class autofree {
+ extern "C" char *plusminus_locale()
+ { static class __plusminus {
+     private:
+-	char str[4];
++	char str[MB_LEN_MAX];
+     public:
+ 	__plusminus()	{   setlocale(LC_CTYPE,ENV_LOCALE);
+ 			    int l = wctomb(str,(wchar_t)(unsigned char)'±');
+@@ -1794,9 +1795,12 @@ static int handle_events (Scsi_Command &
+ 		break;
+ 	    case 5: ret |= 1<<5; break;		// Multiple Initiators
+ 	    case 6:				// Device Busy
+-		if ((event[4]&0xF)==1 &&	// Timeout occured
+-		    (event[5]&0x3)!=0)
+-		{   poll(NULL,0,(descr&0xFFFF)*100+100);
++		if ((event[4]&0xF)==1)      // Timeout occured
++      {
++          if ((event[5]&0x3)==0) // No event
++             return 0;
++
++          poll(NULL,0,(descr&0xFFFF)*100+100);
+ 		    cmd[0] = 0;		// TEST UNIT READY
+ 		    cmd[5] = 0;
+ 		    if ((err=cmd.transport()))
