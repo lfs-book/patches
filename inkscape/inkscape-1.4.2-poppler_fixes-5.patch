@@ -1,0 +1,374 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2025-06-09
+Initial Package Version: 1.4.2
+Upstream Status:         Pending (but approved)
+Origin:                  Upstream (https://gitlab.com/inkscape/inkscape/-/merge_requests/7264)
+Description:             Fixes building Inkscape against poppler-25.06 by
+                         adapting to a private API change where an array of
+                         pointers was changed to a vector of unique_ptr. The MR
+                         upstream also adapted the source to be able to build
+                         with a copy of poppler built but not installed to the
+                         system, but I didn't carry that part of the patch in
+                         as it was both not needed and does not apply without
+                         more backports to this version of Inkscape.
+                         As such, the only commit we needed was:
+                         97bd8f29a61e691ceea98ca2444b974cf4256ae0
+                         Tested with importing clisp-link.pdf from the clisp
+                         docs in /usr/share/doc/clisp-2.49.
+
+Updated by:              Bruce Dubbs <bdubbs@linuxfromscratch.org>
+Date:                    2025-07-10
+Upstream Status:         Pending (but approved)
+Origin:                  Upstream (https://gitlab.com/inkscape/inkscape/-/merge_requests/7321)
+Description:             Fixes building Inkscape against poppler-25.07
+                         Combines previous patch for poppler-25.06 with the new patch.
+
+Updated by:              Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2025-09-23
+Upstream Status:         Approved
+Origin:                  Upstream (https://gitlab.com/inkscape/inkscape/-/merge_requests/7409)
+Description:             Fixes building Inkscape against poppler-25.09.0, while
+                         also combining the previous patches.
+
+Updated by:              Joe Locash <jlocash at gmail dot com>
+Date:                    2025-10-24
+Upstream Status:         Applied
+Origin:                  Upstream commit ace884e1
+Description:             Fixes building Inkscape against poppler-25.10.0, while
+                         backporting the upsteam commit, and also combining the
+                         previous patches.
+
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/pdf-parser.cpp inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/pdf-parser.cpp
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/pdf-parser.cpp	2025-04-27 14:26:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/pdf-parser.cpp	2025-10-24 14:37:01.894558763 -0400
+@@ -27,6 +27,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <memory>
+ #include <mutex> // std::call_once()
+ #include <utility>
+ #include <vector>
+@@ -686,7 +687,6 @@ void PdfParser::opSetLineWidth(Object ar
+ void PdfParser::opSetExtGState(Object args[], int /*numArgs*/)
+ {
+     Object obj1, obj2, obj3, obj4, obj5;
+-    Function *funcs[4] = {nullptr, nullptr, nullptr, nullptr};
+     GfxColor backdropColor;
+     GBool haveBackdropColor = gFalse;
+     GBool alpha = gFalse;
+@@ -744,13 +744,14 @@ void PdfParser::opSetExtGState(Object ar
+         state->setLineWidth(obj2.getNum());
+     }
+ 
++    _POPPLER_DECLARE_TRANSFER_FUNCTION_VECTOR(funcs);
++
+     // transfer function
+     if (_POPPLER_CALL_ARGS_DEREF(obj2, obj1.dictLookup, "TR2").isNull()) {
+         _POPPLER_CALL_ARGS(obj2, obj1.dictLookup, "TR");
+     }
+     if (obj2.isName(const_cast<char *>("Default")) || obj2.isName(const_cast<char *>("Identity"))) {
+-        funcs[0] = funcs[1] = funcs[2] = funcs[3] = nullptr;
+-        state->setTransfer(funcs);
++        state->setTransfer(std::move(funcs));
+     } else if (obj2.isArray() && obj2.arrayGetLength() == 4) {
+         int pos = 4;
+         for (int i = 0; i < 4; ++i) {
+@@ -763,12 +764,14 @@ void PdfParser::opSetExtGState(Object ar
+         }
+         _POPPLER_FREE(obj3);
+         if (pos == 4) {
+-            state->setTransfer(funcs);
++            state->setTransfer(std::move(funcs));
+         }
+     } else if (obj2.isName() || obj2.isDict() || obj2.isStream()) {
+         if ((funcs[0] = Function::parse(&obj2))) {
+-            funcs[1] = funcs[2] = funcs[3] = nullptr;
+-            state->setTransfer(funcs);
++            funcs[1] = nullptr;
++            funcs[2] = nullptr;
++            funcs[3] = nullptr;
++            state->setTransfer(std::move(funcs));
+         }
+     } else if (!obj2.isNull()) {
+         error(errSyntaxError, getPos(), "Invalid transfer function in ExtGState");
+@@ -790,8 +793,7 @@ void PdfParser::opSetExtGState(Object ar
+                 funcs[0] = Function::parse(&obj3);
+                 if (funcs[0]->getInputSize() != 1 || funcs[0]->getOutputSize() != 1) {
+                     error(errSyntaxError, getPos(), "Invalid transfer function in soft mask in ExtGState");
+-                    delete funcs[0];
+-                    funcs[0] = nullptr;
++                    _POPPLER_DELETE_TRANSFER_FUNCTION(funcs[0]);
+                 }
+             }
+             _POPPLER_FREE(obj3);
+@@ -835,9 +837,10 @@ void PdfParser::opSetExtGState(Object ar
+                             }
+                         }
+                     }
+-                    doSoftMask(&obj3, alpha, blendingColorSpace.get(), isolated, knockout, funcs[0], &backdropColor);
++                    doSoftMask(&obj3, alpha, blendingColorSpace.get(), isolated, knockout,
++                               _POPPLER_GET_TRANSFER_FUNCTION_POINTER(funcs[0]), &backdropColor);
+                     if (funcs[0]) {
+-                        delete funcs[0];
++                        _POPPLER_DELETE_TRANSFER_FUNCTION(funcs[0]);
+                     }
+                 } else {
+                     error(errSyntaxError, getPos(), "Invalid soft mask in ExtGState - missing group");
+@@ -1649,12 +1652,11 @@ void PdfParser::doFunctionShFill1(GfxFun
+   GfxColor color0M, color1M, colorM0, colorM1, colorMM;
+   GfxColor colors2[4];
+   double functionColorDelta = colorDeltas[pdfFunctionShading-1];
+-  const double *matrix;
+   double xM, yM;
+   int nComps, i, j;
+ 
+   nComps = shading->getColorSpace()->getNComps();
+-  matrix = shading->getMatrix();
++  const auto& matrix = shading->getMatrix();
+ 
+   // compare the four corner colors
+   for (i = 0; i < 4; ++i) {
+@@ -2256,7 +2258,7 @@ void PdfParser::doShowText(GooString *s)
+     auto font = state->getFont();
+     int wMode = font->getWMode(); // Vertical/Horizontal/Invalid
+ 
+-    builder->beginString(state, s->getLength());
++    builder->beginString(state, get_goostring_length(*s));
+ 
+     // handle a Type 3 char
+     if (font->getType() == fontType3) {
+@@ -2267,7 +2269,7 @@ void PdfParser::doShowText(GooString *s)
+     state->textTransformDelta(0, state->getRise(), &riseX, &riseY);
+ 
+     auto p = s->getCString(); // char* or const char*
+-    int len = s->getLength();
++    int len = get_goostring_length(*s);
+ 
+     while (len > 0) {
+ 
+@@ -2312,11 +2314,11 @@ void PdfParser::doShowText(GooString *s)
+         state->textTransformDelta(originX, originY, &tOriginX, &tOriginY);
+ 
+         // In Gfx.cc this is drawChar(...)
+-        builder->addChar(state, state->getCurX() + riseX, state->getCurY() + riseY,
++        builder->addChar(state, state->_POPPLER_GET_CUR_TEXT_X() + riseX, state->_POPPLER_GET_CUR_TEXT_Y() + riseY,
+                          dx, dy, ax, ay, tOriginX, tOriginY, code, n, u, uLen);
+ 
+         // Move onto next unicode character.
+-        state->shift(tdx, tdy);
++        state->_POPPLER_TEXT_SHIFT_WITH_USER_COORDS(tdx, tdy);
+         p += n;
+         len -= n;
+     }
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-cairo-font-engine.cpp inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-cairo-font-engine.cpp
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-cairo-font-engine.cpp	2025-04-27 14:26:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-cairo-font-engine.cpp	2025-10-24 14:36:35.950323737 -0400
+@@ -318,7 +318,11 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+ #endif
+     char **enc;
+     const char *name;
++#if POPPLER_CHECK_VERSION(25, 7, 0)
++    std::unique_ptr<FoFiType1C> ff1c;
++#else
+     FoFiType1C *ff1c;
++#endif
+     std::optional<FreeTypeFontFace> font_face;
+     std::vector<int> codeToGID;
+     bool substitute = false;
+@@ -429,7 +433,7 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+                 FoFiTrueType *ff;
+ #endif
+                 if (!font_data.empty()) {
+-                    ff = FoFiTrueType::make((fontchar)font_data.data(), font_data.size(), 0);
++                    ff = _POPPLER_FOFI_TRUETYPE_MAKE(font_data, 0);
+                 } else {
+                     ff = FoFiTrueType::load(fileName.c_str(), 0);
+                 }
+@@ -459,7 +463,7 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+             FoFiTrueType *ff;
+ #endif
+             if (!font_data.empty()) {
+-                ff = FoFiTrueType::make((fontchar)font_data.data(), font_data.size(), 0);
++                ff = _POPPLER_FOFI_TRUETYPE_MAKE(font_data, 0);
+             } else {
+                 ff = FoFiTrueType::load(fileName.c_str(), 0);
+             }
+@@ -493,7 +497,7 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+         case fontCIDType0C:
+             if (!useCIDs) {
+                 if (!font_data.empty()) {
+-                    ff1c = FoFiType1C::make((fontchar)font_data.data(), font_data.size());
++                    ff1c = _POPPLER_FOFI_TYPE1C_MAKE(font_data);
+                 } else {
+                     ff1c = FoFiType1C::load(fileName.c_str());
+                 }
+@@ -506,7 +510,9 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+                     codeToGID.insert(codeToGID.begin(), src, src + n);
+                     gfree(src);
+ #endif
++#if !(POPPLER_CHECK_VERSION(25, 7, 0))
+                     delete ff1c;
++#endif
+                 }
+             }
+ 
+@@ -542,13 +548,13 @@ CairoFreeTypeFont *CairoFreeTypeFont::cr
+                     FoFiTrueType *ff;
+ #endif
+                     if (!font_data.empty()) {
+-                        ff = FoFiTrueType::make((fontchar)font_data.data(), font_data.size(), 0);
++                        ff = _POPPLER_FOFI_TRUETYPE_MAKE(font_data, 0);
+                     } else {
+                         ff = FoFiTrueType::load(fileName.c_str(), 0);
+                     }
+                     if (ff) {
+                         if (ff->isOpenTypeCFF()) {
+-                            auto src = ff1c->_POPPLER_GET_CID_TO_GID_MAP(&n);
++                            auto src = ff->_POPPLER_GET_CID_TO_GID_MAP(&n);
+ #if POPPLER_CHECK_VERSION(25,2,0)
+                             codeToGID = std::move(src);
+ #else
+@@ -629,7 +635,7 @@ static cairo_status_t _init_type3_glyph(
+ 
+     info = (type3_font_info_t *)cairo_font_face_get_user_data(cairo_scaled_font_get_font_face(scaled_font),
+                                                               &type3_font_key);
+-    const double *mat = info->font->getFontBBox();
++    const auto& mat = info->font->getFontBBox();
+     extents->ascent = mat[3];   /* y2 */
+     extents->descent = -mat[3]; /* -y1 */
+     extents->height = extents->ascent + extents->descent;
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-transition-api.h inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-transition-api.h
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-transition-api.h	2025-04-07 13:25:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-transition-api.h	2025-10-24 14:36:35.950724323 -0400
+@@ -15,6 +15,32 @@
+ #include <glib/poppler-features.h>
+ #include <poppler/UTF.h>
+ 
++#if POPPLER_CHECK_VERSION(25, 7, 0)
++#define _POPPLER_TEXT_SHIFT_WITH_USER_COORDS(dx, dy) textShiftWithUserCoords(dx, dy)
++#define _POPPLER_FOFI_TRUETYPE_MAKE(font_data, faceIndex) FoFiTrueType::make(std::span(font_data), faceIndex)
++#define _POPPLER_FOFI_TYPE1C_MAKE(font_data) FoFiType1C::make(std::span(font_data))
++#define _POPPLER_GET_CUR_TEXT_X() getCurTextX()
++#define _POPPLER_GET_CUR_TEXT_Y() getCurTextY()
++#else
++#define _POPPLER_TEXT_SHIFT_WITH_USER_COORDS(dx, dy) shift(dx, dy)
++#define _POPPLER_FOFI_TRUETYPE_MAKE(font_data, faceIndex) FoFiTrueType::make((fontchar)font_data.data(), font_data.size(), faceIndex)
++#define _POPPLER_FOFI_TYPE1C_MAKE(font_data) FoFiType1C::make((fontchar)font_data.data(), font_data.size())
++#define _POPPLER_GET_CUR_TEXT_X() getCurX()
++#define _POPPLER_GET_CUR_TEXT_Y() getCurY()
++#endif
++
++#if POPPLER_CHECK_VERSION(25, 6, 0)
++#define _POPPLER_DECLARE_TRANSFER_FUNCTION_VECTOR(name) std::vector<std::unique_ptr<Function>> name(4)
++#define _POPPLER_DELETE_TRANSFER_FUNCTION(name) name.reset()
++#define _POPPLER_GET_TRANSFER_FUNCTION_POINTER(name) name.get()
++#else
++#define _POPPLER_DECLARE_TRANSFER_FUNCTION_VECTOR(name) Function *name[4] = {}
++#define _POPPLER_DELETE_TRANSFER_FUNCTION(name) \
++    delete name;                                \
++    name = nullptr
++#define _POPPLER_GET_TRANSFER_FUNCTION_POINTER(name) name
++#endif
++
+ #if POPPLER_CHECK_VERSION(25,2,0)
+ #define _POPPLER_GET_CODE_TO_GID_MAP(ff, len) getCodeToGIDMap(ff)
+ #define _POPPLER_GET_CID_TO_GID_MAP(len) getCIDToGIDMap()
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-utils.cpp inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-utils.cpp
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-utils.cpp	2025-04-27 14:26:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-utils.cpp	2025-10-24 14:40:44.297052269 -0400
+@@ -38,6 +38,10 @@ Geom::Affine ctmToAffine(const double *c
+     return Geom::Affine(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
+ }
+ 
++Geom::Affine ctmToAffine(const std::array<double, 6>& ctm) {
++    return ctmToAffine(ctm.data());
++}
++
+ void ctmout(const char *label, const double *ctm)
+ {
+     std::cout << "C:" << label << ":" << ctm[0] << "," << ctm[1] << "," << ctm[2] << "," << ctm[3] << "," << ctm[4]
+@@ -164,7 +168,7 @@ void InkFontDict::hashFontObject1(const
+         case objString:
+             h->hash('s');
+             s = obj->getString();
+-            h->hash(s->c_str(), s->getLength());
++            h->hash(s->c_str(), get_goostring_length(*s));
+             break;
+         case objName:
+             h->hash('n');
+@@ -582,10 +586,10 @@ std::string getDictString(Dict *dict, co
+ std::string getString(const GooString *value)
+ {
+     if (_POPPLER_HAS_UNICODE_BOM(value)) {
+-        return g_convert(value->getCString () + 2, value->getLength () - 2,
++        return g_convert(value->getCString () + 2, get_goostring_length(*value) - 2,
+                          "UTF-8", "UTF-16BE", NULL, NULL, NULL);
+     } else if (_POPPLER_HAS_UNICODE_BOMLE(value)) {
+-        return g_convert(value->getCString () + 2, value->getLength () - 2,
++        return g_convert(value->getCString () + 2, get_goostring_length(*value) - 2,
+                          "UTF-8", "UTF-16LE", NULL, NULL, NULL);
+     }
+     return value->toStr();
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-utils.h inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-utils.h
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/poppler-utils.h	2025-04-27 14:26:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/poppler-utils.h	2025-10-24 14:37:01.894925184 -0400
+@@ -13,11 +13,13 @@
+ #ifndef POPPLER_UTILS_H
+ #define POPPLER_UTILS_H
+ 
++#include <array>
+ #include <map>
+ #include <memory>
+ #include <string>
+ #include <unordered_set>
+ #include <vector>
++#include <goo/GooString.h>
+ 
+ #include "poppler-transition-api.h"
+ 
+@@ -36,7 +38,10 @@ class Ref;
+ class XRef;
+ 
+ Geom::Affine stateToAffine(GfxState *state);
++// this function is for Poppler older than v25.09.0
+ Geom::Affine ctmToAffine(const double *ctm);
++// this flavor is for Poppler v25.09.0 and above
++Geom::Affine ctmToAffine(const std::array<double, 6>& ctm);
+ 
+ void ctmout(const char *label, const double *ctm);
+ void affout(const char *label, Geom::Affine affine);
+@@ -100,4 +105,12 @@ private:
+     void hashFontObject1(const Object *obj, FNVHash *h);
+ };
+ 
++inline size_t get_goostring_length(const GooString& str) {
++#if POPPLER_CHECK_VERSION(25, 10, 0)
++    return str.size();
++#else
++    return str.getLength();
++#endif
++}
++
+ #endif /* POPPLER_UTILS_H */
+diff -Naurp inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/svg-builder.cpp inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/svg-builder.cpp
+--- inkscape-1.4.2_2025-05-08_ebf0e940d0.orig/src/extension/internal/pdfinput/svg-builder.cpp	2025-04-27 14:26:33.000000000 -0400
++++ inkscape-1.4.2_2025-05-08_ebf0e940d0/src/extension/internal/pdfinput/svg-builder.cpp	2025-10-24 14:36:35.951708621 -0400
+@@ -1025,7 +1025,7 @@ gchar *SvgBuilder::_createTilingPattern(
+     pattern_node->setAttribute("patternUnits", "userSpaceOnUse");
+     // Set pattern tiling
+     // FIXME: don't ignore XStep and YStep
+-    const double *bbox = tiling_pattern->getBBox();
++    const auto& bbox = tiling_pattern->getBBox();
+     pattern_node->setAttributeSvgDouble("x", 0.0);
+     pattern_node->setAttributeSvgDouble("y", 0.0);
+     pattern_node->setAttributeSvgDouble("width", bbox[2] - bbox[0]);
+@@ -1255,7 +1255,7 @@ void SvgBuilder::updateFont(GfxState *st
+ 
+     auto new_font_size = state->getFontSize();
+     if (font->getType() == fontType3) {
+-        const double *font_matrix = font->getFontMatrix();
++        const auto& font_matrix = font->getFontMatrix();
+         if (font_matrix[0] != 0.0) {
+             new_font_size *= font_matrix[3] / font_matrix[0];
+         }
