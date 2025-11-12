@@ -1,0 +1,37 @@
+Submitted By:            Joe Locash <jlocash at gmail dot com>
+Date:                    2025-10-25
+Initial Package Version: 3.0.0
+Upstream Status:         Applied
+Origin:                  Upstream commit 1621ef5d
+Description:             Fixes building screengrab against qt-6.10.
+
+From 1621ef5df9461cdd1dcef3faee36e9419f1ca08c Mon Sep 17 00:00:00 2001
+From: Chiitoo <Chiitoo@users.noreply.github.com>
+Date: Wed, 8 Oct 2025 19:45:54 +0300
+Subject: [PATCH] cmake: fix build with Qt 6.10 (#434)
+
+The 'Qt6FooPrivate' targets have been split into separate CMake files
+in Qt 6.9, and require a 'find_package(Qt6FooPrivate)' call starting
+with Qt 6.10.
+
+See also: https://bugreports.qt.io/browse/QTBUG-87776
+---
+ CMakeLists.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a4925f6..408231f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,6 +28,11 @@ find_package(LayerShellQt ${SHELLQT_MINIMUM_VERSION} REQUIRED)
+ find_package(KF6WindowSystem ${KF6_MINIMUM_VERSION} REQUIRED)
+ find_package(lxqt2-build-tools ${LXQTBT_MINIMUM_VERSION} REQUIRED)
+ 
++if (Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
++    find_package(Qt6GuiPrivate REQUIRED)
++    find_package(Qt6WaylandClientPrivate REQUIRED)
++endif()
++
+ # right now we declare it as required
+ find_package(X11 REQUIRED)
+ set(HAVE_X11 1)
