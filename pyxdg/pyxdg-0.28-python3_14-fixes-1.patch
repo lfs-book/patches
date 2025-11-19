@@ -1,0 +1,78 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2025-11-19
+Initial Package Version: 0.28
+Upstream Status:         Applied
+Origin:                  Upstream (commits 275865e6, 9291d419, and 63033ac3)
+Description:             Fixes several problems with Python 3.12  and 3.14.
+                         We never noticed the Python 3.12 issues as we didn't
+                         run the test suite in the past. The Python 3.14 issues
+                         are related to ast.Str being removed, which causes us
+                         to need to use ast.Constant instead. This patch also
+                         makes the code compatible with Python 3.15 because of
+                         the changes to lineno/col_offset and the ast.Expression
+                         arguments under parse_rule.
+
+diff -Naurp pyxdg-0.28.orig/test/test_basedirectory.py pyxdg-0.28/test/test_basedirectory.py
+--- pyxdg-0.28.orig/test/test_basedirectory.py	2022-06-05 06:19:52.000000000 -0500
++++ pyxdg-0.28/test/test_basedirectory.py	2025-11-19 12:31:20.275956310 -0600
+@@ -9,7 +9,7 @@ import stat
+ try:
+     reload
+ except NameError:
+-    from imp import reload
++    from importlib import reload
+ 
+ class BaseDirectoryTest(unittest.TestCase):
+     def setUp(self):
+diff -Naurp pyxdg-0.28.orig/xdg/Menu.py pyxdg-0.28/xdg/Menu.py
+--- pyxdg-0.28.orig/xdg/Menu.py	2022-06-05 06:19:50.000000000 -0500
++++ pyxdg-0.28/xdg/Menu.py	2025-11-19 12:30:52.655648942 -0600
+@@ -411,7 +411,7 @@ class Rule:
+     def fromFilename(cls, type, filename):
+         tree = ast.Expression(
+             body=ast.Compare(
+-                left=ast.Str(filename),
++                left=ast.Constant(filename),
+                 ops=[ast.Eq()],
+                 comparators=[ast.Attribute(
+                     value=ast.Name(id='menuentry', ctx=ast.Load()),
+@@ -419,7 +419,6 @@ class Rule:
+                     ctx=ast.Load()
+                 )]
+             ),
+-            lineno=1, col_offset=0
+         )
+         ast.fix_missing_locations(tree)
+         rule = Rule(type, tree)
+@@ -763,12 +762,10 @@ class XMLMenuBuilder(object):
+ 
+     def parse_rule(self, node):
+         type = Rule.TYPE_INCLUDE if node.tag == 'Include' else Rule.TYPE_EXCLUDE
+-        tree = ast.Expression(lineno=1, col_offset=0)
++        tree = ast.Expression(body=_ast_const('False'))
+         expr = self.parse_bool_op(node, ast.Or())
+         if expr:
+             tree.body = expr
+-        else:
+-            tree.body = _ast_const('False')
+         ast.fix_missing_locations(tree)
+         return Rule(type, tree)
+ 
+@@ -799,7 +796,7 @@ class XMLMenuBuilder(object):
+         elif tag == 'Category':
+             category = node.text
+             return ast.Compare(
+-                left=ast.Str(category),
++                left=ast.Constant(category),
+                 ops=[ast.In()],
+                 comparators=[ast.Attribute(
+                     value=ast.Name(id='menuentry', ctx=ast.Load()),
+@@ -810,7 +807,7 @@ class XMLMenuBuilder(object):
+         elif tag == 'Filename':
+             filename = node.text
+             return ast.Compare(
+-                left=ast.Str(filename),
++                left=ast.Constant(filename),
+                 ops=[ast.Eq()],
+                 comparators=[ast.Attribute(
+                     value=ast.Name(id='menuentry', ctx=ast.Load()),
