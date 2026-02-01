@@ -264,8 +264,8 @@ index 3b84134..403aa2e 100644
  }
 diff --git a/glycin/src/api_common.rs b/glycin/src/api_common.rs
 index c904300..2215b52 100644
---- a/glycin/src/api_common.rs
-+++ b/glycin/src/api_common.rs
+--- a/vendor/glycin/src/api_common.rs
++++ b/vendor/glycin/src/api_common.rs
 @@ -315,7 +315,10 @@ pub(crate) async fn guess_mime_type(gfile_worker: &GFileWorker) -> Result<MimeTy
      // Prefer file extension for gzip since it might be an SVGZ
      let is_gzip = mime_type.clone().ok() == Some("application/gzip".into());
