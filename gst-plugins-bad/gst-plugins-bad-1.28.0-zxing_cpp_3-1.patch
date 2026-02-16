@@ -1,0 +1,102 @@
+Submitted by:            Xi Ruoyao (xry111 at xry111 dot site)
+Date:                    2026-02-16
+Initial Package Version: 1.28.0
+Upstream Status:         Applied
+Origin:                  Upstream Git repository (see From line for SHA);
+                         Manually edited to apply with patch -p1.
+Description:             Fixes build with zxing-cpp >= 3.0.0.
+
+From 5b44dd830dddc99c322e425601b7027a1b5ac872 Mon Sep 17 00:00:00 2001
+From: axxel <awagger@gmail.com>
+Date: Wed, 11 Feb 2026 09:59:53 +0000
+Subject: [PATCH] zxing: Minimal support for compiling with zxing-cpp 3.x
+
+Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/10790>
+---
+ .../gst-plugins-bad/ext/zxing/gstzxing.cpp    | 22 ++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/subprojects/gst-plugins-bad/ext/zxing/gstzxing.cpp b/subprojects/gst-plugins-bad/ext/zxing/gstzxing.cpp
+index 478c678ebb3..b24f2e6a78c 100644
+--- gst-plugins-bad/ext/zxing/gstzxing.cpp
++++ gst-plugins-bad/ext/zxing/gstzxing.cpp
+@@ -62,9 +62,12 @@
+ 
+ #include <gst/video/video.h>
+ 
+-#include "ReadBarcode.h"
+-#include "TextUtfEncoding.h"
+-#include "ZXVersion.h"
++#if __has_include("ZXing/WriteBarcode.h") /* only available in version >= 3.x */
++#include "ZXing/ZXingCpp.h" /* future proof one-stop-shop header */
++#else
++#include "ZXing/ReadBarcode.h"
++#include "ZXing/ZXVersion.h"
++#endif
+ 
+ using namespace ZXing;
+ 
+@@ -139,7 +142,7 @@ static const GEnumValue barcode_formats[] = {
+   {BARCODE_FORMAT_CODE_39, "CODE_39", "code_39"},
+   {BARCODE_FORMAT_CODE_93, "CODE_93", "code_93"},
+   {BARCODE_FORMAT_CODE_128, "CODE_128", "code_128"},
+-  {BARCODE_FORMAT_DATA_MATRIX, "PNG", "png"},
++  {BARCODE_FORMAT_DATA_MATRIX, "DATA_MATRIX", "data_matrix"},
+   {BARCODE_FORMAT_EAN_8, "EAN_8", "ean_8"},
+   {BARCODE_FORMAT_EAN_13, "EAN_13", "ean_13"},
+   {BARCODE_FORMAT_ITF, "ITF", "itf"},
+@@ -392,7 +395,11 @@ gst_zxing_set_info (GstVideoFilter * vfilter, GstCaps * in,
+   switch (in_info->finfo->format) {
+     case GST_VIDEO_FORMAT_ARGB:
+     case GST_VIDEO_FORMAT_xRGB:
++  #if ZXING_VERSION_MAJOR >= 3
++      zxing->image_format = ImageFormat::ARGB;
++  #else
+       zxing->image_format = ImageFormat::XRGB;
++  #endif
+       break;
+     case GST_VIDEO_FORMAT_Y444:
+     case GST_VIDEO_FORMAT_Y42B:
+@@ -423,7 +430,12 @@ gst_zxing_transform_frame_ip (GstVideoFilter * vfilter, GstVideoFrame * frame)
+ 
+   hints.setTryRotate(zxing->rotate);
+   hints.setTryHarder(!zxing->faster);
+-  hints.setFormats(BarcodeFormatFromString (barcode_formats[zxing->barcode_format].value_name));
++  try {
++    hints.setFormats(BarcodeFormatFromString (barcode_formats[zxing->barcode_format].value_name));
++  } catch (const std::invalid_argument&) {
++    /* since 3.0 zxing-cpp throws if BarcodeFormatFromString() can't parse the string.
++     * see https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/4893#note_3325953 */
++  }
+ 
+   /* all formats we support start with an 8-bit Y plane. zxing doesn't need
+    * to know about the chroma plane(s) */
+-- 
+GitLab
+
+From 89433821003538c4789643ff8da59eaf02f87d27 Mon Sep 17 00:00:00 2001
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Mon, 16 Feb 2026 10:51:53 +0800
+Subject: [PATCH] zxing: Fix version check for zxing-cpp 3.0.1
+
+Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/10812>
+---
+ subprojects/gst-plugins-bad/ext/zxing/gstzxing.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/subprojects/gst-plugins-bad/ext/zxing/gstzxing.cpp b/subprojects/gst-plugins-bad/ext/zxing/gstzxing.cpp
+index b24f2e6a78c..3f874a7e025 100644
+--- gst-plugins-bad/ext/zxing/gstzxing.cpp
++++ gst-plugins-bad/ext/zxing/gstzxing.cpp
+@@ -422,7 +422,8 @@ gst_zxing_transform_frame_ip (GstVideoFilter * vfilter, GstVideoFrame * frame)
+   GstZXing *zxing = GST_ZXING (vfilter);
+   gpointer data;
+   gint height, width;
+-  #if ZXING_VERSION_MAJOR >= 2 && ZXING_VERSION_MINOR >= 2
++  #if ZXING_VERSION_MAJOR >= 3 || \
++      (ZXING_VERSION_MAJOR >= 2 && ZXING_VERSION_MINOR >= 2)
+     ReaderOptions hints;
+   #else
+     DecodeHints hints;
+-- 
+GitLab
