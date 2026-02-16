@@ -1,0 +1,1317 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch.org>
+Date:                    2026-02-16
+Initial Package Version: 3.26.0
+Upstream Status:         Applied
+Origin:                  Upstream (https://sourceware.org/git/?p=valgrind.git;a=log;h=refs/heads/VALGRIND_3_26_BRANCH)
+Description:             Applies a total of 7 patches to valgrind-3.26.0 for
+                         adapting to changes with glibc-2.43 and Linux 6.18.x.
+                         This particularly affects packages that use the
+                         _dl_allocate_tls_init and __is_decorate_maps_available
+                         functions.
+
+From 0f4968e8aaaacbb9700c09d88b20a195118f6ae4 Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Wed, 7 Jan 2026 15:11:59 +0100
+Subject: [PATCH] Prepare NEWS for branch 3.26 fixes
+
+---
+ NEWS | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/NEWS b/NEWS
+index fdeebfaead..d176b0aa2e 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,3 +1,15 @@
++Branch 3.26
++~~~~~~~~~~~
++
++* ==================== FIXED BUGS ====================
++
++The following bugs have been fixed or resolved on this branch.
++
++To see details of a given bug, visit
++  https://bugs.kde.org/show_bug.cgi?id=XXXXXX
++where XXXXXX is the bug number as listed above.
++
++
+ Release 3.26.0 (24 Oct 2025)
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+-- 
+2.43.7
+
+
+From fc9cf49c2f2e0e2282b000557df80ce2f755f191 Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Wed, 12 Nov 2025 21:46:23 +0100
+Subject: [PATCH] Bug 511972 - valgrind-3.26.0 tests fail to build on upcomig
+ gcc-16: unrecognized command-line option
+ '-Wno-alloc-size-larger-than=18446744073709551615'
+
+Initial patch from Sergei Trofimovich, thanks.
+
+(cherry picked from commit 51c5973d9d1f096b9472df75638f2a53324fafed)
+---
+ NEWS                                     | 4 ++++
+ configure.ac                             | 4 ++--
+ memcheck/tests/Makefile.am               | 8 ++++----
+ memcheck/tests/amd64-freebsd/Makefile.am | 2 +-
+ memcheck/tests/amd64-linux/Makefile.am   | 2 +-
+ memcheck/tests/x86-freebsd/Makefile.am   | 2 +-
+ 6 files changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/NEWS b/NEWS
+index d176b0aa2e..4e6cb3de91 100644
+--- a/NEWS
++++ b/NEWS
+@@ -5,6 +5,10 @@ Branch 3.26
+ 
+ The following bugs have been fixed or resolved on this branch.
+ 
++511972  valgrind-3.26.0 tests fail to build on upcomig gcc-16:
++        unrecognized command-line option
++        '-Wno-alloc-size-larger-than=18446744073709551615'
++
+ To see details of a given bug, visit
+   https://bugs.kde.org/show_bug.cgi?id=XXXXXX
+ where XXXXXX is the bug number as listed above.
+diff --git a/configure.ac b/configure.ac
+index 371dcf235c..9d62a7d27a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -2538,7 +2538,7 @@ fi
+ AC_DEFUN([AC_GCC_WARNING_SUBST_NO],[
+   AC_MSG_CHECKING([if gcc accepts -W$1])
+   safe_CFLAGS=$CFLAGS
+-  CFLAGS="-W$1 -Werror"
++  CFLAGS="-W$1 -Wno-$1 -Werror"
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[;]])], [
+   AC_SUBST([$2], [-Wno-$1])
+   AC_MSG_RESULT([yes])], [
+@@ -2591,7 +2591,6 @@ AC_GCC_WARNING_SUBST_NO([unused-result], [FLAG_W_NO_UNUSED_RESULT])
+ AC_GCC_WARNING_SUBST_NO([infinite-recursion], [FLAG_W_NO_INFINITE_RECURSION])
+ AC_GCC_WARNING_SUBST_NO([deprecated], [FLAG_W_NO_DEPRECATED])
+ # OK for 32 and 64 bit
+-AC_GCC_WARNING_SUBST_NO([alloc-size-larger-than=18446744073709551615], [FLAG_W_NO_ALLOC_SIZE_LARGER_THAN])
+ AC_GCC_WARNING_SUBST_NO([alloc-size], [FLAG_W_NO_ALLOC_SIZE])
+ 
+ AC_GCC_WARNING_SUBST([write-strings], [FLAG_W_WRITE_STRINGS])
+@@ -2605,6 +2604,7 @@ AC_GCC_WARNING_SUBST([missing-parameter-type], [FLAG_W_MISSING_PARAMETER_TYPE])
+ AC_GCC_WARNING_SUBST([logical-op], [FLAG_W_LOGICAL_OP])
+ AC_GCC_WARNING_SUBST([enum-conversion], [FLAG_W_ENUM_CONVERSION])
+ AC_GCC_WARNING_SUBST([implicit-fallthrough=2], [FLAG_W_IMPLICIT_FALLTHROUGH])
++AC_GCC_WARNING_SUBST([alloc-size-larger-than=18446744073709551616], [FLAG_W_ALLOC_SIZE_LARGER_THAN])
+ 
+ # as above, C++ flags
+ AC_DEFUN([AC_GXX_WARNING_SUBST_NO],[
+diff --git a/memcheck/tests/Makefile.am b/memcheck/tests/Makefile.am
+index 920f262a68..4bdca487aa 100644
+--- a/memcheck/tests/Makefile.am
++++ b/memcheck/tests/Makefile.am
+@@ -689,18 +689,18 @@ leak_cpp_interior_SOURCES	= leak_cpp_interior.cpp
+ 
+ # Suppress various gcc warnings which are correct, but for things
+ # we are actually testing for at runtime.
+-accounting_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++accounting_CFLAGS	= $(AM_CFLAGS) @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+ badfree_CFLAGS		= $(AM_CFLAGS) @FLAG_W_NO_FREE_NONHEAP_OBJECT@
+-bug155125_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNUSED_RESULT@ @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++bug155125_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNUSED_RESULT@ @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+ bug472219_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+-calloc_overflow_CFLAGS	= ${AM_CFLAGS} @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++calloc_overflow_CFLAGS	= ${AM_CFLAGS} @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+ malloc_usable_CFLAGS	= ${AM_CFLAGS} @FLAG_W_NO_MAYBE_UNINITIALIZED@ @FLAG_W_NO_UNINITIALIZED@
+ mallinfo_CFLAGS		= $(AM_CFLAGS) -Wno-deprecated-declarations
+ if VGCONF_OS_IS_SOLARIS
+ mallinfo_LDADD = -lmalloc
+ endif
+ mallinfo2_CFLAGS	= $(AM_CFLAGS) -Wno-deprecated-declarations
+-malloc3_CFLAGS		= $(AM_CFLAGS) @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@ @FLAG_W_NO_ALLOC_SIZE@
++malloc3_CFLAGS		= $(AM_CFLAGS) @FLAG_W_ALLOC_SIZE_LARGER_THAN@ @FLAG_W_NO_ALLOC_SIZE@
+ sbfragment_CFLAGS	= $(AM_CFLAGS) -Wno-deprecated-declarations
+ if VGCONF_OS_IS_SOLARIS
+ sbfragment_LDADD = -lmalloc
+diff --git a/memcheck/tests/amd64-freebsd/Makefile.am b/memcheck/tests/amd64-freebsd/Makefile.am
+index 378446d4cf..1eff95fce3 100644
+--- a/memcheck/tests/amd64-freebsd/Makefile.am
++++ b/memcheck/tests/amd64-freebsd/Makefile.am
+@@ -24,5 +24,5 @@ AM_CCASFLAGS += @FLAG_M64@
+ 
+ posix_fallocate_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+ posix_fadvise_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+-reallocarray_CFLAGS	= ${AM_CFLAGS} @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++reallocarray_CFLAGS	= ${AM_CFLAGS} @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+ 
+diff --git a/memcheck/tests/amd64-linux/Makefile.am b/memcheck/tests/amd64-linux/Makefile.am
+index a3b5df5a67..69a84ffdfc 100644
+--- a/memcheck/tests/amd64-linux/Makefile.am
++++ b/memcheck/tests/amd64-linux/Makefile.am
+@@ -32,5 +32,5 @@ AM_CCASFLAGS += @FLAG_M64@
+ 
+ defcfaexpr_SOURCES	= defcfaexpr.S
+ defcfaexpr_CFLAGS	= $(AM_CFLAGS) @FLAG_NO_PIE@ 
+-reallocarray_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++reallocarray_CFLAGS	= $(AM_CFLAGS) @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+ scalar_CFLAGS = $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+diff --git a/memcheck/tests/x86-freebsd/Makefile.am b/memcheck/tests/x86-freebsd/Makefile.am
+index 8c48506c2b..7839bb3095 100644
+--- a/memcheck/tests/x86-freebsd/Makefile.am
++++ b/memcheck/tests/x86-freebsd/Makefile.am
+@@ -23,4 +23,4 @@ AM_CCASFLAGS += @FLAG_M32@
+ 
+ posix_fallocate_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+ posix_fadvise_CFLAGS	= $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@
+-reallocarray_CFLAGS	= ${AM_CFLAGS} @FLAG_W_NO_ALLOC_SIZE_LARGER_THAN@
++reallocarray_CFLAGS	= ${AM_CFLAGS} @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+-- 
+2.43.7
+
+
+From 7de247c998049db64c4df8cb8bc8e481493f3b8e Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Sat, 3 Jan 2026 18:24:34 +0100
+Subject: [PATCH] readlink("/proc/self/exe") overwrites buffer beyond its
+ return value
+
+https://bugs.kde.org/show_bug.cgi?id=514094
+
+Squashed cherry-picks:
+
+Solaris: set VG_(resolved_exename) in load_client()
+
+  Haven't needed it yet, but I would like to try using it in the
+  readlink syscall wrapper.
+
+(cherry picked from commit bf154d815a9fd7f4aaae97e31aa03cecf69448d4)
+
+Bug 514094 - readlink("/proc/self/exe") overwrites buffer beyond its return value
+
+  Used the reproducer as the basis for a test on Solaris and Linux.
+
+(cherry picked from commit 5c0f5e604bc3a4e8822ea59c488c123af6284afd)
+
+readlink[at] syswrap: limit copy to bufsiz when path is proc self exe
+
+(cherry picked from commit bd9edb8fcd0a8692d865e08fab2a573a4cde4c16)
+
+Regtest: add missing readlinkat_self files
+
+(cherry picked from commit 987034c44105cdc2f6f8d84751135d23bd5c37b6)
+
+regtest: fix warning
+
+  Added a nice const named variable then didn't use it
+
+(cherry picked from commit dae37ecd2692e0e5beba77c296c2648ebbf47637)
+
+Fix bug514094,vgtest typo in none/tests/Makefile.am
+
+(cherry picked from commit 294742a2d9f431fd2dcd73db161f67fb12ddd833)
+
+syswrap readlink and linux readlinkat: check that buf is accessible for proc self exe case
+
+  Also update the t testcases to cover this.
+
+(cherry picked from commit 8d8023d107699c7c2d97acf2dcb77bae71c0b1cf)
+
+solaris readlinkat: check that buf is accessible for proc self path a.out
+
+(cherry picked from commit 827a1b8c307a2eafa001788565e14af3445f2151)
+---
+
+ NEWS                                          |  1 +
+ coregrind/m_initimg/initimg-solaris.c         |  9 ++++
+ coregrind/m_syswrap/syswrap-generic.c         | 29 +++++++----
+ coregrind/m_syswrap/syswrap-linux.c           | 28 +++++++----
+ coregrind/m_syswrap/syswrap-solaris.c         | 13 +++--
+ none/tests/Makefile.am                        |  3 ++
+ none/tests/bug514094.c                        | 48 +++++++++++++++++++
+ none/tests/bug514094.stderr.exp               |  2 +
+ none/tests/bug514094.vgtest                   |  2 +
+ none/tests/linux/Makefile.am                  |  3 ++
+ none/tests/linux/readlinkat_self.c            | 34 +++++++++++++
+ none/tests/linux/readlinkat_self.stderr.exp   |  2 +
+ none/tests/linux/readlinkat_self.vgtest       |  1 +
+ none/tests/solaris/Makefile.am                |  3 ++
+ none/tests/solaris/readlinkat_self.c          | 34 +++++++++++++
+ none/tests/solaris/readlinkat_self.stderr.exp |  2 +
+ none/tests/solaris/readlinkat_self.vgtest     |  1 +
+ 18 files changed, 194 insertions(+), 24 deletions(-)
+ create mode 100644 none/tests/bug514094.c
+ create mode 100644 none/tests/bug514094.stderr.exp
+ create mode 100644 none/tests/bug514094.vgtest
+ create mode 100644 none/tests/linux/readlinkat_self.c
+ create mode 100644 none/tests/linux/readlinkat_self.stderr.exp
+ create mode 100644 none/tests/linux/readlinkat_self.vgtest
+ create mode 100644 none/tests/solaris/readlinkat_self.c
+ create mode 100644 none/tests/solaris/readlinkat_self.stderr.exp
+ create mode 100644 none/tests/solaris/readlinkat_self.vgtest
+
+diff --git a/NEWS b/NEWS
+index 4e6cb3de91..cca48f5131 100644
+--- a/NEWS
++++ b/NEWS
+@@ -8,6 +8,7 @@ The following bugs have been fixed or resolved on this branch.
+ 511972  valgrind-3.26.0 tests fail to build on upcomig gcc-16:
+         unrecognized command-line option
+         '-Wno-alloc-size-larger-than=18446744073709551615'
++514094  readlink("/proc/self/exe") overwrites buffer beyond its return value
+ 
+ To see details of a given bug, visit
+   https://bugs.kde.org/show_bug.cgi?id=XXXXXX
+diff --git a/coregrind/m_initimg/initimg-solaris.c b/coregrind/m_initimg/initimg-solaris.c
+index 79072f3a85..bd2d822e5d 100644
+--- a/coregrind/m_initimg/initimg-solaris.c
++++ b/coregrind/m_initimg/initimg-solaris.c
+@@ -94,6 +94,15 @@ static void load_client(/*OUT*/ExeInfo *info,
+       /*NOTREACHED*/
+    }
+    VG_(strcpy)(out_exe_name, exe_name);
++   if (VG_(resolved_exename) == NULL) {
++      HChar interp_name[VKI_PATH_MAX];
++      if (VG_(try_get_interp)(exe_name, interp_name, VKI_PATH_MAX)) {
++         exe_name = interp_name;
++      }
++      HChar resolved_name[VKI_PATH_MAX];
++      VG_(realpath)(exe_name, resolved_name);
++      VG_(resolved_exename) = VG_(strdup)("initimg-solaris.lc.1", resolved_name);
++   }
+ 
+    /* Set initial brk values. */
+    if (info->ldsoexec) {
+diff --git a/coregrind/m_syswrap/syswrap-generic.c b/coregrind/m_syswrap/syswrap-generic.c
+index 37f312fe8f..f39dbcdba0 100644
+--- a/coregrind/m_syswrap/syswrap-generic.c
++++ b/coregrind/m_syswrap/syswrap-generic.c
+@@ -5060,20 +5060,16 @@ POST(sys_poll)
+ 
+ PRE(sys_readlink)
+ {
+-   FUSE_COMPATIBLE_MAY_BLOCK();
+    PRINT("sys_readlink ( %#" FMT_REGWORD "x(%s), %#" FMT_REGWORD "x, %llu )",
+          ARG1, (char*)(Addr)ARG1, ARG2, (ULong)ARG3);
+    PRE_REG_READ3(long, "readlink",
+                  const char *, path, char *, buf, int, bufsiz);
+    PRE_MEM_RASCIIZ( "readlink(path)", ARG1 );
+    PRE_MEM_WRITE( "readlink(buf)", ARG2,ARG3 );
+-}
+ 
+-POST(sys_readlink)
+-{
++   Bool fuse_may_block = True;
+ #if defined(VGO_linux) || defined(VGO_solaris)
+    {
+-      Word saved = SYSNO;
+ #if defined(VGO_linux)
+ #define PID_EXEPATH  "/proc/%d/exe"
+ #define SELF_EXEPATH "/proc/self/exe"
+@@ -5092,14 +5088,27 @@ POST(sys_readlink)
+       VG_(sprintf)(name, PID_EXEPATH, VG_(getpid)());
+       if (ML_(safe_to_deref)(arg1s, 1)
+           && (VG_STREQ(arg1s, name) || VG_STREQ(arg1s, SELF_EXEPATH))) {
+-         VG_(sprintf)(name, SELF_EXEFD, VG_(cl_exec_fd));
+-         SET_STATUS_from_SysRes( VG_(do_syscall3)(saved, (UWord)name, 
+-                                                  ARG2, ARG3));
++         HChar* out_name = (HChar*)ARG2;
++         SizeT res = VG_(strlen)(VG_(resolved_exename));
++         res = VG_MIN(res, ARG3);
++         if (ML_(safe_to_deref)(out_name, res)) {
++            VG_(strncpy)(out_name, VG_(resolved_exename), res);
++            SET_STATUS_Success(res);
++         } else {
++            SET_STATUS_Failure(VKI_EFAULT);
++         }
++         fuse_may_block = False;
+       }
+    }
+ #endif
+-   if (SUCCESS && RES > 0)
+-      POST_MEM_WRITE( ARG2, RES );
++
++   if (fuse_may_block)
++       FUSE_COMPATIBLE_MAY_BLOCK();
++}
++
++POST(sys_readlink)
++{
++   POST_MEM_WRITE( ARG2, RES );
+ }
+ 
+ PRE(sys_readv)
+diff --git a/coregrind/m_syswrap/syswrap-linux.c b/coregrind/m_syswrap/syswrap-linux.c
+index e8b200385b..f1970cd8be 100644
+--- a/coregrind/m_syswrap/syswrap-linux.c
++++ b/coregrind/m_syswrap/syswrap-linux.c
+@@ -6468,14 +6468,10 @@ PRE(sys_readlinkat)
+    ML_(fd_at_check_allowed)(SARG1, (const HChar*)ARG2, "readlinkat", tid, status);
+    PRE_MEM_RASCIIZ( "readlinkat(path)", ARG2 );
+    PRE_MEM_WRITE( "readlinkat(buf)", ARG3,ARG4 );
+-}
+ 
+-POST(sys_readlinkat)
+-{
++   Bool fuse_may_block = True;
+    HChar name[30];       // large enough
+-   Word  saved = SYSNO;
+ 
+-   // @todo PJF why is this done in POST and not in PRE?
+    /*
+     * Handle the case where readlinkat is looking at /proc/self/exe or
+     * /proc/<pid>/exe.
+@@ -6484,13 +6480,25 @@ POST(sys_readlinkat)
+    if (ML_(safe_to_deref)((void*)(Addr)ARG2, 1)
+        && (VG_(strcmp)((HChar *)(Addr)ARG2, name) == 0
+            || VG_(strcmp)((HChar *)(Addr)ARG2, "/proc/self/exe") == 0)) {
+-      VG_(sprintf)(name, "/proc/self/fd/%d", VG_(cl_exec_fd));
+-      SET_STATUS_from_SysRes( VG_(do_syscall4)(saved, ARG1, (UWord)name, 
+-                                               ARG3, ARG4));
++       HChar* out_name = (HChar*)ARG3;
++       SizeT res = VG_(strlen)(VG_(resolved_exename));
++       res = VG_MIN(res, ARG4);
++       if (ML_(safe_to_deref)(out_name, res)) {
++          VG_(strncpy)(out_name, VG_(resolved_exename), res);
++          SET_STATUS_Success(res);
++       } else {
++          SET_STATUS_Failure(VKI_EFAULT);
++       }
++       fuse_may_block = False;
+    }
+ 
+-   if (SUCCESS && RES > 0)
+-      POST_MEM_WRITE( ARG3, RES );
++   if (fuse_may_block)
++      FUSE_COMPATIBLE_MAY_BLOCK();
++}
++
++POST(sys_readlinkat)
++{
++   POST_MEM_WRITE( ARG3, RES );
+ }
+ 
+ PRE(sys_fchmodat)
+diff --git a/coregrind/m_syswrap/syswrap-solaris.c b/coregrind/m_syswrap/syswrap-solaris.c
+index 2665633f43..57af54fdc3 100644
+--- a/coregrind/m_syswrap/syswrap-solaris.c
++++ b/coregrind/m_syswrap/syswrap-solaris.c
+@@ -2295,7 +2295,6 @@ PRE(sys_readlinkat)
+    /* ssize_t readlinkat(int dfd, const char *path, char *buf,
+                          size_t bufsiz); */
+    HChar name[30];    // large enough
+-   Word saved = SYSNO;
+ 
+    /* Interpret the first argument as 32-bit value even on 64-bit architecture.
+       This is different from Linux, for example, where glibc sign-extends it. */
+@@ -2317,9 +2316,15 @@ PRE(sys_readlinkat)
+    if (ML_(safe_to_deref)((void*)ARG2, 1) &&
+        (!VG_(strcmp)((HChar*)ARG2, name) ||
+         !VG_(strcmp)((HChar*)ARG2, "/proc/self/path/a.out"))) {
+-      VG_(sprintf)(name, "/proc/self/path/%d", VG_(cl_exec_fd));
+-      SET_STATUS_from_SysRes(VG_(do_syscall4)(saved, dfd, (UWord)name, ARG3,
+-                                              ARG4));
++       HChar* out_name = (HChar*)ARG3;
++       SizeT res = VG_(strlen)(VG_(resolved_exename));
++       res = VG_MIN(res, ARG4);
++       if (ML_(safe_to_deref)(out_name, res)) {
++          VG_(strncpy)(out_name, VG_(resolved_exename), res);
++          SET_STATUS_Success(res);
++       } else {
++          SET_STATUS_Failure(VKI_EFAULT);
++       }
+    }
+ }
+ 
+diff --git a/none/tests/Makefile.am b/none/tests/Makefile.am
+index a95d66436d..a5e03de77c 100644
+--- a/none/tests/Makefile.am
++++ b/none/tests/Makefile.am
+@@ -111,6 +111,7 @@ EXTRA_DIST = \
+ 	bug290061.vgtest bug290061.stderr.exp \
+ 	bug491394.vgtest bug491394.stderr.exp \
+ 	bug492678.vgtest bug492678.stderr.exp \
++	bug514094.vgtest bug514094.stderr.exp \
+ 	closeall.stderr.exp closeall.vgtest \
+ 	cmdline0.stderr.exp cmdline0.stdout.exp cmdline0.vgtest \
+ 	cmdline1.stderr.exp cmdline1.stdout.exp cmdline1.vgtest \
+@@ -287,6 +288,7 @@ check_PROGRAMS = \
+ 	bug129866 bug234814 \
+ 	bug290061 \
+ 	bug492678 \
++	bug514094 \
+ 	closeall coolo_strlen \
+ 	discard exec-sigmask execve faultstatus fcntl_setown \
+ 	fdleak_cmsg fdleak_creat fdleak_doubleclose0 fdleak_dup fdleak_dup2 \
+@@ -392,6 +394,7 @@ bug290061_LDFLAGS	= @FLAG_PIE@
+ bug491394_LDADD		= -lc
+ bug491394_LDFLAGS	= -nostdlib -static
+ bug491394_CFLAGS	= ${AM_CFLAGS} -Os
++bug514094_CFLAGS	= ${AM_CFLAGS} @FLAG_W_NO_STRINGOP_OVERFLOW@
+ execve_CFLAGS		= $(AM_CFLAGS) @FLAG_W_NO_NONNULL@
+ if VGCONF_OS_IS_SOLARIS
+ fcntl_setown_LDADD	= -lsocket -lnsl
+diff --git a/none/tests/bug514094.c b/none/tests/bug514094.c
+new file mode 100644
+index 0000000000..a62a6406b7
+--- /dev/null
++++ b/none/tests/bug514094.c
+@@ -0,0 +1,48 @@
++#include <stdio.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <assert.h>
++#include <limits.h>
++#include <errno.h>
++#include "../../config.h"
++
++int main(int argc, char** argv)
++{
++   char buf[PATH_MAX];
++   memset(buf, 0, PATH_MAX);
++#if defined(VGO_solaris)
++   int ret = readlink("/proc/self/path/a.out", buf, PATH_MAX);
++#else
++   // Linux, and maybe one day NetBSD
++   // other platforms excluded by .vgtest prereq
++   int ret = readlink("/proc/self/exe", buf, PATH_MAX);
++#endif
++   if (argc > 1) {
++      printf("ret = %d, buf = %.64s\n", ret, buf);
++   }
++   char resolved[PATH_MAX];
++   realpath(argv[0], resolved);
++   assert(strcmp(resolved, buf) == 0);
++
++   const size_t small_buf_size = 11;
++   char small_buf[small_buf_size];
++   memset(small_buf, '#', small_buf_size);
++#if defined(VGO_solaris)
++   ret = readlink("/proc/self/path/a.out", small_buf, 10);
++#else
++   ret = readlink("/proc/self/exe", small_buf, 10);
++#endif
++   assert(strncmp(resolved, small_buf, 10) == 0);
++   assert(small_buf[10] == '#');
++
++#if defined(VGO_solaris)
++   ret = readlink("/proc/self/path/a.out", (char*)1, 100);
++#else
++   ret = readlink("/proc/self/exe", (char*)1, 100);
++#endif
++   assert(ret == -1);
++   assert(errno = EFAULT);
++}
++
+diff --git a/none/tests/bug514094.stderr.exp b/none/tests/bug514094.stderr.exp
+new file mode 100644
+index 0000000000..139597f9cb
+--- /dev/null
++++ b/none/tests/bug514094.stderr.exp
+@@ -0,0 +1,2 @@
++
++
+diff --git a/none/tests/bug514094.vgtest b/none/tests/bug514094.vgtest
+new file mode 100644
+index 0000000000..292428cb76
+--- /dev/null
++++ b/none/tests/bug514094.vgtest
+@@ -0,0 +1,2 @@
++prereq: ../../tests/os_test solaris || ../../tests/os_test linux
++prog: bug514094
+diff --git a/none/tests/linux/Makefile.am b/none/tests/linux/Makefile.am
+index 55426e2b26..3692c6ff1f 100644
+--- a/none/tests/linux/Makefile.am
++++ b/none/tests/linux/Makefile.am
+@@ -21,6 +21,7 @@ EXTRA_DIST = \
+ 	mremap6.stderr.exp mremap6.vgtest \
+ 	open_client.stderr.exp open_client.vgtest \
+ 	pthread-stack.stderr.exp pthread-stack.vgtest \
++	readlinkat_self.stderr.exp readlinkat_self.vgtest \
+ 	stack-overflow.stderr.exp stack-overflow.vgtest
+ 
+ check_PROGRAMS = \
+@@ -37,6 +38,7 @@ check_PROGRAMS = \
+ 	mremap5 \
+ 	mremap6 \
+ 	pthread-stack \
++	readlinkat_self \
+ 	stack-overflow
+ 
+ if HAVE_OPENAT2
+@@ -58,6 +60,7 @@ open_client_SOURCES = open_client.cpp
+ endif
+ clonev_LDADD = -lpthread
+ pthread_stack_LDADD = -lpthread
++readlinkat_self_CFLAGS = ${AM_CFLAGS} @FLAG_W_NO_STRINGOP_OVERFLOW@
+ 
+ stack_overflow_CFLAGS = $(AM_CFLAGS) @FLAG_W_NO_UNINITIALIZED@ \
+ 			@FLAG_W_NO_INFINITE_RECURSION@
+diff --git a/none/tests/linux/readlinkat_self.c b/none/tests/linux/readlinkat_self.c
+new file mode 100644
+index 0000000000..586581a0d9
+--- /dev/null
++++ b/none/tests/linux/readlinkat_self.c
+@@ -0,0 +1,34 @@
++#include <stdio.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <assert.h>
++#include <limits.h>
++#include <errno.h>
++#include "../../config.h"
++
++int main(int argc, char** argv)
++{
++   char buf[PATH_MAX];
++   memset(buf, 0, PATH_MAX);
++   int ret = readlinkat(99, "/proc/self/exe", buf, PATH_MAX);
++   if (argc > 1) {
++      printf("ret = %d, buf = %.64s\n", ret, buf);
++   }
++   char resolved[PATH_MAX];
++   realpath(argv[0], resolved);
++   assert(strcmp(resolved, buf) == 0);
++
++   const size_t small_buf_size = 11;
++   char small_buf[small_buf_size];
++   memset(small_buf, '#', small_buf_size);
++   ret = readlinkat(100, "/proc/self/exe", small_buf, 10);
++   assert(strncmp(resolved, small_buf, 10) == 0);
++   assert(small_buf[10] == '#');
++
++   ret = readlinkat(101, "/proc/self/exe", (char*)1, 100);
++   assert(ret == -1);
++   assert(errno = EFAULT);
++}
++
+diff --git a/none/tests/linux/readlinkat_self.stderr.exp b/none/tests/linux/readlinkat_self.stderr.exp
+new file mode 100644
+index 0000000000..139597f9cb
+--- /dev/null
++++ b/none/tests/linux/readlinkat_self.stderr.exp
+@@ -0,0 +1,2 @@
++
++
+diff --git a/none/tests/linux/readlinkat_self.vgtest b/none/tests/linux/readlinkat_self.vgtest
+new file mode 100644
+index 0000000000..3b91da54c5
+--- /dev/null
++++ b/none/tests/linux/readlinkat_self.vgtest
+@@ -0,0 +1 @@
++prog: readlinkat_self
+diff --git a/none/tests/solaris/Makefile.am b/none/tests/solaris/Makefile.am
+index 861c9ff562..c488c782de 100644
+--- a/none/tests/solaris/Makefile.am
++++ b/none/tests/solaris/Makefile.am
+@@ -23,6 +23,7 @@ EXTRA_DIST = \
+ 	proc_psinfo.stderr.exp proc_psinfo.stdout.exp proc_psinfo.vgtest \
+ 	posix_spawn.stderr.exp posix_spawn.stdout.exp posix_spawn.vgtest \
+ 	pthread-stack.stderr.exp pthread-stack.vgtest \
++	readlinkat_self.stderr.exp readlinkat_self.vgtest \
+ 	reserve_sysstat_addr.map reserve_sysstat_addr.stderr.exp reserve_sysstat_addr.vgtest \
+ 	reserve_sysstat_zone_addr.map reserve_sysstat_zone_addr.stderr.exp reserve_sysstat_zone_addr.vgtest \
+ 	resolv.stdout.exp resolv.stderr.exp resolv.vgtest \
+@@ -47,6 +48,7 @@ check_PROGRAMS = \
+ 	proc_psinfo \
+ 	posix_spawn \
+ 	pthread-stack \
++	readlinkat_self \
+ 	resolv \
+ 	sigresend \
+ 	stack_overflow \
+@@ -57,6 +59,7 @@ AM_CFLAGS   += $(AM_FLAG_M3264_PRI)
+ AM_CXXFLAGS += $(AM_FLAG_M3264_PRI)
+ 
+ pthread_stack_LDADD = -lpthread
++readlinkat_self_CFLAGS = ${AM_CFLAGS} @FLAG_W_NO_STRINGOP_OVERFLOW@
+ resolv_LDADD = -lresolv
+ stack_overflow_CFLAGS = ${AM_CFLAGS} @FLAG_W_NO_INFINITE_RECURSION@
+ stack_prot_LDFLAGS = -Wl,-M,/usr/lib/ld/map.noexstk
+diff --git a/none/tests/solaris/readlinkat_self.c b/none/tests/solaris/readlinkat_self.c
+new file mode 100644
+index 0000000000..ca60834aeb
+--- /dev/null
++++ b/none/tests/solaris/readlinkat_self.c
+@@ -0,0 +1,34 @@
++#include <stdio.h>
++#include <unistd.h>
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <assert.h>
++#include <limits.h>
++#include <errno.h>
++#include "../../config.h"
++
++int main(int argc, char** argv)
++{
++   char buf[PATH_MAX];
++   memset(buf, 0, PATH_MAX);
++   int ret = readlinkat(99, "/proc/self/path/a.out", buf, PATH_MAX);
++   if (argc > 1) {
++      printf("ret = %d, buf = %.64s\n", ret, buf);
++   }
++   char resolved[PATH_MAX];
++   realpath(argv[0], resolved);
++   assert(strcmp(resolved, buf) == 0);
++
++   const size_t small_buf_size = 11;
++   char small_buf[small_buf_size];
++   memset(small_buf, '#', small_buf_size);
++   ret = readlinkat(100, "/proc/self/path/a.out", small_buf, 10);
++   assert(strncmp(resolved, small_buf, 10) == 0);
++   assert(small_buf[10] == '#');
++
++   ret = readlinkat(101, "/proc/self/path/a.out", (char*)1, 100);
++   assert(ret == -1);
++   assert(errno = EFAULT);
++}
++
+diff --git a/none/tests/solaris/readlinkat_self.stderr.exp b/none/tests/solaris/readlinkat_self.stderr.exp
+new file mode 100644
+index 0000000000..139597f9cb
+--- /dev/null
++++ b/none/tests/solaris/readlinkat_self.stderr.exp
+@@ -0,0 +1,2 @@
++
++
+diff --git a/none/tests/solaris/readlinkat_self.vgtest b/none/tests/solaris/readlinkat_self.vgtest
+new file mode 100644
+index 0000000000..3b91da54c5
+--- /dev/null
++++ b/none/tests/solaris/readlinkat_self.vgtest
+@@ -0,0 +1 @@
++prog: readlinkat_self
+-- 
+2.43.7
+
+
+From 4a1d79be47ead6918053f649f66107b8d8df4310 Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Mon, 1 Dec 2025 08:12:30 +0100
+Subject: [PATCH] Linux DRD suppression: add an entry for
+ __is_decorate_maps_enabled
+
+Seen on Fedora 43
+
+(cherry picked from commit cfc8b0706a9a0fbf05525a0ce142e2bf4cc53fed)
+---
+ drd/tests/std_thread2.supp | 7 +++++++
+ glibc-2.X-drd.supp.in      | 6 ++++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/drd/tests/std_thread2.supp b/drd/tests/std_thread2.supp
+index 40741b06f8..39a201da9a 100644
+--- a/drd/tests/std_thread2.supp
++++ b/drd/tests/std_thread2.supp
+@@ -98,3 +98,10 @@
+    drd:ConflictingAccess
+    fun:__set_vma_name
+ }
++
++{
++   drd-libc-__is_decorate_maps_enabled
++   drd:ConflictingAccess
++   fun:__is_decorate_maps_enabled
++}
++
+diff --git a/glibc-2.X-drd.supp.in b/glibc-2.X-drd.supp.in
+index 419ff2256c..6866904470 100644
+--- a/glibc-2.X-drd.supp.in
++++ b/glibc-2.X-drd.supp.in
+@@ -369,3 +369,9 @@
+    fun:_dl_exception_create_format
+ }
+ 
++{
++   drd-libc-__is_decorate_maps_enabled
++   drd:ConflictingAccess
++   fun:__is_decorate_maps_enabled
++}
++
+-- 
+2.43.7
+
+
+From c080f583dc41a779d339ffd2a08863bd05a80904 Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Mon, 1 Dec 2025 08:18:56 +0100
+Subject: [PATCH] Linux Helgrind: add a suppression for _dl_allocate_tls_init
+
+Seen on Fedora 43 amd64
+
+(cherry picked from commit b599858486bb7db6d2ff3e6ddc4e7f71791d393d)
+---
+ glibc-2.X-helgrind.supp.in | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/glibc-2.X-helgrind.supp.in b/glibc-2.X-helgrind.supp.in
+index 9b1ef9ae48..61d4e1d724 100644
+--- a/glibc-2.X-helgrind.supp.in
++++ b/glibc-2.X-helgrind.supp.in
+@@ -356,3 +356,9 @@
+    obj:/usr/lib/*/libnss_mdns4*.so.*
+ }
+ 
++{
++   helgrind---_dl_allocate_tls_init
++   Helgrind:Race
++   fun:mempcpy
++   fun:_dl_allocate_tls_init
++}
+-- 
+2.43.7
+
+
+From dbdfc2b4522bb210786bddbc16e3ad855d5fa62a Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Wed, 7 Jan 2026 22:20:49 +0100
+Subject: [PATCH] Disable linux madvise MADV_GUARD_INSTALL
+
+glibc 2.42+ (with linux 6.13+) uses MADV_GUARD_INSTALL to setup stack
+guard pages. valgrind currently isn't able to track this and such
+guard pages also don't show up in /proc maps (only in /proc pagemap
+since linux 6.14). For now valgrind fails a madvise MADV_GUARD_INSTALL
+syscall with EINVAL. This causes glibc to fall back to mprotect
+PROT_NONE which valgrind is able to track.
+
+https://bugs.kde.org/show_bug.cgi?id=511717
+
+(cherry picked from commit 19a34d1d9376f459cf0a19feb39ea4ab27690390)
+---
+ NEWS                                  | 14 ++++++++++++++
+ coregrind/m_syswrap/syswrap-generic.c | 10 ++++++++++
+ include/vki/vki-linux.h               |  7 +++++++
+ 3 files changed, 31 insertions(+)
+
+diff --git a/NEWS b/NEWS
+index cca48f5131..28409915e1 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,6 +1,18 @@
+ Branch 3.26
+ ~~~~~~~~~~~
+ 
++* ==================== CORE CHANGES ===================
++
++* linux madvise MADV_GUARD_INSTALL unsupported
++
++  glibc 2.42+ (with linux 6.13+) uses MADV_GUARD_INSTALL to setup
++  stack guard pages. valgrind currently isn't able to track this and
++  such guard pages also don't show up in /proc maps (only in /proc
++  pagemap since linux 6.14). For now valgrind fails a madvise
++  MADV_GUARD_INSTALL syscall with EINVAL. This causes glibc to fall
++  back to mprotect PROT_NONE which valgrind is able to track.
++  See also https://bugs.kde.org/show_bug.cgi?id=514297
++
+ * ==================== FIXED BUGS ====================
+ 
+ The following bugs have been fixed or resolved on this branch.
+@@ -8,6 +20,8 @@ The following bugs have been fixed or resolved on this branch.
+ 511972  valgrind-3.26.0 tests fail to build on upcomig gcc-16:
+         unrecognized command-line option
+         '-Wno-alloc-size-larger-than=18446744073709551615'
++511717  gdbserver (valgrind_read_memory) the 'impossible' happened:
++        Killed by fatal signal (SIGSEGV)
+ 514094  readlink("/proc/self/exe") overwrites buffer beyond its return value
+ 
+ To see details of a given bug, visit
+diff --git a/coregrind/m_syswrap/syswrap-generic.c b/coregrind/m_syswrap/syswrap-generic.c
+index f39dbcdba0..668acc4605 100644
+--- a/coregrind/m_syswrap/syswrap-generic.c
++++ b/coregrind/m_syswrap/syswrap-generic.c
+@@ -3112,6 +3112,16 @@ PRE(sys_madvise)
+                         ARG1, ARG2, SARG3);
+    PRE_REG_READ3(long, "madvise",
+                  unsigned long, start, vki_size_t, length, int, advice);
++   /* Ugly hack to try to bypass the problem of guard pages not being
++      understood by valgrind aspace manager.
++      By making the syscall fail, we expect glibc to fallback
++      on implementing guard pages with mprotect PROT_NONE to ensure
++      the valgrind address space manager is not confused wrongly
++      believing the guard page is rw. */
++#ifdef VKI_MADV_GUARD_INSTALL
++   if (ARG3 == VKI_MADV_GUARD_INSTALL)
++      SET_STATUS_Failure( VKI_EINVAL );
++#endif
+ }
+ 
+ #if HAVE_MREMAP
+diff --git a/include/vki/vki-linux.h b/include/vki/vki-linux.h
+index 3f9272f4d1..96c181a857 100644
+--- a/include/vki/vki-linux.h
++++ b/include/vki/vki-linux.h
+@@ -1364,6 +1364,13 @@ struct  vki_seminfo {
+ #define VKI_MREMAP_MAYMOVE	1
+ #define VKI_MREMAP_FIXED	2
+ 
++//----------------------------------------------------------------------
++// Common madvise flags mman-common.h
++//----------------------------------------------------------------------
++
++#define VKI_MADV_GUARD_INSTALL 102
++#define VKI_MADV_GUARD_REMOVE  103
++
+ //----------------------------------------------------------------------
+ // From linux-2.6.31-rc4/include/linux/futex.h
+ //----------------------------------------------------------------------
+-- 
+2.43.7
+
+
+From 0a95412527ecba22cdb0f96a905a7a5ce45a14bc Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Thu, 15 Jan 2026 08:44:52 +0100
+Subject: [PATCH] Bug 514613 - Unclosed leak_summary/still_reachable tag in xml
+ output
+
+(cherry picked from commit 758b0f55e878fd7bd9dcd1ff3e74f10a7a00a771)
+---
+ NEWS                    | 1 +
+ memcheck/mc_leakcheck.c | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/NEWS b/NEWS
+index 28409915e1..164218c14e 100644
+--- a/NEWS
++++ b/NEWS
+@@ -23,6 +23,7 @@ The following bugs have been fixed or resolved on this branch.
+ 511717  gdbserver (valgrind_read_memory) the 'impossible' happened:
+         Killed by fatal signal (SIGSEGV)
+ 514094  readlink("/proc/self/exe") overwrites buffer beyond its return value
++514613  Unclosed leak_summary/still_reachable tag in xml output
+ 
+ To see details of a given bug, visit
+   https://bugs.kde.org/show_bug.cgi?id=XXXXXX
+diff --git a/memcheck/mc_leakcheck.c b/memcheck/mc_leakcheck.c
+index 586bff448b..4df0b180d5 100644
+--- a/memcheck/mc_leakcheck.c
++++ b/memcheck/mc_leakcheck.c
+@@ -1768,7 +1768,8 @@ static void print_results(ThreadId tid, LeakCheckParams* lcp)
+       umsg_or_xml(VG_(clo_xml) ?
+                   "  <still_reachable>\n"
+                   "    <bytes>%'lu%s</bytes>\n"
+-                  "    <blocks>%'lu%s</blocks>\n" :
++                  "    <blocks>%'lu%s</blocks>\n"
++                  "  </still_reachable>\n" :
+                   "   still reachable: %'lu%s bytes in %'lu%s blocks\n",
+                 MC_(bytes_reachable), 
+                 DBY (MC_(bytes_reachable), old_bytes_reachable), 
+-- 
+2.43.7
+
+
+From 2ddba5ddc12312386b019b4a785c80ce8633ba57 Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Tue, 20 Jan 2026 07:44:31 +0100
+Subject: [PATCH] Bug 514206 - Assertion '!sr_isError(sr)' failed - mmap fd
+ points to an open descriptor to a PCI device
+
+(cherry picked from commit 38609f9b87eb6908a4a04ed5882db337edaec765)
+---
+ NEWS                              | 2 ++
+ coregrind/m_debuginfo/debuginfo.c | 5 ++++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/NEWS b/NEWS
+index 164218c14e..a09cf7e1bb 100644
+--- a/NEWS
++++ b/NEWS
+@@ -23,6 +23,8 @@ The following bugs have been fixed or resolved on this branch.
+ 511717  gdbserver (valgrind_read_memory) the 'impossible' happened:
+         Killed by fatal signal (SIGSEGV)
+ 514094  readlink("/proc/self/exe") overwrites buffer beyond its return value
++514206  Assertion '!sr_isError(sr)' failed - mmap fd points to an open
++        descriptor to a PCI device
+ 514613  Unclosed leak_summary/still_reachable tag in xml output
+ 
+ To see details of a given bug, visit
+diff --git a/coregrind/m_debuginfo/debuginfo.c b/coregrind/m_debuginfo/debuginfo.c
+index 18152b9e25..196fe8d988 100644
+--- a/coregrind/m_debuginfo/debuginfo.c
++++ b/coregrind/m_debuginfo/debuginfo.c
+@@ -1177,8 +1177,11 @@ ULong VG_(di_notify_mmap)( Addr a, Bool allow_SkFileV, Int use_fd )
+     * --20208-- WARNING: Serious error when reading debug info
+     * --20208-- When reading debug info from /proc/xen/privcmd:
+     * --20208-- can't read file to inspect ELF header
++    *
++    * Also PCI devices, see bug 514206
+     */
+-   if (VG_(strncmp)(filename, "/proc/xen/", 10) == 0)
++   if (VG_(strncmp)(filename, "/proc/xen/", 10) == 0 ||
++       VG_(strncmp)(filename, "/sys/devices/pci", 16) == 0)
+       return 0;
+ 
+    if (debug)
+-- 
+2.43.7
+
+
+From 844101289032c59cbb8523bef71756997a3efacb Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Wed, 28 Jan 2026 13:38:39 +0100
+Subject: [PATCH] Bug 514613 again (closing </still_reachable> xml tag)
+
+Always close the tag after the heuristic details.
+
+Add 4 testcases, one with no errors, one with a simple leak,
+one with a simple reachable and one "Xmas tree" test (in
+reference to the TCP/IP Christmas tree packet
+https://en.wikipedia.org/wiki/Christmas_tree_packet). That
+has most of the errors that memcheck can produce.
+
+All of these tests get checked by xmllint.
+
+(cherry picked from commit 65d41bffbec97e0174db7101a42fb8a8cca21666)
+---
+
+ memcheck/mc_leakcheck.c                       | 16 ++--
+ memcheck/tests/Makefile.am                    | 14 ++-
+ memcheck/tests/nothing.c                      |  5 ++
+ memcheck/tests/nothing_xml.stderr.exp         |  0
+ memcheck/tests/nothing_xml.vgtest             |  4 +
+ memcheck/tests/simple_leak.c                  | 10 +++
+ memcheck/tests/simple_leak_xml.stderr.exp     |  0
+ memcheck/tests/simple_leak_xml.vgtest         |  4 +
+ memcheck/tests/simple_reachable.c             |  9 ++
+ .../tests/simple_reachable_xml.stderr.exp     |  0
+ memcheck/tests/simple_reachable_xml.vgtest    |  4 +
+ memcheck/tests/xmas_tree.cpp                  | 90 +++++++++++++++++++
+ memcheck/tests/xmas_tree_xml.stderr.exp       |  0
+ memcheck/tests/xmas_tree_xml.supp             |  7 ++
+ memcheck/tests/xmas_tree_xml.vgtest           |  4 +
+ 16 files changed, 162 insertions(+), 9 deletions(-)
+ create mode 100644 memcheck/tests/nothing.c
+ create mode 100644 memcheck/tests/nothing_xml.stderr.exp
+ create mode 100644 memcheck/tests/nothing_xml.vgtest
+ create mode 100644 memcheck/tests/simple_leak.c
+ create mode 100644 memcheck/tests/simple_leak_xml.stderr.exp
+ create mode 100644 memcheck/tests/simple_leak_xml.vgtest
+ create mode 100644 memcheck/tests/simple_reachable.c
+ create mode 100644 memcheck/tests/simple_reachable_xml.stderr.exp
+ create mode 100644 memcheck/tests/simple_reachable_xml.vgtest
+ create mode 100644 memcheck/tests/xmas_tree.cpp
+ create mode 100644 memcheck/tests/xmas_tree_xml.stderr.exp
+ create mode 100644 memcheck/tests/xmas_tree_xml.supp
+ create mode 100644 memcheck/tests/xmas_tree_xml.vgtest
+
+ 
+diff --git a/memcheck/mc_leakcheck.c b/memcheck/mc_leakcheck.c
+index 4df0b180d5..b0056b65bd 100644
+--- a/memcheck/mc_leakcheck.c
++++ b/memcheck/mc_leakcheck.c
+@@ -1768,23 +1768,23 @@ static void print_results(ThreadId tid, LeakCheckParams* lcp)
+       umsg_or_xml(VG_(clo_xml) ?
+                   "  <still_reachable>\n"
+                   "    <bytes>%'lu%s</bytes>\n"
+-                  "    <blocks>%'lu%s</blocks>\n"
+-                  "  </still_reachable>\n" :
++                  "    <blocks>%'lu%s</blocks>\n" :
+                   "   still reachable: %'lu%s bytes in %'lu%s blocks\n",
+                 MC_(bytes_reachable), 
+                 DBY (MC_(bytes_reachable), old_bytes_reachable), 
+                 MC_(blocks_reachable),
+                 DBL (MC_(blocks_reachable), old_blocks_reachable));
+-      for (i = 0; i < N_LEAK_CHECK_HEURISTICS; i++)
++      for (i = 0; i < N_LEAK_CHECK_HEURISTICS; i++) {
+          if (old_blocks_heuristically_reachable[i] > 0 
+              || MC_(blocks_heuristically_reachable)[i] > 0) {
+             umsg_or_xml(VG_(clo_xml) ? "" : "                      of which "
+                       "reachable via heuristic:\n");
+             break;
+          }
+-      for (i = 0; i < N_LEAK_CHECK_HEURISTICS; i++)
+-         if (old_blocks_heuristically_reachable[i] > 0 
+-             || MC_(blocks_heuristically_reachable)[i] > 0)
++      }
++      for (i = 0; i < N_LEAK_CHECK_HEURISTICS; i++) {
++         if (old_blocks_heuristically_reachable[i] > 0
++             || MC_(blocks_heuristically_reachable)[i] > 0) {
+             umsg_or_xml(VG_(clo_xml) ?
+                         "    <reachable_heuristic>\n"
+                         "      <kind>%ls</kind>\n"
+@@ -1800,7 +1800,9 @@ static void print_results(ThreadId tid, LeakCheckParams* lcp)
+                       MC_(blocks_heuristically_reachable)[i],
+                       DBL (MC_(blocks_heuristically_reachable)[i],
+                            old_blocks_heuristically_reachable[i]));
+-      if (VG_(clo_xml) && MC_(bytes_reachable)) {
++         }
++      }
++      if (VG_(clo_xml)) {
+          umsg_or_xml("  </still_reachable>\n");
+       }
+       umsg_or_xml(VG_(clo_xml) ?
+diff --git a/memcheck/tests/Makefile.am b/memcheck/tests/Makefile.am
+index 4bdca487aa..8be95ed397 100644
+--- a/memcheck/tests/Makefile.am
++++ b/memcheck/tests/Makefile.am
+@@ -307,6 +307,7 @@ EXTRA_DIST = \
+ 	new_nothrow.stderr.exp new_nothrow.vgtest \
+ 	new_override.stderr.exp new_override.stdout.exp new_override.vgtest \
+ 	noisy_child.vgtest noisy_child.stderr.exp noisy_child.stdout.exp \
++	nothing_xml.vgtest nothing_xml.stderr.exp \
+ 	null_socket.stderr.exp null_socket.vgtest \
+ 	origin1-yes.vgtest origin1-yes.stdout.exp origin1-yes.stderr.exp \
+ 		origin1-yes.stderr.exp-freebsd \
+@@ -403,6 +404,8 @@ EXTRA_DIST = \
+ 	    sigkill.stderr.exp-glibc-2.28 sigkill.vgtest \
+ 	signal2.stderr.exp signal2.stdout.exp signal2.vgtest \
+ 	sigprocmask.stderr.exp sigprocmask.stderr.exp2 sigprocmask.vgtest \
++	simple_leak_xml.vgtest simple_reachable_xml.vgtest \
++	simple_leak_xml.stderr.exp simple_reachable_xml.stderr.exp \
+ 	sized_delete.stderr.exp sized_delete.stderr.exp-x86 sized_delete.vgtest \
+ 	static_malloc.stderr.exp static_malloc.vgtest \
+ 	stpncpy.vgtest stpncpy.stderr.exp stpncpy.stdout.exp \
+@@ -478,6 +481,7 @@ EXTRA_DIST = \
+ 	wrapmallocstatic.vgtest wrapmallocstatic.stdout.exp \
+ 	wrapmallocstatic.stderr.exp \
+ 	writev1.stderr.exp writev1.stderr.exp-solaris writev1.vgtest \
++	xmas_tree_xml.vgtest xmas_tree_xml.supp xmas_tree_xml.stderr.exp \
+ 	xml1.stderr.exp xml1.stdout.exp xml1.vgtest xml1.stderr.exp-s390x-mvc
+ 
+ check_PROGRAMS = \
+@@ -539,6 +543,7 @@ check_PROGRAMS = \
+ 	mismatches new_override metadata \
+ 	nanoleak_supp nanoleak2 new_nothrow \
+ 	noisy_child \
++	nothing \
+ 	null_socket \
+ 	origin1-yes origin2-not-quite origin3-no \
+ 	origin4-many origin5-bz2 origin6-fp \
+@@ -556,7 +561,9 @@ check_PROGRAMS = \
+ 	sbfragment \
+ 	sendmsg \
+ 	sh-mem sh-mem-random \
+-	sigaltstack signal2 sigprocmask static_malloc sigkill \
++	sigaltstack signal2 sigprocmask \
++	simple_leak simple_reachable \
++	static_malloc sigkill \
+ 	strchr \
+ 	str_tester \
+ 	supp_unknown supp1 supp2 suppfree \
+@@ -575,7 +582,8 @@ check_PROGRAMS = \
+ 	wmemcmp \
+ 	wrap1 wrap2 wrap3 wrap4 wrap5 wrap6 wrap7 wrap7so.so wrap8 \
+ 	wrapmalloc wrapmallocso.so wrapmallocstatic \
+-	writev1
++	writev1 \
++	xmas_tree
+ 
+ if !SOLARIS_SUN_STUDIO_AS
+ # Sun Studio assembler fails on "IDENT too long"
+@@ -950,3 +958,5 @@ endif
+ writev1_CFLAGS		= $(AM_CFLAGS) @FLAG_W_NO_STRINGOP_OVERFLOW@ @FLAG_W_NO_STRINGOP_OVERREAD@
+ xml1_CFLAGS             = $(AM_CFLAGS) -D_GNU_SOURCE @FLAG_W_NO_UNINITIALIZED@ @FLAG_W_NO_USE_AFTER_FREE@
+ 
++xmas_tree_SOURCES	= xmas_tree.cpp
++xmas_tree_CXXFLAGS	= ${AM_CXXFLAGS} @FLAG_W_NO_UNINITIALIZED@ @FLAG_W_NO_MISMATCHED_NEW_DELETE@ @FLAG_W_ALLOC_SIZE_LARGER_THAN@
+diff --git a/memcheck/tests/nothing.c b/memcheck/tests/nothing.c
+new file mode 100644
+index 0000000000..2e424a58de
+--- /dev/null
++++ b/memcheck/tests/nothing.c
+@@ -0,0 +1,5 @@
++/* no errors, except Darwin */
++int main()
++{
++}
++
+diff --git a/memcheck/tests/nothing_xml.stderr.exp b/memcheck/tests/nothing_xml.stderr.exp
+new file mode 100644
+index 0000000000..e69de29bb2
+diff --git a/memcheck/tests/nothing_xml.vgtest b/memcheck/tests/nothing_xml.vgtest
+new file mode 100644
+index 0000000000..db2eca402a
+--- /dev/null
++++ b/memcheck/tests/nothing_xml.vgtest
+@@ -0,0 +1,4 @@
++prereq: which xmllint > /dev/null
++prog: nothing
++args: | xmllint --noout -
++vgopts: --xml=yes --xml-fd=1
+diff --git a/memcheck/tests/simple_leak.c b/memcheck/tests/simple_leak.c
+new file mode 100644
+index 0000000000..b94dade4c2
+--- /dev/null
++++ b/memcheck/tests/simple_leak.c
+@@ -0,0 +1,10 @@
++#include <stdlib.h>
++
++static void *p;
++
++int main ()
++{
++  p = malloc (1024);
++  p = NULL;
++}
++
+diff --git a/memcheck/tests/simple_leak_xml.stderr.exp b/memcheck/tests/simple_leak_xml.stderr.exp
+new file mode 100644
+index 0000000000..e69de29bb2
+diff --git a/memcheck/tests/simple_leak_xml.vgtest b/memcheck/tests/simple_leak_xml.vgtest
+new file mode 100644
+index 0000000000..9652b32764
+--- /dev/null
++++ b/memcheck/tests/simple_leak_xml.vgtest
+@@ -0,0 +1,4 @@
++prereq: which xmllint > /dev/null
++prog: simple_leak
++args: | xmllint --noout -
++vgopts: --xml=yes --xml-fd=1
+diff --git a/memcheck/tests/simple_reachable.c b/memcheck/tests/simple_reachable.c
+new file mode 100644
+index 0000000000..4fe1adaf45
+--- /dev/null
++++ b/memcheck/tests/simple_reachable.c
+@@ -0,0 +1,9 @@
++#include <stdlib.h>
++
++static void *p;
++
++int main ()
++{
++  p = malloc (1024);
++}
++
+diff --git a/memcheck/tests/simple_reachable_xml.stderr.exp b/memcheck/tests/simple_reachable_xml.stderr.exp
+new file mode 100644
+index 0000000000..e69de29bb2
+diff --git a/memcheck/tests/simple_reachable_xml.vgtest b/memcheck/tests/simple_reachable_xml.vgtest
+new file mode 100644
+index 0000000000..a64cb2ac5d
+--- /dev/null
++++ b/memcheck/tests/simple_reachable_xml.vgtest
+@@ -0,0 +1,4 @@
++prereq: which xmllint > /dev/null
++prog: simple_reachable
++args: | xmllint --noout -
++vgopts: --xml=yes --xml-fd=1
+diff --git a/memcheck/tests/xmas_tree.cpp b/memcheck/tests/xmas_tree.cpp
+new file mode 100644
+index 0000000000..680833b46d
+--- /dev/null
++++ b/memcheck/tests/xmas_tree.cpp
+@@ -0,0 +1,90 @@
++#include <new>
++#include <cstdlib>
++#include <cstring>
++#include <unistd.h>
++#include "../memcheck.h"
++
++struct Ae
++{
++   virtual ~Ae()
++   {
++   }
++};
++struct Be
++{
++   virtual ~Be()
++   {
++   }
++};
++struct Ce : public Ae, public Be
++{
++   virtual ~Ce()
++   {
++   }
++};
++
++void* reachable;
++Be *interior;
++
++int suppress_me()
++{
++   int qqq;
++   if (qqq)
++       return 2;
++    return 1;
++}
++
++int main()
++{
++    std::align_val_t misalign(static_cast<std::align_val_t>(63U));
++    std::align_val_t align(static_cast<std::align_val_t>(64U));
++    std::align_val_t align2(static_cast<std::align_val_t>(32U));
++    std::size_t size(32);
++    std::size_t badsize(42);
++    std::nothrow_t tag;
++    int count{0};
++
++    char *mem = static_cast<char*>(operator new[](size, tag));
++    if (mem[31])
++        ++count;
++    if (mem[32])
++        ++count;
++    operator delete(mem, misalign, tag);
++
++    mem = static_cast<char*>(operator new(size, align, tag));
++    operator delete(mem, align2, tag);
++
++    mem = static_cast<char*>(malloc(20));
++    mem = static_cast<char*>(realloc(mem, 0));
++    delete mem;
++
++    mem = static_cast<char*>(operator new[](size));
++    memcpy(mem+10, mem+5, 10);
++    operator delete[](mem, badsize);
++
++    mem = static_cast<char*>(malloc(-1));
++
++    int fd{42};
++    int bad;
++    fd += bad;
++    fd -= bad;
++    char* buf{nullptr};
++    ++buf;
++    write(fd, buf, fd);
++
++    int zzz;
++    VALGRIND_CHECK_MEM_IS_DEFINED(&zzz, 4);
++
++    reachable = malloc(10);
++    mem = static_cast<char*>(malloc(20));
++
++    char* indirect = static_cast<char*>(malloc(30));
++    memcpy(&mem[8], &indirect, sizeof(indirect));
++    mem = nullptr;
++
++    count += suppress_me();
++
++    interior = new Ce;  // interior ptr.
++
++    return count;
++}
+diff --git a/memcheck/tests/xmas_tree_xml.stderr.exp b/memcheck/tests/xmas_tree_xml.stderr.exp
+new file mode 100644
+index 0000000000..e69de29bb2
+diff --git a/memcheck/tests/xmas_tree_xml.supp b/memcheck/tests/xmas_tree_xml.supp
+new file mode 100644
+index 0000000000..2643371609
+--- /dev/null
++++ b/memcheck/tests/xmas_tree_xml.supp
+@@ -0,0 +1,7 @@
++{
++   Hello, suppression World!
++   Memcheck:Cond
++   fun:_Z11suppress_mev
++   fun:main
++}
++
+diff --git a/memcheck/tests/xmas_tree_xml.vgtest b/memcheck/tests/xmas_tree_xml.vgtest
+new file mode 100644
+index 0000000000..5061ad12a4
+--- /dev/null
++++ b/memcheck/tests/xmas_tree_xml.vgtest
+@@ -0,0 +1,4 @@
++prereq: which xmllint > /dev/null
++prog: xmas_tree
++args: | xmllint --noout -
++vgopts: --xml=yes --xml-fd=1 --leak-check=full --suppressions=xmas_tree_xml.supp --leak-check-heuristics=multipleinheritance
+-- 
+2.43.7
+
+
