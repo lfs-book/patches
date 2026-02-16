@@ -1,0 +1,183 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2026-02-15
+Initial Package Version: 1.0.1
+Upstream Status:         Abandoned
+Origin:                  Upstream (PR#32 for a base guide) with changes for
+                         compatibilty for sphinx-9.1.0 and pytest-9.0.2.
+Description:             Fixes a significant compatibility problem with Sphinx
+                         that causes the module to output blank documents if
+                         equations are used. This is because the function
+                         "domain.has_equations()" has been removed from Sphinx.
+                         There was an old PR from May of 2025 that fixed part
+                         of this, but further adaptations were required for
+                         Sphinx 9.1. The test suite also needed to be adapted
+                         for compatibilty with pytest-9.0.2.
+
+diff -Naurp sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib/jsmath/__init__.py sphinxcontrib-jsmath-1.0.1/sphinxcontrib/jsmath/__init__.py
+--- sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib/jsmath/__init__.py	2019-01-21 09:42:01.000000000 -0600
++++ sphinxcontrib-jsmath-1.0.1/sphinxcontrib/jsmath/__init__.py	2026-02-15 21:23:41.267566642 -0600
+@@ -15,8 +15,6 @@ from typing import Any, Dict, cast
+ from docutils import nodes
+ from sphinx.application import Sphinx
+ from sphinx.builders.html import StandaloneHTMLBuilder
+-from sphinx.domains.math import MathDomain
+-from sphinx.environment import BuildEnvironment
+ from sphinx.errors import ExtensionError
+ from sphinx.locale import get_translation
+ from sphinx.util.math import get_node_equation_number
+@@ -62,7 +60,12 @@ def html_visit_displaymath(self: HTMLTra
+     raise nodes.SkipNode
+ 
+ 
+-def install_jsmath(app: Sphinx, env: BuildEnvironment) -> None:
++def install_jsmath(app: Sphinx,
++                   pagename: str,
++                   templatename: str,
++                   context: dict[str, Any],
++                   event_arg: Any,
++                   ) -> None:
+     if app.builder.format != 'html' or app.builder.math_renderer_name != 'jsmath':  # type: ignore  # NOQA
+         return
+     if not app.config.jsmath_path:
+@@ -70,8 +73,8 @@ def install_jsmath(app: Sphinx, env: Bui
+                              'jsmath extension to work')
+ 
+     builder = cast(StandaloneHTMLBuilder, app.builder)
+-    domain = cast(MathDomain, env.get_domain('math'))
+-    if domain.has_equations():
++    page_has_equations = context.get('has_maths_elements', True)
++    if app.registry.html_assets_policy == 'always' or page_has_equations:
+         # Enable jsmath only if equations exists
+         builder.add_js_file(app.config.jsmath_path)
+ 
+@@ -84,7 +87,7 @@ def setup(app: Sphinx) -> Dict[str, Any]
+                                (html_visit_displaymath, None))
+ 
+     app.add_config_value('jsmath_path', '', False)
+-    app.connect('env-updated', install_jsmath)
++    app.connect('html-page-context', install_jsmath)
+     return {
+         'version': __version__,
+         'parallel_read_safe': True,
+diff -Naurp sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib_jsmath.egg-info/PKG-INFO sphinxcontrib-jsmath-1.0.1/sphinxcontrib_jsmath.egg-info/PKG-INFO
+--- sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib_jsmath.egg-info/PKG-INFO	2019-01-21 10:09:55.000000000 -0600
++++ sphinxcontrib-jsmath-1.0.1/sphinxcontrib_jsmath.egg-info/PKG-INFO	2026-02-15 21:23:49.435373530 -0600
+@@ -1,16 +1,12 @@
+-Metadata-Version: 2.1
++Metadata-Version: 2.4
+ Name: sphinxcontrib-jsmath
+ Version: 1.0.1
+ Summary: A sphinx extension which renders display math in HTML via JavaScript
+ Home-page: http://sphinx-doc.org/
++Download-URL: https://pypi.org/project/sphinxcontrib-jsmath/
+ Author: Georg Brandl
+ Author-email: georg@python.org
+ License: BSD
+-Download-URL: https://pypi.org/project/sphinxcontrib-jsmath/
+-Description: 
+-        sphinxcontrib-jsmath is a sphinx extension which renders display math in HTML
+-        via JavaScript.
+-        
+ Platform: any
+ Classifier: Development Status :: 5 - Production/Stable
+ Classifier: Environment :: Console
+@@ -31,4 +27,24 @@ Classifier: Topic :: Documentation :: Sp
+ Classifier: Topic :: Text Processing
+ Classifier: Topic :: Utilities
+ Requires-Python: >=3.5
++License-File: LICENSE
+ Provides-Extra: test
++Requires-Dist: pytest; extra == "test"
++Requires-Dist: flake8; extra == "test"
++Requires-Dist: mypy; extra == "test"
++Dynamic: author
++Dynamic: author-email
++Dynamic: classifier
++Dynamic: description
++Dynamic: download-url
++Dynamic: home-page
++Dynamic: license
++Dynamic: license-file
++Dynamic: platform
++Dynamic: provides-extra
++Dynamic: requires-python
++Dynamic: summary
++
++
++sphinxcontrib-jsmath is a sphinx extension which renders display math in HTML
++via JavaScript.
+diff -Naurp sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib_jsmath.egg-info/SOURCES.txt sphinxcontrib-jsmath-1.0.1/sphinxcontrib_jsmath.egg-info/SOURCES.txt
+--- sphinxcontrib-jsmath-1.0.1.orig/sphinxcontrib_jsmath.egg-info/SOURCES.txt	2019-01-21 10:09:55.000000000 -0600
++++ sphinxcontrib-jsmath-1.0.1/sphinxcontrib_jsmath.egg-info/SOURCES.txt	2026-02-15 21:23:49.444529239 -0600
+@@ -17,6 +17,8 @@ sphinxcontrib_jsmath.egg-info/requires.t
+ sphinxcontrib_jsmath.egg-info/top_level.txt
+ tests/conftest.py
+ tests/test_jsmath.py
++tests/__pycache__/conftest.cpython-314-pytest-9.0.2.pyc
++tests/__pycache__/test_jsmath.cpython-314-pytest-9.0.2.pyc
+ tests/roots/test-basic/conf.py
+ tests/roots/test-basic/index.rst
+ tests/roots/test-basic/math.rst
+diff -Naurp sphinxcontrib-jsmath-1.0.1.orig/tests/conftest.py sphinxcontrib-jsmath-1.0.1/tests/conftest.py
+--- sphinxcontrib-jsmath-1.0.1.orig/tests/conftest.py	2019-01-13 22:51:22.000000000 -0600
++++ sphinxcontrib-jsmath-1.0.1/tests/conftest.py	2026-02-15 20:57:30.382165352 -0600
+@@ -8,11 +8,11 @@
+ 
+ import pytest
+ 
+-from sphinx.testing.path import path
++from pathlib import Path
+ 
+ pytest_plugins = 'sphinx.testing.fixtures'
+ 
+ 
+ @pytest.fixture(scope='session')
+ def rootdir():
+-    return path(__file__).parent.abspath() / 'roots'
++    return Path(__file__).resolve().parent / 'roots'
+diff -Naurp sphinxcontrib-jsmath-1.0.1.orig/tests/test_jsmath.py sphinxcontrib-jsmath-1.0.1/tests/test_jsmath.py
+--- sphinxcontrib-jsmath-1.0.1.orig/tests/test_jsmath.py	2019-01-04 04:06:27.000000000 -0600
++++ sphinxcontrib-jsmath-1.0.1/tests/test_jsmath.py	2026-02-15 21:07:15.856441388 -0600
+@@ -9,13 +9,14 @@
+ """
+ 
+ import pytest
+-
++import sphinx
+ 
+ @pytest.mark.sphinx('html', testroot='basic')
+ def test_basic(app, status, warning):
+     app.builder.build_all()
+-    content = (app.outdir / 'math.html').text()
++    content = (app.outdir / 'math.html').read_text()
+     print(content)
++    assert 'jsmath.js' in content
+     assert '<div class="math notranslate nohighlight">\nE = mc^2</div>' in content
+     assert ('<span class="eqno">(1)<a class="headerlink" href="#equation-pythagorean" '
+             'title="Permalink to this equation">¶</a></span>'
+@@ -34,7 +35,8 @@ def test_basic(app, status, warning):
+ def test_numfig_enabled(app, status, warning):
+     app.builder.build_all()
+ 
+-    content = (app.outdir / 'math.html').text()
++    content = (app.outdir / 'math.html').read_text()
++    assert 'jsmath.js' in content
+     assert '<div class="math notranslate nohighlight">\nE = mc^2</div>' in content
+     assert ('<span class="eqno">(1.1)<a class="headerlink" href="#equation-pythagorean" '
+             'title="Permalink to this equation">¶</a></span>'
+@@ -47,10 +49,13 @@ def test_numfig_enabled(app, status, war
+     assert '<a class="reference internal" href="#equation-pythagorean">(1.1)</a>' in content
+     assert '<a class="reference internal" href="#equation-pythagorean">(1.1)</a>' in content
+ 
+-
++@pytest.mark.skipif(
++        sphinx.version_info < (8, 2),
++        reason='Sphinx < 8.2 does not have `has_maths_elements` in context',
++)
+ @pytest.mark.sphinx('html', testroot='nomath')
+ def test_disabled_when_equations_not_found(app, status, warning):
+     app.builder.build_all()
+ 
+-    content = (app.outdir / 'index.html').text()
++    content = (app.outdir / 'index.html').read_text()
+     assert 'jsmath.js' not in content
