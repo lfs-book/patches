@@ -3,7 +3,7 @@ Date:                    2026-02-26
 Initial Package Version: 26.2.0.3
 Origin:                  Marty J.
 Upstream Status:         Unknown
-Description:             Fixes building Libreoffice with poppler-16.02
+Description:             Fixes building Libreoffice with poppler-26.02
 diff -Naur libreoffice-26.2.0.3.orig/sdext/source/pdfimport/xpdfwrapper/pdfioutdev_gpl.cxx libreoffice-26.2.0.3/sdext/source/pdfimport/xpdfwrapper/pdfioutdev_gpl.cxx
 --- libreoffice-26.2.0.3.orig/sdext/source/pdfimport/xpdfwrapper/pdfioutdev_gpl.cxx	2026-01-27 16:11:38.000000000 -0500
 +++ libreoffice-26.2.0.3/sdext/source/pdfimport/xpdfwrapper/pdfioutdev_gpl.cxx	2026-02-06 21:43:02.552471927 -0500
