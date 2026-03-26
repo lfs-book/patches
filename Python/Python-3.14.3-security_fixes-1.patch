@@ -1,0 +1,321 @@
+Submitted By:            Joe Locash
+Date:                    2026-03-26
+Initial Package Version: 3.14.3
+Upstream Status:         Applied
+Origin:                  Upstream
+               https://github.com/python/cpython/commit/eb0e8be3a7e11b87d198a2c3af1ed0eccf532768
+               https://github.com/python/cpython/commit/57e88c1cf95e1481b94ae57abe1010469d47a6b4
+               https://github.com/python/cpython/pull/143931
+Description:  
+     When an Expat parser with a registered ElementDeclHandler parses an inline 
+     document type definition containing a deeply nested content model a C stack overflow occurs.
+
+     The fix for CVE-2026-0672, which rejected control characters in
+     http.cookies.Morsel, was incomplete. The Morsel.update(), |= operator, and
+     unpickling paths were not patched, allowing control characters to bypass
+     input validation. Additionally, BaseCookie.js_output() lacked the output
+     validation applied to BaseCookie.output().
+
+     The webbrowser.open() API would accept leading dashes in the URL which
+     could be handled as command line options for certain web browsers. New
+     behavior rejects leading dashes. Users are recommended to sanitize URLs
+     prior to passing to webbrowser.open(). 
+
+     Fixes backported to version 3.14.3 by Joe Locash.
+
+diff -Nuarp Python-3.14.3.orig/Lib/http/cookies.py Python-3.14.3/Lib/http/cookies.py
+--- Python-3.14.3.orig/Lib/http/cookies.py	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Lib/http/cookies.py	2026-03-21 16:49:52.712312381 -0400
+@@ -337,9 +337,16 @@ class Morsel(dict):
+             key = key.lower()
+             if key not in self._reserved:
+                 raise CookieError("Invalid attribute %r" % (key,))
++            if _has_control_character(key, val):
++                raise CookieError("Control characters are not allowed in "
++                                  f"cookies {key!r} {val!r}")
+             data[key] = val
+         dict.update(self, data)
+ 
++    def __ior__(self, values):
++        self.update(values)
++        return self
++
+     def isReservedKey(self, K):
+         return K.lower() in self._reserved
+ 
+@@ -365,9 +372,15 @@ class Morsel(dict):
+         }
+ 
+     def __setstate__(self, state):
+-        self._key = state['key']
+-        self._value = state['value']
+-        self._coded_value = state['coded_value']
++        key = state['key']
++        value = state['value']
++        coded_value = state['coded_value']
++        if _has_control_character(key, value, coded_value):
++            raise CookieError("Control characters are not allowed in cookies "
++                              f"{key!r} {value!r} {coded_value!r}")
++        self._key = key
++        self._value = value
++        self._coded_value = coded_value
+ 
+     def output(self, attrs=None, header="Set-Cookie:"):
+         return "%s %s" % (header, self.OutputString(attrs))
+@@ -379,13 +392,16 @@ class Morsel(dict):
+ 
+     def js_output(self, attrs=None):
+         # Print javascript
++        output_string = self.OutputString(attrs)
++        if _has_control_character(output_string):
++            raise CookieError("Control characters are not allowed in cookies")
+         return """
+         <script type="text/javascript">
+         <!-- begin hiding
+         document.cookie = \"%s\";
+         // end hiding -->
+         </script>
+-        """ % (self.OutputString(attrs).replace('"', r'\"'))
++        """ % (output_string.replace('"', r'\"'))
+ 
+     def OutputString(self, attrs=None):
+         # Build up our result
+diff -Nuarp Python-3.14.3.orig/Lib/test/test_http_cookies.py Python-3.14.3/Lib/test/test_http_cookies.py
+--- Python-3.14.3.orig/Lib/test/test_http_cookies.py	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Lib/test/test_http_cookies.py	2026-03-21 16:49:52.712674042 -0400
+@@ -581,6 +581,14 @@ class MorselTests(unittest.TestCase):
+             with self.assertRaises(cookies.CookieError):
+                 morsel["path"] = c0
+ 
++            # .__setstate__()
++            with self.assertRaises(cookies.CookieError):
++                morsel.__setstate__({'key': c0, 'value': 'val', 'coded_value': 'coded'})
++            with self.assertRaises(cookies.CookieError):
++                morsel.__setstate__({'key': 'key', 'value': c0, 'coded_value': 'coded'})
++            with self.assertRaises(cookies.CookieError):
++                morsel.__setstate__({'key': 'key', 'value': 'val', 'coded_value': c0})
++
+             # .setdefault()
+             with self.assertRaises(cookies.CookieError):
+                 morsel.setdefault("path", c0)
+@@ -595,6 +603,18 @@ class MorselTests(unittest.TestCase):
+             with self.assertRaises(cookies.CookieError):
+                 morsel.set("path", "val", c0)
+ 
++            # .update()
++            with self.assertRaises(cookies.CookieError):
++                morsel.update({"path": c0})
++            with self.assertRaises(cookies.CookieError):
++                morsel.update({c0: "val"})
++
++            # .__ior__()
++            with self.assertRaises(cookies.CookieError):
++                morsel |= {"path": c0}
++            with self.assertRaises(cookies.CookieError):
++                morsel |= {c0: "val"}
++
+     def test_control_characters_output(self):
+         # Tests that even if the internals of Morsel are modified
+         # that a call to .output() has control character safeguards.
+@@ -615,6 +635,24 @@ class MorselTests(unittest.TestCase):
+             with self.assertRaises(cookies.CookieError):
+                 cookie.output()
+ 
++        # Tests that .js_output() also has control character safeguards.
++        for c0 in support.control_characters_c0():
++            morsel = cookies.Morsel()
++            morsel.set("key", "value", "coded-value")
++            morsel._key = c0  # Override private variable.
++            cookie = cookies.SimpleCookie()
++            cookie["cookie"] = morsel
++            with self.assertRaises(cookies.CookieError):
++                cookie.js_output()
++
++            morsel = cookies.Morsel()
++            morsel.set("key", "value", "coded-value")
++            morsel._coded_value = c0  # Override private variable.
++            cookie = cookies.SimpleCookie()
++            cookie["cookie"] = morsel
++            with self.assertRaises(cookies.CookieError):
++                cookie.js_output()
++
+ 
+ def load_tests(loader, tests, pattern):
+     tests.addTest(doctest.DocTestSuite(cookies))
+diff -Nuarp Python-3.14.3.orig/Lib/test/test_pyexpat.py Python-3.14.3/Lib/test/test_pyexpat.py
+--- Python-3.14.3.orig/Lib/test/test_pyexpat.py	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Lib/test/test_pyexpat.py	2026-03-21 16:49:39.677966250 -0400
+@@ -689,6 +689,25 @@ class ElementDeclHandlerTest(unittest.Te
+         parser.ElementDeclHandler = lambda _1, _2: None
+         self.assertRaises(TypeError, parser.Parse, data, True)
+ 
++    @support.skip_if_unlimited_stack_size
++    @support.skip_emscripten_stack_overflow()
++    @support.skip_wasi_stack_overflow()
++    def test_deeply_nested_content_model(self):
++        # This should raise a RecursionError and not crash.
++        # See https://github.com/python/cpython/issues/145986.
++        N = 500_000
++        data = (
++            b'<!DOCTYPE root [\n<!ELEMENT root '
++            + b'(a, ' * N + b'a' + b')' * N
++            + b'>\n]>\n<root/>\n'
++        )
++
++        parser = expat.ParserCreate()
++        parser.ElementDeclHandler = lambda _1, _2: None
++        with support.infinite_recursion():
++            with self.assertRaises(RecursionError):
++                parser.Parse(data)
++
+ class MalformedInputTest(unittest.TestCase):
+     def test1(self):
+         xml = b"\0\r\n"
+diff -Nuarp Python-3.14.3.orig/Lib/test/test_webbrowser.py Python-3.14.3/Lib/test/test_webbrowser.py
+--- Python-3.14.3.orig/Lib/test/test_webbrowser.py	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Lib/test/test_webbrowser.py	2026-03-21 16:49:45.577085677 -0400
+@@ -67,6 +67,11 @@ class GenericBrowserCommandTest(CommandT
+                    options=[],
+                    arguments=[URL])
+ 
++    def test_reject_dash_prefixes(self):
++        browser = self.browser_class(name=CMD_NAME)
++        with self.assertRaises(ValueError):
++            browser.open(f"--key=val {URL}")
++
+ 
+ class BackgroundBrowserCommandTest(CommandTestMixin, unittest.TestCase):
+ 
+diff -Nuarp Python-3.14.3.orig/Lib/webbrowser.py Python-3.14.3/Lib/webbrowser.py
+--- Python-3.14.3.orig/Lib/webbrowser.py	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Lib/webbrowser.py	2026-03-21 16:49:45.577396563 -0400
+@@ -163,6 +163,12 @@ class BaseBrowser:
+     def open_new_tab(self, url):
+         return self.open(url, 2)
+ 
++    @staticmethod
++    def _check_url(url):
++        """Ensures that the URL is safe to pass to subprocesses as a parameter"""
++        if url and url.lstrip().startswith("-"):
++            raise ValueError(f"Invalid URL: {url}")
++
+ 
+ class GenericBrowser(BaseBrowser):
+     """Class for all browsers started with a command
+@@ -180,6 +186,7 @@ class GenericBrowser(BaseBrowser):
+ 
+     def open(self, url, new=0, autoraise=True):
+         sys.audit("webbrowser.open", url)
++        self._check_url(url)
+         cmdline = [self.name] + [arg.replace("%s", url)
+                                  for arg in self.args]
+         try:
+@@ -200,6 +207,7 @@ class BackgroundBrowser(GenericBrowser):
+         cmdline = [self.name] + [arg.replace("%s", url)
+                                  for arg in self.args]
+         sys.audit("webbrowser.open", url)
++        self._check_url(url)
+         try:
+             if sys.platform[:3] == 'win':
+                 p = subprocess.Popen(cmdline)
+@@ -266,6 +274,7 @@ class UnixBrowser(BaseBrowser):
+ 
+     def open(self, url, new=0, autoraise=True):
+         sys.audit("webbrowser.open", url)
++        self._check_url(url)
+         if new == 0:
+             action = self.remote_action
+         elif new == 1:
+@@ -357,6 +366,7 @@ class Konqueror(BaseBrowser):
+ 
+     def open(self, url, new=0, autoraise=True):
+         sys.audit("webbrowser.open", url)
++        self._check_url(url)
+         # XXX Currently I know no way to prevent KFM from opening a new win.
+         if new == 2:
+             action = "newTab"
+@@ -588,6 +598,7 @@ if sys.platform[:3] == "win":
+     class WindowsDefault(BaseBrowser):
+         def open(self, url, new=0, autoraise=True):
+             sys.audit("webbrowser.open", url)
++            self._check_url(url)
+             try:
+                 os.startfile(url)
+             except OSError:
+@@ -608,6 +619,7 @@ if sys.platform == 'darwin':
+ 
+         def open(self, url, new=0, autoraise=True):
+             sys.audit("webbrowser.open", url)
++            self._check_url(url)
+             url = url.replace('"', '%22')
+             if self.name == 'default':
+                 proto, _sep, _rest = url.partition(":")
+@@ -664,6 +676,7 @@ if sys.platform == "ios":
+     class IOSBrowser(BaseBrowser):
+         def open(self, url, new=0, autoraise=True):
+             sys.audit("webbrowser.open", url)
++            self._check_url(url)
+             # If ctypes isn't available, we can't open a browser
+             if objc is None:
+                 return False
+diff -Nuarp Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-01-16-12-04-49.gh-issue-143930.zYC5x3.rst Python-3.14.3/Misc/NEWS.d/next/Security/2026-01-16-12-04-49.gh-issue-143930.zYC5x3.rst
+--- Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-01-16-12-04-49.gh-issue-143930.zYC5x3.rst	1969-12-31 19:00:00.000000000 -0500
++++ Python-3.14.3/Misc/NEWS.d/next/Security/2026-01-16-12-04-49.gh-issue-143930.zYC5x3.rst	2026-03-21 16:49:45.577550844 -0400
+@@ -0,0 +1 @@
++Reject leading dashes in URLs passed to :func:`webbrowser.open`
+diff -Nuarp Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-03-06-17-03-38.gh-issue-145599.kchwZV.rst Python-3.14.3/Misc/NEWS.d/next/Security/2026-03-06-17-03-38.gh-issue-145599.kchwZV.rst
+--- Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-03-06-17-03-38.gh-issue-145599.kchwZV.rst	1969-12-31 19:00:00.000000000 -0500
++++ Python-3.14.3/Misc/NEWS.d/next/Security/2026-03-06-17-03-38.gh-issue-145599.kchwZV.rst	2026-03-21 16:49:52.713006379 -0400
+@@ -0,0 +1,4 @@
++Reject control characters in :class:`http.cookies.Morsel`
++:meth:`~http.cookies.Morsel.update` and
++:meth:`~http.cookies.BaseCookie.js_output`.
++This addresses :cve:`2026-3644`.
+diff -Nuarp Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-03-14-17-31-39.gh-issue-145986.ifSSr8.rst Python-3.14.3/Misc/NEWS.d/next/Security/2026-03-14-17-31-39.gh-issue-145986.ifSSr8.rst
+--- Python-3.14.3.orig/Misc/NEWS.d/next/Security/2026-03-14-17-31-39.gh-issue-145986.ifSSr8.rst	1969-12-31 19:00:00.000000000 -0500
++++ Python-3.14.3/Misc/NEWS.d/next/Security/2026-03-14-17-31-39.gh-issue-145986.ifSSr8.rst	2026-03-21 16:49:39.678194310 -0400
+@@ -0,0 +1,4 @@
++:mod:`xml.parsers.expat`: Fixed a crash caused by unbounded C recursion when
++converting deeply nested XML content models with
++:meth:`~xml.parsers.expat.xmlparser.ElementDeclHandler`.
++This addresses :cve:`2026-4224`.
+diff -Nuarp Python-3.14.3.orig/Modules/pyexpat.c Python-3.14.3/Modules/pyexpat.c
+--- Python-3.14.3.orig/Modules/pyexpat.c	2026-02-03 10:32:20.000000000 -0500
++++ Python-3.14.3/Modules/pyexpat.c	2026-03-21 16:49:39.678449501 -0400
+@@ -3,6 +3,7 @@
+ #endif
+ 
+ #include "Python.h"
++#include "pycore_ceval.h"         // _Py_EnterRecursiveCall()
+ #include "pycore_import.h"        // _PyImport_SetModule()
+ #include "pycore_pyhash.h"        // _Py_HashSecret
+ #include "pycore_traceback.h"     // _PyTraceback_Add()
+@@ -603,6 +604,10 @@ static PyObject *
+ conv_content_model(XML_Content * const model,
+                    PyObject *(*conv_string)(void *))
+ {
++    if (_Py_EnterRecursiveCall(" in conv_content_model")) {
++        return NULL;
++    }
++
+     PyObject *result = NULL;
+     PyObject *children = PyTuple_New(model->numchildren);
+     int i;
+@@ -614,7 +619,7 @@ conv_content_model(XML_Content * const m
+                                                  conv_string);
+             if (child == NULL) {
+                 Py_XDECREF(children);
+-                return NULL;
++                goto done;
+             }
+             PyTuple_SET_ITEM(children, i, child);
+         }
+@@ -622,6 +627,8 @@ conv_content_model(XML_Content * const m
+                                model->type, model->quant,
+                                conv_string, model->name, children);
+     }
++done:
++    _Py_LeaveRecursiveCall();
+     return result;
+ }
+ 
