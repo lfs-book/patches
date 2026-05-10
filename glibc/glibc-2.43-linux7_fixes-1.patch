@@ -1,0 +1,63 @@
+Submitted by:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2026-04-30
+Initial Package Version: 2.43
+Upstream Status:         Applied
+Origin:                  Upstream commits ce1013a19, portion of d1d8d271, and
+                         1634cc11a5
+Description:             Fixes building and testing glibc-2.43 against Linux-7.
+                         These problems were caused by changes in the kernel's
+                         version of mount.h, as a version of that header is
+                         included by glibc as well and it needed to be synced.
+                         The test failure fixed is in tst-rseq.c. Only a portion
+                         of commit d1d8d271 was brought over (the portion that
+                         affected sysv/linux/sys/mount.h) as the relevant commit
+                         did not exist in the release/2.43 branch at the time
+                         that this patch was created. 
+
+diff '--color=auto' -Naurp glibc-2.43.orig/sysdeps/unix/sysv/linux/sys/mount.h glibc-2.43/sysdeps/unix/sysv/linux/sys/mount.h
+--- glibc-2.43.orig/sysdeps/unix/sysv/linux/sys/mount.h	2026-01-23 14:54:00.000000000 -0600
++++ glibc-2.43/sysdeps/unix/sysv/linux/sys/mount.h	2026-04-30 11:07:51.986998648 -0500
+@@ -265,9 +265,16 @@ enum fsconfig_command
+ #define FSOPEN_CLOEXEC          0x00000001
+ 
+ /* open_tree flags.  */
+-#define OPEN_TREE_CLONE    1         /* Clone the target tree and attach the clone */
+-#define OPEN_TREE_CLOEXEC  O_CLOEXEC /* Close the file on execve() */
+-
++#ifndef OPEN_TREE_CLONE
++# define OPEN_TREE_CLONE    1         /* Clone the target tree and attach the clone */
++#endif
++#ifndef O_CLOEXEC
++# include <bits/cloexec.h>
++# define O_CLOEXEC __O_CLOEXEC
++#endif
++#ifndef OPEN_TREE_CLOEXEC
++# define OPEN_TREE_CLOEXEC  O_CLOEXEC /* Close the file on execve() */
++#endif
+ 
+ __BEGIN_DECLS
+ 
+diff '--color=auto' -Naurp glibc-2.43.orig/sysdeps/unix/sysv/linux/tst-rseq.c glibc-2.43/sysdeps/unix/sysv/linux/tst-rseq.c
+--- glibc-2.43.orig/sysdeps/unix/sysv/linux/tst-rseq.c	2026-01-23 14:54:00.000000000 -0600
++++ glibc-2.43/sysdeps/unix/sysv/linux/tst-rseq.c	2026-04-30 11:06:38.544976970 -0500
+@@ -48,8 +48,7 @@ do_rseq_main_test (void)
+   size_t rseq_align = MAX (getauxval (AT_RSEQ_ALIGN), RSEQ_MIN_ALIGN);
+   size_t rseq_feature_size = MAX (getauxval (AT_RSEQ_FEATURE_SIZE),
+                                   RSEQ_AREA_SIZE_INITIAL_USED);
+-  size_t rseq_alloc_size = roundup (MAX (rseq_feature_size,
+-                                    RSEQ_AREA_SIZE_INITIAL_USED), rseq_align);
++  size_t rseq_reg_size = MAX (rseq_feature_size, RSEQ_AREA_SIZE_INITIAL);
+   struct rseq *rseq_abi = __thread_pointer () + __rseq_offset;
+ 
+   TEST_VERIFY_EXIT (rseq_thread_registered ());
+@@ -89,8 +88,8 @@ do_rseq_main_test (void)
+   /* Test a rseq registration with the same arguments as the internal
+      registration which should fail with errno == EBUSY.  */
+   TEST_VERIFY (((unsigned long) rseq_abi % rseq_align) == 0);
+-  TEST_VERIFY (__rseq_size <= rseq_alloc_size);
+-  int ret = syscall (__NR_rseq, rseq_abi, rseq_alloc_size, 0, RSEQ_SIG);
++  TEST_VERIFY (__rseq_size <= rseq_reg_size);
++  int ret = syscall (__NR_rseq, rseq_abi, rseq_reg_size, 0, RSEQ_SIG);
+   TEST_VERIFY (ret != 0);
+   TEST_COMPARE (errno, EBUSY);
+ }
