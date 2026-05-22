@@ -1,0 +1,918 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2026-05-12
+Initial Package Version: 2.4.67
+Upstream Status:         Pending
+Origin:                  Upstream PR#642
+Description:             Fixes building httpd-2.4.67 with OpenSSL-4 by making
+                         several adaptations to ASN1_*/X509_* usage.
+
+diff -Naurp httpd-2.4.67.orig/.github/workflows/linux.yml httpd-2.4.67/.github/workflows/linux.yml
+--- httpd-2.4.67.orig/.github/workflows/linux.yml	2026-04-28 13:10:32.000000000 -0500
++++ httpd-2.4.67/.github/workflows/linux.yml	2026-05-12 15:05:26.353213272 -0500
+@@ -260,6 +260,58 @@ jobs:
+           #     APR_VERSION=1.7.3
+           #     APU_VERSION=1.6.3
+           # APU_CONFIG="--with-crypto --with-ldap"
++          # -------------------------------------------------------------------------
++          - name: OpenSSL 3.0 LTS
++            config: --enable-mods-shared=most --enable-maintainer-mode --disable-md --disable-http2 --disable-ldap --disable-crypto
++            env: |
++              TEST_OPENSSL3=3.0.18
++              APR_VERSION=1.7.6
++              APU_VERSION=1.6.3
++              APU_CONFIG="--without-crypto"
++            pkgs: subversion
++          # -------------------------------------------------------------------------
++          - name: OpenSSL 3.4 -Werror
++            config: --enable-mods-shared=most --enable-maintainer-mode --disable-md --disable-http2 --disable-ldap --disable-crypto
++            notest-cflags: -Werror -O2
++            env: |
++              TEST_OPENSSL3=3.4.4
++              APR_VERSION=1.7.6
++              APU_VERSION=1.6.3
++              APU_CONFIG="--without-crypto"
++            pkgs: subversion
++          # -------------------------------------------------------------------------
++          - name: OpenSSL 3.4 no-engine
++            config: --enable-mods-shared=most --enable-maintainer-mode --disable-md --disable-http2 --disable-ldap --disable-crypto
++            env: |
++              TEST_OPENSSL3=3.4.4
++              OPENSSL_CONFIG=no-engine
++              APR_VERSION=1.7.6
++              APU_VERSION=1.6.3
++              APU_CONFIG="--without-crypto"
++            pkgs: subversion
++          # -------------------------------------------------------------------------
++          - name: OpenSSL 3.5 no-engine -Werror
++            config: --enable-mods-shared=most --enable-maintainer-mode --disable-md --disable-http2 --disable-ldap --disable-crypto
++            notest-cflags: -Werror -O2
++            env: |
++              TEST_OPENSSL3=3.5.5
++              OPENSSL_CONFIG=no-engine
++              APR_VERSION=1.7.6
++              APU_VERSION=1.6.3
++              APU_CONFIG="--without-crypto"
++            pkgs: subversion
++          # -------------------------------------------------------------------------
++          - name: OpenSSL 4.0
++            config: --enable-mods-shared=most --enable-maintainer-mode --disable-md --disable-http2 --disable-ldap --disable-crypto
++            notest-cflags: -Werror -O2
++            env: |
++              TEST_OPENSSL3=4.0.0
++              OPENSSL_CONFIG=
++              APR_VERSION=1.7.6
++              APU_VERSION=1.6.3
++              APU_CONFIG="--without-crypto"
++            pkgs: subversion
++          # -------------------------------------------------------------------------
+     runs-on: ${{ matrix.os == '' && 'ubuntu-latest' || matrix.os }}
+     timeout-minutes: 30
+     env:
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_engine_kernel.c httpd-2.4.67/modules/ssl/ssl_engine_kernel.c
+--- httpd-2.4.67.orig/modules/ssl/ssl_engine_kernel.c	2025-11-24 03:06:41.000000000 -0600
++++ httpd-2.4.67/modules/ssl/ssl_engine_kernel.c	2026-05-12 15:05:26.346876649 -0500
+@@ -1254,7 +1254,7 @@ int ssl_hook_UserCheck(request_rec *r)
+     }
+ 
+     if (!sslconn->client_dn) {
+-        X509_NAME *name = X509_get_subject_name(sslconn->client_cert);
++        const X509_NAME *name = X509_get_subject_name(sslconn->client_cert);
+         char *cp = X509_NAME_oneline(name, NULL, 0);
+         sslconn->client_dn = apr_pstrdup(r->connection->pool, cp);
+         OPENSSL_free(cp);
+@@ -1778,7 +1778,7 @@ int ssl_callback_proxy_cert(SSL *ssl, X5
+     server_rec *s = mySrvFromConn(c);
+     SSLSrvConfigRec *sc = mySrvConfig(s);
+     SSLDirConfigRec *dc = myDirConfigFromConn(c);
+-    X509_NAME *ca_name, *issuer, *ca_issuer;
++    const X509_NAME *ca_name, *issuer, *ca_issuer;
+     X509_INFO *info;
+     X509 *ca_cert;
+     STACK_OF(X509_NAME) *ca_list;
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_engine_log.c httpd-2.4.67/modules/ssl/ssl_engine_log.c
+--- httpd-2.4.67.orig/modules/ssl/ssl_engine_log.c	2021-12-13 04:27:03.000000000 -0600
++++ httpd-2.4.67/modules/ssl/ssl_engine_log.c	2026-05-12 15:05:26.346996647 -0500
+@@ -126,7 +126,7 @@ void ssl_log_ssl_error(const char *file,
+ static void ssl_log_cert_error(const char *file, int line, int level,
+                                apr_status_t rv, const server_rec *s,
+                                const conn_rec *c, const request_rec *r,
+-                               apr_pool_t *p, X509 *cert, const char *format,
++                               apr_pool_t *p, const X509 *cert, const char *format,
+                                va_list ap)
+ {
+     char buf[HUGE_STRING_LEN];
+@@ -167,14 +167,14 @@ static void ssl_log_cert_error(const cha
+             }
+ 
+             BIO_puts(bio, " / serial: ");
+-            if (i2a_ASN1_INTEGER(bio, X509_get_serialNumber(cert)) == -1)
++            if (i2a_ASN1_INTEGER(bio, X509_get0_serialNumber(cert)) == -1)
+                 BIO_puts(bio, "(ERROR)");
+ 
+             BIO_puts(bio, " / notbefore: ");
+-            ASN1_TIME_print(bio, X509_get_notBefore(cert));
++            ASN1_TIME_print(bio, X509_get0_notBefore(cert));
+ 
+             BIO_puts(bio, " / notafter: ");
+-            ASN1_TIME_print(bio, X509_get_notAfter(cert));
++            ASN1_TIME_print(bio, X509_get0_notAfter(cert));
+ 
+             BIO_puts(bio, "]");
+ 
+@@ -209,7 +209,7 @@ static void ssl_log_cert_error(const cha
+  * in the other cases we use the connection and request pool, respectively).
+  */
+ void ssl_log_xerror(const char *file, int line, int level, apr_status_t rv,
+-                    apr_pool_t *ptemp, server_rec *s, X509 *cert,
++                    apr_pool_t *ptemp, server_rec *s, const X509 *cert,
+                     const char *fmt, ...)
+ {
+     if (APLOG_IS_LEVEL(s,level)) {
+@@ -222,7 +222,7 @@ void ssl_log_xerror(const char *file, in
+ }
+ 
+ void ssl_log_cxerror(const char *file, int line, int level, apr_status_t rv,
+-                     conn_rec *c, X509 *cert, const char *fmt, ...)
++                     conn_rec *c, const X509 *cert, const char *fmt, ...)
+ {
+     if (APLOG_IS_LEVEL(mySrvFromConn(c),level)) {
+        va_list ap;
+@@ -234,7 +234,7 @@ void ssl_log_cxerror(const char *file, i
+ }
+ 
+ void ssl_log_rxerror(const char *file, int line, int level, apr_status_t rv,
+-                     request_rec *r, X509 *cert, const char *fmt, ...)
++                     request_rec *r, const X509 *cert, const char *fmt, ...)
+ {
+     if (APLOG_R_IS_LEVEL(r,level)) {
+        va_list ap;
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_engine_ocsp.c httpd-2.4.67/modules/ssl/ssl_engine_ocsp.c
+--- httpd-2.4.67.orig/modules/ssl/ssl_engine_ocsp.c	2021-04-18 14:11:48.000000000 -0500
++++ httpd-2.4.67/modules/ssl/ssl_engine_ocsp.c	2026-05-12 15:05:26.347043405 -0500
+@@ -38,8 +38,8 @@ static const char *extract_responder_uri
+         /* Name found in extension, and is a URI: */
+         if (OBJ_obj2nid(value->method) == NID_ad_OCSP
+             && value->location->type == GEN_URI) {
+-            result = apr_pstrdup(pool,
+-                                 (char *)value->location->d.uniformResourceIdentifier->data);
++            const ASN1_STRING *uri = value->location->d.uniformResourceIdentifier;
++            result = modssl_ASN1_STRING_convert(pool, uri, 0);
+         }
+     }
+ 
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_engine_vars.c httpd-2.4.67/modules/ssl/ssl_engine_vars.c
+--- httpd-2.4.67.orig/modules/ssl/ssl_engine_vars.c	2025-07-07 07:03:42.000000000 -0500
++++ httpd-2.4.67/modules/ssl/ssl_engine_vars.c	2026-05-12 15:05:26.347135771 -0500
+@@ -41,10 +41,10 @@
+ 
+ static char *ssl_var_lookup_ssl(apr_pool_t *p, SSLConnRec *sslconn, request_rec *r, char *var);
+ static char *ssl_var_lookup_ssl_cert(apr_pool_t *p, request_rec *r, X509 *xs, char *var);
+-static char *ssl_var_lookup_ssl_cert_dn(apr_pool_t *p, X509_NAME *xsname, const char *var);
++static char *ssl_var_lookup_ssl_cert_dn(apr_pool_t *p, const X509_NAME *xsname, const char *var);
+ static char *ssl_var_lookup_ssl_cert_san(apr_pool_t *p, X509 *xs, char *var);
+-static char *ssl_var_lookup_ssl_cert_valid(apr_pool_t *p, ASN1_TIME *tm);
+-static char *ssl_var_lookup_ssl_cert_remain(apr_pool_t *p, ASN1_TIME *tm);
++static char *ssl_var_lookup_ssl_cert_valid(apr_pool_t *p, const ASN1_TIME *tm);
++static char *ssl_var_lookup_ssl_cert_remain(apr_pool_t *p, const ASN1_TIME *tm);
+ static char *ssl_var_lookup_ssl_cert_serial(apr_pool_t *p, X509 *xs);
+ static char *ssl_var_lookup_ssl_cert_chain(apr_pool_t *p, STACK_OF(X509) *sk, char *var);
+ static char *ssl_var_lookup_ssl_cert_rfc4523_cea(apr_pool_t *p, SSL *ssl);
+@@ -444,7 +444,7 @@ static char *ssl_var_lookup_ssl(apr_pool
+ }
+ 
+ static char *ssl_var_lookup_ssl_cert_dn_oneline(apr_pool_t *p, request_rec *r,
+-                                                X509_NAME *xsname)
++                                                const X509_NAME *xsname)
+ {
+     char *result = NULL;
+     SSLDirConfigRec *dc;
+@@ -476,7 +476,7 @@ static char *ssl_var_lookup_ssl_cert(apr
+ {
+     char *result;
+     BOOL resdup;
+-    X509_NAME *xsname;
++    const X509_NAME *xsname;
+     int nid;
+ 
+     result = NULL;
+@@ -490,13 +490,13 @@ static char *ssl_var_lookup_ssl_cert(apr
+         result = ssl_var_lookup_ssl_cert_serial(p, xs);
+     }
+     else if (strcEQ(var, "V_START")) {
+-        result = ssl_var_lookup_ssl_cert_valid(p, X509_get_notBefore(xs));
++        result = ssl_var_lookup_ssl_cert_valid(p, X509_get0_notBefore(xs));
+     }
+     else if (strcEQ(var, "V_END")) {
+-        result = ssl_var_lookup_ssl_cert_valid(p, X509_get_notAfter(xs));
++        result = ssl_var_lookup_ssl_cert_valid(p, X509_get0_notAfter(xs));
+     }
+     else if (strcEQ(var, "V_REMAIN")) {
+-        result = ssl_var_lookup_ssl_cert_remain(p, X509_get_notAfter(xs));
++        result = ssl_var_lookup_ssl_cert_remain(p, X509_get0_notAfter(xs));
+         resdup = FALSE;
+     }
+     else if (*var && strcEQ(var+1, "_DN")) {
+@@ -583,12 +583,12 @@ static const struct {
+     { NULL,    0,                          0 }
+ };
+ 
+-static char *ssl_var_lookup_ssl_cert_dn(apr_pool_t *p, X509_NAME *xsname,
++static char *ssl_var_lookup_ssl_cert_dn(apr_pool_t *p, const X509_NAME *xsname,
+                                         const char *var)
+ {
+     const char *ptr;
+     char *result;
+-    X509_NAME_ENTRY *xsne;
++    const X509_NAME_ENTRY *xsne;
+     int i, j, n, idx = 0, raw = 0;
+     apr_size_t varlen;
+ 
+@@ -615,7 +615,7 @@ static char *ssl_var_lookup_ssl_cert_dn(
+             for (j = 0; j < X509_NAME_entry_count(xsname); j++) {
+                 xsne = X509_NAME_get_entry(xsname, j);
+ 
+-                n =OBJ_obj2nid((ASN1_OBJECT *)X509_NAME_ENTRY_get_object(xsne));
++                n = OBJ_obj2nid(X509_NAME_ENTRY_get_object(xsne));
+ 
+                 if (n == ssl_var_lookup_ssl_cert_dn_rec[i].nid && idx-- == 0) {
+                     result = modssl_X509_NAME_ENTRY_to_string(p, xsne, raw);
+@@ -672,7 +672,7 @@ static char *ssl_var_lookup_ssl_cert_san
+         return NULL;
+ }
+ 
+-static char *ssl_var_lookup_ssl_cert_valid(apr_pool_t *p, ASN1_TIME *tm)
++static char *ssl_var_lookup_ssl_cert_valid(apr_pool_t *p, const ASN1_TIME *tm)
+ {
+     BIO* bio;
+ 
+@@ -687,8 +687,15 @@ static char *ssl_var_lookup_ssl_cert_val
+ 
+ /* Return a string giving the number of days remaining until 'tm', or
+  * "0" if this can't be determined. */
+-static char *ssl_var_lookup_ssl_cert_remain(apr_pool_t *p, ASN1_TIME *tm)
++static char *ssl_var_lookup_ssl_cert_remain(apr_pool_t *p, const ASN1_TIME *tm)
+ {
++#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(LIBRESSL_VERSION_NUMBER)
++    int diff;
++
++    if (ASN1_TIME_check(tm) != 1 || ASN1_TIME_diff(&diff, NULL, NULL, tm) != 1) {
++        return "0";
++    }
++#else
+     apr_time_t then, now = apr_time_now();
+     apr_time_exp_t exp = {0};
+     long diff;
+@@ -723,6 +730,7 @@ static char *ssl_var_lookup_ssl_cert_rem
+     }
+ 
+     diff = (long)((apr_time_sec(then) - apr_time_sec(now)) / (60*60*24));
++#endif
+ 
+     return diff > 0 ? apr_ltoa(p, diff) : apr_pstrdup(p, "0");
+ }
+@@ -772,7 +780,7 @@ static char *ssl_var_lookup_ssl_cert_rfc
+ 
+     serialNumber = X509_get_serialNumber(xs);
+     if (serialNumber) {
+-        X509_NAME *issuer = X509_get_issuer_name(xs);
++        const X509_NAME *issuer = X509_get_issuer_name(xs);
+         if (issuer) {
+             BIGNUM *bn = ASN1_INTEGER_to_BN(serialNumber, NULL);
+             char *decimal = BN_bn2dec(bn);
+@@ -896,9 +904,9 @@ static char *ssl_var_lookup_ssl_version(
+ /* Add each RDN in 'xn' to the table 't' where the NID is present in
+  * 'nids', using key prefix 'pfx'.  */
+ static void extract_dn(apr_table_t *t, apr_hash_t *nids, const char *pfx,
+-                       X509_NAME *xn, apr_pool_t *p)
++                       const X509_NAME *xn, apr_pool_t *p)
+ {
+-    X509_NAME_ENTRY *xsne;
++    const X509_NAME_ENTRY *xsne;
+     apr_hash_t *count;
+     int i, nid;
+ 
+@@ -913,7 +921,7 @@ static void extract_dn(apr_table_t *t, a
+ 
+          /* Retrieve the nid, and check whether this is one of the nids
+           * which are to be extracted. */
+-         nid = OBJ_obj2nid((ASN1_OBJECT *)X509_NAME_ENTRY_get_object(xsne));
++         nid = OBJ_obj2nid(X509_NAME_ENTRY_get_object(xsne));
+ 
+          tag = apr_hash_get(nids, &nid, sizeof nid);
+          if (tag) {
+@@ -1026,15 +1034,19 @@ void modssl_var_extract_san_entries(apr_
+  * parse the extension type as a primitive string.  This will fail for
+  * any structured extension type per the docs.  Returns non-zero on
+  * success and writes the string to the given bio. */
+-static int dump_extn_value(BIO *bio, ASN1_OCTET_STRING *str)
++static int dump_extn_value(BIO *bio, const ASN1_OCTET_STRING *str)
+ {
+-    const unsigned char *pp = str->data;
++    const unsigned char *pp = ASN1_STRING_get0_data(str);
+     ASN1_STRING *ret = ASN1_STRING_new();
+     int rv = 0;
+ 
++    if (!ret) {
++        return rv;
++    }
++
+     /* This allows UTF8String, IA5String, VisibleString, or BMPString;
+      * conversion to UTF-8 is forced. */
+-    if (d2i_DISPLAYTEXT(&ret, &pp, str->length)) {
++    if (d2i_DISPLAYTEXT(&ret, &pp, ASN1_STRING_length(str))) {
+         ASN1_STRING_print_ex(bio, ret, ASN1_STRFLGS_UTF8_CONVERT);
+         rv = 1;
+     }
+@@ -1081,7 +1093,7 @@ apr_array_header_t *ssl_ext_list(apr_poo
+      */
+     array = apr_array_make(p, count, sizeof(char *));
+     for (j = 0; j < count; j++) {
+-        X509_EXTENSION *ext = X509_get_ext(xs, j);
++        MODSSL_X509_EXT_CONST X509_EXTENSION *ext = X509_get_ext(xs, j);
+ 
+         if (OBJ_cmp(X509_EXTENSION_get_object(ext), oid) == 0) {
+             BIO *bio = BIO_new(BIO_s_mem());
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_private.h httpd-2.4.67/modules/ssl/ssl_private.h
+--- httpd-2.4.67.orig/modules/ssl/ssl_private.h	2025-11-06 03:09:18.000000000 -0600
++++ httpd-2.4.67/modules/ssl/ssl_private.h	2026-05-12 15:05:26.347249167 -0500
+@@ -145,6 +145,12 @@
+ #define MODSSL_SSL_METHOD_CONST
+ #endif
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x40000000L
++#define MODSSL_X509_EXT_CONST const
++#else
++#define MODSSL_X509_EXT_CONST
++#endif
++
+ #if defined(LIBRESSL_VERSION_NUMBER)
+ /* Missing from LibreSSL */
+ #if LIBRESSL_VERSION_NUMBER < 0x2060000f
+@@ -266,6 +272,12 @@
+ #define BIO_get_shutdown(x)        (x->shutdown)
+ #define BIO_set_shutdown(x,v)      (x->shutdown=v)
+ #define DH_bits(x)                 (BN_num_bits(x->p))
++#define X509_up_ref(x)             (CRYPTO_add(&(x)->references, +1, CRYPTO_LOCK_X509))
++#define EVP_PKEY_up_ref(pk)        (CRYPTO_add(&(pk)->references, +1, CRYPTO_LOCK_EVP_PKEY))
++#define ASN1_STRING_get0_data(x)   ((x)->data)
++#define ASN1_STRING_length(x)      ((int)(x)->length)
++#define X509_get0_before(x)        X509_get_before(x)
++#define X509_get0_after(x)         X509_get_after(x)
+ #else
+ void init_bio_methods(void);
+ void free_bio_methods(void);
+@@ -1164,16 +1176,16 @@ void         ssl_log_ssl_error(const cha
+  * counterparts. */
+ void ssl_log_xerror(const char *file, int line, int level,
+                     apr_status_t rv, apr_pool_t *p, server_rec *s,
+-                    X509 *cert, const char *format, ...)
++                    const X509 *cert, const char *format, ...)
+     __attribute__((format(printf,8,9)));
+ 
+ void ssl_log_cxerror(const char *file, int line, int level,
+-                     apr_status_t rv, conn_rec *c, X509 *cert,
++                     apr_status_t rv, conn_rec *c, const X509 *cert,
+                      const char *format, ...)
+     __attribute__((format(printf,7,8)));
+ 
+ void ssl_log_rxerror(const char *file, int line, int level,
+-                     apr_status_t rv, request_rec *r, X509 *cert,
++                     apr_status_t rv, request_rec *r, const X509 *cert,
+                      const char *format, ...)
+     __attribute__((format(printf,7,8)));
+ 
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_util_ssl.c httpd-2.4.67/modules/ssl/ssl_util_ssl.c
+--- httpd-2.4.67.orig/modules/ssl/ssl_util_ssl.c	2024-06-21 09:28:25.000000000 -0500
++++ httpd-2.4.67/modules/ssl/ssl_util_ssl.c	2026-05-12 15:05:26.347328638 -0500
+@@ -202,7 +202,7 @@ char *modssl_bio_free_read(apr_pool_t *p
+ /* Convert ASN.1 string to a pool-allocated char * string, escaping
+  * control characters.  If raw is zero, convert to UTF-8, otherwise
+  * unchanged from the character set. */
+-static char *asn1_string_convert(apr_pool_t *p, ASN1_STRING *asn1str, int raw)
++char *modssl_ASN1_STRING_convert(apr_pool_t *p, const ASN1_STRING *asn1str, int raw)
+ {
+     BIO *bio;
+     int flags = ASN1_STRFLGS_ESC_CTRL;
+@@ -217,13 +217,13 @@ static char *asn1_string_convert(apr_poo
+     return modssl_bio_free_read(p, bio);
+ }
+ 
+-#define asn1_string_to_utf8(p, a) asn1_string_convert(p, a, 0)
++#define asn1_string_to_utf8(p, a) modssl_ASN1_STRING_convert(p, a, 0)
+ 
+ /* convert a NAME_ENTRY to UTF8 string */
+-char *modssl_X509_NAME_ENTRY_to_string(apr_pool_t *p, X509_NAME_ENTRY *xsne,
++char *modssl_X509_NAME_ENTRY_to_string(apr_pool_t *p, const X509_NAME_ENTRY *xsne,
+                                        int raw)
+ {
+-    char *result = asn1_string_convert(p, X509_NAME_ENTRY_get_data(xsne), raw);
++    char *result = modssl_ASN1_STRING_convert(p, X509_NAME_ENTRY_get_data(xsne), raw);
+     ap_xlate_proto_from_ascii(result, len);
+     return result;
+ }
+@@ -232,7 +232,7 @@ char *modssl_X509_NAME_ENTRY_to_string(a
+  * convert an X509_NAME to an RFC 2253 formatted string, optionally truncated
+  * to maxlen characters (specify a maxlen of 0 for no length limit)
+  */
+-char *modssl_X509_NAME_to_string(apr_pool_t *p, X509_NAME *dn, int maxlen)
++char *modssl_X509_NAME_to_string(apr_pool_t *p, const X509_NAME *dn, int maxlen)
+ {
+     char *result = NULL;
+     BIO *bio;
+@@ -362,7 +362,7 @@ BOOL modssl_X509_getSAN(apr_pool_t *p, X
+ /* return an array of (RFC 6125 coined) DNS-IDs and CN-IDs in a certificate */
+ static BOOL getIDs(apr_pool_t *p, X509 *x509, apr_array_header_t **ids)
+ {
+-    X509_NAME *subj;
++    const X509_NAME *subj;
+     int i = -1;
+ 
+     /* First, the DNS-IDs (dNSName entries in the subjectAltName extension) */
+diff -Naurp httpd-2.4.67.orig/modules/ssl/ssl_util_ssl.h httpd-2.4.67/modules/ssl/ssl_util_ssl.h
+--- httpd-2.4.67.orig/modules/ssl/ssl_util_ssl.h	2021-05-12 05:14:42.000000000 -0500
++++ httpd-2.4.67/modules/ssl/ssl_util_ssl.h	2026-05-12 15:05:26.347378001 -0500
+@@ -71,13 +71,19 @@ EVP_PKEY   *modssl_read_privatekey(const
+ 
+ int         modssl_smart_shutdown(SSL *ssl);
+ BOOL        modssl_X509_getBC(X509 *, int *, int *);
+-char       *modssl_X509_NAME_ENTRY_to_string(apr_pool_t *p, X509_NAME_ENTRY *xsne,
++char       *modssl_X509_NAME_ENTRY_to_string(apr_pool_t *p, const X509_NAME_ENTRY *xsne,
+                                              int raw);
+-char       *modssl_X509_NAME_to_string(apr_pool_t *, X509_NAME *, int);
++char       *modssl_X509_NAME_to_string(apr_pool_t *, const X509_NAME *, int);
+ BOOL        modssl_X509_getSAN(apr_pool_t *, X509 *, int, const char *, int, apr_array_header_t **);
+ BOOL        modssl_X509_match_name(apr_pool_t *, X509 *, const char *, BOOL, server_rec *);
+ char       *modssl_SSL_SESSION_id2sz(IDCONST unsigned char *, int, char *, int);
+ 
++/* Convert ASN.1 string to a pool-allocated char * string, escaping
++ * control characters.  If raw is zero, convert to UTF-8, otherwise
++ * unchanged from the character set. */
++char *modssl_ASN1_STRING_convert(apr_pool_t *p, const ASN1_STRING *asn1str,
++                                 int raw);
++
+ /* Reads the remaining data in BIO, if not empty, and copies it into a
+  * pool-allocated string.  If empty, returns NULL.  BIO_free(bio) is
+  * called for both cases. */
+diff -Naurp httpd-2.4.67.orig/support/ab.c httpd-2.4.67/support/ab.c
+--- httpd-2.4.67.orig/support/ab.c	2025-01-15 05:51:28.000000000 -0600
++++ httpd-2.4.67/support/ab.c	2026-05-12 15:05:26.347467812 -0500
+@@ -675,7 +675,7 @@ static int ssl_print_connection_info(BIO
+ 
+ static void ssl_print_cert_info(BIO *bio, X509 *cert)
+ {
+-    X509_NAME *dn;
++    const X509_NAME *dn;
+     EVP_PKEY *pk;
+     char buf[1024];
+ 
+diff -Naurp httpd-2.4.67.orig/test/travis_before_linux.sh httpd-2.4.67/test/travis_before_linux.sh
+--- httpd-2.4.67.orig/test/travis_before_linux.sh	2026-02-23 05:53:02.000000000 -0600
++++ httpd-2.4.67/test/travis_before_linux.sh	2026-05-12 15:05:26.353390228 -0500
+@@ -120,6 +120,13 @@ if ! test -v SKIP_TESTING -o -v NO_TEST_
+ 
+     # Make a shallow clone of httpd-tests git repo.
+     git clone -q --depth=1 https://github.com/apache/httpd-tests.git test/perl-framework
++
++    # For OpenSSL 3.2+ testing, Apache::Test r1916067 is required, so
++    # use a checkout of trunk until there is an updated CPAN release
++    # with that revision.
++    if test -v TEST_OPENSSL3; then
++       svn co -q https://svn.apache.org/repos/asf/perl/Apache-Test/trunk test/perl-framework/Apache-Test
++    fi
+ fi
+ 
+ # For LDAP testing, run slapd listening on port 8389 and populate the
+@@ -138,22 +145,46 @@ if test -v TEST_SSL; then
+     popd
+ fi
+ 
++# Build the requested version of OpenSSL if it's not already installed
++# in the cached ~/root
+ if test -v TEST_OPENSSL3; then
+-    # Build the requested version of OpenSSL if it's not already
+-    # installed in the cached ~/root
++    # For a branch, rebuild if the remote branch has updated.
++    if test -v TEST_OPENSSL3_BRANCH -a -f $HOME/root/openssl-is-${TEST_OPENSSL3}; then
++        latest=`git ls-remote https://github.com/openssl/openssl refs/heads/${TEST_OPENSSL3_BRANCH} | cut -f1`
++        : Got branch latest commit ${latest}
++        if grep -q ^${latest} $HOME/root/openssl-is-${TEST_OPENSSL3}; then
++            : Cached repos already at ${latest}
++        else
++            : Forcing rebuild
++            rm -f $HOME/root/openssl-is-${TEST_OPENSSL3}
++        fi
++    fi
++
+     if ! test -f $HOME/root/openssl-is-${TEST_OPENSSL3}; then
+         # Remove any previous install.
+         rm -rf $HOME/root/openssl3
+ 
+         mkdir -p build/openssl
+         pushd build/openssl
+-           curl "https://www.openssl.org/source/openssl-${TEST_OPENSSL3}.tar.gz" |
+-              tar -xzf -
++           if test -v TEST_OPENSSL3_BRANCH; then
++               git clone --depth=1 -b $TEST_OPENSSL3_BRANCH -q https://github.com/openssl/openssl openssl-${TEST_OPENSSL3}
++           else
++               curl -L "https://github.com/openssl/openssl/releases/download/openssl-${TEST_OPENSSL3}/openssl-${TEST_OPENSSL3}.tar.gz" |
++                   tar -xzf -
++           fi
+            cd openssl-${TEST_OPENSSL3}
+-           ./Configure --prefix=$HOME/root/openssl3 shared no-tests
++           # Build with RPATH so ./bin/openssl doesn't require $LD_LIBRARY_PATH
++           ./Configure --prefix=$HOME/root/openssl3 \
++                       shared no-tests ${OPENSSL_CONFIG} \
++                       '-Wl,-rpath=$(LIBRPATH)'
+            make $MFLAGS
+            make install_sw
+-           touch $HOME/root/openssl-is-${TEST_OPENSSL3}
++           if test -d .git; then
++               : Caching git commit hash:
++               git rev-parse HEAD | tee $HOME/root/openssl-is-${TEST_OPENSSL3}
++           else
++               touch $HOME/root/openssl-is-${TEST_OPENSSL3}
++           fi
+        popd
+     fi
+ 
+diff -Naurp httpd-2.4.67.orig/test/travis_run_linux.sh httpd-2.4.67/test/travis_run_linux.sh
+--- httpd-2.4.67.orig/test/travis_run_linux.sh	2024-09-17 06:17:23.000000000 -0500
++++ httpd-2.4.67/test/travis_run_linux.sh	2026-05-12 15:05:26.353462405 -0500
+@@ -61,7 +61,10 @@ fi
+ 
+ if test -v TEST_OPENSSL3; then
+     CONFIG="$CONFIG --with-ssl=$HOME/root/openssl3"
+-    export LD_LIBRARY_PATH=$HOME/root/openssl3/lib:$HOME/root/openssl3/lib64
++    export PATH=$HOME/root/openssl3/bin:$PATH
++    # Force everything built to hard-code an RPATH
++    export LDFLAGS="-Wl,-rpath,$HOME/root/openssl3/lib -Wl,-rpath,$HOME/root/openssl3/lib64"
++    openssl version
+ fi
+ 
+ srcdir=$PWD
+@@ -74,9 +77,19 @@ fi
+ $srcdir/configure --prefix=$PREFIX $CONFIG
+ make $MFLAGS
+ 
++if test -v TEST_OPENSSL3; then
++   # Clear the library/run paths so that anything else run during
++   # testing is not forced to use the custom OpenSSL build; e.g. perl,
++   # php-fpm, ...
++   unset LD_LIBRARY_PATH
++   unset LD_RUN_PATH
++fi
++
+ if test -v TEST_INSTALL; then
+    make install
+    pushd $PREFIX
++     # Basic sanity tests of the installed server.
++     ./bin/apachectl -V
+      test `./bin/apxs -q PREFIX` = $PREFIX
+      test `$PWD/bin/apxs -q PREFIX` = $PREFIX
+      ./bin/apxs -g -n foobar
+@@ -84,174 +97,196 @@ if test -v TEST_INSTALL; then
+    popd
+ fi
+ 
+-if ! test -v SKIP_TESTING; then
+-    set +e
+-    RV=0
+-
+-    if test -v TEST_MALLOC; then
+-        # Enable enhanced glibc malloc debugging, see mallopt(3)
+-        export MALLOC_PERTURB_=65 MALLOC_CHECK_=3
+-        export LIBC_FATAL_STDERR_=1
+-    fi
++if test -v SKIP_TESTING; then
++    # Check that httpd was built successfully, nothing more.
++    ./httpd -V
++    exit 0
++fi
+ 
+-    if test -v TEST_UBSAN; then
+-        export UBSAN_OPTIONS="log_path=$PWD/ubsan.log"
+-    fi
++###############################################################
++### Everything below is only run if SKIP_TESTING was not set ##
++###############################################################
++
++: Running tests...
++
++set +e
++RV=0
++
++if test -v TEST_MALLOC; then
++    # Enable enhanced glibc malloc debugging, see mallopt(3)
++    export MALLOC_PERTURB_=65 MALLOC_CHECK_=3
++    export LIBC_FATAL_STDERR_=1
++fi
+ 
+-    if test -v TEST_ASAN; then
+-        export ASAN_OPTIONS="log_path=$PWD/asan.log:detect_leaks=0"
+-    fi
++if test -v TEST_UBSAN; then
++    export UBSAN_OPTIONS="log_path=$PWD/ubsan.log"
++fi
+ 
+-    # Try to keep all potential coredumps from all processes
+-    sudo sysctl -w kernel.core_uses_pid=1 2>/dev/null || true
+-    # Systemd based systems might process core dumps via systemd-coredump.
+-    # But we want to have local unprocessed files.
+-    sudo sysctl -w kernel.core_pattern=core || true
+-    ulimit -c unlimited 2>/dev/null || true
++if test -v TEST_ASAN; then
++    export ASAN_OPTIONS="log_path=$PWD/asan.log:detect_leaks=0"
++fi
+ 
+-    if test -v WITH_TEST_SUITE; then
+-        make check TESTS="${TESTS}" TEST_CONFIG="${TEST_ARGS}"
+-        RV=$?
+-    else
+-        test -v TEST_INSTALL || make install
+-        pushd test/perl-framework
+-            perl Makefile.PL -apxs $PREFIX/bin/apxs
+-            make test APACHE_TEST_EXTRA_ARGS="${TEST_ARGS} ${TESTS}" | tee test.log
+-            RV=${PIPESTATUS[0]}
+-            # re-run failing tests with -v, avoiding set -e
+-            if [ $RV -ne 0 ]; then
+-                #mv t/logs/error_log t/logs/error_log_save
+-                FAILERS=""
+-                while read FAILER; do
+-                    FAILERS="$FAILERS $FAILER"
+-                done < <(awk '/Failed:/{print $1}' test.log)
+-                if [ -n "$FAILERS" ]; then
+-                    t/TEST -v $FAILERS || true
+-                fi
+-                # set -e would have killed us after the original t/TEST
+-                rm -f test.log
+-                #mv t/logs/error_log_save t/logs/error_log
+-                false
++if test -v PHP_FPM; then
++    # Sanity test the executable exists.
++    $PHP_FPM --version
++fi
++
++# Try to keep all potential coredumps from all processes
++sudo sysctl -w kernel.core_uses_pid=1 2>/dev/null || true
++# Systemd based systems might process core dumps via systemd-coredump.
++# But we want to have local unprocessed files.
++sudo sysctl -w kernel.core_pattern=core || true
++ulimit -c unlimited 2>/dev/null || true
++
++if test -v WITH_TEST_SUITE; then
++    make check TESTS="${TESTS}" TEST_CONFIG="${TEST_ARGS}"
++    RV=$?
++else
++    test -v TEST_INSTALL || make install
++    pushd test/perl-framework
++        perl Makefile.PL -apxs $PREFIX/bin/apxs
++        make test APACHE_TEST_EXTRA_ARGS="${TEST_ARGS} ${TESTS}" | tee test.log
++        RV=${PIPESTATUS[0]}
++        # re-run failing tests with -v, avoiding set -e
++        if [ $RV -ne 0 ]; then
++            #mv t/logs/error_log t/logs/error_log_save
++            FAILERS=""
++            while read FAILER; do
++                FAILERS="$FAILERS $FAILER"
++            done < <(awk '/Failed:/{print $1}' test.log)
++            if [ -n "$FAILERS" ]; then
++                t/TEST -v $FAILERS || true
+             fi
+-        popd
+-    fi
++            # set -e would have killed us after the original t/TEST
++            rm -f test.log
++            #mv t/logs/error_log_save t/logs/error_log
++            false
++        fi
++    popd
++fi
+ 
+-    # Skip further testing if a core dump was created during the test
+-    # suite run above.
+-    if test $RV -eq 0 && test -n "`ls test/perl-framework/t/core{,.*} 2>/dev/null`"; then
+-        RV=4
+-    fi
++# Skip further testing if a core dump was created during the test
++# suite run above.
++if test $RV -eq 0 && test -n "`ls test/perl-framework/t/core{,.*} 2>/dev/null`"; then
++    RV=4
++fi
+ 
+-    if test -v TEST_SSL -a $RV -eq 0; then
+-        pushd test/perl-framework
+-            # Test loading encrypted private keys
+-            ./t/TEST -defines "TEST_SSL_DES3_KEY TEST_SSL_PASSPHRASE_EXEC" t/ssl
+-            RV=$?
++if test \( -v TEST_SSL -o -v TEST_OPENSSL3 \) \
++        -a -f test/perl-framework/t/logs/error_log; then
++    : -- Check OpenSSL version used by mod_ssl at compile- and run-time --
++    grep 'mod_ssl.*compiled against' test/perl-framework/t/logs/error_log | tail -n1 | grep --color=always 'OpenSSL/[^ ]*'
++    grep 'resuming normal operations' test/perl-framework/t/logs/error_log | tail -n1 | grep --color=always 'OpenSSL/[^ ]*'
++fi
+ 
+-            # Log the OpenSSL version.
+-            grep 'mod_ssl.*compiled against' t/logs/error_log | tail -n 1
+-            
+-            # Test various session cache backends
+-            for cache in shmcb redis:localhost:6379 memcache:localhost:11211; do
+-                test $RV -eq 0 || break
+-
+-                SSL_SESSCACHE=$cache ./t/TEST -sslproto TLSv1.2 -defines TEST_SSL_SESSCACHE -start
+-                ./t/TEST t/ssl
+-                RV=$?
+-                ./t/TEST -stop
+-                SRV=$?
+-                if test $RV -eq 0 -a $SRV -ne 0; then
+-                    RV=$SRV
+-                fi
+-            done
+-        popd
+-    fi
++if test -v TEST_SSL -a $RV -eq 0; then
++    pushd test/perl-framework
++        # Test loading encrypted private keys
++        ./t/TEST -defines "TEST_SSL_DES3_KEY TEST_SSL_PASSPHRASE_EXEC" t/ssl
++        RV=$?
+ 
+-    if test -v LITMUS -a $RV -eq 0; then
+-        pushd test/perl-framework
+-           mkdir -p t/htdocs/modules/dav
+-           ./t/TEST -start
+-           # litmus uses $TESTS, so unset it.
+-           unset TESTS
+-           litmus http://localhost:8529/modules/dav/
+-           RV=$?
+-           ./t/TEST -stop
+-        popd
+-    fi
++        # Log the OpenSSL version.
++        grep 'mod_ssl.*compiled against' t/logs/error_log | tail -n 1
++        
++        # Test various session cache backends
++        for cache in shmcb redis:localhost:6379 memcache:localhost:11211; do
++            test $RV -eq 0 || break
+ 
+-    if test $RV -ne 0 && test -f test/perl-framework/t/logs/error_log; then
+-        grep -v ':\(debug\|trace[12345678]\)\]' test/perl-framework/t/logs/error_log
+-    fi
++            SSL_SESSCACHE=$cache ./t/TEST -sslproto TLSv1.2 -defines TEST_SSL_SESSCACHE -start
++            ./t/TEST t/ssl
++            RV=$?
++            ./t/TEST -stop
++            SRV=$?
++            if test $RV -eq 0 -a $SRV -ne 0; then
++                RV=$SRV
++            fi
++        done
++    popd
++fi
+ 
+-    if test -v TEST_CORE -a $RV -eq 0; then
+-        # Run HTTP/2 tests.
+-        MPM=event py.test-3 test/modules/core
+-        RV=$?
+-    fi
++if test -v LITMUS -a $RV -eq 0; then
++    pushd test/perl-framework
++       mkdir -p t/htdocs/modules/dav
++       ./t/TEST -start
++       # litmus uses $TESTS, so unset it.
++       unset TESTS
++       litmus http://localhost:8529/modules/dav/
++       RV=$?
++       ./t/TEST -stop
++    popd
++fi
+ 
+-    if test -v TEST_H2 -a $RV -eq 0; then
+-        # Build the test clients
+-        (cd test/clients && make)
+-        # Run HTTP/2 tests.
+-        MPM=event py.test-3 test/modules/http2
+-        RV=$?
+-        if test $RV -eq 0; then
+-          MPM=worker py.test-3 test/modules/http2
+-          RV=$?
+-        fi
+-    fi
++if test $RV -ne 0 && test -f test/perl-framework/t/logs/error_log; then
++    grep -v ':\(debug\|trace[12345678]\)\]' test/perl-framework/t/logs/error_log
++fi
+ 
+-    if test -v TEST_MD -a $RV -eq 0; then
+-        # Run ACME tests.
+-        # need the go based pebble as ACME test server
+-        # which is a package on debian sid, but not on focal
+-        export GOPATH=${PREFIX}/gocode
+-        mkdir -p "${GOPATH}"
+-        export PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
+-        go get -u github.com/letsencrypt/pebble/...
+-        (cd $GOPATH/src/github.com/letsencrypt/pebble && go install ./...)
++if test -v TEST_CORE -a $RV -eq 0; then
++    # Run HTTP/2 tests.
++    MPM=event py.test-3 test/modules/core
++    RV=$?
++fi
+ 
+-        py.test-3 test/modules/md
+-        RV=$?
++if test -v TEST_H2 -a $RV -eq 0; then
++    # Build the test clients
++    (cd test/clients && make)
++    # Run HTTP/2 tests.
++    MPM=event py.test-3 test/modules/http2
++    RV=$?
++    if test $RV -eq 0; then
++      MPM=worker py.test-3 test/modules/http2
++      RV=$?
+     fi
++fi
+ 
+-    # Catch cases where abort()s get logged to stderr by libraries but
+-    # only cause child processes to terminate e.g. during shutdown,
+-    # which may not otherwise trigger test failures.
+-
+-    # "glibc detected": printed with LIBC_FATAL_STDERR_/MALLOC_CHECK_
+-    # glibc will abort when malloc errors are detected.  This will get
+-    # caught by the segfault grep as well.
+-
+-    # "pool concurrency check": printed by APR built with
+-    # --enable-thread-debug when an APR pool concurrency check aborts
+-
+-    for phrase in 'Segmentation fault' 'glibc detected' 'pool concurrency check:' 'Assertion.*failed'; do
+-        # Ignore IO/debug logs
+-        if grep -v ':\(debug\|trace[12345678]\)\]' test/perl-framework/t/logs/error_log | grep -q "$phrase"; then
+-            grep --color=always -C5 "$phrase" test/perl-framework/t/logs/error_log
+-            RV=2
+-        fi
+-    done
++if test -v TEST_MD -a $RV -eq 0; then
++    # Run ACME tests.
++    # need the go based pebble as ACME test server
++    # which is a package on debian sid, but not on focal
++    export GOPATH=${PREFIX}/gocode
++    mkdir -p "${GOPATH}"
++    export PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
++    go get -u github.com/letsencrypt/pebble/...
++    (cd $GOPATH/src/github.com/letsencrypt/pebble && go install ./...)
+ 
+-    if test -v TEST_UBSAN && test -n "`ls ubsan.log.* 2>/dev/null`"; then
+-        cat ubsan.log.*
+-        RV=3
+-    fi
++    py.test-3 test/modules/md
++    RV=$?
++fi
+ 
+-    if test -v TEST_ASAN && test -n "`ls asan.log.* 2>/dev/null`"; then
+-        cat asan.log.*
++# Catch cases where abort()s get logged to stderr by libraries but
++# only cause child processes to terminate e.g. during shutdown,
++# which may not otherwise trigger test failures.
++
++# "glibc detected": printed with LIBC_FATAL_STDERR_/MALLOC_CHECK_
++# glibc will abort when malloc errors are detected.  This will get
++# caught by the segfault grep as well.
++
++# "pool concurrency check": printed by APR built with
++# --enable-thread-debug when an APR pool concurrency check aborts
++
++for phrase in 'Segmentation fault' 'glibc detected' 'pool concurrency check:' 'Assertion.*failed'; do
++    # Ignore IO/debug logs
++    if grep -v ':\(debug\|trace[12345678]\)\]' test/perl-framework/t/logs/error_log | grep -q "$phrase"; then
++        grep --color=always -C5 "$phrase" test/perl-framework/t/logs/error_log
++        RV=2
++    fi
++done
++
++if test -v TEST_UBSAN && test -n "`ls ubsan.log.* 2>/dev/null`"; then
++    cat ubsan.log.*
++    RV=3
++fi
+ 
+-        # ASan can report memory leaks, fail on errors only
+-        if grep -q "ERROR: AddressSanitizer:" `ls asan.log.*`; then
+-            RV=4
+-        fi
++if test -v TEST_ASAN && test -n "`ls asan.log.* 2>/dev/null`"; then
++    cat asan.log.*
++
++    # ASan can report memory leaks, fail on errors only
++    if grep -q "ERROR: AddressSanitizer:" `ls asan.log.*`; then
++        RV=4
+     fi
++fi
+ 
+-    for core in `ls test/perl-framework/t/core{,.*} test/gen/apache/core{,.*} 2>/dev/null`; do
+-        gdb -ex 'thread apply all backtrace full' -batch ./httpd "$core"
+-        RV=5
+-    done
++for core in `ls test/perl-framework/t/core{,.*} test/gen/apache/core{,.*} 2>/dev/null`; do
++    gdb -ex 'thread apply all backtrace full' -batch ./httpd "$core"
++    RV=5
++done
+ 
+-    exit $RV
+-fi
++exit $RV
