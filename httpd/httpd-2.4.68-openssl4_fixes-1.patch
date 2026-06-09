@@ -1,0 +1,33 @@
+Submitted By:            Douglas R. Reno <renodr at linuxfromscratch dot org>
+Date:                    2026-05-12
+Initial Package Version: 2.4.67
+Upstream Status:         Pending
+Origin:                  Upstream PR#642
+Description:             Fixes building httpd-2.4.67 with OpenSSL-4 by making
+                         several adaptations to ASN1_*/X509_* usage.
+Updated by:              Joe Locash <jlocash at gmail dot com>
+Date:                    2026-06-09
+Description:             Remove hunks applied upstream
+
+diff --git a/modules/md/md_ocsp.c b/modules/md/md_ocsp.c
+index b44458676f7..be98be59821 100644
+--- a/modules/md/md_ocsp.c
++++ b/modules/md/md_ocsp.c
+@@ -533,13 +533,13 @@ static const char *certid_summary(const OCSP_CERTID *certid, apr_pool_t *p)
+     serial = issuer = key = "???";
+     OCSP_id_get0_info(&aname_hash, &amd_nid, &akey_hash, &aserial, (OCSP_CERTID*)certid);
+     if (aname_hash) {
+-        data.len = (apr_size_t)aname_hash->length;
+-        data.data = (const char*)aname_hash->data;
++        data.len = (apr_size_t)ASN1_STRING_length(aname_hash);
++        data.data = (const char*)ASN1_STRING_get0_data(aname_hash);
+         md_data_to_hex(&issuer, 0, p, &data);
+     }
+     if (akey_hash) {
+-        data.len = (apr_size_t)akey_hash->length;
+-        data.data = (const char*)akey_hash->data;
++        data.len = (apr_size_t)ASN1_STRING_length(akey_hash);
++        data.data = (const char*)ASN1_STRING_get0_data(akey_hash);
+         md_data_to_hex(&key, 0, p, &data);
+     }
+     if (aserial) {
