@@ -389,3 +389,32 @@ index 98d5108e6..701c63b96 100644
 -- 
 GitLab
 
+From 84ce43ebf7706b4cd0d5b765ce973a627ae7b5ef Mon Sep 17 00:00:00 2001
+From: Peter Bloomfield <PeterBloomfield@bellsouth.net>
+Date: Sun, 31 May 2026 15:54:57 -0400
+Subject: [PATCH] rfc2445: Normalize event duration
+
+In libical-4, icalcomponent_get_duration() may return an icaldurationtype
+structure with only the seconds member non-zero, which is presumably why
+there is now icaldurationtype_normalize(); so use it.
+---
+ libbalsa/rfc2445.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libbalsa/rfc2445.c b/libbalsa/rfc2445.c
+index 701c63b96..50132757d 100644
+--- a/libbalsa/rfc2445.c
++++ b/libbalsa/rfc2445.c
+@@ -1293,6 +1293,9 @@ vcalendar_extract(const gchar *vcal_buf)
+ 			if (icaldurationtype_is_bad_duration(event->duration)) {
+ 				event->duration = icaldurationtype_null_duration();
+ 			}
++#if ICAL_CHECK_VERSION(4, 0, 0)
++                        event->duration = icaldurationtype_normalize(event->duration);
++#endif /* ICAL_CHECK_VERSION(4, 0, 0) */
+ 
+ 			/* RECURRENCE-ID */
+ 			event->recurrence_id = icalcomponent_get_recurrenceid(item);
+-- 
+GitLab
+
