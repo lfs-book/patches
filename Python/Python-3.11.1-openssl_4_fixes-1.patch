@@ -1,0 +1,276 @@
+Submitted By:            Pierre Labastie <pierre dot labastie at neuf dot fr>
+Date:                    2026-06-13
+Initial Package Version: 3.11.1
+Upstream Status:         Not applicable
+Origin:                  Patch for 3.14.5, rediffed for 3.11.3
+Description:             This is a quick and dirty patch that allows
+                         building the _ssl module with 3.11.3. Seamonkey
+                         can be built too, and this is enough
+
+diff -Naur a/Lib/test/test_ssl.py b/Lib/test/test_ssl.py
+--- a/Lib/test/test_ssl.py	2022-12-06 20:05:27.000000000 +0100
++++ b/Lib/test/test_ssl.py	2026-06-12 16:02:29.106150663 +0200
+@@ -337,7 +337,7 @@
+         ssl.OP_NO_COMPRESSION
+         self.assertEqual(ssl.HAS_SNI, True)
+         self.assertEqual(ssl.HAS_ECDH, True)
+-        self.assertEqual(ssl.HAS_TLSv1_2, True)
++        self.assertIsInstance(ssl.HAS_TLSv1_2, bool)
+         self.assertEqual(ssl.HAS_TLSv1_3, True)
+         ssl.OP_NO_SSLv2
+         ssl.OP_NO_SSLv3
+@@ -524,11 +524,11 @@
+         # Some sanity checks follow
+         # >= 1.1.1
+         self.assertGreaterEqual(n, 0x10101000)
+-        # < 4.0
+-        self.assertLess(n, 0x40000000)
++        # < 5.0
++        self.assertLess(n, 0x50000000)
+         major, minor, fix, patch, status = t
+         self.assertGreaterEqual(major, 1)
+-        self.assertLess(major, 4)
++        self.assertLess(major, 5)
+         self.assertGreaterEqual(minor, 0)
+         self.assertLess(minor, 256)
+         self.assertGreaterEqual(fix, 0)
+@@ -594,12 +594,14 @@
+             ssl.OP_NO_TLSv1_2,
+             ssl.OP_NO_TLSv1_3
+         ]
+-        protocols = [
+-            ssl.PROTOCOL_TLSv1,
+-            ssl.PROTOCOL_TLSv1_1,
+-            ssl.PROTOCOL_TLSv1_2,
+-            ssl.PROTOCOL_TLS
+-        ]
++        protocols = []
++        if hasattr(ssl, 'PROTOCOL_TLSv1'):
++            protocols.append(ssl.PROTOCOL_TLSv1)
++        if hasattr(ssl, 'PROTOCOL_TLSv1_1'):
++            protocols.append(ssl.PROTOCOL_TLSv1_1)
++        if hasattr(ssl, 'PROTOCOL_TLSv1_2'):
++            protocols.append(ssl.PROTOCOL_TLSv1_2)
++        protocols.append(ssl.PROTOCOL_TLS)
+         versions = [
+             ssl.TLSVersion.SSLv3,
+             ssl.TLSVersion.TLSv1,
+@@ -1304,7 +1306,7 @@
+         ctx.maximum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+         self.assertIn(
+             ctx.maximum_version,
+-            {ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_1, ssl.TLSVersion.SSLv3}
++            {ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_1, ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3, ssl.TLSVersion.SSLv3}
+         )
+ 
+         ctx.minimum_version = ssl.TLSVersion.MAXIMUM_SUPPORTED
+@@ -1316,7 +1318,7 @@
+         with self.assertRaises(ValueError):
+             ctx.minimum_version = 42
+ 
+-        if has_tls_protocol(ssl.PROTOCOL_TLSv1_1):
++        if has_tls_protocol('PROTOCOL_TLSv1_1'):
+             ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_1)
+ 
+             self.assertIn(
+@@ -1731,23 +1733,25 @@
+         self.assertFalse(ctx.check_hostname)
+         self._assert_context_options(ctx)
+ 
+-        if has_tls_protocol(ssl.PROTOCOL_TLSv1):
++        if has_tls_protocol('PROTOCOL_TLSv1'):
+             with warnings_helper.check_warnings():
+                 ctx = ssl._create_stdlib_context(ssl.PROTOCOL_TLSv1)
+             self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+             self.assertEqual(ctx.verify_mode, ssl.CERT_NONE)
+             self._assert_context_options(ctx)
+ 
+-        with warnings_helper.check_warnings():
+-            ctx = ssl._create_stdlib_context(
+-                ssl.PROTOCOL_TLSv1_2,
+-                cert_reqs=ssl.CERT_REQUIRED,
+-                check_hostname=True
+-            )
+-        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1_2)
+-        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+-        self.assertTrue(ctx.check_hostname)
+-        self._assert_context_options(ctx)
++        if has_tls_protocol('PROTOCOL_TLSv1_2'):
++            with warnings_helper.check_warnings():
++                ctx = ssl._create_stdlib_context(
++                    ssl.PROTOCOL_TLSv1_2,
++                    cert_reqs=ssl.CERT_REQUIRED,
++                    check_hostname=True
++                )
++            self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1_2)
++            self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
++            self.assertTrue(ctx.check_hostname)
++            self._assert_context_options(ctx)
++
+ 
+         ctx = ssl._create_stdlib_context(purpose=ssl.Purpose.CLIENT_AUTH)
+         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLS_SERVER)
+@@ -3473,10 +3477,10 @@
+                            client_options=ssl.OP_NO_TLSv1_2)
+ 
+         try_protocol_combo(ssl.PROTOCOL_TLS, ssl.PROTOCOL_TLSv1_2, 'TLSv1.2')
+-        if has_tls_protocol(ssl.PROTOCOL_TLSv1):
++        if has_tls_protocol('PROTOCOL_TLSv1'):
+             try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1, False)
+             try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLSv1_2, False)
+-        if has_tls_protocol(ssl.PROTOCOL_TLSv1_1):
++        if has_tls_protocol('PROTOCOL_TLSv1_1'):
+             try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1_1, False)
+             try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1_2, False)
+ 
+diff -Naur a/Modules/_ssl/cert.c b/Modules/_ssl/cert.c
+--- a/Modules/_ssl/cert.c	2022-12-06 20:05:27.000000000 +0100
++++ b/Modules/_ssl/cert.c	2026-06-12 16:02:29.140497678 +0200
+@@ -128,7 +128,8 @@
+ }
+ 
+ static PyObject*
+-_x509name_print(_sslmodulestate *state, X509_NAME *name, int indent, unsigned long flags)
++_x509name_print(_sslmodulestate *state, const X509_NAME *name,
++                int indent, unsigned long flags)
+ {
+     PyObject *res;
+     BIO *biobuf;
+diff -Naur a/Modules/_ssl.c b/Modules/_ssl.c
+--- a/Modules/_ssl.c	2022-12-06 20:05:27.000000000 +0100
++++ b/Modules/_ssl.c	2026-06-12 16:06:54.489761422 +0200
+@@ -120,6 +120,17 @@
+ #include "_ssl_data.h"
+ #endif
+ 
++#if (OPENSSL_VERSION_NUMBER >= 0x40000000L)
++#  define OPENSSL_NO_SSL3
++#  define OPENSSL_NO_TLS1
++#  define OPENSSL_NO_TLS1_1
++#  define OPENSSL_NO_TLS1_2
++#  define OPENSSL_NO_SSL3_METHOD
++#  define OPENSSL_NO_TLS1_METHOD
++#  define OPENSSL_NO_TLS1_1_METHOD
++#  define OPENSSL_NO_TLS1_2_METHOD
++#endif
++
+ /* OpenSSL API 1.1.0+ does not include version methods */
+ #ifndef OPENSSL_NO_SSL3_METHOD
+ extern const SSL_METHOD *SSLv3_method(void);
+@@ -1045,7 +1056,7 @@
+ 
+ static PyObject *
+ _create_tuple_for_attribute(_sslmodulestate *state,
+-                            ASN1_OBJECT *name, ASN1_STRING *value)
++                            const ASN1_OBJECT *name, const ASN1_STRING *value)
+ {
+     Py_ssize_t buflen;
+     PyObject *pyattr;
+@@ -1074,16 +1085,16 @@
+ }
+ 
+ static PyObject *
+-_create_tuple_for_X509_NAME (_sslmodulestate *state, X509_NAME *xname)
++_create_tuple_for_X509_NAME (_sslmodulestate *state, const X509_NAME *xname)
+ {
+     PyObject *dn = NULL;    /* tuple which represents the "distinguished name" */
+     PyObject *rdn = NULL;   /* tuple to hold a "relative distinguished name" */
+     PyObject *rdnt;
+     PyObject *attr = NULL;   /* tuple to hold an attribute */
+     int entry_count = X509_NAME_entry_count(xname);
+-    X509_NAME_ENTRY *entry;
+-    ASN1_OBJECT *name;
+-    ASN1_STRING *value;
++    const X509_NAME_ENTRY *entry;
++    const ASN1_OBJECT *name;
++    const ASN1_STRING *value;
+     int index_counter;
+     int rdn_level = -1;
+     int retcode;
+@@ -1322,15 +1333,15 @@
+                 }
+                 PyTuple_SET_ITEM(t, 0, v);
+ 
+-                if (name->d.ip->length == 4) {
+-                    unsigned char *p = name->d.ip->data;
++                if (ASN1_STRING_length(name->d.ip) == 4) {
++                    const unsigned char *p = ASN1_STRING_get0_data(name->d.ip);
+                     v = PyUnicode_FromFormat(
+                         "%d.%d.%d.%d",
+                         p[0], p[1], p[2], p[3]
+                     );
+-                } else if (name->d.ip->length == 16) {
++                } else if (ASN1_STRING_length(name->d.ip) == 16) {
+                     /* PyUnicode_FromFormat() does not support %X */
+-                    unsigned char *p = name->d.ip->data;
++                    const unsigned char *p = ASN1_STRING_get0_data(name->d.ip);
+                     len = sprintf(
+                         buf,
+                         "%X:%X:%X:%X:%X:%X:%X:%X",
+@@ -1463,8 +1474,8 @@
+             continue;
+         }
+         uri = ad->location->d.uniformResourceIdentifier;
+-        ostr = PyUnicode_FromStringAndSize((char *)uri->data,
+-                                           uri->length);
++        ostr = PyUnicode_FromStringAndSize((char *)ASN1_STRING_get0_data(uri),
++                                           ASN1_STRING_length(uri));
+         if (ostr == NULL) {
+             goto fail;
+         }
+@@ -1530,8 +1541,8 @@
+                 continue;
+             }
+             uri = gn->d.uniformResourceIdentifier;
+-            ouri = PyUnicode_FromStringAndSize((char *)uri->data,
+-                                               uri->length);
++            ouri = PyUnicode_FromStringAndSize((char *)ASN1_STRING_get0_data(uri),
++                                               ASN1_STRING_length(uri));
+             if (ouri == NULL)
+                 goto done;
+ 
+@@ -5864,12 +5875,18 @@
+                             PY_SSL_VERSION_TLS_CLIENT);
+     PyModule_AddIntConstant(m, "PROTOCOL_TLS_SERVER",
+                             PY_SSL_VERSION_TLS_SERVER);
++#ifndef OPENSSL_NO_TLS1
+     PyModule_AddIntConstant(m, "PROTOCOL_TLSv1",
+                             PY_SSL_VERSION_TLS1);
++#endif
++#ifndef OPENSSL_NO_TLS1_1
+     PyModule_AddIntConstant(m, "PROTOCOL_TLSv1_1",
+                             PY_SSL_VERSION_TLS1_1);
++#endif
++#ifndef OPENSSL_NO_TLS1_2
+     PyModule_AddIntConstant(m, "PROTOCOL_TLSv1_2",
+                             PY_SSL_VERSION_TLS1_2);
++#endif
+ 
+     /* protocol options */
+     PyModule_AddIntConstant(m, "OP_ALL",
+diff -Naur a/Tools/ssl/multissltests.py b/Tools/ssl/multissltests.py
+--- a/Tools/ssl/multissltests.py	2022-12-06 20:05:27.000000000 +0100
++++ b/Tools/ssl/multissltests.py	2026-06-12 16:02:29.142603249 +0200
+@@ -405,9 +405,11 @@
+     def _post_install(self):
+         if self.version.startswith("3.0"):
+             self._post_install_300()
++        if self.version.startswith("4.0"):
++            self._post_install_400()
+ 
+     def _build_src(self, config_args=()):
+-        if self.version.startswith("3.0"):
++        if self.version.startswith("3.0","4.0"):
+             config_args += ("enable-fips",)
+         super()._build_src(config_args)
+ 
+@@ -423,6 +425,9 @@
+             lib64 = self.lib_dir + "64"
+             os.symlink(lib64, self.lib_dir)
+ 
++    def _post_install_400(self):
++        self._post_install_300()
++
+     @property
+     def short_version(self):
+         """Short version for OpenSSL download URL"""
