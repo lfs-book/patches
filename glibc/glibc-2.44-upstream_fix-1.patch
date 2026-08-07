@@ -26,24 +26,11 @@ Reported-by: Michael Brunnbauer <brunni@netestate.de>
 
 (cherry picked from commit b01abba04a954cbd6b2834c0643a08685a915fe5)
 ---
- NEWS                                      | 1 +
  sysdeps/ieee754/dbl-64/s_tanh.c           | 2 ++
  sysdeps/x86_64/fpu/multiarch/s_tanh-fma.c | 6 ------
  sysdeps/x86_64/fpu/multiarch/s_tanh.c     | 5 ++---
  4 files changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/NEWS b/NEWS
-index fe2b1d7f79..43667c1963 100644
---- a/NEWS
-+++ b/NEWS
-@@ -11,6 +11,7 @@ The following bugs are resolved with this release:
- 
-   [34441] math: math: sinh() returns wrong results for some inputs with
-     |x| > 36.736801
-+  [34465] math: math: x86_64 tanh ifunc selection wrong
- 
- Version 2.44
- 
 diff --git a/sysdeps/ieee754/dbl-64/s_tanh.c b/sysdeps/ieee754/dbl-64/s_tanh.c
 index 2029de8fa5..ef80b9edb6 100644
 --- a/sysdeps/ieee754/dbl-64/s_tanh.c
