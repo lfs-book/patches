@@ -1,0 +1,108 @@
+Submitted by:            Xi Ruoyao <xry111@xry111.site>
+Date:                    2026-09-05
+Initial Package Version: Firefox 153.2.0 (also applicable for SpiderMonkey
+                         140.14.0 and Thunderbird 153.2.0)
+Upstream Status:         Applied in tip but not the ESR branches
+Origin:                  mozilla-central commit 8df170d41a0b (test suite
+                         change removed for applying to SpiderMonkey)
+                         harfbuzz commit 5e887d36722a (synced into mozilla-
+                         central at commit b71906b223a6, the change removing
+                         a previous incorrect change removed)
+Description:             Allow building firefox with clang 23 and rustc 1.98
+
+diff --git a/build/moz.configure/rust.configure b/build/moz.configure/rust.configure
+--- a/build/moz.configure/rust.configure
++++ b/build/moz.configure/rust.configure
+@@ -293,16 +293,20 @@ def detect_rustc_target(host_or_target, 
+     )
+ 
+     def find_candidate(candidates):
+         if len(candidates) == 1:
+             return candidates[0].rust_target
+         elif not candidates:
+             return None
+ 
++        # config.guess uses the "pc" vendor for x86/x86_64 where rust uses its
++        # generic "unknown" vendor; normalize so we correlate on the right one.
++        vendor = "unknown" if host_or_target.vendor == "pc" else host_or_target.vendor
++
+         # We have multiple candidates. There are two cases where we can try to
+         # narrow further down using extra information from the build system.
+         # - For windows targets, correlate with the C compiler type
+         if host_or_target.kernel == "WINNT":
+             if host_or_target.abi:
+                 if host_or_target.abi == "msvc":
+                     suffix = "windows-msvc"
+                 elif host_or_target.abi == "mingw":
+@@ -355,21 +359,29 @@ def detect_rustc_target(host_or_target, 
+             # hard-float, this will pick a wrong target, but since rust only
+             # supports hard-float, let's assume that means freebsd only support
+             # hard-float.
+             if arm_target.float_abi == "hard" and host_or_target.os != "FreeBSD":
+                 suffix = "hf"
+             else:
+                 suffix = ""
+             for p in prefixes:
+-                for c in candidates:
+-                    if c.rust_target.startswith(
+-                        "{}-".format(p)
+-                    ) and c.rust_target.endswith(suffix):
++                matches = [
++                    c
++                    for c in candidates
++                    if c.rust_target.startswith("{}-".format(p))
++                    and c.rust_target.endswith(suffix)
++                ]
++                if not matches:
++                    continue
++                # As below, correlate on the (normalized) vendor.
++                for c in matches:
++                    if c.target.vendor == vendor:
+                         return c.rust_target
++                return matches[0].rust_target
+ 
+         # See if we can narrow down on the exact alias.
+         # We use the sub_configure_alias to keep support mingw32 triplets as input.
+         narrowed = [
+             c
+             for c in candidates
+             if c.target.sub_configure_alias == host_or_target.sub_configure_alias
+         ]
+@@ -388,16 +400,25 @@ def detect_rustc_target(host_or_target, 
+         # The wasm32-wasi target was renamed to wasm32-wasip1
+         if host_or_target.raw_os == "wasi":
+             narrowed = [c for c in candidates if c.target.raw_os == "wasip1"]
+             if len(narrowed) == 1:
+                 return narrowed[0].rust_target
+             elif narrowed:
+                 candidates = narrowed
+ 
++        # Correlate on the (normalized) vendor, so vendor-specific targets (e.g.
++        # the *-oe-linux-gnu targets added in rust 1.98) don't shadow the
++        # generic ones for aliases whose vendor doesn't match a rust target.
++        narrowed = [c for c in candidates if c.target.vendor == vendor]
++        if len(narrowed) == 1:
++            return narrowed[0].rust_target
++        elif narrowed:
++            candidates = narrowed
++
+         # See if we can narrow down with the raw OS and raw CPU
+         narrowed = [
+             c
+             for c in candidates
+             if c.target.raw_os == host_or_target.raw_os
+             and c.target.raw_cpu == host_or_target.raw_cpu
+         ]
+         if len(narrowed) == 1:
+
+diff --git a/src/hb.hh b/src/hb.hh
+index 2458c1b3ab1..5d7c45c7941 100644
+--- a/gfx/harfbuzz/src/hb.hh
++++ b/gfx/harfbuzz/src/hb.hh
+@@ -152,6 +151,7 @@
+ #pragma GCC diagnostic ignored "-Wrange-loop-analysis" // https://github.com/harfbuzz/harfbuzz/issues/2834
+ #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+ #pragma GCC diagnostic ignored "-Wtype-limits"
++#pragma GCC diagnostic ignored "-Wunused-template"
+ #pragma GCC diagnostic ignored "-Wc++11-compat" // only gcc raises it
+ #endif
